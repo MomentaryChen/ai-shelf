@@ -1,0 +1,77 @@
+{
+  "name": "ai-cli-inventory",
+  "version": "0.1.0",
+  "description": "Unified AI CLI inventory — see models, skills, MCP servers and configs across Claude, Copilot, Cursor",
+  "type": "module",
+  "main": "dist/electron/main.js",
+  "bin": {
+    "ai": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && vite build && node -e \"const fs=require('fs');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');\"",
+    "dev": "tsc --watch",
+    "dev:renderer": "vite",
+    "start": "node dist/cli.js",
+    "electron": "pnpm build && electron .",
+    "package:win": "pnpm build && pkg . --targets node22-win-x64 --output dist/ai-inventory.exe",
+    "dist:win": "pnpm build && electron-builder --win",
+    "test:e2e": "pnpm build && playwright test",
+    "gen-icon": "node scripts/gen-icon.mjs"
+  },
+  "build": {
+    "appId": "com.ai-cli-inventory",
+    "productName": "AI CLI Inventory",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/assets/icon.ico"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "src/assets/icon.ico"
+    }
+  },
+  "pkg": {
+    "targets": [
+      "node22-win-x64"
+    ],
+    "outputPath": "dist",
+    "assets": []
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "inventory",
+    "claude",
+    "copilot",
+    "cursor",
+    "mcp"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@playwright/test": "^1.59.1",
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/node": "^25.6.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@yao-pkg/pkg": "^6.19.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.8.1",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.11"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  }
+}
