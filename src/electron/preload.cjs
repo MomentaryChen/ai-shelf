@@ -2,6 +2,16 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   getInventory: () => ipcRenderer.invoke("get-inventory"),
+  startInventoryScan: () => ipcRenderer.invoke("start-inventory-scan"),
+  clearInventoryCache: () => ipcRenderer.invoke("clear-inventory-cache"),
+  onInventoryEntry: (cb) => ipcRenderer.on("inventory-entry", (_e, data) => cb(data)),
+  onInventoryEnriched: (cb) => ipcRenderer.on("inventory-enriched", (_e, data) => cb(data)),
+  onInventoryComplete: (cb) => ipcRenderer.on("inventory-complete", (_e, payload) => cb(payload)),
+  offInventoryListeners: () => {
+    ipcRenderer.removeAllListeners("inventory-entry");
+    ipcRenderer.removeAllListeners("inventory-enriched");
+    ipcRenderer.removeAllListeners("inventory-complete");
+  },
   runDoctor: () => ipcRenderer.invoke("run-doctor"),
   runDoctorTool: (tool) => ipcRenderer.invoke("doctor-tool", tool),
   checkUpdate: () => ipcRenderer.invoke("check-update"),
@@ -39,4 +49,13 @@ contextBridge.exposeInMainWorld("api", {
   },
   setDefaultModel: (tool, model) => ipcRenderer.invoke("set-default-model", tool, model),
   getEnvVars: () => ipcRenderer.invoke("get-env-vars"),
+  wsGetTree: () => ipcRenderer.invoke("ws-get-tree"),
+  wsWorkspaceCreate: (name, rootPath) => ipcRenderer.invoke("ws-workspace-create", name, rootPath),
+  wsGroupCreate: (workspace, group) => ipcRenderer.invoke("ws-group-create", workspace, group),
+  wsSessionCreate: (workspace, group, name, opts) =>
+    ipcRenderer.invoke("ws-session-create", workspace, group, name, opts),
+  wsSessionStop: (workspace, group, name) =>
+    ipcRenderer.invoke("ws-session-stop", workspace, group, name),
+  openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
+  openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
 });

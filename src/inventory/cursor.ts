@@ -1,9 +1,57 @@
-import type { ProviderEntry } from "./types.js";
+import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
 import { join } from "node:path";
 
-export async function detectCursor(): Promise<ProviderEntry> {
+const CURSOR_MODELS = [
+  "claude-3-5-sonnet-20241022",
+  "claude-3-5-haiku-20241022",
+  "claude-3-opus-20240229",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4-turbo",
+  "o1",
+  "o1-mini",
+  "o3-mini",
+  "gemini-1.5-pro-latest",
+  "gemini-2.0-flash",
+  "cursor-small",
+];
+
+async function fetchCursorModelIds(toolCmd: string, available: boolean): Promise<string[]> {
+  let models: string[] = [];
+  const apiKey = process.env["CURSOR_API_KEY"];
+  if (apiKey) {
+    try {
+      const res = await fetch("https://api.cursor.com/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (res.ok) {
+        const data = await res.json() as { data?: { id: string }[] };
+        models = (data.data ?? []).map((m) => m.id).filter(Boolean);
+      }
+    } catch { /* fall through */ }
+  }
+
+  if (models.length === 0 && available) {
+    const listResult = await run(toolCmd, ["--list-models"]);
+    if (listResult.ok) {
+      models = listResult.stdout
+        .split("\n")
+        .map((line) => line.split(" - ")[0].trim())
+        .filter((id) => id.length > 0 && id !== "Available models" && !id.startsWith("Tip:"));
+    }
+  }
+
+  return models.length > 0 ? models : CURSOR_MODELS;
+}
+
+function withDefaultModel(models: string[], model: string): string[] {
+  return models.includes(model) ? models : [model, ...models];
+}
+
+export async function detectCursor(opts: DetectOptions = {}): Promise<ProviderEntry> {
   // Probe all candidate commands in parallel; pick the first that responds
   const probes = await Promise.all(
     ["agent"].map((cmd) =>
@@ -60,53 +108,10 @@ export async function detectCursor(): Promise<ProviderEntry> {
     }
   }
 
-  const CURSOR_MODELS = [
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
-    "claude-3-opus-20240229",
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4-turbo",
-    "o1",
-    "o1-mini",
-    "o3-mini",
-    "gemini-1.5-pro-latest",
-    "gemini-2.0-flash",
-    "cursor-small",
-  ];
-
-  // Model switching not supported; always use "auto"
   const model = "auto";
-
-  // Fetch live model list: API first, then CLI, then static fallback
-  let models: string[] = [];
-
-  try {
-    const apiKey = process.env["CURSOR_API_KEY"];
-    const res = await fetch("https://api.cursor.com/v1/models", {
-      headers: apiKey ? { "Authorization": `Bearer ${apiKey}` } : {},
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (res.ok) {
-      const data = await res.json() as { data?: { id: string }[] };
-      models = (data.data ?? []).map((m) => m.id).filter(Boolean);
-    }
-  } catch { /* fall through */ }
-
-  if (models.length === 0 && available) {
-    const listResult = await run(toolCmd, ["--list-models"]);
-    if (listResult.ok) {
-      models = listResult.stdout
-        .split("\n")
-        .map((line) => line.split(" - ")[0].trim())
-        .filter((id) => id.length > 0 && id !== "Available models" && !id.startsWith("Tip:"));
-    }
-  }
-
-  if (models.length === 0) models = CURSOR_MODELS;
-
-  // Ensure the current model is always present in the list (e.g. "auto")
-  if (!models.includes(model)) models = [model, ...models];
+  const models = opts.quick
+    ? CURSOR_MODELS
+    : withDefaultModel(await fetchCursorModelIds(toolCmd, available), model);
 
   return {
     tool: toolCmd,
@@ -135,4 +140,16 @@ export async function detectCursor(): Promise<ProviderEntry> {
       ],
     },
   };
+}
+
+/** Lightweight enrich: remote model list only. */
+export async function fetchCursorModelsForEntry(
+  entry: ProviderEntry,
+): Promise<Pick<ProviderEntry, "models" | "model">> {
+  const toolCmd = entry.tool === "cursor" ? "agent" : entry.tool;
+  const model = entry.model ?? "auto";
+  const fetched = await fetchCursorModelIds(toolCmd, entry.available);
+  const base =
+    fetched.length > 0 ? fetched : (entry.models?.length ? entry.models : CURSOR_MODELS);
+  return { models: withDefaultModel(base, model), model };
 }

@@ -9,5 +9,13 @@ export default defineConfig({
   build: {
     outDir: "../../dist/renderer",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("@xterm")) return "xterm";
+          if (id.includes("node_modules/react")) return "react";
+        },
+      },
+    },
   },
 });

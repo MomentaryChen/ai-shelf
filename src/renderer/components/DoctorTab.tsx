@@ -7,18 +7,29 @@ import { toolIcon, toolLabel } from "../utils";
 export function DoctorTab({ data }: { data: ProviderEntry[] }) {
   const [results, setResults] = useState<Record<string, DoctorResult>>({});
 
+  const toolIds = data.map((e) => e.tool).join("\0");
+
   useEffect(() => {
     setResults({});
-    // Fire each tool check independently in parallel — cards update as each resolves
-    data.forEach(({ tool }) => {
-      window.api.runDoctorTool(tool)
-        .then((res) => setResults((prev) => ({ ...prev, [tool]: res })))
-        .catch(() => setResults((prev) => ({
-          ...prev,
-          [tool]: { tool, checks: [{ name: "error", status: "fail", detail: "Check failed unexpectedly" }] },
-        })));
-    });
-  }, [data]);
+    let cancelled = false;
+    // Fire each tool check in parallel — cards update as each resolves
+    void Promise.all(
+      data.map(async ({ tool }) => {
+        try {
+          const res = await window.api.runDoctorTool(tool);
+          if (!cancelled) setResults((prev) => ({ ...prev, [tool]: res }));
+        } catch {
+          if (!cancelled) {
+            setResults((prev) => ({
+              ...prev,
+              [tool]: { tool, checks: [{ name: "error", status: "fail", detail: "Check failed unexpectedly" }] },
+            }));
+          }
+        }
+      }),
+    );
+    return () => { cancelled = true; };
+  }, [toolIds]);
 
   return (
     <>

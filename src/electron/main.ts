@@ -3,10 +3,22 @@ import { join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
-import * as pty from "node-pty";
-import { detectAll } from "../inventory/index.js";
+import {
+  detectAll,
+  detectTool,
+  enrichEntryModels,
+  shouldEnrichModels,
+  DETECTORS,
+} from "../inventory/index.js";
+import type { ProviderEntry } from "../inventory/types.js";
+import { sortProviderEntries } from "../tool-sort.js";
 import { run } from "../utils/exec.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
+import {
+  getWorkspaceContext,
+  closeWorkspaceContext,
+  getWorkspaceTree,
+} from "./workspace-host.js";
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> = {
@@ -28,35 +40,170 @@ const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; 
 };
 
 let mainWindow: BrowserWindow | null = null;
+let chatWindow: BrowserWindow | null = null;
+let settingsWindow: BrowserWindow | null = null;
+
+const RENDERER_HTML = join(import.meta.dirname, "..", "renderer", "index.html");
+const APP_ICON = join(import.meta.dirname, "..", "assets", "icon.ico");
+
+const sharedWebPreferences = {
+  preload: join(import.meta.dirname, "preload.cjs"),
+  contextIsolation: true,
+  nodeIntegration: false,
+} as const;
+
+const INVENTORY_CACHE_TTL_MS = 30_000;
+let inventoryCache: { at: number; entries: ProviderEntry[] } | null = null;
+
+type PtyModule = typeof import("node-pty");
+let ptyModule: PtyModule | null = null;
+
+async function getPty(): Promise<PtyModule> {
+  if (!ptyModule) ptyModule = await import("node-pty");
+  return ptyModule;
+}
+
+function getCachedInventory(): ProviderEntry[] | null {
+  if (inventoryCache && Date.now() - inventoryCache.at < INVENTORY_CACHE_TTL_MS) {
+    return inventoryCache.entries;
+  }
+  return null;
+}
+
+function setInventoryCache(entries: ProviderEntry[]) {
+  inventoryCache = { at: Date.now(), entries };
+}
+
+function mergeInventoryEntry(entries: ProviderEntry[], entry: ProviderEntry): ProviderEntry[] {
+  const i = entries.findIndex((e) => e.tool === entry.tool);
+  if (i >= 0) {
+    const next = [...entries];
+    next[i] = entry;
+    return sortProviderEntries(next);
+  }
+  return sortProviderEntries([...entries, entry]);
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 750,
-    minWidth: 800,
-    minHeight: 500,
+    width: 1200,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
     title: "AI CLI Inventory",
-    icon: join(import.meta.dirname, "..", "assets", "icon.ico"),
-    webPreferences: {
-      preload: join(import.meta.dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    icon: APP_ICON,
+    webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
 
-  mainWindow.loadFile(join(import.meta.dirname, "..", "renderer", "index.html"));
+  mainWindow.loadFile(RENDERER_HTML);
 
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
 
+function createChatWindow() {
+  if (chatWindow && !chatWindow.isDestroyed()) {
+    chatWindow.focus();
+    return;
+  }
+  chatWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    title: "AI Terminal",
+    icon: APP_ICON,
+    webPreferences: sharedWebPreferences,
+    autoHideMenuBar: true,
+    backgroundColor: "#0f172a",
+  });
+  chatWindow.loadFile(RENDERER_HTML, { hash: "chat" });
+  chatWindow.on("closed", () => {
+    chatWindow = null;
+  });
+}
+
+function createSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
+    width: 520,
+    height: 680,
+    minWidth: 440,
+    minHeight: 520,
+    title: "Terminal Settings",
+    icon: APP_ICON,
+    webPreferences: sharedWebPreferences,
+    autoHideMenuBar: true,
+    backgroundColor: "#0f172a",
+  });
+  settingsWindow.loadFile(RENDERER_HTML, { hash: "settings" });
+  settingsWindow.on("closed", () => {
+    settingsWindow = null;
+  });
+}
+
+ipcMain.handle("open-chat-window", () => {
+  createChatWindow();
+});
+
+ipcMain.handle("open-settings-window", () => {
+  createSettingsWindow();
+});
+
 // IPC handlers
 ipcMain.handle("get-inventory", async () => {
-  const entries = await detectAll();
+  const cached = getCachedInventory();
+  if (cached) return cached;
+  const entries = await detectAll({ quick: true });
+  setInventoryCache(entries);
   return entries;
+});
+
+ipcMain.handle("start-inventory-scan", async (event) => {
+  const push = (channel: string, payload: unknown) => {
+    if (!event.sender.isDestroyed()) event.sender.send(channel, payload);
+  };
+
+  let entries: ProviderEntry[] = getCachedInventory() ?? [];
+  if (entries.length > 0) {
+    for (const entry of entries) push("inventory-entry", entry);
+  } else {
+    await Promise.all(
+      DETECTORS.map(async (detect) => {
+        try {
+          const entry = await detect({ quick: true });
+          entries = mergeInventoryEntry(entries, entry);
+          push("inventory-entry", entry);
+        } catch { /* skip failed detectors */ }
+      }),
+    );
+    setInventoryCache(entries);
+  }
+
+  const enrichCount = entries.filter(shouldEnrichModels).length;
+  push("inventory-complete", { count: enrichCount });
+
+  // Background: remote model lists only (tools with credentials or Cursor CLI)
+  void Promise.all(
+    entries.filter(shouldEnrichModels).map(async (entry) => {
+      try {
+        const enriched = await enrichEntryModels(entry);
+        entries = mergeInventoryEntry(entries, enriched);
+        setInventoryCache(entries);
+        push("inventory-enriched", enriched);
+      } catch { /* keep quick entry */ }
+    }),
+  );
+});
+
+ipcMain.handle("clear-inventory-cache", () => {
+  inventoryCache = null;
 });
 
 /** Shared: run doctor checks for a single inventory entry */
@@ -95,14 +242,21 @@ async function runChecksForEntry(entry: Awaited<ReturnType<typeof detectAll>>[nu
 }
 
 ipcMain.handle("run-doctor", async () => {
-  const entries = await detectAll();
+  const entries = getCachedInventory() ?? await detectAll({ quick: true });
+  if (!getCachedInventory()) setInventoryCache(entries);
   return Promise.all(entries.map(runChecksForEntry));
 });
 
 ipcMain.handle("doctor-tool", async (_event, tool: string) => {
-  const entries = await detectAll();
-  const entry = entries.find((e) => e.tool === tool);
-  if (!entry) return { tool, checks: [{ name: "error", status: "fail", detail: `Tool "${tool}" not found` }] };
+  let entry = getCachedInventory()?.find((e) => e.tool === tool);
+  if (!entry) {
+    const detected = await detectTool(tool, { quick: true });
+    if (!detected) {
+      return { tool, checks: [{ name: "error", status: "fail", detail: `Tool "${tool}" not found` }] };
+    }
+    entry = detected;
+    setInventoryCache(mergeInventoryEntry(getCachedInventory() ?? [], entry));
+  }
   return runChecksForEntry(entry);
 });
 
@@ -136,7 +290,6 @@ ipcMain.handle("get-env-vars", () => {
 /** npm package names for tools that can be version-checked */
 const TOOL_NPM_PACKAGE: Record<string, string> = {
   claude: "@anthropic-ai/claude-code",
-  "ai-cli-inventory": "ai-cli-inventory",
 };
 
 function fetchLatestNpmVersion(pkg: string): string | null {
@@ -160,20 +313,17 @@ ipcMain.handle("check-update", async () => {
     updateCommand: string;
   }[] = [];
 
-  // Fetch npm latest versions in parallel ahead of time
-  const npmPkgs = Object.entries(TOOL_NPM_PACKAGE);
   const latestVersionMap: Record<string, string | null> = {};
   await Promise.all(
-    npmPkgs.map(async ([tool, pkg]) => {
-      latestVersionMap[tool] = await new Promise((resolve) =>
-        resolve(fetchLatestNpmVersion(pkg))
-      );
-    })
+    Object.entries(TOOL_NPM_PACKAGE).map(async ([tool, pkg]) => {
+      latestVersionMap[tool] = fetchLatestNpmVersion(pkg);
+    }),
   );
 
   // Per-tool checks
   try {
-    const entries = await detectAll();
+    const entries = getCachedInventory() ?? await detectAll({ quick: true });
+    if (!getCachedInventory()) setInventoryCache(entries);
     for (const entry of entries) {
       const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
       results.push({
@@ -197,7 +347,7 @@ ipcMain.handle("check-update", async () => {
     tool: "ai-cli-inventory",
     label: "AI CLI Inventory (self)",
     currentVersion: selfVersion,
-    latestVersion: latestVersionMap["ai-cli-inventory"] ?? null,
+    latestVersion: null,
     available: true,
     updateCommand: detectSelfUpdateCmd(),
   });
@@ -216,20 +366,19 @@ ipcMain.handle("get-tools-list", async () => {
     updateCommand: string;
   }[] = [];
 
-  try {
-    const entries = await detectAll();
-    for (const entry of entries) {
-      const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
-      results.push({
-        tool: entry.tool,
-        label: cfg?.label ?? entry.provider,
-        currentVersion: entry.version ?? null,
-        latestVersion: null,
-        available: entry.available,
-        updateCommand: cfg ? cfg.update.join(" ") : "",
-      });
-    }
-  } catch { /* ok */ }
+  const entries = getCachedInventory() ?? await detectAll({ quick: true });
+  if (!getCachedInventory()) setInventoryCache(entries);
+  for (const entry of entries) {
+    const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
+    results.push({
+      tool: entry.tool,
+      label: cfg?.label ?? entry.provider,
+      currentVersion: entry.version ?? null,
+      latestVersion: null,
+      available: entry.available,
+      updateCommand: cfg ? cfg.update.join(" ") : "",
+    });
+  }
 
   let selfVersion = "unknown";
   try { selfVersion = app.getVersion(); } catch { /* ok */ }
@@ -272,16 +421,11 @@ ipcMain.handle("start-update-scan", async (event) => {
   push("tool-detected", selfEntry);
 
   // Detect each AI tool individually in parallel, push as each resolves
-  const { detectClaude } = await import("../inventory/claude.js");
-  const { detectCopilot } = await import("../inventory/copilot.js");
-  const { detectCursor } = await import("../inventory/cursor.js");
-
-  const detectors = [detectClaude, detectCopilot, detectCursor];
   const allTools: ToolInfo[] = [selfEntry];
 
-  await Promise.all(detectors.map(async (detect) => {
+  await Promise.all(DETECTORS.map(async (detect) => {
     try {
-      const entry = await detect();
+      const entry = await detect({ quick: true });
       const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
       const info: ToolInfo = {
         tool: entry.tool,
@@ -358,14 +502,14 @@ function readMcpServers(tool: string): McpServersMap {
 }
 
 ipcMain.handle("get-mcp-raw", async () => {
-  const result: Record<string, { servers: McpServersMap; configPath: string }> = {};
-  for (const tool of SYNC_TOOLS) {
-    result[tool] = {
+  const rows = await Promise.all(
+    SYNC_TOOLS.map(async (tool) => ({
+      tool,
       servers: readMcpServers(tool),
       configPath: getMcpConfigPath(tool),
-    };
-  }
-  return result;
+    })),
+  );
+  return Object.fromEntries(rows.map(({ tool, servers, configPath }) => [tool, { servers, configPath }]));
 });
 
 ipcMain.handle("sync-mcp", async (_event, opts: {
@@ -446,7 +590,7 @@ ipcMain.handle("open-path", async (_event, filePath: string) => {
 
 // --- PTY (In-App Terminal) ---
 
-const PTY_SESSIONS = new Map<string, ReturnType<typeof pty.spawn>>();
+const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
 
 ipcMain.handle("pick-folder", async (_event, defaultPath?: string) => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -456,7 +600,8 @@ ipcMain.handle("pick-folder", async (_event, defaultPath?: string) => {
   return canceled ? null : filePaths[0];
 });
 
-ipcMain.handle("pty-spawn", (event, tool: string, cwd?: string) => {
+ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string) => {
+  const pty = await getPty();
   const cmd = TOOL_LAUNCH_CMD[tool];
   if (!cmd) return { success: false, error: `Unknown tool: ${tool}` };
 
@@ -490,7 +635,7 @@ ipcMain.handle("pty-spawn", (event, tool: string, cwd?: string) => {
   };
 
   try {
-    let proc: ReturnType<typeof pty.spawn> | undefined;
+    let proc: import("node-pty").IPty | undefined;
 
     if (isWin) {
       for (const [sh, args] of windowsCandidates) {
@@ -654,6 +799,55 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
   }
 });
 
+// --- Workspace Manager ---
+
+ipcMain.handle("ws-get-tree", () => getWorkspaceTree());
+
+ipcMain.handle("ws-workspace-create", (_e, name: string, rootPath?: string) => {
+  try {
+    const ws = getWorkspaceContext().workspaceService.create(name, rootPath);
+    return { success: true, workspace: ws };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("ws-group-create", (_e, workspace: string, group: string) => {
+  try {
+    const g = getWorkspaceContext().groupService.create(workspace, group);
+    return { success: true, group: g };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle(
+  "ws-session-create",
+  async (
+    _e,
+    workspace: string,
+    group: string,
+    name: string,
+    opts?: { cwd?: string; tool?: string },
+  ) => {
+    try {
+      const s = await getWorkspaceContext().sessionService.create(workspace, group, name, opts);
+      return { success: true, session: s };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle("ws-session-stop", (_e, workspace: string, group: string, name: string) => {
+  try {
+    const s = getWorkspaceContext().sessionService.stop(workspace, group, name);
+    return { success: true, session: s };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
 app.whenReady().then(createWindow);
 
 // Kill all active PTY sessions before the app exits
@@ -662,6 +856,7 @@ app.on("before-quit", () => {
     try { proc.kill(); } catch { /* already dead */ }
   }
   PTY_SESSIONS.clear();
+  closeWorkspaceContext();
 });
 
 app.on("window-all-closed", () => {

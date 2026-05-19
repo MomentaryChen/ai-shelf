@@ -3,6 +3,7 @@ import type { ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { toolIcon } from "../utils";
+import { sortByDisplayName, toolDisplayName } from "../../tool-sort.js";
 
 export function UpdateTab() {
   const [tools, setTools] = useState<ToolUpdateInfo[]>([]);
@@ -25,9 +26,10 @@ export function UpdateTab() {
       if (abortRef.current) return;
       setTools((prev) => {
         const exists = prev.find((t) => t.tool === data.tool);
-        return exists
+        const next = exists
           ? prev.map((t) => (t.tool === data.tool ? { ...t, ...data } : t))
           : [...prev, data];
+        return sortByDisplayName(next, (t) => t.label || toolDisplayName(t.tool));
       });
       setCheckingLatest((prev) => new Set([...prev, data.tool]));
     });

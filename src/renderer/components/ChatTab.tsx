@@ -1,60 +1,25 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { ProviderEntry } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { toolLabel } from "../utils";
 import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-type ExternalTerminal = "auto" | "wt" | "pwsh" | "powershell" | "cmd";
-
-interface ChatSettings {
-  externalTerminal: ExternalTerminal;
-  terminalBg: string;
-  workingDir: string; // "" = home directory
-  dirHistory: string[];
-}
+import { WorkspaceSidebar, type WorkspaceSelection } from "./WorkspaceSidebar";
+import {
+  TERMINAL_OPTIONS,
+  getAppBg,
+  loadSettings,
+  saveSettings,
+  type ChatSettings,
+  type ExternalTerminal,
+  SETTINGS_KEY,
+} from "../chat-settings";
 
 interface PaneInfo {
   id: string;
   tool: string;
   sessionId: string;
 }
-
-// ─── Settings helpers ──────────────────────────────────────────────────────────
-
-const SETTINGS_KEY = "ai-inventory-chat-settings";
-
-function loadSettings(): ChatSettings {
-  try { return { externalTerminal: "auto", terminalBg: "#0c0c0c", workingDir: "", dirHistory: [], ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") }; }
-  catch { return { externalTerminal: "auto", terminalBg: "#0c0c0c", workingDir: "", dirHistory: [] }; }
-}
-
-function saveSettings(s: ChatSettings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-}
-
-/** Read the app's --color-bg-primary CSS variable as fallback */
-function getAppBg(): string {
-  return getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() || "#0f172a";
-}
-
-const BG_PRESETS = [
-  { label: "Windows Terminal", value: "#0c0c0c", preview: "#0c0c0c" },
-  { label: "App theme",        value: "",        preview: "var(--color-bg-primary)" },
-  { label: "Pure black",       value: "#000000", preview: "#000000" },
-  { label: "PowerShell blue",  value: "#012456", preview: "#012456" },
-  { label: "VS Code",          value: "#1e1e1e", preview: "#1e1e1e" },
-];
-
-const TERMINAL_OPTIONS: { value: ExternalTerminal; label: string }[] = [
-  { value: "auto",       label: "🔍 Auto detect" },
-  { value: "wt",         label: "🪟 Windows Terminal" },
-  { value: "pwsh",       label: "🔵 PowerShell 7+ (pwsh)" },
-  { value: "powershell", label: "💙 PowerShell 5 (built-in)" },
-  { value: "cmd",        label: "⬛ Command Prompt" },
-];
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
   claude:  "Anthropic coding agent — context-rich, file-aware sessions",
@@ -63,8 +28,9 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
 };
 
 
-export function ChatTab({ data }: { data: ProviderEntry[] }) {
+export function ChatTab({ data, active = true }: { data: ProviderEntry[]; active?: boolean }) {
   const [panes, setPanes] = useState<PaneInfo[]>([]);
+  const [wsSelection, setWsSelection] = useState<WorkspaceSelection | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
   const [splitDir, setSplitDir] = useState<"lr" | "tb">("lr");
   const [paneWidths,  setPaneWidths]  = useState<number[]>([]);
@@ -77,34 +43,43 @@ export function ChatTab({ data }: { data: ProviderEntry[] }) {
     setPaneHeights([...eq]);
   }, [panes.length]);
 
-  function updateSettings(partial: Partial<ChatSettings>) {
-    const next = { ...settings, ...partial };
-    setSettings(next);
-    saveSettings(next);
-  }
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SETTINGS_KEY) setSettings(loadSettings());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
 
   function removePane(id: string) {
     setPanes((prev) => prev.filter((p) => p.id !== id));
   }
 
-  async function openInApp(tool: string) {
-    const result = await window.api.ptySpawn(tool, settings.workingDir || undefined);
+  async function openInApp(tool: string, cwd?: string) {
+    const workDir = cwd ?? (settings.workingDir || undefined);
+    const result = await window.api.ptySpawn(tool, workDir);
     if (result.success && result.sessionId) {
       setPanes((prev) => [...prev, { id: result.sessionId!, tool, sessionId: result.sessionId! }]);
-      setActivePaneId(result.sessionId!);
+    }
+  }
+
+  function handleWorkspaceSelect(sel: WorkspaceSelection | null) {
+    setWsSelection(sel);
+    if (sel) {
+      updateSettings({ workingDir: sel.session.cwd });
     }
   }
 
   async function openExternal(tool: string): Promise<{ success: boolean; error?: string }> {
     return window.api.launchInTerminal(tool, settings.externalTerminal, settings.workingDir || undefined);
-  }
-
-  async function browsePath() {
-    const dir = await window.api.pickFolder(settings.workingDir || undefined);
-    if (dir) {
-      const history = [dir, ...settings.dirHistory.filter((d) => d !== dir)].slice(0, 10);
-      updateSettings({ workingDir: dir, dirHistory: history });
-    }
   }
 
   function startDragCol(dividerIndex: number, e: React.MouseEvent) {
@@ -144,170 +119,33 @@ export function ChatTab({ data }: { data: ProviderEntry[] }) {
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (panes.length === 0) {
     return (
-      <div className="flex h-full flex-col overflow-y-auto">
+      <div className="flex h-full overflow-hidden">
+        <WorkspaceSidebar
+          onSelect={handleWorkspaceSelect}
+          onLaunchTool={(tool, cwd) => void openInApp(tool, cwd)}
+        />
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
         {/* Compact header */}
         <div className="flex items-center gap-3 border-b border-border bg-bg-secondary px-8 py-4">
           <span className="text-[15px] font-semibold text-text-primary">💬 AI Terminal</span>
           <span className="text-[12px] text-text-secondary">Launch an AI assistant in an embedded or external shell</span>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {wsSelection && (
+              <span className="max-w-[240px] truncate text-[11px] text-accent">
+                {wsSelection.workspace.name} / {wsSelection.group.name} / {wsSelection.session.name}
+              </span>
+            )}
+            <button
+              onClick={() => void window.api.openSettingsWindow()}
+              className="cursor-pointer rounded-lg border border-border px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
+              title="Terminal settings"
+            >
+              ⚙️ Settings
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col gap-6 px-8 py-6">
-          {/* Working directory */}
-          <div>
-            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-secondary">Working directory</p>
-            <div className="flex items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-3 rounded-lg border border-border bg-bg-secondary px-3 py-2">
-                <svg className="h-4 w-4 shrink-0 text-text-tertiary" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                </svg>
-                {settings.workingDir ? (
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12px] font-medium text-text-primary">
-                      {settings.workingDir.split(/[\\/]/).filter(Boolean).pop()}
-                    </p>
-                    <p className="truncate font-mono text-[10px] text-text-tertiary">{settings.workingDir}</p>
-                  </div>
-                ) : (
-                  <span className="text-[12px] text-text-tertiary italic">~ (home directory)</span>
-                )}
-              </div>
-              <button
-                onClick={browsePath}
-                className="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-[12px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
-              >
-                Browse…
-              </button>
-              {settings.workingDir && (
-                <button
-                  onClick={() => updateSettings({ workingDir: "" })}
-                  className="cursor-pointer rounded-lg border border-border px-3 py-2 text-[12px] text-text-secondary transition-colors hover:border-fail/40 hover:text-fail"
-                  title="Reset to home"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* History */}
-            {settings.dirHistory.length > 0 && (
-              <div className="mt-3">
-                <div className="mb-1.5 flex items-center justify-between px-0.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Recent</span>
-                  <button
-                    onClick={() => updateSettings({ dirHistory: [], workingDir: "" })}
-                    className="cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-fail"
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <div className="overflow-hidden rounded-lg border border-border divide-y divide-border">
-                  {settings.dirHistory.map((dir) => {
-                    const isActive = dir === settings.workingDir;
-                    const name = dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
-                    return (
-                      <div
-                        key={dir}
-                        onClick={() => updateSettings({ workingDir: dir })}
-                        className={`group flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-bg-secondary ${isActive ? "bg-accent/5" : ""}`}
-                      >
-                        <svg
-                          className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-accent" : "text-text-tertiary"}`}
-                          viewBox="0 0 20 20" fill="currentColor"
-                        >
-                          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                        </svg>
-                        <div className="min-w-0 flex-1">
-                          <p className={`truncate text-[12px] font-medium ${isActive ? "text-accent" : "text-text-primary"}`}>
-                            {name}
-                          </p>
-                          <p className="truncate font-mono text-[10px] text-text-tertiary">{dir}</p>
-                        </div>
-                        {isActive && (
-                          <svg className="h-3.5 w-3.5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const next = settings.dirHistory.filter((d) => d !== dir);
-                            updateSettings({ dirHistory: next, ...(isActive ? { workingDir: "" } : {}) });
-                          }}
-                          className="hidden shrink-0 cursor-pointer rounded p-0.5 text-[11px] text-text-tertiary transition-colors hover:bg-fail/10 hover:text-fail group-hover:flex"
-                          title="Remove"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Terminal preference */}
-          <div>
-            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-secondary">
-              External terminal preference
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {TERMINAL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => updateSettings({ externalTerminal: opt.value })}
-                  className={`cursor-pointer rounded-lg border px-4 py-2 text-[13px] transition-all duration-150 ${
-                    settings.externalTerminal === opt.value
-                      ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                      : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Terminal background */}
-          <div>
-            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-secondary">
-              Terminal background
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {BG_PRESETS.map((p) => {
-                const active = settings.terminalBg === p.value;
-                return (
-                  <button
-                    key={p.label}
-                    onClick={() => updateSettings({ terminalBg: p.value })}
-                    title={p.label}
-                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
-                      active
-                        ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                        : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-                    }`}
-                  >
-                    <span className="inline-block h-3.5 w-3.5 rounded-sm border border-white/20" style={{ background: p.preview }} />
-                    {p.label}
-                  </button>
-                );
-              })}
-              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
-                !BG_PRESETS.some((p) => p.value === settings.terminalBg) && settings.terminalBg
-                  ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                  : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-              }`}>
-                <input
-                  type="color"
-                  value={settings.terminalBg || getAppBg()}
-                  onChange={(e) => updateSettings({ terminalBg: e.target.value })}
-                  className="h-3.5 w-3.5 cursor-pointer rounded-sm border-0 bg-transparent p-0 outline-none"
-                />
-                Custom
-              </label>
-            </div>
-          </div>
-
           {/* Tool cards */}
           <div>
             <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-secondary">
@@ -328,12 +166,18 @@ export function ChatTab({ data }: { data: ProviderEntry[] }) {
             </div>
           </div>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full overflow-hidden">
+      <WorkspaceSidebar
+        onSelect={handleWorkspaceSelect}
+        onLaunchTool={(tool, cwd) => void openInApp(tool, cwd)}
+      />
+    <div className="flex min-w-0 flex-1 flex-col">
       {/* Tab bar */}
       <div className="flex items-center gap-1 border-b border-border bg-bg-secondary px-4 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
@@ -356,6 +200,13 @@ export function ChatTab({ data }: { data: ProviderEntry[] }) {
             value={settings.externalTerminal}
             onChange={(v) => updateSettings({ externalTerminal: v })}
           />
+          <button
+            onClick={() => void window.api.openSettingsWindow()}
+            className="cursor-pointer rounded-md border border-border px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-accent/50 hover:text-text-primary"
+            title="Terminal settings"
+          >
+            ⚙️
+          </button>
           <button
             onClick={() => setPanes([])}
             className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-fail/50 hover:text-fail"
@@ -380,7 +231,12 @@ export function ChatTab({ data }: { data: ProviderEntry[] }) {
             <div key={pane.id} style={{ ...sizeStyle, background: bg }} className={paneClass}>
               <PaneTitle pane={pane} onClose={removePane} />
               <div className="flex-1 overflow-hidden">
-                <EmbeddedTerminal sessionId={pane.sessionId} bg={bg} onExit={() => removePane(pane.id)} />
+                <EmbeddedTerminal
+                  sessionId={pane.sessionId}
+                  bg={bg}
+                  active={active}
+                  onExit={() => removePane(pane.id)}
+                />
               </div>
             </div>,
           ];
@@ -414,6 +270,7 @@ export function ChatTab({ data }: { data: ProviderEntry[] }) {
           return parts;
         })}
       </div>
+    </div>
     </div>
   );
 }

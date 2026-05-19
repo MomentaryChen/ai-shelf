@@ -1,13 +1,7 @@
 import type { ReactNode } from "react";
 import { ToolLogo } from "./components/ToolLogo";
 
-const TOOL_LABELS: Record<string, string> = {
-  claude: "Claude",
-  copilot: "Copilot",
-  cursor: "Cursor",
-  "cursor-agent": "Cursor",
-  agent: "Cursor",
-};
+import { toolDisplayName } from "../tool-sort.js";
 
 type InstallInfo = { cmd: string; url: string };
 
@@ -43,7 +37,7 @@ export function toolIcon(tool: string): ReactNode {
 }
 
 export function toolLabel(tool: string) {
-  return TOOL_LABELS[tool] ?? tool;
+  return toolDisplayName(tool);
 }
 
 export function formatContext(tokens?: number) {

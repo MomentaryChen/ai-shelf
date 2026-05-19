@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 release/
+.tmp-better-sqlite3-build/
+**/build.stale.*/
 
 # TypeScript
 *.tsbuildinfo

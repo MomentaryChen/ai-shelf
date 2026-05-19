@@ -1,5 +1,10 @@
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
+/** Detection options — `quick` skips remote model list fetches for faster first paint. */
+export interface DetectOptions {
+  quick?: boolean;
+}
+
 export interface MCPInfo {
   supported: boolean;
   servers: string[];

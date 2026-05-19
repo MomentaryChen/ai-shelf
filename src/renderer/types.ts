@@ -89,8 +89,44 @@ export interface EnvVarGroup {
   vars: EnvVar[];
 }
 
+export interface WorkspaceInfo {
+  id: string;
+  name: string;
+  root_path: string | null;
+}
+
+export interface GroupInfo {
+  id: string;
+  workspace_id: string;
+  name: string;
+}
+
+export interface SessionInfo {
+  id: string;
+  workspace_id: string;
+  group_id: string;
+  name: string;
+  cwd: string;
+  shell: string;
+  tool: string | null;
+  pid: number | null;
+  status: string;
+}
+
+export interface WorkspaceTree {
+  workspaces: WorkspaceInfo[];
+  groups: Record<string, GroupInfo[]>;
+  sessions: Record<string, SessionInfo[]>;
+}
+
 export interface ElectronAPI {
   getInventory: () => Promise<ProviderEntry[]>;
+  startInventoryScan: () => Promise<void>;
+  clearInventoryCache: () => Promise<void>;
+  onInventoryEntry: (cb: (entry: ProviderEntry) => void) => void;
+  onInventoryEnriched: (cb: (entry: ProviderEntry) => void) => void;
+  onInventoryComplete: (cb: (payload: { count: number }) => void) => void;
+  offInventoryListeners: () => void;
   runDoctor: () => Promise<DoctorResult[]>;
   runDoctorTool: (tool: string) => Promise<DoctorResult>;
   checkUpdate: () => Promise<UpdateCheckResult>;
@@ -116,6 +152,22 @@ export interface ElectronAPI {
   onPtyExit: (cb: (p: { sessionId: string; exitCode: number }) => void) => (() => void);
   setDefaultModel: (tool: string, model: string) => Promise<{ success: boolean; error?: string }>;
   getEnvVars: () => Promise<EnvVarGroup[]>;
+  wsGetTree: () => Promise<WorkspaceTree>;
+  wsWorkspaceCreate: (name: string, rootPath?: string) => Promise<{ success: boolean; error?: string }>;
+  wsGroupCreate: (workspace: string, group: string) => Promise<{ success: boolean; error?: string }>;
+  wsSessionCreate: (
+    workspace: string,
+    group: string,
+    name: string,
+    opts?: { cwd?: string; tool?: string },
+  ) => Promise<{ success: boolean; error?: string }>;
+  wsSessionStop: (
+    workspace: string,
+    group: string,
+    name: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  openChatWindow: () => Promise<void>;
+  openSettingsWindow: () => Promise<void>;
 }
 
 declare global {

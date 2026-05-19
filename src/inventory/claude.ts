@@ -1,6 +1,24 @@
-import type { ProviderEntry } from "./types.js";
+import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
+
+const CLAUDE_MODELS = [
+  "claude-opus-4-5",
+  "claude-sonnet-4-5",
+  "claude-haiku-4-5",
+  "claude-opus-4",
+  "claude-sonnet-4",
+  "claude-3-7-sonnet-20250219",
+  "claude-3-5-sonnet-20241022",
+  "claude-3-5-haiku-20241022",
+  "claude-3-opus-20240229",
+];
+
+function resolveClaudeModelAlias(model: string, models: string[]): string {
+  if (model.startsWith("claude-")) return model;
+  const lc = model.toLowerCase();
+  return models.find((m) => m.toLowerCase().includes(lc)) ?? model;
+}
 
 async function listClaudeModels(): Promise<string[]> {
   const apiKey = process.env["ANTHROPIC_API_KEY"];
@@ -24,7 +42,7 @@ async function listClaudeModels(): Promise<string[]> {
   }
 }
 
-export async function detectClaude(): Promise<ProviderEntry> {
+export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEntry> {
   const versionResult = await run("claude", ["--version"], 5_000);
   const available = versionResult.ok;
   const version = available ? versionResult.stdout.split("\n")[0] : undefined;
@@ -34,7 +52,7 @@ export async function detectClaude(): Promise<ProviderEntry> {
     available
       ? run("claude", ["auth", "status", "--text"]).then((r) => r.ok ? "ok" : "missing" as ProviderEntry["auth"])
       : Promise.resolve(process.env["ANTHROPIC_API_KEY"] ? "ok" : "missing" as ProviderEntry["auth"]),
-    listClaudeModels(),
+    opts.quick ? Promise.resolve([]) : listClaudeModels(),
     available ? run("claude", ["config", "get", "model"]) : Promise.resolve({ ok: false, stdout: "", stderr: "" }),
   ]);
 
@@ -84,27 +102,8 @@ export async function detectClaude(): Promise<ProviderEntry> {
     }
   }
 
-  const CLAUDE_MODELS = [
-    "claude-opus-4-5",
-    "claude-sonnet-4-5",
-    "claude-haiku-4-5",
-    "claude-opus-4",
-    "claude-sonnet-4",
-    "claude-3-7-sonnet-20250219",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
-    "claude-3-opus-20240229",
-  ];
-
-  // Fetch live model list via CLI; fall back to static list
   const models = cliModels.length > 0 ? cliModels : CLAUDE_MODELS;
-
-  // Resolve short alias (e.g. "sonnet") to full model ID from the models list
-  if (model && !model.startsWith("claude-")) {
-    const lc = model.toLowerCase();
-    const matched = models.find((m) => m.toLowerCase().includes(lc));
-    if (matched) model = matched;
-  }
+  if (model) model = resolveClaudeModelAlias(model, models);
 
   return {
     tool: "claude",
@@ -131,4 +130,14 @@ export async function detectClaude(): Promise<ProviderEntry> {
       instructionFiles: findExistingPaths(instructionCandidates),
     },
   };
+}
+
+/** Lightweight enrich: remote model list only (no version/auth/fs scan). */
+export async function fetchClaudeModelsForEntry(
+  entry: ProviderEntry,
+): Promise<Pick<ProviderEntry, "models" | "model">> {
+  const cliModels = await listClaudeModels();
+  const models = cliModels.length > 0 ? cliModels : (entry.models?.length ? entry.models : CLAUDE_MODELS);
+  const model = entry.model ? resolveClaudeModelAlias(entry.model, models) : entry.model;
+  return { models, model };
 }

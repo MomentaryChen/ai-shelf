@@ -1,6 +1,23 @@
-import type { ProviderEntry } from "./types.js";
+import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson, envPresent } from "../utils/config.js";
+
+const COPILOT_MODELS = [
+  "claude-sonnet-4.6",
+  "claude-sonnet-4.5",
+  "claude-haiku-4.5",
+  "claude-opus-4.7",
+  "claude-opus-4.6",
+  "claude-opus-4.5",
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.3-codex",
+  "gpt-5.2-codex",
+  "gpt-5.2",
+  "gpt-5.4-mini",
+  "gpt-5-mini",
+  "gpt-4.1",
+];
 
 async function listCopilotModels(): Promise<string[]> {
   const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"];
@@ -23,7 +40,7 @@ async function listCopilotModels(): Promise<string[]> {
   }
 }
 
-export async function detectCopilot(): Promise<ProviderEntry> {
+export async function detectCopilot(opts: DetectOptions = {}): Promise<ProviderEntry> {
   const versionResult = await run("copilot", ["--version"], 5_000);
   const available = versionResult.ok;
   const version = available ? versionResult.stdout.split("\n")[0] : undefined;
@@ -33,7 +50,7 @@ export async function detectCopilot(): Promise<ProviderEntry> {
     envPresent("GH_TOKEN") || envPresent("GITHUB_TOKEN")
       ? Promise.resolve("ok" as ProviderEntry["auth"])
       : run("gh", ["auth", "status"]).then((r) => (r.ok ? "ok" : "missing") as ProviderEntry["auth"]),
-    listCopilotModels(),
+    opts.quick ? Promise.resolve([]) : listCopilotModels(),
   ]);
 
   // Copilot home
@@ -94,22 +111,7 @@ export async function detectCopilot(): Promise<ProviderEntry> {
     // directory doesn't exist — fine
   }
 
-  const COPILOT_MODELS = [
-    "claude-sonnet-4.6",
-    "claude-sonnet-4.5",
-    "claude-haiku-4.5",
-    "claude-opus-4.7",
-    "claude-opus-4.6",
-    "claude-opus-4.5",
-    "gpt-5.5",
-    "gpt-5.4",
-    "gpt-5.3-codex",
-    "gpt-5.2-codex",
-    "gpt-5.2",
-    "gpt-5.4-mini",
-    "gpt-5-mini",
-    "gpt-4.1",
-  ];
+  const models = cliModels.length > 0 ? cliModels : COPILOT_MODELS;
 
   return {
     tool: "copilot",
@@ -118,7 +120,7 @@ export async function detectCopilot(): Promise<ProviderEntry> {
     available,
     auth,
     model,
-    models: cliModels.length > 0 ? cliModels : COPILOT_MODELS,
+    models,
     skills: ["coding", "shell", "repo-edit", "mcp"],
     mcp: {
       supported: true,
@@ -139,4 +141,13 @@ export async function detectCopilot(): Promise<ProviderEntry> {
       ],
     },
   };
+}
+
+/** Lightweight enrich: remote model list only. */
+export async function fetchCopilotModelsForEntry(
+  entry: ProviderEntry,
+): Promise<Pick<ProviderEntry, "models">> {
+  const cliModels = await listCopilotModels();
+  const models = cliModels.length > 0 ? cliModels : (entry.models?.length ? entry.models : COPILOT_MODELS);
+  return { models };
 }

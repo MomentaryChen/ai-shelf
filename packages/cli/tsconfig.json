@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "rootDir": "src",
+    "outDir": "dist",
+    "baseUrl": "src",
+    "paths": {
+      "@core/*": ["core/*"],
+      "@runtime/*": ["runtime/*"],
+      "@services/*": ["services/*"],
+      "@infra/*": ["infra/*"],
+      "@cli/*": ["cli/*"],
+      "@tui/*": ["tui/*"],
+      "@models/*": ["models/*"],
+      "@database/*": ["database/*"],
+      "@config/*": ["config/*"],
+      "@shared/*": ["shared/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}
