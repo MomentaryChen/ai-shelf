@@ -13,14 +13,9 @@ const MODES: { id: AppMode; label: string }[] = [
 
 export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitchProps) {
   return (
-    <div
-      role="tablist"
-      aria-label="Application mode"
-      className="inline-flex rounded-xl border border-border bg-bg-secondary p-1"
-    >
+    <nav role="tablist" aria-label="Application mode" className="flex shrink-0 items-center">
       {MODES.map((m) => {
         const active = mode === m.id;
-        const isTerminal = m.id === "terminal";
         return (
           <button
             key={m.id}
@@ -29,22 +24,18 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
             aria-selected={active}
             disabled={disabled}
             onClick={() => onChange(m.id)}
-            className={`rounded-lg px-5 py-2 font-sans transition-all duration-150 ${
+            className={`border-b-2 px-3 py-1.5 font-sans text-[12px] transition-colors duration-150 ${
               disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"
             } ${
               active
-                ? isTerminal
-                  ? "border border-accent/50 bg-accent/15 text-[14px] font-semibold text-accent shadow-sm"
-                  : "border border-border bg-bg-card text-[13px] font-medium text-text-primary"
-                : isTerminal
-                  ? "border border-transparent text-[14px] font-medium text-text-primary hover:text-accent"
-                  : "border border-transparent text-[13px] text-text-secondary hover:text-text-primary"
+                ? "border-accent font-medium text-text-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             {m.label}
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

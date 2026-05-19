@@ -1,6 +1,7 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
+import { parseCliVersionLine } from "../utils/version.js";
 
 const CLAUDE_MODELS = [
   "claude-opus-4-5",
@@ -45,7 +46,9 @@ async function listClaudeModels(): Promise<string[]> {
 export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEntry> {
   const versionResult = await run("claude", ["--version"], 5_000);
   const available = versionResult.ok;
-  const version = available ? versionResult.stdout.split("\n")[0] : undefined;
+  const version = available
+    ? parseCliVersionLine(versionResult.stdout.split("\n")[0] ?? "")
+    : undefined;
 
   // Run auth check, model list, and config get in parallel
   const [authResult, cliModels, cfgResult] = await Promise.all([

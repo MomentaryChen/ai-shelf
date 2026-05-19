@@ -1,10 +1,24 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import type { ProviderEntry } from "../types";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import type { ProviderEntry, ProfileInfo } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { toolLabel } from "../utils";
 import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
-import { WorkspaceSidebar, type WorkspaceSelection } from "./WorkspaceSidebar";
+import { ProfileSidebar } from "./ProfileSidebar";
+import { SplitPaneLayout } from "./SplitPaneLayout";
+import { ResizeDivider } from "./ResizeDivider";
+import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
+import {
+  collectPanes,
+  findPane,
+  mapPanesInTree,
+  removePaneFromTree,
+  splitPaneInTree,
+  updateSplitRatio,
+  type LayoutNode,
+  type PaneInfo,
+  type SplitDirection,
+} from "../terminal/split-tree";
 import {
   TERMINAL_OPTIONS,
   getAppBg,
@@ -14,42 +28,98 @@ import {
   type ExternalTerminal,
   SETTINGS_KEY,
 } from "../chat-settings";
+import { toolIdsFromInventory } from "../utils/available-tools";
 
-interface PaneInfo {
-  id: string;
-  tool: string;
-  sessionId: string;
+const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
+const SIDEBAR_MIN = 180;
+const SIDEBAR_MAX = 420;
+
+function loadSidebarWidth(): number {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const n = raw ? Number(raw) : 240;
+    if (!Number.isFinite(n)) return 240;
+    return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n));
+  } catch {
+    return 240;
+  }
 }
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
-  claude:  "Anthropic coding agent — context-rich, file-aware sessions",
+  claude: "Anthropic coding agent — context-rich, file-aware sessions",
   copilot: "GitHub Copilot CLI — explain, suggest and chat",
-  cursor:  "Cursor agent — AI pair programmer for your workspace",
+  cursor: "Cursor agent — AI pair programmer for your workspace",
 };
 
-
-export function ChatTab({ data, active = true }: { data: ProviderEntry[]; active?: boolean }) {
-  const [panes, setPanes] = useState<PaneInfo[]>([]);
-  const [wsSelection, setWsSelection] = useState<WorkspaceSelection | null>(null);
+export function ChatTab({
+  data,
+  active = true,
+  inventoryScanning = false,
+}: {
+  data: ProviderEntry[];
+  active?: boolean;
+  inventoryScanning?: boolean;
+}) {
+  const [layout, setLayout] = useState<LayoutNode | null>(null);
+  const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
-  const [splitDir, setSplitDir] = useState<"lr" | "tb">("lr");
-  const [paneWidths,  setPaneWidths]  = useState<number[]>([]);
-  const [paneHeights, setPaneHeights] = useState<number[]>([]);
-  const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const [broadcastInput, setBroadcastInput] = useState(false);
+  const [showNewMenu, setShowNewMenu] = useState(false);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [terminalError, setTerminalError] = useState<string | null>(null);
+  const [addingTerminal, setAddingTerminal] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
+  const newMenuRef = useRef<HTMLDivElement>(null);
+  const initialRestoreDoneRef = useRef(false);
+  const restoreInFlightRef = useRef(false);
 
-  useEffect(() => {
-    const eq = panes.map(() => 100 / Math.max(panes.length, 1));
-    setPaneWidths([...eq]);
-    setPaneHeights([...eq]);
-  }, [panes.length]);
+  const panes = layout ? collectPanes(layout) : [];
+  const bg = settings.terminalBg || getAppBg();
 
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY) setSettings(loadSettings());
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+  const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+    const result = await window.api.ptySpawn(tool, cwd || undefined);
+    if (!result.success || !result.sessionId) {
+      const msg = result.error ?? "unknown error";
+      console.error("[pty-spawn]", tool, msg);
+      setTerminalError(`無法啟動 terminal（${tool}）：${msg}`);
+      return null;
+    }
+    setTerminalError(null);
+    return { id: result.sessionId, tool, sessionId: result.sessionId, cwd: cwd || "" };
   }, []);
+
+  const spawnPaneResilient = useCallback(
+    async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+      const order = [tool, ...(tool !== "shell" ? ["shell"] : [])];
+      for (const t of order) {
+        const pane = await spawnPane(t, cwd);
+        if (pane) return pane;
+      }
+      return spawnPane("shell", "");
+    },
+    [spawnPane],
+  );
+
+  const {
+    activeProfile,
+    restoring,
+    migrationDone,
+    activateProfile,
+    restoreLastProfile,
+    discardProfileSessions,
+    getProfilePanes,
+    getProfileFocusedPaneId,
+    canAddPane,
+    maxPanes,
+  } = useProfileWorkspace(
+    layout,
+    setLayout,
+    focusedPaneId,
+    setFocusedPaneId,
+    spawnPaneResilient,
+    settings.workingDir,
+    broadcastInput,
+  );
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -59,235 +129,461 @@ export function ChatTab({ data, active = true }: { data: ProviderEntry[]; active
     });
   }, []);
 
-  function removePane(id: string) {
-    setPanes((prev) => prev.filter((p) => p.id !== id));
-  }
+  const panesRef = useRef(panes);
+  panesRef.current = panes;
 
-  async function openInApp(tool: string, cwd?: string) {
-    const workDir = cwd ?? (settings.workingDir || undefined);
-    const result = await window.api.ptySpawn(tool, workDir);
-    if (result.success && result.sessionId) {
-      setPanes((prev) => [...prev, { id: result.sessionId!, tool, sessionId: result.sessionId! }]);
+  const handlePtyWrite = useCallback(
+    (data: string, sessionId: string) => {
+      const current = panesRef.current;
+      if (broadcastInput && current.length > 1) {
+        for (const p of current) window.api.ptyWrite(p.sessionId, data);
+      } else {
+        window.api.ptyWrite(sessionId, data);
+      }
+    },
+    [broadcastInput],
+  );
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SETTINGS_KEY) setSettings(loadSettings());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!showNewMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (!newMenuRef.current?.contains(e.target as Node)) setShowNewMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showNewMenu]);
+
+  useEffect(() => {
+    if (!migrationDone || initialRestoreDoneRef.current || restoreInFlightRef.current) return;
+
+    let cancelled = false;
+    restoreInFlightRef.current = true;
+    void (async () => {
+      try {
+        const r = await window.api.profileGetTree();
+        if (cancelled || !r.success || !r.tree) return;
+        const result = await restoreLastProfile(r.tree);
+        if (cancelled) return;
+        if (result?.cwd) updateSettings({ workingDir: result.cwd });
+        if (result?.broadcastInput !== undefined) setBroadcastInput(result.broadcastInput);
+      } catch (err) {
+        console.error("[profile-restore]", err);
+      } finally {
+        restoreInFlightRef.current = false;
+        if (!cancelled) initialRestoreDoneRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [migrationDone, restoreLastProfile, updateSettings]);
+
+  const resolveCwd = useCallback(
+    (override?: string) => {
+      if (override) return override;
+      if (settings.workingDir) return settings.workingDir;
+      if (activeProfile?.defaultCwd) return activeProfile.defaultCwd;
+      return "";
+    },
+    [settings.workingDir, activeProfile],
+  );
+
+  const addPane = useCallback(
+    async (
+      tool: string,
+      cwd?: string,
+      splitTargetId?: string,
+      direction: SplitDirection = "horizontal",
+    ) => {
+      if (restoring) {
+        setTerminalError("正在還原 profile，請稍候再試…");
+        return false;
+      }
+      if (!canAddPane) {
+        setTerminalError(`已達上限 ${maxPanes} 個 terminal，請先關閉一個 pane`);
+        return false;
+      }
+      if (!window.api?.ptySpawn) {
+        setTerminalError("Terminal API 未就緒，請重啟應用程式");
+        return false;
+      }
+
+      const pane = await spawnPaneResilient(tool || "shell", resolveCwd(cwd));
+      if (!pane) return false;
+
+      setLayout((prev) => {
+        if (!prev) return { kind: "pane", pane };
+        const targetId = splitTargetId ?? focusedPaneId ?? collectPanes(prev)[0]?.id;
+        if (!targetId) return { kind: "pane", pane };
+        return splitPaneInTree(prev, targetId, direction, pane);
+      });
+      setFocusedPaneId(pane.id);
+      return true;
+    },
+    [canAddPane, maxPanes, restoring, resolveCwd, spawnPaneResilient, focusedPaneId],
+  );
+
+  const respawnPane = useCallback(
+    async (paneId: string) => {
+      const victim = layout ? findPane(layout, paneId) : null;
+      if (!victim) return;
+      window.api.ptyKill(victim.sessionId);
+      const next = await spawnPaneResilient(victim.tool, victim.cwd || resolveCwd());
+      if (!next) {
+        setTerminalError(
+          (prev) =>
+            prev ??
+            `Terminal session 已失效且無法重新啟動（${victim.tool}）。請關閉此 pane 後再按 + Terminal。`,
+        );
+        return;
+      }
+      setTerminalError(null);
+      setLayout((prev) =>
+        prev
+          ? mapPanesInTree(prev, (p) =>
+              p.id === paneId
+                ? { ...next, id: paneId, cwd: victim.cwd || next.cwd }
+                : p,
+            )
+          : prev,
+      );
+    },
+    [layout, spawnPaneResilient, resolveCwd],
+  );
+
+  const closePane = useCallback((paneId: string) => {
+    setLayout((prev) => {
+      if (prev) {
+        const victim = collectPanes(prev).find((p) => p.id === paneId);
+        if (victim) window.api.ptyKill(victim.sessionId);
+      }
+      return removePaneFromTree(prev, paneId);
+    });
+    setFocusedPaneId((prev) => (prev === paneId ? null : prev));
+  }, []);
+
+  const splitPane = useCallback(
+    async (paneId: string, direction: SplitDirection) => {
+      if (!canAddPane) return;
+      const parent = layout ? collectPanes(layout).find((p) => p.id === paneId) : null;
+      const tool = parent?.tool ?? data.find((e) => e.available)?.tool ?? "claude";
+      await addPane(tool, parent?.cwd || resolveCwd(), paneId, direction);
+    },
+    [layout, data, addPane, canAddPane, resolveCwd],
+  );
+
+  async function handleActivateProfile(profile: ProfileInfo) {
+    setProfileBusy(true);
+    setTerminalError(null);
+    try {
+      const r = await activateProfile(profile);
+      if (r?.cwd) updateSettings({ workingDir: r.cwd });
+      if (r?.broadcastInput !== undefined) setBroadcastInput(r.broadcastInput);
+      return r;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setTerminalError(`無法啟用 profile：${msg}`);
+      return undefined;
+    } finally {
+      setProfileBusy(false);
     }
   }
 
-  function handleWorkspaceSelect(sel: WorkspaceSelection | null) {
-    setWsSelection(sel);
-    if (sel) {
-      updateSettings({ workingDir: sel.session.cwd });
+  async function handleNewTerminal(profile: ProfileInfo) {
+    if (addingTerminal || profileBusy || restoring) return;
+    setAddingTerminal(true);
+    setTerminalError(null);
+    try {
+      if (activeProfile?.id !== profile.id) {
+        await handleActivateProfile(profile);
+      } else if (panes.length === 0) {
+        const r = await handleActivateProfile(profile);
+        if ((r?.paneCount ?? 0) > 0) return;
+      }
+      const ok = await addPane(profile.defaultTool || "shell");
+      if (!ok) {
+        setTerminalError((prev) => prev ?? "無法開啟 terminal，請按 F12 查看 Console");
+      }
+    } catch (err) {
+      setTerminalError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAddingTerminal(false);
     }
+  }
+
+  async function handleToggleBroadcast(profileId: string, enabled: boolean) {
+    if (activeProfile?.id === profileId) setBroadcastInput(enabled);
+    await window.api.profileUpdate(profileId, { broadcastInput: enabled });
   }
 
   async function openExternal(tool: string): Promise<{ success: boolean; error?: string }> {
-    return window.api.launchInTerminal(tool, settings.externalTerminal, settings.workingDir || undefined);
-  }
-
-  function startDragCol(dividerIndex: number, e: React.MouseEvent) {
-    e.preventDefault();
-    const startX = e.clientX;
-    const containerWidth = terminalContainerRef.current?.clientWidth ?? 1;
-    const snapshot = [...paneWidths];
-    function onMove(ev: MouseEvent) {
-      const delta = ((ev.clientX - startX) / containerWidth) * 100;
-      const next = [...snapshot];
-      next[dividerIndex]     = Math.max(10, snapshot[dividerIndex]     + delta);
-      next[dividerIndex + 1] = Math.max(10, snapshot[dividerIndex + 1] - delta);
-      setPaneWidths(next);
-    }
-    function onUp() { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); }
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup",   onUp);
-  }
-
-  function startDragRow(dividerIndex: number, e: React.MouseEvent) {
-    e.preventDefault();
-    const startY = e.clientY;
-    const containerHeight = terminalContainerRef.current?.clientHeight ?? 1;
-    const snapshot = [...paneHeights];
-    function onMove(ev: MouseEvent) {
-      const delta = ((ev.clientY - startY) / containerHeight) * 100;
-      const next = [...snapshot];
-      next[dividerIndex]     = Math.max(10, snapshot[dividerIndex]     + delta);
-      next[dividerIndex + 1] = Math.max(10, snapshot[dividerIndex + 1] - delta);
-      setPaneHeights(next);
-    }
-    function onUp() { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); }
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup",   onUp);
-  }
-
-  // ── Empty state ──────────────────────────────────────────────────────────────
-  if (panes.length === 0) {
-    return (
-      <div className="flex h-full overflow-hidden">
-        <WorkspaceSidebar
-          onSelect={handleWorkspaceSelect}
-          onLaunchTool={(tool, cwd) => void openInApp(tool, cwd)}
-        />
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        {/* Compact header */}
-        <div className="flex items-center gap-3 border-b border-border bg-bg-secondary px-8 py-4">
-          <span className="text-[15px] font-semibold text-text-primary">💬 AI Terminal</span>
-          <span className="text-[12px] text-text-secondary">Launch an AI assistant in an embedded or external shell</span>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {wsSelection && (
-              <span className="max-w-[240px] truncate text-[11px] text-accent">
-                {wsSelection.workspace.name} / {wsSelection.group.name} / {wsSelection.session.name}
-              </span>
-            )}
-            <button
-              onClick={() => void window.api.openSettingsWindow()}
-              className="cursor-pointer rounded-lg border border-border px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
-              title="Terminal settings"
-            >
-              ⚙️ Settings
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-1 flex-col gap-6 px-8 py-6">
-          {/* Tool cards */}
-          <div>
-            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-secondary">
-              Available tools
-            </p>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {data.filter((e) => e.available).map((e) => (
-                <ToolCard
-                  key={e.tool}
-                  entry={e}
-                  onInApp={() => openInApp(e.tool)}
-                  onExternal={() => openExternal(e.tool)}
-                />
-              ))}
-              {data.filter((e) => !e.available).map((e) => (
-                <ToolCard key={e.tool} entry={e} disabled />
-              ))}
-            </div>
-          </div>
-        </div>
-        </div>
-      </div>
+    return window.api.launchInTerminal(
+      tool,
+      settings.externalTerminal,
+      resolveCwd() || undefined,
     );
   }
 
-  return (
-    <div className="flex h-full overflow-hidden">
-      <WorkspaceSidebar
-        onSelect={handleWorkspaceSelect}
-        onLaunchTool={(tool, cwd) => void openInApp(tool, cwd)}
+  const profileLabel = activeProfile?.name ?? null;
+
+  function handleProfileDeleted(profileId: string) {
+    discardProfileSessions(profileId);
+    if (activeProfile?.id !== profileId) return;
+    setLayout(null);
+    setFocusedPaneId(null);
+    setBroadcastInput(false);
+  }
+
+  const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
+
+  const sidebar = (
+    <ProfileSidebar
+      width={sidebarWidth}
+      activeProfileId={activeProfile?.id ?? null}
+      focusedPaneId={focusedPaneId}
+      getProfilePanes={getProfilePanes}
+      getProfileFocusedPaneId={getProfileFocusedPaneId}
+      broadcastInput={broadcastInput}
+      availableTools={availableTools}
+      inventoryScanning={inventoryScanning}
+      busy={profileBusy || restoring}
+      onActivateProfile={(p) => void handleActivateProfile(p)}
+      onSelectPane={(profile, paneId) => {
+        if (activeProfile?.id !== profile.id) {
+          void handleActivateProfile(profile).then(() => setFocusedPaneId(paneId));
+        } else {
+          setFocusedPaneId(paneId);
+        }
+      }}
+      onClosePane={(_profileId, paneId) => closePane(paneId)}
+      onAddTerminal={(profile) => void handleNewTerminal(profile)}
+      addingTerminal={addingTerminal}
+      onToggleBroadcast={(id, v) => void handleToggleBroadcast(id, v)}
+      onUpdateDefaultCwd={(_id, cwd) => updateSettings({ workingDir: cwd })}
+      onProfileDeleted={handleProfileDeleted}
+    />
+  );
+
+  const topBar = (
+    <WarpTopBar
+      profileLabel={profileLabel}
+      paneCount={panes.length}
+      maxPanes={maxPanes}
+      canAddPane={canAddPane}
+      broadcastInput={broadcastInput}
+      restoring={profileBusy || restoring}
+      externalTerminal={settings.externalTerminal}
+      onExternalTerminalChange={(v) => updateSettings({ externalTerminal: v })}
+      newMenuRef={newMenuRef}
+      showNewMenu={showNewMenu}
+      onToggleNewMenu={() => setShowNewMenu((o) => !o)}
+      onAddPane={(tool) => void addPane(tool)}
+      available={data.filter((e) => e.available)}
+    />
+  );
+
+  const terminalArea = layout ? (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-1.5">
+      <div className="flex min-h-0 flex-1 flex-col">
+      <SplitPaneLayout
+        node={layout}
+        focusedPaneId={focusedPaneId}
+        bg={bg}
+        onFocusPane={setFocusedPaneId}
+        onClosePane={closePane}
+        onSplitPane={(id, dir) => void splitPane(id, dir)}
+        onResizeSplit={(splitId, ratio) =>
+          setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
+        }
+        renderTerminal={(pane, paneFocused) => (
+          <EmbeddedTerminal
+            key={pane.sessionId}
+            sessionId={pane.sessionId}
+            bg={bg}
+            active={active}
+            focused={paneFocused}
+            onWrite={handlePtyWrite}
+            onSessionLost={() => void respawnPane(pane.id)}
+            onExit={() => closePane(pane.id)}
+          />
+        )}
       />
-    <div className="flex min-w-0 flex-1 flex-col">
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-border bg-bg-secondary px-4 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-          {panes.map((pane) => (
-            <div key={pane.id} className="flex shrink-0 items-center gap-2 rounded-md bg-bg-card px-3.5 py-2 text-[13px] text-text-primary shadow-sm">
-              <ToolLogo tool={pane.tool} size={14} />
-              <span>{toolLabel(pane.tool)}</span>
-              <span
-                role="button"
-                onClick={() => removePane(pane.id)}
-                className="ml-0.5 cursor-pointer rounded px-0.5 text-[11px] opacity-40 transition-opacity hover:opacity-100 hover:text-fail"
-              >✕</span>
-            </div>
+      </div>
+    </div>
+  ) : (
+    <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-8 py-6">
+      {activeProfile ? (
+        <div className="rounded-lg border border-[#252525] bg-[#111111] px-4 py-3 text-[13px] text-[#8a8a8a]">
+          Profile <span className="text-[#8ab4ff]">{profileLabel}</span>
+          {restoring || profileBusy ? (
+            <span className="ml-2">正在還原 terminal…</span>
+          ) : (
+            <span className="ml-2">
+              — 點上方「+ Pane」開啟 terminal（最多 {maxPanes} 個，會自動記住）
+            </span>
+          )}
+          {terminalError && (
+            <p className="mt-2 text-[12px] text-red-400">{terminalError}</p>
+          )}
+          <p className="mt-2 text-[11px] text-[#505050]">
+            除錯：按 <kbd className="rounded border border-[#333] px-1">F12</kbd> 或{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+I</kbd>
+            開啟開發者工具；也可按 <kbd className="rounded border border-[#333] px-1">Alt</kbd>{" "}
+            → View → Developer Tools
+          </p>
+        </div>
+      ) : (
+        <p className="text-[13px] text-[#6b6b6b]">
+          從左側選擇或建立 <strong className="text-[#a0a0a0]">Profile</strong>
+          ，會自動還原上次的 terminal 視窗與預設目錄。
+        </p>
+      )}
+      <div>
+        <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-[#6b6b6b]">
+          Available tools
+        </p>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {data.filter((e) => e.available).map((e) => (
+            <ToolCard
+              key={e.tool}
+              entry={e}
+              onInApp={() => addPane(e.tool)}
+              onExternal={() => openExternal(e.tool)}
+            />
+          ))}
+          {data.filter((e) => !e.available).map((e) => (
+            <ToolCard key={e.tool} entry={e} disabled />
           ))}
         </div>
-        <div className="ml-2 flex shrink-0 items-center gap-2">
-          <AddPaneMenu data={data} onAdd={(tool) => openInApp(tool)} />
-          <div className="h-4 w-px bg-border" />
-          <TerminalSelector
-            value={settings.externalTerminal}
-            onChange={(v) => updateSettings({ externalTerminal: v })}
-          />
-          <button
-            onClick={() => void window.api.openSettingsWindow()}
-            className="cursor-pointer rounded-md border border-border px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-accent/50 hover:text-text-primary"
-            title="Terminal settings"
-          >
-            ⚙️
-          </button>
-          <button
-            onClick={() => setPanes([])}
-            className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-fail/50 hover:text-fail"
-          >
-            ✕ Close all
-          </button>
-        </div>
       </div>
-
-      {/* Terminal area — drag divider to resize; hover divider icon to flip direction */}
-      <div ref={terminalContainerRef}
-        className={`flex flex-1 gap-2 overflow-hidden p-2 ${splitDir === "tb" ? "flex-col" : ""}`}>
-        {panes.flatMap((pane, i) => {
-          const bg  = settings.terminalBg || getAppBg();
-          const isLr = splitDir === "lr";
-          const sizeStyle = isLr
-            ? { flex: `${paneWidths[i]  ?? 100 / panes.length}`, minWidth: 0 }
-            : { flex: `${paneHeights[i] ?? 100 / panes.length}`, minHeight: 0 };
-          const paneClass = "flex flex-col overflow-hidden rounded-xl border border-border/40";
-
-          const parts: React.ReactNode[] = [
-            <div key={pane.id} style={{ ...sizeStyle, background: bg }} className={paneClass}>
-              <PaneTitle pane={pane} onClose={removePane} />
-              <div className="flex-1 overflow-hidden">
-                <EmbeddedTerminal
-                  sessionId={pane.sessionId}
-                  bg={bg}
-                  active={active}
-                  onExit={() => removePane(pane.id)}
-                />
-              </div>
-            </div>,
-          ];
-
-          if (i < panes.length - 1) {
-            const onDrag = isLr
-              ? (e: React.MouseEvent) => startDragCol(i, e)
-              : (e: React.MouseEvent) => startDragRow(i, e);
-            const divClass = isLr
-              ? "group relative z-10 flex w-3 shrink-0 cursor-col-resize items-center justify-center"
-              : "group relative z-10 flex h-3 shrink-0 cursor-row-resize flex-col items-center justify-center";
-            const lineClass = isLr
-              ? "h-12 w-0.5 rounded-full bg-border transition-colors group-hover:bg-accent/70"
-              : "h-0.5 w-12 rounded-full bg-border transition-colors group-hover:bg-accent/70";
-
-            parts.push(
-              <div key={`div-${i}`} onMouseDown={onDrag} className={divClass}>
-                <div className={lineClass} />
-                {/* Direction toggle — appears on hover, does NOT start a drag */}
-                <button
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); setSplitDir(isLr ? "tb" : "lr"); }}
-                  title={isLr ? "Switch to top / bottom" : "Switch to left / right"}
-                  className="absolute flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-border bg-bg-card text-[11px] text-text-secondary opacity-0 transition-opacity group-hover:opacity-100 hover:border-accent/50 hover:text-accent"
-                >
-                  {isLr ? "↕" : "↔"}
-                </button>
-              </div>
-            );
-          }
-          return parts;
-        })}
-      </div>
-    </div>
     </div>
   );
-}
 
-// ─── PaneTitle ─────────────────────────────────────────────────────────────────
-
-function PaneTitle({ pane, onClose }: { pane: PaneInfo; onClose: (id: string) => void }) {
   return (
-    <div className="flex items-center gap-1.5 border-b border-border bg-black/20 px-3 py-1 text-[11px] text-text-secondary">
-      <ToolLogo tool={pane.tool} size={11} />
-      <span className="flex-1">{toolLabel(pane.tool)}</span>
-      <span role="button" onClick={() => onClose(pane.id)} className="cursor-pointer rounded px-0.5 opacity-40 transition-opacity hover:opacity-100 hover:text-fail">✕</span>
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-[#0a0a0a] text-[#e8e8e8]">
+      {sidebar}
+      <div
+        className="w-2.5 shrink-0 self-stretch"
+        style={{ width: 10 }}
+      >
+        <ResizeDivider
+          mode="delta"
+          orientation="horizontal"
+          onResize={(delta) =>
+            setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
+          }
+        />
+      </div>
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {topBar}
+        {terminalError && (
+          <div className="shrink-0 border-b border-red-500/30 bg-red-900/20 px-3 py-2 text-[12px] text-red-300">
+            {terminalError}
+          </div>
+        )}
+        {terminalArea}
+      </div>
     </div>
   );
 }
 
-// ─── ToolCard ──────────────────────────────────────────────────────────────────
+function WarpTopBar({
+  profileLabel,
+  paneCount,
+  maxPanes,
+  canAddPane,
+  broadcastInput,
+  restoring,
+  externalTerminal,
+  onExternalTerminalChange,
+  newMenuRef,
+  showNewMenu,
+  onToggleNewMenu,
+  onAddPane,
+  available,
+}: {
+  profileLabel: string | null;
+  paneCount: number;
+  maxPanes: number;
+  canAddPane: boolean;
+  broadcastInput: boolean;
+  restoring: boolean;
+  externalTerminal: ExternalTerminal;
+  onExternalTerminalChange: (v: ExternalTerminal) => void;
+  newMenuRef: React.RefObject<HTMLDivElement | null>;
+  showNewMenu: boolean;
+  onToggleNewMenu: () => void;
+  onAddPane: (tool: string) => void;
+  available: ProviderEntry[];
+}) {
+  return (
+    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[#1f1f1f] bg-[#0a0a0a] px-3">
+      <input
+        type="search"
+        placeholder="Search…"
+        className="min-w-0 max-w-md flex-1 rounded-md border border-[#252525] bg-[#111111] px-2.5 py-1 text-[12px] text-[#c0c0c0] placeholder:text-[#5a5a5a] focus:border-[#404040] focus:outline-none"
+      />
+      {profileLabel && (
+        <span className="hidden max-w-[200px] truncate text-[11px] text-[#6b9fff] lg:inline" title={profileLabel}>
+          {profileLabel}
+          {paneCount > 0 && (
+            <span className="ml-1 text-[#5a5a5a]">
+              · {paneCount}/{maxPanes}
+              {broadcastInput && paneCount > 1 ? " · 同步輸入" : ""}
+            </span>
+          )}
+        </span>
+      )}
+      {restoring && <span className="text-[11px] text-[#6b6b6b]">Restoring…</span>}
+      <div ref={newMenuRef} className="relative ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!canAddPane}
+          onClick={onToggleNewMenu}
+          title={canAddPane ? "Add terminal pane" : `Maximum ${maxPanes} panes`}
+          className="cursor-pointer rounded-md border border-[#2a2a2a] px-2.5 py-1 text-[12px] text-[#a0a0a0] hover:border-[#404040] disabled:opacity-40"
+        >
+          + Pane
+        </button>
+        {showNewMenu && canAddPane && (
+          <div className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-lg border border-[#2a2a2a] bg-[#141414] py-1 shadow-xl">
+            {available.map((e) => (
+              <button
+                key={e.tool}
+                type="button"
+                onClick={() => {
+                  onAddPane(e.tool);
+                  onToggleNewMenu();
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[12px] hover:bg-[#1f1f1f]"
+              >
+                <ToolLogo tool={e.tool} size={14} />
+                {toolLabel(e.tool)}
+              </button>
+            ))}
+          </div>
+        )}
+        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
+      </div>
+    </div>
+  );
+}
 
 function ToolCard({
   entry,
@@ -300,63 +596,65 @@ function ToolCard({
   onInApp?: () => void;
   onExternal?: () => Promise<{ success: boolean; error?: string }>;
 }) {
-  const [extBusy,   setExtBusy]   = useState(false);
+  const [extBusy, setExtBusy] = useState(false);
   const [inAppBusy, setInAppBusy] = useState(false);
-  const [err,       setErr]       = useState("");
+  const [err, setErr] = useState("");
 
   async function handleExternal() {
     if (!onExternal) return;
-    setExtBusy(true); setErr("");
+    setExtBusy(true);
+    setErr("");
     const r = await onExternal();
     setExtBusy(false);
     if (!r.success) setErr(r.error ?? "Failed to launch terminal");
   }
 
   async function handleInApp() {
-    setInAppBusy(true); setErr("");
+    setInAppBusy(true);
+    setErr("");
     await onInApp?.();
     setInAppBusy(false);
   }
 
   return (
-    <div className={`flex flex-col gap-4 rounded-xl border p-6 transition-colors ${
-      disabled ? "border-border bg-bg-secondary opacity-50" : "border-border bg-bg-card hover:border-accent/40"
-    }`}>
-      {/* Header */}
+    <div
+      className={`flex flex-col gap-4 rounded-xl border p-6 transition-colors ${
+        disabled
+          ? "border-[#252525] bg-[#111111] opacity-50"
+          : "border-[#252525] bg-[#141414] hover:border-[#404040]"
+      }`}
+    >
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-bg-secondary">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#2a2a2a] bg-[#0a0a0a]">
           <ToolLogo tool={entry.tool} size={28} />
         </div>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="text-[15px] font-semibold text-text-primary">{toolLabel(entry.tool)}</span>
-            {entry.version && <span className="text-[11px] text-text-secondary">v{entry.version}</span>}
+            <span className="text-[15px] font-semibold">{toolLabel(entry.tool)}</span>
+            {entry.version && <span className="text-[11px] text-[#6b6b6b]">v{entry.version}</span>}
           </div>
           <AuthBadge auth={disabled ? "missing" : entry.auth} />
         </div>
       </div>
-
-      <p className="text-[13px] leading-relaxed text-text-secondary">
+      <p className="text-[13px] leading-relaxed text-[#8a8a8a]">
         {TOOL_DESCRIPTIONS[entry.tool] ?? "AI coding assistant"}
       </p>
-
-      {err && <p className="rounded-md bg-fail/10 px-3 py-2 text-[12px] text-fail">{err}</p>}
-
+      {err && <p className="rounded-md bg-red-500/10 px-3 py-2 text-[12px] text-red-400">{err}</p>}
       {disabled ? (
-        <p className="text-center text-[13px] text-text-secondary">Not installed</p>
+        <p className="text-center text-[13px] text-[#6b6b6b]">Not installed</p>
       ) : (
         <div className="mt-auto grid grid-cols-2 gap-3">
           <button
             disabled={extBusy}
             onClick={handleExternal}
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-[13px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#2a2a2a] py-2.5 text-[13px] disabled:opacity-50"
           >
             {extBusy ? <span className="animate-spin">⟳</span> : "🖥️"} External
           </button>
           <button
             disabled={inAppBusy}
             onClick={handleInApp}
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-accent/60 bg-accent/10 py-2.5 text-[13px] font-medium text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#3d5a80] bg-[#1a2a40]/60 py-2.5 text-[13px] font-medium text-[#7eb8ff] disabled:opacity-50"
           >
             {inAppBusy ? <span className="animate-spin">⟳</span> : "⌨️"} In-App
           </button>
@@ -366,52 +664,10 @@ function ToolCard({
   );
 }
 
-// ─── AddPaneMenu ───────────────────────────────────────────────────────────────
-
-function AddPaneMenu({ data, onAdd }: { data: ProviderEntry[]; onAdd: (tool: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const available = data.filter((e) => e.available);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="cursor-pointer rounded-md border border-border px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-accent/50 hover:text-text-primary"
-      >
-        + Add
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 min-w-[160px] rounded-xl border border-border bg-bg-card shadow-xl">
-          {available.length === 0 && (
-            <p className="px-4 py-3 text-[12px] text-text-secondary">No tools available</p>
-          )}
-          {available.map((e) => (
-            <button
-              key={e.tool}
-              onClick={() => { onAdd(e.tool); setOpen(false); }}
-              className="flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-[12px] text-text-primary transition-colors hover:bg-bg-secondary first:rounded-t-xl last:rounded-b-xl"
-            >
-              <ToolLogo tool={e.tool} size={14} />
-              {toolLabel(e.tool)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── TerminalSelector ──────────────────────────────────────────────────────────
-
-function TerminalSelector({ value, onChange }: {
+function TerminalSelector({
+  value,
+  onChange,
+}: {
   value: ExternalTerminal;
   onChange: (v: ExternalTerminal) => void;
 }) {
@@ -419,13 +675,13 @@ function TerminalSelector({ value, onChange }: {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as ExternalTerminal)}
-      className="cursor-pointer rounded-md border border-border bg-bg-secondary px-2 py-1 font-sans text-[12px] text-text-secondary transition-colors hover:border-accent/50 focus:outline-none"
+      className="cursor-pointer rounded-md border border-[#2a2a2a] bg-[#111111] px-2 py-1 text-[12px] focus:outline-none"
     >
       {TERMINAL_OPTIONS.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   );
 }
-
-

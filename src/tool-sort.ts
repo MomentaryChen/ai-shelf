@@ -1,6 +1,7 @@
 import type { ProviderEntry } from "./inventory/types.js";
 
 export const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  shell: "Plain shell",
   claude: "Claude",
   copilot: "Copilot",
   cursor: "Cursor",

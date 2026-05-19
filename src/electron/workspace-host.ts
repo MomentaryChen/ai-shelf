@@ -1,4 +1,4 @@
-import { bootstrap, type AppContext } from "ai-cli-inventory";
+import { bootstrap, type AppContext, type GroupLayoutSnapshot } from "ai-cli-inventory";
 
 let ctx: AppContext | null = null;
 
@@ -13,7 +13,7 @@ export function closeWorkspaceContext(): void {
 }
 
 export function getWorkspaceTree() {
-  const { sessionService } = getWorkspaceContext();
+  const { sessionService, groupLayoutService } = getWorkspaceContext();
   const { workspaces, groups, sessions } = sessionService.getTree();
 
   return {
@@ -44,5 +44,48 @@ export function getWorkspaceTree() {
         })),
       ]),
     ),
+    groupLayouts: groupLayoutService.getMetaMap(),
+    lastActiveGroupKey: groupLayoutService.getLastActiveGroupKey(),
   };
+}
+
+export function getGroupLayout(workspaceId: string, groupId: string) {
+  return getWorkspaceContext().groupLayoutService.get(workspaceId, groupId);
+}
+
+export function saveGroupLayout(workspaceId: string, groupId: string, snapshot: GroupLayoutSnapshot) {
+  return getWorkspaceContext().groupLayoutService.save(workspaceId, groupId, snapshot);
+}
+
+export function setLastActiveGroup(workspaceId: string, groupId: string) {
+  getWorkspaceContext().groupLayoutService.setLastActiveGroup(workspaceId, groupId);
+}
+
+export function getProfileTree() {
+  return getWorkspaceContext().profileService.getTree();
+}
+
+export function createProfile(
+  name: string,
+  defaultCwd?: string,
+  defaultTool?: string,
+  accentColor?: string | null,
+) {
+  return getWorkspaceContext().profileService.create(name, defaultCwd, defaultTool, accentColor);
+}
+
+export function updateProfile(
+  profileId: string,
+  patch: {
+    defaultCwd?: string;
+    defaultTool?: string;
+    broadcastInput?: boolean;
+    accentColor?: string | null;
+  },
+) {
+  return getWorkspaceContext().profileService.update(profileId, patch);
+}
+
+export function deleteProfile(profileId: string) {
+  getWorkspaceContext().profileService.delete(profileId);
 }

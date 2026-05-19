@@ -8,6 +8,7 @@ const ChatTab = lazy(() =>
 
 export function ChatWindowApp() {
   const { data, scanning, error, hasData } = useInventoryScan();
+  const inventoryScanning = scanning;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
@@ -23,7 +24,7 @@ export function ChatWindowApp() {
       )}
       {hasData && (
         <Suspense fallback={<Spinner label="Loading terminal…" />}>
-          <ChatTab data={data} />
+          <ChatTab data={data} inventoryScanning={inventoryScanning} />
         </Suspense>
       )}
     </div>

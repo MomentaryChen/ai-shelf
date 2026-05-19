@@ -1,113 +1,115 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ToolUpdateInfo } from "../types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ProviderEntry, ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
-import { toolIcon } from "../utils";
-import { sortByDisplayName, toolDisplayName } from "../../tool-sort.js";
+import { toolIcon, toolLabel } from "../utils";
+import { versionsEqual } from "../../utils/version.js";
 
-export function UpdateTab() {
-  const [tools, setTools] = useState<ToolUpdateInfo[]>([]);
-  const [checkingLatest, setCheckingLatest] = useState<Set<string>>(new Set());
-  const [scanDone, setScanDone] = useState(false);
+type UpdateMeta = Record<string, { latestVersion: string | null; updateCommand: string }>;
+
+export function UpdateTab({ data }: { data: ProviderEntry[] }) {
+  const [meta, setMeta] = useState<UpdateMeta>({});
+  const [selfTool, setSelfTool] = useState<ToolUpdateInfo | null>(null);
+  const [checking, setChecking] = useState(true);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, { success: boolean; message: string }>>({});
-  const abortRef = useRef(false);
 
-  const startScan = useCallback(() => {
-    abortRef.current = false;
-    setTools([]);
-    setCheckingLatest(new Set());
-    setScanDone(false);
+  const runCheck = useCallback(async () => {
+    setChecking(true);
     setResults({});
-
-    window.api.offScanListeners();
-
-    window.api.onToolDetected((data) => {
-      if (abortRef.current) return;
-      setTools((prev) => {
-        const exists = prev.find((t) => t.tool === data.tool);
-        const next = exists
-          ? prev.map((t) => (t.tool === data.tool ? { ...t, ...data } : t))
-          : [...prev, data];
-        return sortByDisplayName(next, (t) => t.label || toolDisplayName(t.tool));
-      });
-      setCheckingLatest((prev) => new Set([...prev, data.tool]));
-    });
-
-    window.api.onToolLatest(({ tool, latestVersion }) => {
-      if (abortRef.current) return;
-      setTools((prev) => prev.map((t) => (t.tool === tool ? { ...t, latestVersion } : t)));
-      setCheckingLatest((prev) => { const n = new Set(prev); n.delete(tool); return n; });
-    });
-
-    window.api.onScanComplete(() => {
-      if (!abortRef.current) setScanDone(true);
-    });
-
-    window.api.startUpdateScan();
+    try {
+      const { tools } = await window.api.checkUpdate();
+      const nextMeta: UpdateMeta = {};
+      let self: ToolUpdateInfo | null = null;
+      for (const t of tools) {
+        if (t.tool === "ai-cli-inventory") {
+          self = t;
+        } else {
+          nextMeta[t.tool] = {
+            latestVersion: t.latestVersion,
+            updateCommand: t.updateCommand,
+          };
+        }
+      }
+      setMeta(nextMeta);
+      setSelfTool(self);
+    } finally {
+      setChecking(false);
+    }
   }, []);
 
   useEffect(() => {
-    startScan();
-    return () => {
-      abortRef.current = true;
-      window.api.offScanListeners();
-    };
-  }, [startScan]);
+    void runCheck();
+  }, [runCheck, data]);
+
+  const tools = useMemo((): ToolUpdateInfo[] => {
+    const fromInventory = data.map((e) => ({
+      tool: e.tool,
+      label: toolLabel(e.tool),
+      currentVersion: e.version ?? null,
+      latestVersion: meta[e.tool]?.latestVersion ?? null,
+      available: e.available,
+      updateCommand: meta[e.tool]?.updateCommand ?? "",
+    }));
+    return selfTool ? [...fromInventory, selfTool] : fromInventory;
+  }, [data, meta, selfTool]);
 
   const handleUpdate = async (tool: string) => {
     setUpdating((prev) => ({ ...prev, [tool]: true }));
-    setResults((prev) => { const n = { ...prev }; delete n[tool]; return n; });
+    setResults((prev) => {
+      const n = { ...prev };
+      delete n[tool];
+      return n;
+    });
     try {
       const res = await window.api.runUpdate(tool);
       setResults((prev) => ({ ...prev, [tool]: res }));
-      if (res.success) startScan();
+      if (res.success) await runCheck();
     } catch {
-      setResults((prev) => ({ ...prev, [tool]: { success: false, message: "Update failed unexpectedly" } }));
+      setResults((prev) => ({
+        ...prev,
+        [tool]: { success: false, message: "Update failed unexpectedly" },
+      }));
     } finally {
       setUpdating((prev) => ({ ...prev, [tool]: false }));
     }
   };
 
-  const selfTool = tools.find((t) => t.tool === "ai-cli-inventory");
-  const aiTools = tools.filter((t) => t.tool !== "ai-cli-inventory");
-  const isScanning = !scanDone || checkingLatest.size > 0;
-
   const outdatedTools = tools.filter(
-    (t) => t.latestVersion != null && t.latestVersion !== t.currentVersion
+    (t) => t.latestVersion != null && !versionsEqual(t.currentVersion, t.latestVersion),
   );
-  const allUpToDate = !isScanning && tools.length > 0 && outdatedTools.length === 0;
-  const hasUpdates = !isScanning && outdatedTools.length > 0;
+  const allUpToDate = !checking && tools.length > 0 && outdatedTools.length === 0;
+  const hasUpdates = !checking && outdatedTools.length > 0;
 
   return (
     <>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
         🔄 Update
-        {isScanning && (
-          <span className="animate-pulse text-sm font-normal text-text-secondary">scanning…</span>
+        {checking && (
+          <span className="animate-pulse text-sm font-normal text-text-secondary">checking…</span>
         )}
       </h2>
 
       <div className="mb-3 flex justify-end">
         <button
-          onClick={startScan}
-          disabled={isScanning}
+          onClick={() => void runCheck()}
+          disabled={checking}
           className="cursor-pointer rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-primary transition-all hover:border-accent disabled:opacity-50"
         >
           🔍 Re-check All
         </button>
       </div>
 
-      {tools.length === 0 && (
-        <p className="py-10 text-center animate-pulse text-text-secondary">Detecting tools…</p>
+      {!checking && tools.length === 0 && (
+        <p className="py-10 text-center text-text-secondary">No tools detected</p>
       )}
 
       {allUpToDate && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-ok/30 bg-ok/10 px-4 py-3">
           <span className="text-2xl">🎉</span>
           <div>
-            <p className="font-semibold text-ok">所有工具均為最新版本</p>
-            <p className="text-xs text-text-secondary">共 {tools.length} 個工具，無需更新</p>
+            <p className="font-semibold text-ok">All tools are up to date</p>
+            <p className="text-xs text-text-secondary">{tools.length} tools checked — nothing to update</p>
           </div>
         </div>
       )}
@@ -116,33 +118,24 @@ export function UpdateTab() {
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-warn/30 bg-warn/10 px-4 py-3">
           <span className="text-2xl">⬆️</span>
           <div>
-            <p className="font-semibold text-warn">有 {outdatedTools.length} 個工具可更新</p>
-            <p className="text-xs text-text-secondary">請展開下方卡片進行更新</p>
+            <p className="font-semibold text-warn">
+              {outdatedTools.length} tool{outdatedTools.length === 1 ? "" : "s"} can be updated
+            </p>
+            <p className="text-xs text-text-secondary">Use the cards below to update</p>
           </div>
         </div>
       )}
 
-      {aiTools.map((t) => (
+      {tools.map((t) => (
         <ToolUpdateCard
           key={t.tool}
           tool={t}
-          isChecking={checkingLatest.has(t.tool)}
+          isChecking={checking && t.latestVersion == null && t.tool !== "ai-cli-inventory"}
           isUpdating={updating[t.tool] ?? false}
           result={results[t.tool]}
-          onUpdate={() => handleUpdate(t.tool)}
+          onUpdate={() => void handleUpdate(t.tool)}
         />
       ))}
-
-      {selfTool && (
-        <ToolUpdateCard
-          key={selfTool.tool}
-          tool={selfTool}
-          isChecking={checkingLatest.has(selfTool.tool)}
-          isUpdating={updating[selfTool.tool] ?? false}
-          result={results[selfTool.tool]}
-          onUpdate={() => handleUpdate(selfTool.tool)}
-        />
-      )}
     </>
   );
 }
@@ -161,8 +154,14 @@ function ToolUpdateCard({
   onUpdate: () => void;
 }) {
   const icon = toolIcon(t.tool === "ai-cli-inventory" ? "" : t.tool);
-  const isOutdated = t.latestVersion != null && t.currentVersion != null && t.latestVersion !== t.currentVersion;
-  const isUpToDate = t.latestVersion != null && t.currentVersion != null && t.latestVersion === t.currentVersion;
+  const isOutdated =
+    t.latestVersion != null &&
+    t.currentVersion != null &&
+    !versionsEqual(t.currentVersion, t.latestVersion);
+  const isUpToDate =
+    t.latestVersion != null &&
+    t.currentVersion != null &&
+    versionsEqual(t.currentVersion, t.latestVersion);
 
   const badge = isChecking
     ? <Badge text="Checking…" variant="info" />
@@ -206,13 +205,13 @@ function ToolUpdateCard({
           </div>
         )}
 
-        {t.available && t.updateCommand && (
+        {t.available && t.updateCommand && !isChecking && (
           isUpToDate ? (
             <div className="flex items-center gap-2 text-sm text-ok">
               <span>✅</span>
-              <span>無需更新，已是最新版本</span>
+              <span>No update needed — already on the latest version</span>
             </div>
-          ) : isOutdated ? (
+          ) : (
             <button
               onClick={onUpdate}
               disabled={isUpdating}
@@ -220,7 +219,7 @@ function ToolUpdateCard({
             >
               {isUpdating ? "⏳ Updating…" : "⬆️ Update"}
             </button>
-          ) : null
+          )
         )}
 
         {result && (

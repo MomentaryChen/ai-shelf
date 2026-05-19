@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from "electron";
+import type { MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -14,10 +15,18 @@ import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { run } from "../utils/exec.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
+import type { GroupLayoutSnapshot } from "ai-cli-inventory";
 import {
   getWorkspaceContext,
   closeWorkspaceContext,
   getWorkspaceTree,
+  getGroupLayout,
+  saveGroupLayout,
+  setLastActiveGroup,
+  getProfileTree,
+  createProfile,
+  updateProfile,
+  deleteProfile,
 } from "./workspace-host.js";
 
 /** Update commands for each AI tool */
@@ -59,7 +68,16 @@ type PtyModule = typeof import("node-pty");
 let ptyModule: PtyModule | null = null;
 
 async function getPty(): Promise<PtyModule> {
-  if (!ptyModule) ptyModule = await import("node-pty");
+  if (!ptyModule) {
+    try {
+      ptyModule = await import("node-pty");
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `node-pty native module is not available for Electron. Run: pnpm run rebuild:native:all\n${detail}`,
+      );
+    }
+  }
   return ptyModule;
 }
 
@@ -84,6 +102,70 @@ function mergeInventoryEntry(entries: ProviderEntry[], entry: ProviderEntry): Pr
   return sortProviderEntries([...entries, entry]);
 }
 
+function toggleDevTools(win: BrowserWindow | null) {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.toggleDevTools();
+}
+
+/** F12 / Ctrl+Shift+I — Electron does not enable these by default. */
+function bindDevToolsShortcuts(win: BrowserWindow) {
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    const key = input.key;
+    const f12 = key === "F12";
+    const ctrlShiftI =
+      (input.control || input.meta) && input.shift && key.toLowerCase() === "i";
+    if (f12 || ctrlShiftI) {
+      event.preventDefault();
+      toggleDevTools(win);
+    }
+  });
+}
+
+function setupAppMenu() {
+  const isMac = process.platform === "darwin";
+  const viewSubmenu: MenuItemConstructorOptions[] = [
+    { role: "reload" },
+    { role: "forceReload" },
+    { type: "separator" },
+    {
+      label: "Developer Tools",
+      accelerator: "F12",
+      click: (_item, win) => {
+        const bw = win && "webContents" in win ? (win as BrowserWindow) : null;
+        toggleDevTools(bw);
+      },
+    },
+    {
+      label: "Developer Tools (Alt)",
+      accelerator: "CmdOrCtrl+Shift+I",
+      click: (_item, win) => {
+        const bw = win && "webContents" in win ? (win as BrowserWindow) : null;
+        toggleDevTools(bw);
+      },
+    },
+    { type: "separator" },
+    { role: "resetZoom" },
+    { role: "zoomIn" },
+    { role: "zoomOut" },
+    { type: "separator" },
+    { role: "togglefullscreen" },
+  ];
+
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac
+      ? [{ role: "appMenu" as const }]
+      : []),
+    { label: "View", submenu: viewSubmenu },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function attachWindow(win: BrowserWindow) {
+  bindDevToolsShortcuts(win);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -98,6 +180,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(RENDERER_HTML);
+  attachWindow(mainWindow);
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -121,6 +204,7 @@ function createChatWindow() {
     backgroundColor: "#0f172a",
   });
   chatWindow.loadFile(RENDERER_HTML, { hash: "chat" });
+  attachWindow(chatWindow);
   chatWindow.on("closed", () => {
     chatWindow = null;
   });
@@ -143,6 +227,7 @@ function createSettingsWindow() {
     backgroundColor: "#0f172a",
   });
   settingsWindow.loadFile(RENDERER_HTML, { hash: "settings" });
+  attachWindow(settingsWindow);
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
@@ -154,6 +239,11 @@ ipcMain.handle("open-chat-window", () => {
 
 ipcMain.handle("open-settings-window", () => {
   createSettingsWindow();
+});
+
+ipcMain.handle("toggle-devtools", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  toggleDevTools(win);
 });
 
 // IPC handlers
@@ -261,28 +351,22 @@ ipcMain.handle("doctor-tool", async (_event, tool: string) => {
 });
 
 ipcMain.handle("get-env-vars", () => {
-  const e = (key: string) => process.env[key];
+  const env = (key: string) => {
+    const value = process.env[key];
+    return { key, set: !!value, value };
+  };
   return [
     {
       provider: "Claude",
-      vars: [
-        { key: "ANTHROPIC_API_KEY", set: !!e("ANTHROPIC_API_KEY") },
-        { key: "ANTHROPIC_BASE_URL", set: !!e("ANTHROPIC_BASE_URL"), value: e("ANTHROPIC_BASE_URL") },
-      ],
+      vars: [env("ANTHROPIC_API_KEY"), env("ANTHROPIC_BASE_URL")],
     },
     {
       provider: "Copilot",
-      vars: [
-        { key: "GH_TOKEN", set: !!e("GH_TOKEN") },
-        { key: "GITHUB_TOKEN", set: !!e("GITHUB_TOKEN") },
-        { key: "COPILOT_HOME", set: !!e("COPILOT_HOME"), value: e("COPILOT_HOME") },
-      ],
+      vars: [env("GH_TOKEN"), env("GITHUB_TOKEN"), env("COPILOT_HOME")],
     },
     {
       provider: "Cursor",
-      vars: [
-        { key: "CURSOR_API_KEY", set: !!e("CURSOR_API_KEY") },
-      ],
+      vars: [env("CURSOR_API_KEY")],
     },
   ];
 });
@@ -290,6 +374,7 @@ ipcMain.handle("get-env-vars", () => {
 /** npm package names for tools that can be version-checked */
 const TOOL_NPM_PACKAGE: Record<string, string> = {
   claude: "@anthropic-ai/claude-code",
+  copilot: "@github/copilot",
 };
 
 function fetchLatestNpmVersion(pkg: string): string | null {
@@ -590,7 +675,54 @@ ipcMain.handle("open-path", async (_event, filePath: string) => {
 
 // --- PTY (In-App Terminal) ---
 
+const TOOL_LAUNCH_CMD: Record<string, string> = {
+  claude: "claude",
+  copilot: "copilot",
+  cursor: "cursor",
+  "cursor-agent": "agent",
+  agent: "agent",
+};
+
+const PLAIN_SHELL_TOOL_ID = "shell";
+
 const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
+const PTY_OUTPUT_BUFFERS = new Map<string, string>();
+const PTY_BUFFER_MAX_CHARS = 256 * 1024;
+
+function appendPtyBuffer(sessionId: string, data: string) {
+  const prev = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
+  let next = prev + data;
+  if (next.length > PTY_BUFFER_MAX_CHARS) {
+    next = next.slice(-PTY_BUFFER_MAX_CHARS);
+  }
+  PTY_OUTPUT_BUFFERS.set(sessionId, next);
+}
+
+function clearPtyBuffer(sessionId: string) {
+  PTY_OUTPUT_BUFFERS.delete(sessionId);
+}
+
+function broadcastPtyData(sessionId: string, data: string) {
+  appendPtyBuffer(sessionId, data);
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("pty-data", { sessionId, data });
+    }
+  }
+}
+
+function broadcastPtyExit(sessionId: string, exitCode: number) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("pty-exit", { sessionId, exitCode });
+    }
+  }
+}
+
+function resolvePtyWorkDir(cwd?: string): string {
+  if (cwd && existsSync(cwd)) return cwd;
+  return homedir();
+}
 
 ipcMain.handle("pick-folder", async (_event, defaultPath?: string) => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -601,22 +733,34 @@ ipcMain.handle("pick-folder", async (_event, defaultPath?: string) => {
 });
 
 ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string) => {
-  const pty = await getPty();
-  const cmd = TOOL_LAUNCH_CMD[tool];
-  if (!cmd) return { success: false, error: `Unknown tool: ${tool}` };
+  let pty: PtyModule;
+  try {
+    pty = await getPty();
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+  const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
+  const cmd = shellOnly ? "" : TOOL_LAUNCH_CMD[tool];
+  if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
 
   const sessionId = `${tool}-${Date.now()}`;
   const isWin = process.platform === "win32";
-  const workDir = cwd || homedir();
+  const workDir = resolvePtyWorkDir(cwd);
 
   // On Windows: prefer pwsh (loads $PROFILE for prompt themes) → powershell → cmd
-  const windowsCandidates: [string, string[]][] = [
-    ["pwsh.exe",       ["-NoLogo", "-NoExit", "-Command", cmd]],
-    ["powershell.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
-    ["cmd.exe",        ["/k", cmd]],
-  ];
+  const windowsCandidates: [string, string[]][] = shellOnly
+    ? [
+        ["pwsh.exe", ["-NoLogo", "-NoExit"]],
+        ["powershell.exe", ["-NoLogo", "-NoExit"]],
+        ["cmd.exe", ["/k"]],
+      ]
+    : [
+        ["pwsh.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
+        ["powershell.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
+        ["cmd.exe", ["/k", cmd]],
+      ];
   const unixShell = "/bin/bash";
-  const unixArgs  = ["-c", `${cmd}; exec bash`];
+  const unixArgs = shellOnly ? [] : ["-c", `${cmd}; exec bash`];
 
   const ptyOpts = {
     name: "xterm-256color",
@@ -647,15 +791,25 @@ ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string) => {
       proc = pty.spawn(unixShell, unixArgs, ptyOpts);
     }
 
+    PTY_OUTPUT_BUFFERS.set(sessionId, "");
+
     PTY_SESSIONS.set(sessionId, proc);
 
     proc.onData((data) => {
-      if (!event.sender.isDestroyed()) event.sender.send("pty-data", { sessionId, data });
+      broadcastPtyData(sessionId, data);
     });
+
+    // Kick the shell to emit a prompt after attach (some shells wait for first resize).
+    try {
+      proc.resize(ptyOpts.cols, ptyOpts.rows);
+    } catch {
+      /* ignore */
+    }
 
     proc.onExit(({ exitCode }) => {
       PTY_SESSIONS.delete(sessionId);
-      if (!event.sender.isDestroyed()) event.sender.send("pty-exit", { sessionId, exitCode });
+      clearPtyBuffer(sessionId);
+      broadcastPtyExit(sessionId, exitCode);
     });
 
     return { success: true, sessionId };
@@ -664,22 +818,24 @@ ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string) => {
   }
 });
 
+ipcMain.handle("pty-attach", (_event, sessionId: string) => {
+  const alive = PTY_SESSIONS.has(sessionId);
+  return {
+    success: true,
+    alive,
+    buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
+  };
+});
+
 ipcMain.on("pty-write",  (_e, sessionId: string, data: string)                    => { PTY_SESSIONS.get(sessionId)?.write(data); });
 ipcMain.on("pty-resize", (_e, sessionId: string, cols: number, rows: number)       => { PTY_SESSIONS.get(sessionId)?.resize(cols, rows); });
 ipcMain.on("pty-kill",   (_e, sessionId: string)                                   => {
   try { PTY_SESSIONS.get(sessionId)?.kill(); } catch { /* already dead */ }
   PTY_SESSIONS.delete(sessionId);
+  clearPtyBuffer(sessionId);
 });
 
 // --- Launch in Terminal ---
-
-const TOOL_LAUNCH_CMD: Record<string, string> = {
-  claude: "claude",
-  copilot: "copilot",
-  cursor: "cursor",
-  "cursor-agent": "agent",
-  agent: "agent",
-};
 
 ipcMain.handle("launch-in-terminal", (_event, tool: string, terminal: string = "auto", cwd?: string) => {
   const baseCmd = TOOL_LAUNCH_CMD[tool];
@@ -848,7 +1004,95 @@ ipcMain.handle("ws-session-stop", (_e, workspace: string, group: string, name: s
   }
 });
 
-app.whenReady().then(createWindow);
+ipcMain.handle("ws-group-layout-get", (_e, workspaceId: string, groupId: string) => {
+  try {
+    const snapshot = getGroupLayout(workspaceId, groupId);
+    return { success: true, snapshot };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle(
+  "ws-group-layout-save",
+  (
+    _e,
+    workspaceId: string,
+    groupId: string,
+    snapshot: GroupLayoutSnapshot,
+  ) => {
+    try {
+      const saved = saveGroupLayout(workspaceId, groupId, snapshot);
+      return { success: true, snapshot: saved };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle("ws-group-layout-set-active", (_e, workspaceId: string, groupId: string) => {
+  try {
+    setLastActiveGroup(workspaceId, groupId);
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("profile-get-tree", () => {
+  try {
+    return { success: true, tree: getProfileTree() };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle(
+  "profile-create",
+  (_e, name: string, defaultCwd?: string, defaultTool?: string, accentColor?: string | null) => {
+    try {
+      const profile = createProfile(name, defaultCwd, defaultTool, accentColor);
+      return { success: true, profile };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  "profile-update",
+  (
+    _e,
+    profileId: string,
+    patch: {
+      defaultCwd?: string;
+      defaultTool?: string;
+      broadcastInput?: boolean;
+      accentColor?: string | null;
+    },
+  ) => {
+    try {
+      const profile = updateProfile(profileId, patch);
+      return { success: true, profile };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle("profile-delete", (_e, profileId: string) => {
+  try {
+    deleteProfile(profileId);
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+app.whenReady().then(() => {
+  setupAppMenu();
+  createWindow();
+});
 
 // Kill all active PTY sessions before the app exits
 app.on("before-quit", () => {

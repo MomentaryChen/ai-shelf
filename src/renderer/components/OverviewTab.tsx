@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EnvVarGroup, ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { DataTable, Td } from "./DataTable";
@@ -13,7 +13,21 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
   const warnings = data.filter((e) => !e.available || e.auth === "missing").length;
 
   const [envGroups, setEnvGroups] = useState<EnvVarGroup[]>([]);
+  const [openEnvId, setOpenEnvId] = useState<string | null>(null);
+  const envPopoverRef = useRef<HTMLSpanElement>(null);
   useEffect(() => { window.api.getEnvVars().then(setEnvGroups); }, []);
+
+  useEffect(() => {
+    if (!openEnvId) return;
+    const close = (e: MouseEvent) => {
+      if (envPopoverRef.current?.contains(e.target as Node)) return;
+      setOpenEnvId(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [openEnvId]);
+
+  const envKey = (provider: string, key: string) => `${provider}:${key}`;
 
   return (
     <>
@@ -85,17 +99,41 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
             <div key={group.provider} className="flex items-start gap-4 border-t border-border py-2.5 first:border-none first:pt-0 text-[13px]">
               <span className="w-20 shrink-0 font-medium text-text-primary">{group.provider}</span>
               <div className="flex flex-wrap gap-x-6 gap-y-1.5">
-                {group.vars.map((v) => (
-                  <span key={v.key} className="flex items-center gap-1.5">
-                    <span className={v.set ? "text-ok" : "text-warn"}>{v.set ? "●" : "○"}</span>
-                    <span className="text-text-secondary">{v.key}</span>
-                    {v.value && (
-                      <span className="text-[12px] text-accent blur-sm transition-[filter] duration-150 hover:blur-none cursor-default select-none hover:select-text">
-                        {v.value}
-                      </span>
-                    )}
-                  </span>
-                ))}
+                {group.vars.map((v) => {
+                  const id = envKey(group.provider, v.key);
+                  const isOpen = openEnvId === id;
+                  const canReveal = v.set && !!v.value;
+                  return (
+                    <span
+                      key={v.key}
+                      ref={isOpen ? envPopoverRef : undefined}
+                      className="relative inline-flex items-center gap-1.5"
+                    >
+                      <span className={v.set ? "text-ok" : "text-warn"}>{v.set ? "●" : "○"}</span>
+                      <button
+                        type="button"
+                        disabled={!canReveal}
+                        onClick={() => setOpenEnvId(isOpen ? null : id)}
+                        className={`text-left text-text-secondary transition-colors ${
+                          canReveal
+                            ? "cursor-pointer hover:text-accent"
+                            : "cursor-default opacity-80"
+                        }`}
+                        title={canReveal ? (isOpen ? "隱藏值" : "點擊查看值") : v.set ? "已設定（無可顯示的值）" : "未設定"}
+                      >
+                        {v.key}
+                      </button>
+                      {canReveal && isOpen && (
+                        <div
+                          role="tooltip"
+                          className="absolute top-full left-0 z-20 mt-1 w-max max-w-[95vw] overflow-x-auto whitespace-nowrap rounded-md border border-border bg-bg-primary px-3 py-2 font-mono text-[12px] text-accent shadow-lg select-all"
+                        >
+                          {v.value}
+                        </div>
+                      )}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ))}

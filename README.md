@@ -1,69 +1,113 @@
 # AI CLI Inventory
 
-> Unified CLI to inspect models, skills, MCP servers, and configs across Claude, GitHub Copilot, and Cursor — all in one place.
+> Unified toolkit to inspect, launch, and orchestrate AI CLIs — Claude Code, GitHub Copilot, and Cursor — in one place.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [中文說明](README.zh-TW.md)
 
+**v0.2.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-cli-inventory`).
+
+---
+
+## What's in the repo
+
+| Deliverable | Binary / entry | Role |
+|---|---|---|
+| **Inventory CLI** | `ai` | Scan models, skills, MCP, config; run doctor/update/raw |
+| **Workspace CLI** | `ai-cli-inventory` | Manage workspaces, groups, sessions; broadcast commands; TUI |
+| **Desktop app** | `pnpm electron` | Terminal launcher + inventory dashboard (Electron + React) |
+
+The desktop app uses both: inventory detection lives in `src/`, while profiles, layouts, and session metadata are backed by SQLite via `packages/cli`.
+
 ---
 
 ## Features
 
-- **Overview** — at-a-glance capability matrix with summary stats, warnings, and env-var presence
-- **Models** — list available models per tool (via native CLI), switch default model with one click, expand collapsed lists with "load more"
+### Inventory (`ai`)
+
+- **Overview** — capability matrix, summary stats, warnings, env-var presence
+- **Models** — list models per tool via native CLI; one-click default switch; expandable lists
 - **Skills** — per-tool skill cards + cross-tool skill matrix
-- **MCP** — full MCP server inventory with sync status and cross-tool matrix
-- **Config** — all config, instruction, and MCP file paths per tool, clickable to open
-- **Doctor** — parallel health checks (binary, auth, config JSON) shown as live cards
-- **Update** — version check and one-click update for each tool and self, via native CLI
-- **Chat** — embedded terminal (xterm.js + node-pty) to launch any AI tool directly in-app; supports multi-pane split view with drag-to-resize, or open in an external terminal (Windows Terminal, PowerShell, CMD)
-- **JSON output** — machine-readable output for every CLI command
-- **Electron GUI** — optional desktop app (dark theme)
+- **MCP** — server inventory, sync status, cross-tool matrix, **MCP sync** (copy missing servers across tools)
+- **Config** — config / instruction / MCP file paths, clickable to open
+- **Doctor** — parallel health checks (binary, auth, config JSON)
+- **Update** — version check and one-click update per tool and self
+- **JSON output** — `--json` on every inventory command
 
-## Supported Tools
+### Terminal workspace (`ai-cli-inventory`)
 
-| Tool | Binary |
-|---|---|
-| Claude Code | `claude` |
-| GitHub Copilot CLI | `gh copilot` |
-| Cursor | `agent` |
+- **Workspaces & groups** — organize projects and terminal groups in SQLite
+- **Sessions** — create/start/stop PTY sessions with optional AI tool launch (`claude`, `copilot`, `cursor`)
+- **Broadcast exec** — send the same command to all running sessions in a group
+- **TUI** — full-screen terminal UI (`ai-cli-inventory tui`) built with neo-blessed
+- **Profiles API** — exported library used by the desktop app for named terminal profiles
+
+### Desktop app (Electron)
+
+- **Two modes** — **Terminal** (default) and **Inventory** (7 tabs: Overview · Models · Skills · MCP · Config · Doctor · Update)
+- **Profiles sidebar** — create/rename/delete profiles; each profile stores split-pane layout in SQLite
+- **Embedded terminals** — xterm.js + node-pty; multi-pane split with drag resize; broadcast input across panes
+- **External launch** — Windows Terminal, PowerShell 7+, PowerShell 5, or CMD
+- **Detached windows** — optional pop-out chat and settings windows
+- **Dark theme** — React + Tailwind CSS v4
 
 ---
 
-## Desktop GUI
+## Supported tools
+
+| Tool | Binary | Inventory id |
+|---|---|---|
+| Claude Code | `claude` | `claude` |
+| GitHub Copilot CLI | `copilot` / `gh copilot` | `copilot` |
+| Cursor | `agent` | `cursor` |
+
+---
+
+## Desktop app
 
 ![Overview](tests/screenshots/01.overview.png)
 
-The Electron app has 8 tabs: **Overview · Chat · Models · Skills · MCP · Config · Doctor · Update**.  
+Switch between **Terminal** and **Inventory** in the header. Inventory mode has the tabbed dashboard above; Terminal mode is the embedded multi-pane launcher with a profiles sidebar.
+
 → **[Full page-by-page guide with screenshots](docs/pages.md)**
 
 ---
 
 ## Installation
 
+### From npm (inventory CLI)
+
 ```bash
-# npm
-npm install -g ai-cli-inventory
-
-# pnpm
+npm install -g ai-cli-inventory   # exposes `ai` when published from root package
 pnpm add -g ai-cli-inventory
-
-# yarn
-yarn global add ai-cli-inventory
 ```
+
+### From source (monorepo)
+
+```bash
+git clone <repo-url> ai-cli-inventory
+cd ai-cli-inventory
+pnpm install          # rebuilds native modules (node-pty, better-sqlite3)
+pnpm build
+pnpm start            # ai inventory / doctor / …
+pnpm exec ai-cli-inventory workspace list
+pnpm electron         # desktop app
+```
+
+**Requirements:** Node.js ≥ 22, pnpm ≥ 10
 
 ---
 
 ## Usage
 
+### Inventory CLI — `ai`
+
 ```
 ai <command> [subcommand] [options]
 ```
 
-### `ai inventory` (alias: `ai inv`)
-
-Show a capability matrix for all detected AI tools.
+#### `ai inventory` (alias: `ai inv`)
 
 ```bash
 ai inventory            # full overview table
@@ -92,44 +136,33 @@ ai inventory claude     # detail view for a single tool
     ~/.config/gh/config.yml
 ```
 
-### `ai doctor`
-
-Run health checks for each detected tool.
+#### `ai doctor`
 
 ```bash
 ai doctor
 ai doctor --json
 ```
 
-Checks performed:
+Checks: binary in `PATH`, auth status, config JSON validity, MCP config JSON validity.
 
-- Binary found in `PATH`
-- Auth status (`ok` / `missing` / `expired` / `unknown`)
-- Config JSON validity
-- MCP config JSON validity
-
-### `ai raw <tool> [args...]`
-
-Pass arguments directly to an underlying CLI binary.
+#### `ai raw <tool> [args...]`
 
 ```bash
 ai raw claude --version
 ai raw copilot auth status
 ```
 
-### `ai update [target]`
-
-Update AI tools or the inventory itself.
+#### `ai update [target]`
 
 ```bash
-ai update              # update all detected tools + self
-ai update claude       # update Claude Code only
-ai update copilot      # update GitHub Copilot CLI only
-ai update cursor       # update Cursor only
-ai update self         # update ai-cli-inventory only
+ai update              # all detected tools + self
+ai update claude
+ai update copilot
+ai update cursor
+ai update self
 ```
 
-### Global Options
+#### Global options
 
 | Flag | Description |
 |---|---|
@@ -139,57 +172,107 @@ ai update self         # update ai-cli-inventory only
 
 ---
 
-## Development
+### Workspace CLI — `ai-cli-inventory`
 
-**Requirements:** Node.js ≥ 22, pnpm
+Persistent data (Windows):
+
+| Path | Purpose |
+|---|---|
+| `%APPDATA%/ai-cli-inventory/config.yaml` | App config |
+| `%APPDATA%/ai-cli-inventory/workspaces.db` | SQLite database |
+| `%APPDATA%/ai-cli-inventory/logs/app.log` | Logs |
 
 ```bash
-# Install dependencies
-pnpm install
+# Workspaces
+ai-cli-inventory workspace create <name> [--root <path>]
+ai-cli-inventory workspace list
+ai-cli-inventory workspace delete <name>
 
-# Watch mode (TypeScript)
-pnpm dev
+# Groups (within a workspace)
+ai-cli-inventory group create <workspace> <group>
+ai-cli-inventory group list <workspace>
+ai-cli-inventory group delete <workspace> <group>
 
-# Build
-pnpm build
+# Sessions
+ai-cli-inventory session create <workspace> <group> <name> [--cwd <path>] [--shell <shell>] [--tool <tool>]
+ai-cli-inventory session start <workspace> <group> <name>
+ai-cli-inventory session stop <workspace> <group> <name>
+ai-cli-inventory session list <workspace> [--group <name>]
+ai-cli-inventory session exec <workspace> <group> <command...> [--session <name>]
+ai-cli-inventory session exec <workspace> <group> <command...> --broadcast
+ai-cli-inventory session delete <workspace> <group> <name>
 
-# Run CLI from build
-pnpm start
-
-# Launch Electron desktop app
-pnpm electron
-
-# Package as standalone Windows executable
-pnpm package:win
-
-# Build Windows installer (electron-builder)
-pnpm dist:win
+# Full-screen TUI
+ai-cli-inventory tui
 ```
 
-### Project Structure
+See [`packages/cli/STRUCTURE.md`](packages/cli/STRUCTURE.md) for package internals.
+
+---
+
+## Development
+
+```bash
+pnpm install                 # postinstall rebuilds native addons for Electron
+
+# TypeScript
+pnpm dev                     # watch root src/ (inventory + electron main)
+pnpm dev:cli                 # watch packages/cli
+pnpm dev:renderer            # Vite dev server for React UI
+
+# Build & run
+pnpm build                   # CLI package + tsc + Vite renderer
+pnpm start                   # node dist/cli.js  →  `ai` commands
+pnpm electron                # build + launch desktop app
+pnpm electron:dev            # electron without rebuild (after pnpm build)
+
+# Native modules (node-pty for Electron)
+pnpm rebuild:native          # current Electron ABI
+pnpm rebuild:native:all      # all installed Electron versions
+
+# Quality & packaging
+pnpm test:e2e                # Playwright screenshot tests
+pnpm lint
+pnpm format / pnpm format:check
+pnpm package:win             # standalone CLI exe (pkg)
+pnpm dist:win                # portable Windows app (electron-builder → release/)
+```
+
+### Project structure
 
 ```
-src/
-├── cli.ts              # CLI entry point & argument parsing
-├── commands/
-│   ├── inventory.ts    # inventory command
-│   ├── doctor.ts       # doctor command
-│   ├── raw.ts          # raw pass-through command
-│   └── update.ts       # update command
-├── inventory/
-│   ├── index.ts        # detectAll() — runs all detectors
-│   ├── claude.ts       # Claude detector
-│   ├── copilot.ts      # Copilot detector
-│   ├── cursor.ts       # Cursor detector
-│   └── types.ts        # shared types (ProviderEntry, etc.)
-├── electron/           # Electron main process + preload
-├── renderer/           # React + Tailwind desktop UI
-│   └── components/
-│       ├── ChatTab.tsx          # embedded terminal launcher
-│       ├── EmbeddedTerminal.tsx # xterm.js terminal pane
-│       └── ...                  # OverviewTab, ModelsTab, etc.
-└── utils/              # exec, config helpers
+ai-cli-inventory/                 # root workspace (Electron app + inventory CLI)
+├── src/
+│   ├── cli.ts                    # `ai` entry — inventory, doctor, raw, update
+│   ├── commands/                 # CLI command handlers
+│   ├── inventory/                # Claude / Copilot / Cursor detectors
+│   ├── electron/                 # Main process, preload, workspace-host
+│   ├── renderer/                 # React UI (Terminal + Inventory modes)
+│   │   ├── components/           # ChatTab, ProfileSidebar, *Tab, …
+│   │   ├── hooks/                # useInventoryScan, useProfileWorkspace, …
+│   │   └── terminal/             # split-tree, layout serialize, SQLite sync
+│   └── utils/
+├── packages/cli/                 # `ai-cli-inventory` workspace manager
+│   └── src/
+│       ├── cli/                  # Commander commands
+│       ├── core/                 # ports, entities, errors
+│       ├── database/             # SQLite + migrations + repositories
+│       ├── services/             # workspace, group, session, profile, exec
+│       ├── runtime/              # PTY, process registry, event bus
+│       └── tui/                  # neo-blessed terminal UI
+├── docs/pages.md                 # Desktop UI walkthrough
+├── tests/e2e/                    # Playwright tests
+└── scripts/                      # gen-icon, rebuild-native
 ```
+
+### Tech stack
+
+| Layer | Stack |
+|---|---|
+| Inventory CLI | Node.js, native `parseArgs` |
+| Workspace CLI | Commander, better-sqlite3, node-pty, RxJS, Zod, Pino |
+| Desktop | Electron 41, React 19, Vite 8, Tailwind CSS 4, xterm.js |
+| Tests | Playwright |
 
 ---
 

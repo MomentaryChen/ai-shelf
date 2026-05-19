@@ -1,6 +1,7 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson, envPresent } from "../utils/config.js";
+import { parseCliVersionLine } from "../utils/version.js";
 
 const COPILOT_MODELS = [
   "claude-sonnet-4.6",
@@ -43,7 +44,9 @@ async function listCopilotModels(): Promise<string[]> {
 export async function detectCopilot(opts: DetectOptions = {}): Promise<ProviderEntry> {
   const versionResult = await run("copilot", ["--version"], 5_000);
   const available = versionResult.ok;
-  const version = available ? versionResult.stdout.split("\n")[0] : undefined;
+  const version = available
+    ? parseCliVersionLine(versionResult.stdout.split("\n")[0] ?? "")
+    : undefined;
 
   // Auth check and model list in parallel
   const [auth, cliModels] = await Promise.all([

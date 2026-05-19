@@ -1,6 +1,7 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
+import { parseCliVersionLine } from "../utils/version.js";
 import { join } from "node:path";
 
 const CURSOR_MODELS = [
@@ -60,7 +61,9 @@ export async function detectCursor(opts: DetectOptions = {}): Promise<ProviderEn
   );
   const found = probes.find((r) => r.ok);
   const available = !!found;
-  const version = found ? found.stdout.split("\n")[0] : undefined;
+  const version = found
+    ? parseCliVersionLine(found.stdout.split("\n")[0] ?? "")
+    : undefined;
   const toolCmd = found?.cmd ?? "cursor";
 
   // Cursor config paths (Windows)

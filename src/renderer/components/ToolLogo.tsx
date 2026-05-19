@@ -36,7 +36,31 @@ function CursorLogo({ size }: { size: number }) {
   );
 }
 
+function ShellLogo({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="Shell"
+      className="text-[#9ca3af]"
+    >
+      <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M6 9l2.5 2L6 13M10 15h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 const LOGOS: Record<string, (size: number) => React.ReactElement> = {
+  shell: (s) => <ShellLogo size={s} />,
   claude: (s) => <ClaudeLogo size={s} />,
   copilot: (s) => <CopilotLogo size={s} />,
   cursor: (s) => <CursorLogo size={s} />,

@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld("api", {
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   launchInTerminal: (tool, terminal, cwd) => ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd),
   ptySpawn:  (tool, cwd)                    => ipcRenderer.invoke("pty-spawn", tool, cwd),
+  ptyAttach: (sessionId)                    => ipcRenderer.invoke("pty-attach", sessionId),
   pickFolder: (defaultPath)                 => ipcRenderer.invoke("pick-folder", defaultPath),
   ptyWrite:  (sessionId, data)          => ipcRenderer.send("pty-write",  sessionId, data),
   ptyResize: (sessionId, cols, rows)    => ipcRenderer.send("pty-resize", sessionId, cols, rows),
@@ -56,6 +57,18 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("ws-session-create", workspace, group, name, opts),
   wsSessionStop: (workspace, group, name) =>
     ipcRenderer.invoke("ws-session-stop", workspace, group, name),
+  wsGroupLayoutGet: (workspaceId, groupId) =>
+    ipcRenderer.invoke("ws-group-layout-get", workspaceId, groupId),
+  wsGroupLayoutSave: (workspaceId, groupId, snapshot) =>
+    ipcRenderer.invoke("ws-group-layout-save", workspaceId, groupId, snapshot),
+  wsGroupLayoutSetActive: (workspaceId, groupId) =>
+    ipcRenderer.invoke("ws-group-layout-set-active", workspaceId, groupId),
+  profileGetTree: () => ipcRenderer.invoke("profile-get-tree"),
+  profileCreate: (name, defaultCwd, defaultTool, accentColor) =>
+    ipcRenderer.invoke("profile-create", name, defaultCwd, defaultTool, accentColor),
+  profileUpdate: (profileId, patch) => ipcRenderer.invoke("profile-update", profileId, patch),
+  profileDelete: (profileId) => ipcRenderer.invoke("profile-delete", profileId),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
+  toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),
 });

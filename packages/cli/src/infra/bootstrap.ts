@@ -3,6 +3,7 @@ import { WorkspaceRepository } from "../database/repositories/workspace-reposito
 import { GroupRepository } from "../database/repositories/group-repository.js";
 import { SessionRepository } from "../database/repositories/session-repository.js";
 import { CommandHistoryRepository } from "../database/repositories/command-history-repository.js";
+import { GroupLayoutRepository } from "../database/repositories/group-layout-repository.js";
 import { EventBus } from "../runtime/event-bus.js";
 import { ProcessRegistry } from "../runtime/process-registry.js";
 import { OutputBuffer } from "../runtime/output-buffer.js";
@@ -13,6 +14,8 @@ import { WorkspaceService } from "../services/workspace-service.js";
 import { GroupService } from "../services/group-service.js";
 import { SessionService } from "../services/session-service.js";
 import { ExecService } from "../services/exec-service.js";
+import { GroupLayoutService } from "../services/group-layout-service.js";
+import { ProfileService } from "../services/profile-service.js";
 import { loadConfig } from "../config/loader.js";
 import { createLogger, type Logger } from "../shared/logger.js";
 
@@ -25,6 +28,8 @@ export interface AppContext {
   workspaceService: WorkspaceService;
   groupService: GroupService;
   sessionService: SessionService;
+  groupLayoutService: GroupLayoutService;
+  profileService: ProfileService;
   execService: ExecService;
   close: () => void;
 }
@@ -38,6 +43,7 @@ export function bootstrap(): AppContext {
   const groups = new GroupRepository(db);
   const sessions = new SessionRepository(db);
   const commandHistory = new CommandHistoryRepository(db);
+  const groupLayouts = new GroupLayoutRepository(db);
 
   const eventBus = new EventBus();
   const processRegistry = new ProcessRegistry();
@@ -55,6 +61,8 @@ export function bootstrap(): AppContext {
     eventBus,
     sessionRuntime,
   );
+  const groupLayoutService = new GroupLayoutService(workspaces, groups, groupLayouts);
+  const profileService = new ProfileService(workspaces, groups, groupLayouts, eventBus);
   const execService = new ExecService(sessionService, sessionRuntime, commandHistory);
 
   eventBus.onAll((event) => {
@@ -72,6 +80,8 @@ export function bootstrap(): AppContext {
     workspaceService,
     groupService,
     sessionService,
+    groupLayoutService,
+    profileService,
     execService,
     close: () => db.close(),
   };

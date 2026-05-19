@@ -7,19 +7,37 @@ interface Props {
   sessionId: string;
   bg?: string;
   active?: boolean;
+  focused?: boolean;
   onExit: () => void;
+  onSessionLost?: (sessionId: string) => void;
+  onWrite?: (data: string, sessionId: string) => void;
 }
 
-export function EmbeddedTerminal({ sessionId, bg, active = true, onExit }: Props) {
+export function EmbeddedTerminal({
+  sessionId,
+  bg,
+  active = true,
+  focused = true,
+  onExit,
+  onSessionLost,
+  onWrite,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
   const activeRef = useRef(active);
+  const onWriteRef = useRef(onWrite);
+  const onSessionLostRef = useRef(onSessionLost);
   const fitRef = useRef<(() => void) | null>(null);
   const stableOnExit = useCallback(onExit, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   activeRef.current = active;
+  onWriteRef.current = onWrite;
+  onSessionLostRef.current = onSessionLost;
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+
     const background =
       bg ||
       getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() ||
@@ -61,16 +79,55 @@ export function EmbeddedTerminal({ sessionId, bg, active = true, onExit }: Props
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-    term.open(containerRef.current);
+    term.open(el);
+    termRef.current = term;
 
+    const pending: string[] = [];
+    let opened = true;
     let rafId = 0;
-    const fit = () => {
-      if (!activeRef.current) return;
-      const el = containerRef.current;
-      if (!el || el.clientWidth === 0 || el.clientHeight === 0) return;
-      fitAddon.fit();
-      window.api.ptyResize(sessionId, term.cols, term.rows);
+    let wakeTimer = 0;
+    let statusTimer = 0;
+    let receivedBytes = 0;
+
+    const writeSafe = (data: string) => {
+      if (!opened) {
+        pending.push(data);
+        return;
+      }
+      try {
+        term.write(data);
+      } catch (err) {
+        console.error("[xterm-write]", sessionId, err);
+      }
     };
+
+    const flushPending = () => {
+      if (!opened || pending.length === 0) return;
+      const chunk = pending.splice(0, pending.length).join("");
+      try {
+        term.write(chunk);
+      } catch (err) {
+        console.error("[xterm-flush]", sessionId, err);
+      }
+    };
+
+    const syncPtySize = () => {
+      const cols = Math.max(term.cols, 2);
+      const rows = Math.max(term.rows, 2);
+      window.api.ptyResize(sessionId, cols, rows);
+    };
+
+    const fit = () => {
+      const target = containerRef.current;
+      if (!target || target.clientWidth === 0 || target.clientHeight === 0) return;
+      try {
+        fitAddon.fit();
+      } catch {
+        /* mid-layout */
+      }
+      syncPtySize();
+    };
+
     fitRef.current = fit;
 
     const scheduleFit = () => {
@@ -79,10 +136,14 @@ export function EmbeddedTerminal({ sessionId, bg, active = true, onExit }: Props
     };
 
     scheduleFit();
+    flushPending();
 
     const offData = window.api.onPtyData(({ sessionId: sid, data }) => {
-      if (sid === sessionId) term.write(data);
+      if (sid !== sessionId) return;
+      receivedBytes += data.length;
+      writeSafe(data);
     });
+
     const offExit = window.api.onPtyExit(({ sessionId: sid }) => {
       if (sid !== sessionId) return;
       term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
@@ -92,30 +153,74 @@ export function EmbeddedTerminal({ sessionId, bg, active = true, onExit }: Props
       });
     });
 
-    term.onData((data) => window.api.ptyWrite(sessionId, data));
+    term.onData((data) => {
+      const write = onWriteRef.current;
+      if (write) write(data, sessionId);
+      else window.api.ptyWrite(sessionId, data);
+    });
+
+    let cancelled = false;
+    void window.api.ptyAttach(sessionId).then((r) => {
+      if (cancelled) return;
+      if (!r.alive) {
+        onSessionLostRef.current?.(sessionId);
+        return;
+      }
+      if (r.buffer) {
+        receivedBytes += r.buffer.length;
+        writeSafe(r.buffer);
+      }
+      flushPending();
+      scheduleFit();
+
+      wakeTimer = window.setTimeout(() => {
+        if (cancelled || receivedBytes > 0) return;
+        window.api.ptyWrite(sessionId, "\r");
+        scheduleFit();
+      }, 400);
+
+      statusTimer = window.setTimeout(() => {
+        if (cancelled || receivedBytes > 0) return;
+        term.writeln("\r\n\x1b[33m[terminal] waiting for shell output — click here and press Enter\x1b[0m");
+      }, 2500);
+    });
 
     const ro = new ResizeObserver(scheduleFit);
-    ro.observe(containerRef.current);
+    ro.observe(el);
 
-    term.focus();
+    const onPointerDown = () => term.focus();
+    el.addEventListener("pointerdown", onPointerDown);
 
     return () => {
+      cancelled = true;
+      opened = false;
+      window.clearTimeout(wakeTimer);
+      window.clearTimeout(statusTimer);
       cancelAnimationFrame(rafId);
       fitRef.current = null;
+      termRef.current = null;
       offData();
       offExit();
-      window.api.ptyKill(sessionId);
+      el.removeEventListener("pointerdown", onPointerDown);
       ro.disconnect();
       term.dispose();
     };
-  }, [sessionId, stableOnExit]);
+  }, [sessionId, stableOnExit, bg]);
 
-  // Refit once when panel becomes visible again (hidden → shown skips zero-size resize)
   useEffect(() => {
     if (!active) return;
     const id = requestAnimationFrame(() => fitRef.current?.());
     return () => cancelAnimationFrame(id);
   }, [active]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  useEffect(() => {
+    if (!focused) return;
+    const id = requestAnimationFrame(() => {
+      fitRef.current?.();
+      termRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [focused, sessionId]);
+
+  return <div ref={containerRef} className="absolute inset-0" />;
 }

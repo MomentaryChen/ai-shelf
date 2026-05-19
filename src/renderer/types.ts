@@ -113,10 +113,51 @@ export interface SessionInfo {
   status: string;
 }
 
+export interface GroupLayoutMeta {
+  paneCount: number;
+  defaultCwd: string;
+  updatedAt: string;
+}
+
+export interface GroupLayoutSnapshot {
+  defaultCwd: string;
+  panes: { tool: string; cwd: string }[];
+  layout: unknown;
+  broadcastInput?: boolean;
+  accentColor?: string | null;
+  updatedAt: string;
+}
+
+export interface ProfileTerminal {
+  tool: string;
+  cwd: string;
+}
+
+export interface ProfileInfo {
+  id: string;
+  workspaceId: string;
+  name: string;
+  defaultCwd: string;
+  defaultTool: string;
+  broadcastInput: boolean;
+  accentColor: string | null;
+  paneCount: number;
+  terminals: ProfileTerminal[];
+  updatedAt: string | null;
+}
+
+export interface ProfileTree {
+  workspaceId: string;
+  profiles: ProfileInfo[];
+  lastActiveProfileId: string | null;
+}
+
 export interface WorkspaceTree {
   workspaces: WorkspaceInfo[];
   groups: Record<string, GroupInfo[]>;
   sessions: Record<string, SessionInfo[]>;
+  groupLayouts?: Record<string, GroupLayoutMeta>;
+  lastActiveGroupKey?: string | null;
 }
 
 export interface ElectronAPI {
@@ -144,6 +185,7 @@ export interface ElectronAPI {
   openPath: (filePath: string) => Promise<void>;
   launchInTerminal: (tool: string, terminal?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
   ptySpawn:  (tool: string, cwd?: string)                           => Promise<{ success: boolean; sessionId?: string; error?: string }>;
+  ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;
   ptyWrite:  (sessionId: string, data: string)             => void;
   ptyResize: (sessionId: string, cols: number, rows: number) => void;
@@ -166,8 +208,39 @@ export interface ElectronAPI {
     group: string,
     name: string,
   ) => Promise<{ success: boolean; error?: string }>;
+  wsGroupLayoutGet: (
+    workspaceId: string,
+    groupId: string,
+  ) => Promise<{ success: boolean; snapshot?: GroupLayoutSnapshot | null; error?: string }>;
+  wsGroupLayoutSave: (
+    workspaceId: string,
+    groupId: string,
+    snapshot: GroupLayoutSnapshot,
+  ) => Promise<{ success: boolean; snapshot?: GroupLayoutSnapshot; error?: string }>;
+  wsGroupLayoutSetActive: (
+    workspaceId: string,
+    groupId: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  profileGetTree: () => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
+  profileCreate: (
+    name: string,
+    defaultCwd?: string,
+    defaultTool?: string,
+    accentColor?: string | null,
+  ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
+  profileUpdate: (
+    profileId: string,
+    patch: {
+      defaultCwd?: string;
+      defaultTool?: string;
+      broadcastInput?: boolean;
+      accentColor?: string | null;
+    },
+  ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
+  profileDelete: (profileId: string) => Promise<{ success: boolean; error?: string }>;
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
+  toggleDevTools: () => Promise<void>;
 }
 
 declare global {

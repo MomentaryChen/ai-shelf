@@ -13,6 +13,24 @@ interface ChatSettingsPanelProps {
   compact?: boolean;
 }
 
+function buildDirOptions(workingDir: string, dirHistory: string[]): string[] {
+  const seen = new Set<string>();
+  const options: string[] = [];
+  const add = (dir: string) => {
+    if (!dir || seen.has(dir)) return;
+    seen.add(dir);
+    options.push(dir);
+  };
+  add(workingDir);
+  for (const dir of dirHistory) add(dir);
+  return options;
+}
+
+function dirOptionLabel(dir: string): string {
+  const name = dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
+  return `${name} — ${dir}`;
+}
+
 export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
 
@@ -40,6 +58,17 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
     }
   }
 
+  function selectDir(dir: string) {
+    if (!dir) {
+      updateSettings({ workingDir: "" });
+      return;
+    }
+    const history = [dir, ...settings.dirHistory.filter((d) => d !== dir)].slice(0, 10);
+    updateSettings({ workingDir: dir, dirHistory: history });
+  }
+
+  const dirOptions = buildDirOptions(settings.workingDir, settings.dirHistory);
+
   const sectionTitle = compact
     ? "mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary"
     : "mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-secondary";
@@ -50,92 +79,34 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
       <div>
         <p className={sectionTitle}>Working directory</p>
         <div className="flex items-center gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-lg border border-border bg-bg-secondary px-3 py-2">
-            <svg className="h-4 w-4 shrink-0 text-text-tertiary" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-            </svg>
-            {settings.workingDir ? (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-medium text-text-primary">
-                  {settings.workingDir.split(/[\\/]/).filter(Boolean).pop()}
-                </p>
-                <p className="truncate font-mono text-[10px] text-text-tertiary">{settings.workingDir}</p>
-              </div>
-            ) : (
-              <span className="text-[12px] text-text-tertiary italic">~ (home directory)</span>
-            )}
-          </div>
+          <select
+            value={settings.workingDir}
+            onChange={(e) => selectDir(e.target.value)}
+            className="min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-border bg-bg-secondary px-3 py-2 text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+            title={settings.workingDir || undefined}
+          >
+            <option value="">~ (home directory)</option>
+            {dirOptions.map((dir) => (
+              <option key={dir} value={dir}>
+                {dirOptionLabel(dir)}
+              </option>
+            ))}
+          </select>
           <button
             onClick={browsePath}
-            className="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-[12px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
+            className="shrink-0 cursor-pointer rounded-lg border border-border px-3.5 py-2 text-[12px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
           >
             Browse…
           </button>
-          {settings.workingDir && (
-            <button
-              onClick={() => updateSettings({ workingDir: "" })}
-              className="cursor-pointer rounded-lg border border-border px-3 py-2 text-[12px] text-text-secondary transition-colors hover:border-fail/40 hover:text-fail"
-              title="Reset to home"
-            >
-              ✕
-            </button>
-          )}
         </div>
-
-        {/* History */}
         {settings.dirHistory.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-1.5 flex items-center justify-between px-0.5">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">Recent</span>
-              <button
-                onClick={() => updateSettings({ dirHistory: [], workingDir: "" })}
-                className="cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-fail"
-              >
-                Clear all
-              </button>
-            </div>
-            <div className="overflow-hidden rounded-lg border border-border divide-y divide-border">
-              {settings.dirHistory.map((dir) => {
-                const isActive = dir === settings.workingDir;
-                const name = dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
-                return (
-                  <div
-                    key={dir}
-                    onClick={() => updateSettings({ workingDir: dir })}
-                    className={`group flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-bg-secondary ${isActive ? "bg-accent/5" : ""}`}
-                  >
-                    <svg
-                      className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-accent" : "text-text-tertiary"}`}
-                      viewBox="0 0 20 20" fill="currentColor"
-                    >
-                      <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                    </svg>
-                    <div className="min-w-0 flex-1">
-                      <p className={`truncate text-[12px] font-medium ${isActive ? "text-accent" : "text-text-primary"}`}>
-                        {name}
-                      </p>
-                      <p className="truncate font-mono text-[10px] text-text-tertiary">{dir}</p>
-                    </div>
-                    {isActive && (
-                      <svg className="h-3.5 w-3.5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const next = settings.dirHistory.filter((d) => d !== dir);
-                        updateSettings({ dirHistory: next, ...(isActive ? { workingDir: "" } : {}) });
-                      }}
-                      className="hidden shrink-0 cursor-pointer rounded p-0.5 text-[11px] text-text-tertiary transition-colors hover:bg-fail/10 hover:text-fail group-hover:flex"
-                      title="Remove"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="mt-1.5 flex justify-end px-0.5">
+            <button
+              onClick={() => updateSettings({ dirHistory: [], workingDir: "" })}
+              className="cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-fail"
+            >
+              Clear history
+            </button>
           </div>
         )}
       </div>

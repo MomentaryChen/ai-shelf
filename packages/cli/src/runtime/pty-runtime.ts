@@ -3,6 +3,8 @@ import type { IPty } from "node-pty";
 import { RuntimeError } from "../core/errors/app-error.js";
 import type { OutputBuffer } from "./output-buffer.js";
 
+export const PLAIN_SHELL_TOOL_ID = "shell";
+
 export const TOOL_LAUNCH_CMD: Record<string, string> = {
   claude: "claude",
   copilot: "copilot",
@@ -152,6 +154,7 @@ export class PtyRuntime {
 }
 
 function resolveLaunchCommand(tool?: string): string {
+  if (tool === PLAIN_SHELL_TOOL_ID) return "";
   if (tool && TOOL_LAUNCH_CMD[tool]) return TOOL_LAUNCH_CMD[tool];
   return "";
 }

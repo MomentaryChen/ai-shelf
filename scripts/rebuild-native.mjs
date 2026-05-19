@@ -117,10 +117,7 @@ if (sqliteResult.status !== 0) {
 console.log("\n✔ better-sqlite3 rebuilt for Electron\n");
 
 if (!rebuildAll) {
-  console.log(
-    "Skipping node-pty (run `pnpm run rebuild:native:all` for the in-app terminal).\n",
-  );
-  process.exit(0);
+  console.log("Rebuilding node-pty (required for in-app terminal)…\n");
 }
 
 cleanNodePtyBuild();

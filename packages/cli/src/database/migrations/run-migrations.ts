@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 7;
 
 const MIGRATION_V2 = `
 ALTER TABLE sessions ADD COLUMN tool TEXT;
@@ -15,6 +15,36 @@ CREATE TABLE IF NOT EXISTS command_history (
   command TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+`;
+
+const MIGRATION_V4 = `
+CREATE TABLE IF NOT EXISTS group_layouts (
+  group_id TEXT PRIMARY KEY REFERENCES groups(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  default_cwd TEXT NOT NULL DEFAULT '',
+  layout_json TEXT,
+  panes_json TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS app_preferences (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_layouts_workspace ON group_layouts(workspace_id);
+`;
+
+const MIGRATION_V5 = `
+ALTER TABLE group_layouts ADD COLUMN broadcast_input INTEGER NOT NULL DEFAULT 0;
+`;
+
+const MIGRATION_V6 = `
+ALTER TABLE group_layouts ADD COLUMN default_tool TEXT NOT NULL DEFAULT 'claude';
+`;
+
+const MIGRATION_V7 = `
+ALTER TABLE group_layouts ADD COLUMN accent_color TEXT;
 `;
 
 const INITIAL_SCHEMA = `
@@ -88,5 +118,37 @@ export function runMigrations(db: Database.Database): void {
   if (current < 3) {
     db.exec(MIGRATION_V3);
     db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(3);
+  }
+
+  if (current < 4) {
+    db.exec(MIGRATION_V4);
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(4);
+  }
+
+  if (current < 5) {
+    try {
+      db.exec(MIGRATION_V5);
+    } catch {
+      /* column may exist */
+    }
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(5);
+  }
+
+  if (current < 6) {
+    try {
+      db.exec(MIGRATION_V6);
+    } catch {
+      /* column may exist */
+    }
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(6);
+  }
+
+  if (current < 7) {
+    try {
+      db.exec(MIGRATION_V7);
+    } catch {
+      /* column may exist */
+    }
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(7);
   }
 }
