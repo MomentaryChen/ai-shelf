@@ -11,6 +11,10 @@ permissions:
 jobs:
   release-windows:
     runs-on: windows-latest
+    env:
+      # Unsigned Windows builds (docs/RELEASE.md). Without this, signtool may try to
+      # auto-discover a cert on the runner and hang indefinitely on elevate.exe helpers.
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

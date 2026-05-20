@@ -68,6 +68,8 @@ Upload `release/AI-Shelf-Setup-<version>.exe` to a GitHub Release. Do **not** at
 
 Installers are **not** code-signed in this repo. Windows SmartScreen may warn on first run. To sign later, configure `win.certificateFile` / `CSC_*` secrets in electron-builder and CI.
 
+The **Release** GitHub Action sets `CSC_IDENTITY_AUTO_DISCOVERY=false` so `signtool` does not try to auto-pick a certificate on the runner (which can hang on helpers like `elevate.exe`).
+
 ---
 
 ## For Windows users
