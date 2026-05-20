@@ -4,9 +4,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[中文說明](README.zh-TW.md)
+[中文說明](README.zh-TW.md) · [Changelog](CHANGELOG.md)
 
-**v0.2.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-shelf`).
+**v1.0.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-shelf`).
 
 ---
 
@@ -27,7 +27,7 @@ The desktop app uses both: inventory detection lives in `src/`, while profiles, 
 ### Inventory (`ai`)
 
 - **Overview** — capability matrix, summary stats, warnings, env-var presence
-- **Models** — list models per tool via native CLI; one-click default switch; expandable lists
+- **Models** — per-tool model chips with capability columns; long lists expand inline (`+N more`)
 - **Skills** — per-tool skill cards + cross-tool skill matrix
 - **MCP** — server inventory, sync status, cross-tool matrix, **MCP sync** (copy missing servers across tools)
 - **Config** — config / instruction / MCP file paths, clickable to open
@@ -74,11 +74,19 @@ The desktop app uses both: inventory detection lives in `src/`, while profiles, 
 
 Switch between **Terminal** and **Inventory** in the header. Inventory mode has the tabbed dashboard above; Terminal mode is the embedded multi-pane launcher with a profiles sidebar.
 
-→ **[Full page-by-page guide with screenshots](docs/pages.md)**
+→ **[Full page-by-page guide with screenshots](docs/pages.md)** · [繁體中文版](docs/pages.zh-TW.md)
 
 ---
 
 ## Installation
+
+### Windows (desktop app)
+
+1. Download **`AI-Shelf-Setup-<version>.exe`** from [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) (installer only — not portable builds).
+2. Run the installer. If SmartScreen warns about an unknown publisher, choose **More info** → **Run anyway** (unsigned build).
+3. Launch **AI Shelf** from the Start menu or desktop shortcut.
+
+See [docs/RELEASE.md](docs/RELEASE.md) for maintainer release steps and uninstall notes.
 
 ### From npm (inventory CLI)
 
@@ -239,7 +247,8 @@ pnpm test:e2e                # Playwright screenshot tests
 pnpm lint
 pnpm format / pnpm format:check
 pnpm package:win             # standalone CLI exe (pkg)
-pnpm dist:win                # portable Windows app (electron-builder → release/)
+pnpm dist:win                # Windows NSIS installer → release/AI-Shelf-Setup-<version>.exe
+pnpm dist:win:portable       # dev-only portable exe (do not ship to users)
 ```
 
 ### Project structure
@@ -264,7 +273,8 @@ ai-shelf/                 # root workspace (Electron app + inventory CLI)
 │       ├── services/             # workspace, group, session, profile, exec
 │       ├── runtime/              # PTY, process registry, event bus
 │       └── tui/                  # neo-blessed terminal UI
-├── docs/pages.md                 # Desktop UI walkthrough
+├── docs/pages.md                 # Desktop UI walkthrough (EN)
+├── docs/pages.zh-TW.md           # Desktop UI walkthrough (zh-TW)
 ├── tests/e2e/                    # Playwright tests
 └── scripts/                      # gen-icon, rebuild-native
 ```

@@ -4,9 +4,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[English](README.md)
+[English](README.md) · [Changelog](CHANGELOG.md)
 
-**v0.2.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機工作區管理 CLI（`ai-shelf`）。
+**v1.0.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機工作區管理 CLI（`ai-shelf`）。
 
 ---
 
@@ -27,7 +27,7 @@
 ### 清單掃描（`ai`）
 
 - **Overview（總覽）** — 能力矩陣、摘要統計、警告、環境變數狀態
-- **Models（模型）** — 透過原生 CLI 列出模型；一鍵切換預設；可展開長列表
+- **Models（模型）** — 依工具顯示模型晶片與能力欄位；長列表可於列內展開（`+N more`）
 - **Skills（技能）** — 各工具技能卡片 + 跨工具技能矩陣
 - **MCP** — 伺服器清單、同步狀態、跨工具矩陣、**MCP 同步**（將缺少的伺服器複製到其他工具）
 - **Config（設定）** — 設定檔 / 指令檔 / MCP 路徑，可點擊開啟
@@ -74,11 +74,19 @@
 
 在標題列切換 **Terminal** 與 **Inventory**。Inventory 模式為上圖的分頁儀表板；Terminal 模式為內嵌多窗格啟動器與 Profile 側欄。
 
-→ **[完整頁面介紹（含截圖）](docs/pages.md)**
+→ **[完整頁面介紹（含截圖 · 繁中）](docs/pages.zh-TW.md)** · [English](docs/pages.md)
 
 ---
 
 ## 安裝
+
+### Windows（桌面應用）
+
+1. 至 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) 下載 **`AI-Shelf-Setup-<version>.exe`**（僅安裝程式，請勿下載 portable 版）。
+2. 執行安裝精靈。若 SmartScreen 提示未知發行者，請點 **詳細資訊** → **仍要執行**（目前未簽章）。
+3. 從開始選單或桌面捷徑啟動 **AI Shelf**。
+
+維護者發佈流程與解除安裝說明見 [docs/RELEASE.md](docs/RELEASE.md)。
 
 ### 從 npm（清單 CLI）
 
@@ -239,7 +247,8 @@ pnpm test:e2e                # Playwright 截圖測試
 pnpm lint
 pnpm format / pnpm format:check
 pnpm package:win             # 獨立 CLI exe（pkg）
-pnpm dist:win                # Windows 可攜版（electron-builder → release/）
+pnpm dist:win                # Windows NSIS 安裝程式 → release/AI-Shelf-Setup-<version>.exe
+pnpm dist:win:portable       # 僅開發用 portable（勿提供給使用者）
 ```
 
 ### 專案結構
@@ -264,7 +273,8 @@ ai-shelf/                 # 根 workspace（Electron + 清單 CLI）
 │       ├── services/             # workspace、group、session、profile、exec
 │       ├── runtime/              # PTY、process registry、event bus
 │       └── tui/                  # neo-blessed 終端機 UI
-├── docs/pages.md                 # 桌面 UI 圖文說明
+├── docs/pages.md                 # 桌面 UI 圖文說明（英文）
+├── docs/pages.zh-TW.md           # 桌面 UI 圖文說明（繁中）
 ├── tests/e2e/                    # Playwright 測試
 └── scripts/                      # gen-icon、rebuild-native
 ```

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+
+declare const __CLI_VERSION__: string;
 import { bootstrap, type AppContext } from "../infra/bootstrap.js";
 import { APP_NAME, APP_TITLE } from "../config/config.js";
 import { registerWorkspaceCommands } from "./commands/workspace.js";
@@ -19,7 +21,7 @@ const program = new Command();
 program
   .name(APP_NAME)
   .description(APP_TITLE)
-  .version("0.2.0")
+  .version(__CLI_VERSION__)
   .hook("postAction", () => {
     ctx?.close();
     ctx = null;

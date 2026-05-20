@@ -1,10 +1,6 @@
-import { lazy, Suspense } from "react";
+import { ChatTab } from "./components/ChatTab";
 import { Spinner } from "./components/Spinner";
 import { useInventoryScan } from "./hooks/useInventoryScan";
-
-const ChatTab = lazy(() =>
-  import("./components/ChatTab").then((m) => ({ default: m.ChatTab })),
-);
 
 export function ChatWindowApp() {
   const { data, scanning, error, hasData } = useInventoryScan();
@@ -23,9 +19,7 @@ export function ChatWindowApp() {
         </p>
       )}
       {hasData && (
-        <Suspense fallback={<Spinner label="Loading terminal…" />}>
-          <ChatTab data={data} inventoryScanning={inventoryScanning} />
-        </Suspense>
+        <ChatTab data={data} inventoryScanning={inventoryScanning} />
       )}
     </div>
   );

@@ -1,6 +1,11 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
 import { runInventory } from "./commands/inventory.js";
+
+const { version: APP_VERSION } = createRequire(import.meta.url)("../package.json") as {
+  version: string;
+};
 import { runDoctor } from "./commands/doctor.js";
 import { runRaw } from "./commands/raw.js";
 import { runUpdate } from "./commands/update.js";
@@ -17,7 +22,7 @@ const { positionals, values } = parseArgs({
 const [command, ...rest] = positionals;
 
 if (values.version) {
-  console.log("ai-shelf v0.2.0");
+  console.log(`ai-shelf v${APP_VERSION}`);
   process.exit(0);
 }
 
@@ -48,7 +53,7 @@ switch (command) {
 
 function printHelp() {
   console.log(`
-AI Shelf v0.2.0
+AI Shelf v${APP_VERSION}
 
 Usage:
   ai inventory [models|skills|mcp|config]   Show AI tool overview

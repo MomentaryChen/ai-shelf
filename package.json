@@ -1,7 +1,7 @@
 {
   "name": "ai-shelf-workspace",
   "private": true,
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "AI Shelf monorepo — inventory, workspace orchestration, and desktop app",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -23,6 +23,7 @@
     "electron:dev": "electron .",
     "package:win": "pnpm build && pkg . --targets node22-win-x64 --output dist/ai-shelf.exe",
     "dist:win": "pnpm build && electron-builder --win",
+    "dist:win:portable": "pnpm build && electron-builder --win portable",
     "test:e2e": "pnpm build && playwright test",
     "gen-icon": "node scripts/gen-icon.mjs",
     "lint": "pnpm -r run lint --if-present",
@@ -43,8 +44,17 @@
       "src/assets/icon.ico"
     ],
     "win": {
-      "target": "portable",
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI Shelf",
+      "artifactName": "AI-Shelf-Setup-${version}.${ext}",
+      "uninstallDisplayName": "AI Shelf"
     }
   },
   "pkg": {
