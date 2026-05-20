@@ -3,6 +3,11 @@ import { ToolLogo } from "./ToolLogo";
 import { toolLabel } from "../utils";
 import { ResizeDivider } from "./ResizeDivider";
 import type { LayoutNode, PaneInfo, SplitDirection } from "../terminal/split-tree";
+import {
+  profilePaneChromeStyle,
+  profilePaneHeaderDotStyle,
+  profilePaneHeaderStyle,
+} from "../utils/profile-colors";
 
 const DIVIDER_PX = 10;
 
@@ -19,6 +24,7 @@ interface Props {
   onSplitPane: (paneId: string, direction: SplitDirection) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
+  profileAccentColor?: string | null;
 }
 
 export function SplitPaneLayout({
@@ -30,6 +36,7 @@ export function SplitPaneLayout({
   onSplitPane,
   onResizeSplit,
   renderTerminal,
+  profileAccentColor = null,
 }: Props) {
   if (node.kind === "pane") {
     const focused = focusedPaneId === node.pane.id;
@@ -40,6 +47,7 @@ export function SplitPaneLayout({
           pane={node.pane}
           focused={focused}
           bg={bg}
+          profileAccentColor={profileAccentColor}
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
           onSplit={(dir) => onSplitPane(node.pane.id, dir)}
@@ -73,6 +81,7 @@ export function SplitPaneLayout({
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
           renderTerminal={renderTerminal}
+          profileAccentColor={profileAccentColor}
         />
       </div>
 
@@ -100,6 +109,7 @@ export function SplitPaneLayout({
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
           renderTerminal={renderTerminal}
+          profileAccentColor={profileAccentColor}
         />
       </div>
     </div>
@@ -110,6 +120,7 @@ function WarpPaneShell({
   pane,
   focused,
   bg,
+  profileAccentColor,
   onFocus,
   onClose,
   onSplit,
@@ -118,22 +129,35 @@ function WarpPaneShell({
   pane: PaneInfo;
   focused: boolean;
   bg: string;
+  profileAccentColor?: string | null;
   onFocus: () => void;
   onClose: () => void;
   onSplit: (dir: SplitDirection) => void;
   children: ReactNode;
 }) {
+  const chromeStyle = profilePaneChromeStyle(profileAccentColor, focused);
+  const headerStyle = profilePaneHeaderStyle(profileAccentColor, focused);
+  const dotStyle = profilePaneHeaderDotStyle(profileAccentColor);
+
   return (
     <div
-      className={`group/pane flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-lg border transition-colors ${
-        focused ? "border-[#3d3d3d] ring-1 ring-white/10" : "border-[#1f1f1f]"
+      className={`group/pane flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
+        focused && !profileAccentColor ? "border-[#3d3d42] ring-1 ring-white/[0.08]" : "border-[#1a1a1e]"
       }`}
-      style={{ background: bg }}
+      style={{ background: bg, ...chromeStyle }}
       onMouseDown={onFocus}
     >
-      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-[#1f1f1f] bg-black/40 px-2.5">
-        <ToolLogo tool={pane.tool} size={14} />
-        <span className="truncate text-[12px] font-medium text-[#e8e8e8]">{toolLabel(pane.tool)}</span>
+      <div
+        className="flex h-9 shrink-0 items-center gap-2 border-b px-2.5"
+        style={headerStyle}
+      >
+        {focused && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={dotStyle} aria-hidden />
+        )}
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.03]">
+          <ToolLogo tool={pane.tool} size={14} />
+        </span>
+        <span className="truncate text-[12px] font-medium text-[#ececef]">{toolLabel(pane.tool)}</span>
         <span className="min-w-0 flex-1 truncate text-[11px] text-[#6b6b6b]" title={pane.cwd}>
           {pane.cwd ? pane.cwd.replace(/^.*[/\\]/, "") || pane.cwd : "~"}
         </span>
@@ -179,7 +203,7 @@ function IconBtn({
         e.stopPropagation();
         onClick();
       }}
-      className="cursor-pointer rounded px-1 py-0.5 text-[10px] text-[#8a8a8a] hover:bg-white/10 hover:text-[#e0e0e0]"
+      className="cursor-pointer rounded-md px-1.5 py-0.5 text-[10px] text-[#8b8b92] hover:bg-white/[0.08] hover:text-[#ececef]"
     >
       {children}
     </button>

@@ -110,19 +110,30 @@ export function useProfileWorkspace(
     if (collected.length === 0) return;
 
     const { layout: serialized, panes } = serializeLayout(node);
-    const defaultCwd =
-      workingDirRef.current || collected[0]?.cwd || profile.defaultCwd || "";
-
+    const existing = await loadGroupSnapshot(profile.workspaceId, profile.id);
     const snapshot: GroupLayoutSnapshot = {
-      defaultCwd,
-      defaultTool: profile.defaultTool || "claude",
+      defaultCwd: existing?.defaultCwd ?? profile.defaultCwd ?? "",
+      defaultTool: existing?.defaultTool ?? profile.defaultTool ?? "claude",
       panes,
       layout: collected.length > 1 ? serialized : null,
       broadcastInput: broadcastRef.current,
-      accentColor: profile.accentColor ?? null,
+      accentColor: existing?.accentColor ?? profile.accentColor ?? null,
       updatedAt: new Date().toISOString(),
     };
     await saveGroupSnapshot(profile.workspaceId, profile.id, snapshot);
+  }, []);
+
+  const clearProfileSnapshot = useCallback(async (profile: ProfileInfo) => {
+    const existing = await loadGroupSnapshot(profile.workspaceId, profile.id);
+    await saveGroupSnapshot(profile.workspaceId, profile.id, {
+      defaultCwd: existing?.defaultCwd ?? profile.defaultCwd ?? "",
+      defaultTool: existing?.defaultTool ?? profile.defaultTool ?? "claude",
+      panes: [],
+      layout: null,
+      broadcastInput: broadcastRef.current,
+      accentColor: existing?.accentColor ?? profile.accentColor ?? null,
+      updatedAt: new Date().toISOString(),
+    });
   }, []);
 
   const stashLiveProfile = useCallback((profileId: string) => {
@@ -133,18 +144,6 @@ export function useProfileWorkspace(
       focusedPaneId: focusedPaneIdRef.current,
     });
   }, []);
-
-  const spawnDefaultPane = useCallback(
-    async (profile: ProfileInfo): Promise<PaneInfo | null> => {
-      const cwd = profile.defaultCwd || workingDirRef.current || "";
-      const tool = profile.defaultTool || "shell";
-      let pane = await spawnPane(tool, cwd);
-      if (!pane && tool !== "shell") pane = await spawnPane("shell", cwd);
-      if (!pane) pane = await spawnPane("shell", "");
-      return pane;
-    },
-    [spawnPane],
-  );
 
   const discardProfileSessions = useCallback((profileId: string) => {
     const cached = profileLiveCacheRef.current.get(profileId);
@@ -164,14 +163,16 @@ export function useProfileWorkspace(
       const staleCached = profileLiveCacheRef.current.get(profile.id);
       if (staleCached) teardownPtys(staleCached.layout);
 
-      const cwdDefault = snapshot.defaultCwd || profile.defaultCwd || workingDirRef.current || "";
+      const cwdDefault =
+        profile.defaultCwd || snapshot.defaultCwd || workingDirRef.current || "";
       const slots = snapshot.panes.slice(0, MAX_GROUP_PANES);
       const spawned: PaneInfo[] = [];
 
       for (const slot of slots) {
-        let pane = await spawnPane(slot.tool, slot.cwd || cwdDefault);
+        const paneCwd = slot.cwd?.trim() || cwdDefault;
+        let pane = await spawnPane(slot.tool, paneCwd);
         if (!pane && slot.tool !== "shell") {
-          pane = await spawnPane("shell", slot.cwd || cwdDefault);
+          pane = await spawnPane("shell", paneCwd);
         }
         if (pane) spawned.push(pane);
       }
@@ -201,7 +202,7 @@ export function useProfileWorkspace(
       });
       setRestoring(false);
       return {
-        cwd: cwdDefault,
+        cwd: profile.defaultCwd || cwdDefault,
         broadcastInput: snapshot.broadcastInput ?? false,
         paneCount: spawned.length,
       };
@@ -216,7 +217,7 @@ export function useProfileWorkspace(
       if (prev?.id === profile.id) {
         if (layoutRef.current && collectPanes(layoutRef.current).length > 0) {
           return {
-            cwd: workingDirRef.current || profile.defaultCwd,
+            cwd: profile.defaultCwd || workingDirRef.current,
             broadcastInput: profile.broadcastInput,
             paneCount: collectPanes(layoutRef.current).length,
           };
@@ -237,10 +238,7 @@ export function useProfileWorkspace(
             focusedPaneId: focusId,
           });
           return {
-            cwd:
-              workingDirRef.current ||
-              panes[0]?.cwd ||
-              profile.defaultCwd,
+            cwd: profile.defaultCwd || panes[0]?.cwd || workingDirRef.current,
             broadcastInput: profile.broadcastInput,
             paneCount: panes.length,
           };
@@ -252,19 +250,11 @@ export function useProfileWorkspace(
           if (restored.paneCount > 0) return restored;
         }
 
-        const pane = await spawnDefaultPane(profile);
-        if (pane) {
-          const node: LayoutNode = { kind: "pane", pane };
-          applyLayout(setLayout, setFocusedPaneId, layoutRef, node, pane.id);
-          profileLiveCacheRef.current.set(profile.id, {
-            layout: node,
-            focusedPaneId: pane.id,
-          });
-        }
+        applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
         return {
           cwd: profile.defaultCwd || workingDirRef.current || "",
           broadcastInput: profile.broadcastInput,
-          paneCount: pane ? 1 : 0,
+          paneCount: 0,
         };
       }
 
@@ -296,10 +286,7 @@ export function useProfileWorkspace(
           focusedPaneId: focusId,
         });
         return {
-          cwd:
-            workingDirRef.current ||
-            panes[0]?.cwd ||
-            profile.defaultCwd,
+          cwd: profile.defaultCwd || panes[0]?.cwd || workingDirRef.current,
           broadcastInput: profile.broadcastInput,
           paneCount: panes.length,
         };
@@ -312,21 +299,10 @@ export function useProfileWorkspace(
       }
 
       applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
-
-      const pane = await spawnDefaultPane(profile);
-      const cwd = profile.defaultCwd || workingDirRef.current || "";
-      if (pane) {
-        const node: LayoutNode = { kind: "pane", pane };
-        applyLayout(setLayout, setFocusedPaneId, layoutRef, node, pane.id);
-        profileLiveCacheRef.current.set(profile.id, {
-          layout: node,
-          focusedPaneId: pane.id,
-        });
-      }
       return {
-        cwd,
+        cwd: profile.defaultCwd || workingDirRef.current || "",
         broadcastInput: profile.broadcastInput,
-        paneCount: pane ? 1 : 0,
+        paneCount: 0,
       };
     },
     [
@@ -335,7 +311,6 @@ export function useProfileWorkspace(
       restoreSnapshot,
       setLayout,
       setFocusedPaneId,
-      spawnDefaultPane,
     ],
   );
 
@@ -359,18 +334,19 @@ export function useProfileWorkspace(
         layout: layout!,
         focusedPaneId: focusedPaneIdRef.current,
       });
+      const t = window.setTimeout(() => {
+        void persistCurrentProfile();
+      }, 400);
+      return () => window.clearTimeout(t);
     }
-    if (paneCount === 0) return;
-    const t = window.setTimeout(() => {
-      void persistCurrentProfile();
-    }, 400);
-    return () => window.clearTimeout(t);
-  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, persistCurrentProfile]);
+    profileLiveCacheRef.current.delete(activeProfile.id);
+    void clearProfileSnapshot(activeProfile);
+  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, persistCurrentProfile, clearProfileSnapshot]);
 
   const getProfilePanes = useCallback(
     (profileId: string): PaneInfo[] => {
-      if (activeProfile?.id === profileId && layout) {
-        return collectPanes(layout);
+      if (activeProfile?.id === profileId) {
+        return layout ? collectPanes(layout) : [];
       }
       const cached = profileLiveCacheRef.current.get(profileId);
       return cached ? collectPanes(cached.layout) : [];
@@ -398,6 +374,16 @@ export function useProfileWorkspace(
     };
   }, [persistCurrentProfile]);
 
+  const syncActiveProfile = useCallback((profile: ProfileInfo) => {
+    if (activeProfileRef.current?.id !== profile.id) return;
+    activeProfileRef.current = profile;
+    setActiveProfile(profile);
+  }, []);
+
+  const getProfileDefaultCwd = useCallback((): string => {
+    return activeProfileRef.current?.defaultCwd?.trim() ?? "";
+  }, []);
+
   const canAddPane = !layout || collectPanes(layout).length < MAX_GROUP_PANES;
 
   return {
@@ -407,6 +393,8 @@ export function useProfileWorkspace(
     activateProfile,
     restoreLastProfile,
     persistCurrentProfile,
+    syncActiveProfile,
+    getProfileDefaultCwd,
     discardProfileSessions,
     getProfilePanes,
     getProfileFocusedPaneId,

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from "electron";
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
@@ -13,9 +13,10 @@ import {
 } from "../inventory/index.js";
 import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
+import { MCP_SYNC_TOOL_IDS, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
 import { run } from "../utils/exec.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
-import type { GroupLayoutSnapshot } from "ai-cli-inventory";
+import type { GroupLayoutSnapshot } from "ai-shelf";
 import {
   getWorkspaceContext,
   closeWorkspaceContext,
@@ -27,26 +28,21 @@ import {
   createProfile,
   updateProfile,
   deleteProfile,
+  reorderProfiles,
 } from "./workspace-host.js";
 
 /** Update commands for each AI tool */
-const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> = {
-  claude: {
-    check: ["claude", "--version"],
-    update: ["claude", "update"],
-    label: "Claude Code",
-  },
-  copilot: {
-    check: ["copilot", "--version"],
-    update: ["copilot", "update"],
-    label: "GitHub Copilot CLI",
-  },
-  agent: {
-    check: ["agent", "--version"],
-    update: ["agent", "update"],
-    label: "Cursor",
-  },
-};
+const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
+  Object.fromEntries(
+    Object.entries(TOOL_UPDATE).map(([tool, cfg]) => [
+      tool,
+      {
+        check: [cfg.cmd, "--version"],
+        update: [cfg.cmd, ...cfg.args],
+        label: cfg.label,
+      },
+    ]),
+  );
 
 let mainWindow: BrowserWindow | null = null;
 let chatWindow: BrowserWindow | null = null;
@@ -152,10 +148,10 @@ function setupAppMenu() {
     { role: "togglefullscreen" },
   ];
 
+  // Copy/paste accelerators are handled in xterm (see xterm-clipboard.ts).
+  // Menu roles with CmdOrCtrl+C/V would fire twice alongside the terminal handler.
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac
-      ? [{ role: "appMenu" as const }]
-      : []),
+    ...(isMac ? [{ role: "appMenu" as const }] : []),
     { label: "View", submenu: viewSubmenu },
   ];
 
@@ -172,7 +168,7 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: "AI CLI Inventory",
+    title: "AI Shelf",
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
@@ -368,14 +364,25 @@ ipcMain.handle("get-env-vars", () => {
       provider: "Cursor",
       vars: [env("CURSOR_API_KEY")],
     },
+    {
+      provider: "Codex",
+      vars: [env("OPENAI_API_KEY")],
+    },
+    {
+      provider: "Gemini",
+      vars: [env("GEMINI_API_KEY"), env("GOOGLE_API_KEY")],
+    },
+    {
+      provider: "Aider",
+      vars: [
+        env("ANTHROPIC_API_KEY"),
+        env("OPENAI_API_KEY"),
+        env("DEEPSEEK_API_KEY"),
+        env("OPENROUTER_API_KEY"),
+      ],
+    },
   ];
 });
-
-/** npm package names for tools that can be version-checked */
-const TOOL_NPM_PACKAGE: Record<string, string> = {
-  claude: "@anthropic-ai/claude-code",
-  copilot: "@github/copilot",
-};
 
 function fetchLatestNpmVersion(pkg: string): string | null {
   try {
@@ -424,13 +431,13 @@ ipcMain.handle("check-update", async () => {
     // detectAll failed — continue with self only
   }
 
-  // Self (ai-cli-inventory)
+  // Self (ai-shelf)
   let selfVersion = "unknown";
   try { selfVersion = app.getVersion(); } catch { /* ok */ }
 
   results.push({
-    tool: "ai-cli-inventory",
-    label: "AI CLI Inventory (self)",
+    tool: "ai-shelf",
+    label: "AI Shelf (self)",
     currentVersion: selfVersion,
     latestVersion: null,
     available: true,
@@ -469,8 +476,8 @@ ipcMain.handle("get-tools-list", async () => {
   try { selfVersion = app.getVersion(); } catch { /* ok */ }
 
   results.push({
-    tool: "ai-cli-inventory",
-    label: "AI CLI Inventory (self)",
+    tool: "ai-shelf",
+    label: "AI Shelf (self)",
     currentVersion: selfVersion,
     latestVersion: null,
     available: true,
@@ -499,7 +506,7 @@ ipcMain.handle("start-update-scan", async (event) => {
   let selfVersion = "unknown";
   try { selfVersion = app.getVersion(); } catch { /* ok */ }
   const selfEntry: ToolInfo = {
-    tool: "ai-cli-inventory", label: "AI CLI Inventory (self)",
+    tool: "ai-shelf", label: "AI Shelf (self)",
     currentVersion: selfVersion, latestVersion: null,
     available: true, updateCommand: detectSelfUpdateCmd(),
   };
@@ -537,7 +544,7 @@ ipcMain.handle("start-update-scan", async (event) => {
 
 ipcMain.handle("run-update", async (_event, tool: string) => {
   const cliPath = join(import.meta.dirname, "..", "cli.js");
-  const cliArg = tool === "ai-cli-inventory" ? "self" : tool;
+  const cliArg = tool === "ai-shelf" ? "self" : tool;
   const result = await run("node", [cliPath, "update", cliArg], 60_000);
   if (result.ok) {
     return { success: true, message: result.stdout || "Update completed" };
@@ -550,16 +557,16 @@ function detectSelfUpdateCmd(): string {
     try {
       execSync(`${pm} --version`, { stdio: "ignore" });
       return pm === "pnpm"
-        ? "pnpm update -g ai-cli-inventory"
+        ? "pnpm update -g ai-shelf"
         : pm === "yarn"
-          ? "yarn global upgrade ai-cli-inventory"
-          : "npm update -g ai-cli-inventory";
+          ? "yarn global upgrade ai-shelf"
+          : "npm update -g ai-shelf";
     } catch { /* not available */ }
   }
-  return "npm update -g ai-cli-inventory";
+  return "npm update -g ai-shelf";
 }
 
-/** Returns only the self (ai-cli-inventory) version and update command — no detectAll(). */
+/** Returns only the self (ai-shelf) version and update command — no detectAll(). */
 ipcMain.handle("get-self-info", () => {
   let version = "unknown";
   try { version = app.getVersion(); } catch { /* ok */ }
@@ -571,7 +578,7 @@ ipcMain.handle("get-self-info", () => {
 type McpServerEntry = Record<string, unknown>;
 type McpServersMap = Record<string, McpServerEntry>;
 
-const SYNC_TOOLS = ["claude", "copilot", "cursor"] as const;
+const SYNC_TOOLS = MCP_SYNC_TOOL_IDS;
 
 /** Read MCP servers from a tool's config file */
 function readMcpServers(tool: string): McpServersMap {
@@ -675,14 +682,6 @@ ipcMain.handle("open-path", async (_event, filePath: string) => {
 
 // --- PTY (In-App Terminal) ---
 
-const TOOL_LAUNCH_CMD: Record<string, string> = {
-  claude: "claude",
-  copilot: "copilot",
-  cursor: "cursor",
-  "cursor-agent": "agent",
-  agent: "agent",
-};
-
 const PLAIN_SHELL_TOOL_ID = "shell";
 
 const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
@@ -719,10 +718,18 @@ function broadcastPtyExit(sessionId: string, exitCode: number) {
   }
 }
 
-function resolvePtyWorkDir(cwd?: string): string {
-  if (cwd && existsSync(cwd)) return cwd;
-  return homedir();
+function resolvePtyWorkDir(cwd?: string): { ok: true; dir: string } | { ok: false; error: string } {
+  const trimmed = cwd?.trim();
+  if (!trimmed) return { ok: true, dir: homedir() };
+  if (existsSync(trimmed)) return { ok: true, dir: trimmed };
+  return { ok: false, error: `Directory not found: ${trimmed}` };
 }
+
+ipcMain.handle("clipboard-read-text", () => clipboard.readText());
+
+ipcMain.handle("clipboard-write-text", (_event, text: string) => {
+  clipboard.writeText(text ?? "");
+});
 
 ipcMain.handle("pick-folder", async (_event, defaultPath?: string) => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -745,7 +752,11 @@ ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string) => {
 
   const sessionId = `${tool}-${Date.now()}`;
   const isWin = process.platform === "win32";
-  const workDir = resolvePtyWorkDir(cwd);
+  const workDirResult = resolvePtyWorkDir(cwd);
+  if (!workDirResult.ok) {
+    return { success: false, error: workDirResult.error };
+  }
+  const workDir = workDirResult.dir;
 
   // On Windows: prefer pwsh (loads $PROFILE for prompt themes) → powershell → cmd
   const windowsCandidates: [string, string[]][] = shellOnly
@@ -924,6 +935,14 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
       const appData = process.env["APPDATA"] ?? join(homedir(), "AppData", "Roaming");
       settingsPath = join(appData, "Cursor", "User", "settings.json");
       key = "cursor.preferredModel";
+    } else if (tool === "gemini") {
+      settingsPath = join(homedir(), ".gemini", "settings.json");
+      mkdirSync(join(homedir(), ".gemini"), { recursive: true });
+      key = "model";
+    } else if (tool === "opencode") {
+      settingsPath = join(homedir(), ".config", "opencode", "opencode.json");
+      mkdirSync(join(homedir(), ".config", "opencode"), { recursive: true });
+      key = "model";
     } else {
       return { success: false, error: `Unknown tool: ${tool}` };
     }
@@ -1065,6 +1084,7 @@ ipcMain.handle(
     _e,
     profileId: string,
     patch: {
+      name?: string;
       defaultCwd?: string;
       defaultTool?: string;
       broadcastInput?: boolean;
@@ -1084,6 +1104,15 @@ ipcMain.handle("profile-delete", (_e, profileId: string) => {
   try {
     deleteProfile(profileId);
     return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("profile-reorder", (_e, orderedProfileIds: string[]) => {
+  try {
+    const tree = reorderProfiles(orderedProfileIds);
+    return { success: true, tree };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
   }

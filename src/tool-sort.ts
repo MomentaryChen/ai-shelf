@@ -7,6 +7,10 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   cursor: "Cursor",
   "cursor-agent": "Cursor",
   agent: "Cursor",
+  codex: "Codex",
+  gemini: "Gemini",
+  aider: "Aider",
+  opencode: "OpenCode",
 };
 
 /** Display name used for sorting and UI labels. */

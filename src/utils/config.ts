@@ -85,6 +85,10 @@ export function getMcpConfigPath(tool: string): string {
         : home(".copilot", "mcp-config.json");
     case "cursor":
       return home(".cursor", "mcp.json");
+    case "gemini":
+      return home(".gemini", "settings.json");
+    case "opencode":
+      return join(home(".config", "opencode"), "opencode.json");
     default:
       return "";
   }

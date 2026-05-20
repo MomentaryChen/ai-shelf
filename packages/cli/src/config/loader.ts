@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdirSync, existsSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { parse, stringify } from "yaml";
@@ -27,7 +27,28 @@ export function getConfigPath(): string {
   return join(getAppDataDir(), "config.yaml");
 }
 
+const LEGACY_APP_NAME = "ai-cli-inventory";
+
+function migrateLegacyAppDataDir(): void {
+  if (process.platform === "win32") {
+    const appData = process.env.APPDATA ?? join(homedir(), "AppData", "Roaming");
+    const legacyDir = join(appData, LEGACY_APP_NAME);
+    const newDir = join(appData, APP_NAME);
+    if (existsSync(legacyDir) && !existsSync(newDir)) {
+      renameSync(legacyDir, newDir);
+    }
+    return;
+  }
+  const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
+  const legacyDir = join(xdg, LEGACY_APP_NAME);
+  const newDir = join(xdg, APP_NAME);
+  if (existsSync(legacyDir) && !existsSync(newDir)) {
+    renameSync(legacyDir, newDir);
+  }
+}
+
 export function ensureAppDataDir(): string {
+  migrateLegacyAppDataDir();
   const dir = getAppDataDir();
   mkdirSync(dir, { recursive: true });
   mkdirSync(join(dir, "logs"), { recursive: true });

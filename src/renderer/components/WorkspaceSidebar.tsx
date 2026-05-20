@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { GroupInfo, SessionInfo, WorkspaceInfo, WorkspaceTree } from "../types";
 import { getGroupPaneCount, groupKey } from "../terminal/group-layout-storage";
+import { toolDisplayName } from "../../tool-sort.js";
 
 export interface WorkspaceSelection {
   workspace: WorkspaceInfo;
@@ -17,6 +18,8 @@ interface Props {
   onSelect: (sel: WorkspaceSelection | null) => void;
   onActivateGroup: (sel: GroupSelection) => void;
   onLaunchTool: (tool: string, cwd: string) => void;
+  /** Installed AI CLI ids only (from inventory scan). */
+  launchToolIds?: string[];
   activeGroupKey?: string | null;
   embedded?: boolean;
 }
@@ -25,6 +28,7 @@ export function WorkspaceSidebar({
   onSelect,
   onActivateGroup,
   onLaunchTool,
+  launchToolIds = [],
   activeGroupKey = null,
   embedded = false,
 }: Props) {
@@ -271,14 +275,14 @@ export function WorkspaceSidebar({
             {selected.session.cwd}
           </p>
           <div className="grid grid-cols-3 gap-1">
-            {(["claude", "copilot", "cursor"] as const).map((tool) => (
+            {launchToolIds.map((tool) => (
               <button
                 key={tool}
                 type="button"
                 onClick={() => onLaunchTool(tool, selected.session.cwd)}
-                className="cursor-pointer rounded border py-1 text-[10px] capitalize hover:border-accent/50 hover:text-accent"
+                className="cursor-pointer rounded border py-1 text-[10px] hover:border-accent/50 hover:text-accent"
               >
-                {tool}
+                {toolDisplayName(tool)}
               </button>
             ))}
           </div>

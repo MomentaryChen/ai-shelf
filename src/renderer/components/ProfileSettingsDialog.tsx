@@ -9,6 +9,7 @@ import {
 import { ProfileColorPicker } from "./ProfileColorPicker";
 
 export interface ProfileSettingsPatch {
+  name: string;
   defaultCwd: string;
   defaultTool: string;
   broadcastInput: boolean;
@@ -36,6 +37,7 @@ export function ProfileSettingsDialog({
   onSave,
   onDelete,
 }: Props) {
+  const [name, setName] = useState("");
   const [cwd, setCwd] = useState("");
   const [tool, setTool] = useState(PLAIN_SHELL_TOOL_ID);
   const [broadcastInput, setBroadcastInput] = useState(false);
@@ -45,6 +47,7 @@ export function ProfileSettingsDialog({
 
   useEffect(() => {
     if (!open || !profile) return;
+    setName(profile.name);
     setCwd(profile.defaultCwd ?? "");
     setTool(profile.defaultTool || PLAIN_SHELL_TOOL_ID);
     setBroadcastInput(profile.broadcastInput ?? false);
@@ -62,7 +65,10 @@ export function ProfileSettingsDialog({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
     void onSave(profile!.id, {
+      name: trimmedName,
       defaultCwd: cwd.trim(),
       defaultTool: effectiveTool,
       broadcastInput,
@@ -80,13 +86,24 @@ export function ProfileSettingsDialog({
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
       >
-        <h2 className="mb-1 text-[15px] font-semibold text-[#f0f0f0]">Profile 設定</h2>
-        <p className="mb-4 truncate text-[12px] text-[#6b6b6b]" title={profile.name}>
-          {profile.name}
-        </p>
+        <h2 className="mb-4 text-[15px] font-semibold text-[#f0f0f0]">Profile 設定</h2>
+
+        <label className="mb-3 block">
+          <span className="mb-1 block text-[11px] text-[#6b6b6b]">Profile 名稱</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            placeholder="例如：work、side-project"
+            className="w-full rounded-md border border-[#252525] bg-[#0a0a0a] px-3 py-2 text-[13px] focus:border-[#404040] focus:outline-none"
+          />
+        </label>
 
         <label className="mb-3 block">
           <span className="mb-1 block text-[11px] text-[#6b6b6b]">Default directory</span>
+          <p className="mb-1.5 text-[10px] text-[#5a5a5a]">
+            套用於新開啟的 terminal；已開啟的 pane 需關閉後重開才會換目錄。
+          </p>
           <div className="flex gap-2">
             <input
               value={cwd}
@@ -177,7 +194,7 @@ export function ProfileSettingsDialog({
             </button>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !name.trim()}
               className="cursor-pointer rounded-md bg-[#2a4a7a] px-4 py-2 text-[13px] font-medium text-[#e8f0ff] hover:bg-[#355f9e] disabled:opacity-40"
             >
               儲存

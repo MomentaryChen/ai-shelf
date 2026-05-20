@@ -1,4 +1,4 @@
-# AI CLI Inventory
+# AI Shelf
 
 > Unified toolkit to inspect, launch, and orchestrate AI CLIs — Claude Code, GitHub Copilot, and Cursor — in one place.
 
@@ -6,7 +6,7 @@
 
 [中文說明](README.zh-TW.md)
 
-**v0.2.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-cli-inventory`).
+**v0.2.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-shelf`).
 
 ---
 
@@ -15,7 +15,7 @@
 | Deliverable | Binary / entry | Role |
 |---|---|---|
 | **Inventory CLI** | `ai` | Scan models, skills, MCP, config; run doctor/update/raw |
-| **Workspace CLI** | `ai-cli-inventory` | Manage workspaces, groups, sessions; broadcast commands; TUI |
+| **Workspace CLI** | `ai-shelf` | Manage workspaces, groups, sessions; broadcast commands; TUI |
 | **Desktop app** | `pnpm electron` | Terminal launcher + inventory dashboard (Electron + React) |
 
 The desktop app uses both: inventory detection lives in `src/`, while profiles, layouts, and session metadata are backed by SQLite via `packages/cli`.
@@ -35,12 +35,12 @@ The desktop app uses both: inventory detection lives in `src/`, while profiles, 
 - **Update** — version check and one-click update per tool and self
 - **JSON output** — `--json` on every inventory command
 
-### Terminal workspace (`ai-cli-inventory`)
+### Terminal workspace (`ai-shelf`)
 
 - **Workspaces & groups** — organize projects and terminal groups in SQLite
-- **Sessions** — create/start/stop PTY sessions with optional AI tool launch (`claude`, `copilot`, `cursor`)
+- **Sessions** — create/start/stop PTY sessions with optional AI tool launch (`claude`, `copilot`, `cursor`, `codex`, `gemini`, `aider`, `opencode`)
 - **Broadcast exec** — send the same command to all running sessions in a group
-- **TUI** — full-screen terminal UI (`ai-cli-inventory tui`) built with neo-blessed
+- **TUI** — full-screen terminal UI (`ai-shelf tui`) built with neo-blessed
 - **Profiles API** — exported library used by the desktop app for named terminal profiles
 
 ### Desktop app (Electron)
@@ -61,6 +61,10 @@ The desktop app uses both: inventory detection lives in `src/`, while profiles, 
 | Claude Code | `claude` | `claude` |
 | GitHub Copilot CLI | `copilot` / `gh copilot` | `copilot` |
 | Cursor | `agent` | `cursor` |
+| OpenAI Codex CLI | `codex` | `codex` |
+| Google Gemini CLI | `gemini` | `gemini` |
+| Aider | `aider` | `aider` |
+| OpenCode | `opencode` | `opencode` |
 
 ---
 
@@ -79,19 +83,19 @@ Switch between **Terminal** and **Inventory** in the header. Inventory mode has 
 ### From npm (inventory CLI)
 
 ```bash
-npm install -g ai-cli-inventory   # exposes `ai` when published from root package
-pnpm add -g ai-cli-inventory
+npm install -g ai-shelf   # exposes `ai` when published from root package
+pnpm add -g ai-shelf
 ```
 
 ### From source (monorepo)
 
 ```bash
-git clone <repo-url> ai-cli-inventory
-cd ai-cli-inventory
+git clone <repo-url> ai-shelf
+cd ai-shelf
 pnpm install          # rebuilds native modules (node-pty, better-sqlite3)
 pnpm build
 pnpm start            # ai inventory / doctor / …
-pnpm exec ai-cli-inventory workspace list
+pnpm exec ai-shelf workspace list
 pnpm electron         # desktop app
 ```
 
@@ -121,7 +125,7 @@ ai inventory claude     # detail view for a single tool
 **Example output:**
 
 ```
-  AI CLI Inventory
+  AI Shelf
 
   TOOL             AUTH   MCP   MODEL                    CTX    STREAM   TOOLS   SKILLS
   ──────────────────────────────────────────────────────────────────────────────────────
@@ -172,38 +176,38 @@ ai update self
 
 ---
 
-### Workspace CLI — `ai-cli-inventory`
+### Workspace CLI — `ai-shelf`
 
 Persistent data (Windows):
 
 | Path | Purpose |
 |---|---|
-| `%APPDATA%/ai-cli-inventory/config.yaml` | App config |
-| `%APPDATA%/ai-cli-inventory/workspaces.db` | SQLite database |
-| `%APPDATA%/ai-cli-inventory/logs/app.log` | Logs |
+| `%APPDATA%/ai-shelf/config.yaml` | App config |
+| `%APPDATA%/ai-shelf/workspaces.db` | SQLite database |
+| `%APPDATA%/ai-shelf/logs/app.log` | Logs |
 
 ```bash
 # Workspaces
-ai-cli-inventory workspace create <name> [--root <path>]
-ai-cli-inventory workspace list
-ai-cli-inventory workspace delete <name>
+ai-shelf workspace create <name> [--root <path>]
+ai-shelf workspace list
+ai-shelf workspace delete <name>
 
 # Groups (within a workspace)
-ai-cli-inventory group create <workspace> <group>
-ai-cli-inventory group list <workspace>
-ai-cli-inventory group delete <workspace> <group>
+ai-shelf group create <workspace> <group>
+ai-shelf group list <workspace>
+ai-shelf group delete <workspace> <group>
 
 # Sessions
-ai-cli-inventory session create <workspace> <group> <name> [--cwd <path>] [--shell <shell>] [--tool <tool>]
-ai-cli-inventory session start <workspace> <group> <name>
-ai-cli-inventory session stop <workspace> <group> <name>
-ai-cli-inventory session list <workspace> [--group <name>]
-ai-cli-inventory session exec <workspace> <group> <command...> [--session <name>]
-ai-cli-inventory session exec <workspace> <group> <command...> --broadcast
-ai-cli-inventory session delete <workspace> <group> <name>
+ai-shelf session create <workspace> <group> <name> [--cwd <path>] [--shell <shell>] [--tool <tool>]
+ai-shelf session start <workspace> <group> <name>
+ai-shelf session stop <workspace> <group> <name>
+ai-shelf session list <workspace> [--group <name>]
+ai-shelf session exec <workspace> <group> <command...> [--session <name>]
+ai-shelf session exec <workspace> <group> <command...> --broadcast
+ai-shelf session delete <workspace> <group> <name>
 
 # Full-screen TUI
-ai-cli-inventory tui
+ai-shelf tui
 ```
 
 See [`packages/cli/STRUCTURE.md`](packages/cli/STRUCTURE.md) for package internals.
@@ -241,7 +245,7 @@ pnpm dist:win                # portable Windows app (electron-builder → releas
 ### Project structure
 
 ```
-ai-cli-inventory/                 # root workspace (Electron app + inventory CLI)
+ai-shelf/                 # root workspace (Electron app + inventory CLI)
 ├── src/
 │   ├── cli.ts                    # `ai` entry — inventory, doctor, raw, update
 │   ├── commands/                 # CLI command handlers
@@ -252,7 +256,7 @@ ai-cli-inventory/                 # root workspace (Electron app + inventory CLI
 │   │   ├── hooks/                # useInventoryScan, useProfileWorkspace, …
 │   │   └── terminal/             # split-tree, layout serialize, SQLite sync
 │   └── utils/
-├── packages/cli/                 # `ai-cli-inventory` workspace manager
+├── packages/cli/                 # `ai-shelf` workspace manager
 │   └── src/
 │       ├── cli/                  # Commander commands
 │       ├── core/                 # ports, entities, errors

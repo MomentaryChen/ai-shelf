@@ -1,6 +1,6 @@
 # UI Pages — Detailed Guide
 
-> Full page-by-page walkthrough of the AI CLI Inventory desktop app.  
+> Full page-by-page walkthrough of the AI Shelf desktop app.  
 > Back to [README](../README.md) · [中文說明](../README.zh-TW.md)
 
 ---
@@ -227,7 +227,7 @@ Updates are applied via each tool's own native CLI update mechanism:
 | Claude | `claude update` |
 | Copilot | `gh extension upgrade gh-copilot` |
 | Cursor | `cursor --update` |
-| ai-cli-inventory (self) | `npm update -g ai-cli-inventory` |
+| ai-shelf (self) | `npm update -g ai-shelf` |
 
 ### Per-Tool Cards
 Each card shows:

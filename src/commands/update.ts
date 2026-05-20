@@ -2,14 +2,7 @@ import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { run } from "../utils/exec.js";
 import { detectAll } from "../inventory/index.js";
-
-const TOOL_UPDATE: Record<string, { cmd: string; args: string[]; label: string }> = {
-  claude: { cmd: "claude", args: ["update"], label: "Claude Code" },
-  copilot: { cmd: "copilot", args: ["update"], label: "GitHub Copilot CLI" },
-  cursor: { cmd: "agent", args: ["update"], label: "Cursor" },
-  "cursor-agent": { cmd: "agent", args: ["update"], label: "Cursor Agent" },
-  agent: { cmd: "agent", args: ["update"], label: "Cursor Agent" },
-};
+import { TOOL_UPDATE } from "../tools.js";
 
 export async function runUpdate(args: string[]) {
   const target = args[0]; // optional: specific tool name
@@ -56,7 +49,7 @@ async function updateTool(tool: string) {
 
 async function updateSelf() {
   const currentVersion = getCurrentVersion();
-  console.log(`\n🔄 Updating ai-cli-inventory (current: ${currentVersion})…`);
+  console.log(`\n🔄 Updating ai-shelf (current: ${currentVersion})…`);
 
   const pm = detectPackageManager();
   const cmd = buildUpdateCommand(pm);
@@ -66,9 +59,9 @@ async function updateSelf() {
     execSync(cmd, { stdio: "inherit" });
     const newVersion = getInstalledVersion(pm);
     if (newVersion && newVersion !== currentVersion) {
-      console.log(`✅ Updated ai-cli-inventory ${currentVersion} → ${newVersion}`);
+      console.log(`✅ Updated ai-shelf ${currentVersion} → ${newVersion}`);
     } else {
-      console.log(`✅ ai-cli-inventory already up to date (${currentVersion})`);
+      console.log(`✅ ai-shelf already up to date (${currentVersion})`);
     }
   } catch {
     console.error(`❌ Self-update failed. Try manually:\n   ${cmd}`);
@@ -101,9 +94,9 @@ function detectPackageManager(): "pnpm" | "npm" | "yarn" {
 
 function buildUpdateCommand(pm: "pnpm" | "npm" | "yarn"): string {
   switch (pm) {
-    case "pnpm": return "pnpm update -g ai-cli-inventory";
-    case "yarn": return "yarn global upgrade ai-cli-inventory";
-    case "npm": return "npm update -g ai-cli-inventory";
+    case "pnpm": return "pnpm update -g ai-shelf";
+    case "yarn": return "yarn global upgrade ai-shelf";
+    case "npm": return "npm update -g ai-shelf";
   }
 }
 
@@ -111,9 +104,9 @@ function getInstalledVersion(pm: "pnpm" | "npm" | "yarn"): string | null {
   try {
     const cmd = pm === "yarn"
       ? "yarn global list --depth=0 2>&1"
-      : `${pm} list -g ai-cli-inventory --depth=0 2>&1`;
+      : `${pm} list -g ai-shelf --depth=0 2>&1`;
     const output = execSync(cmd, { encoding: "utf-8" });
-    const match = output.match(/ai-cli-inventory@(\S+)/);
+    const match = output.match(/ai-shelf@(\S+)/);
     return match?.[1] ?? null;
   } catch {
     return null;

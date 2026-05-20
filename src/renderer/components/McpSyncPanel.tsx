@@ -3,8 +3,16 @@ import type { McpRawData, McpSyncResult } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 
-const TOOLS = ["claude", "copilot", "cursor"] as const;
-const TOOL_ICONS: Record<string, string> = { claude: "🟣", copilot: "🐙", cursor: "📐" };
+import { MCP_SYNC_TOOL_IDS } from "../../tools.js";
+
+const TOOLS = MCP_SYNC_TOOL_IDS;
+const TOOL_ICONS: Record<string, string> = {
+  claude: "🟣",
+  copilot: "🐙",
+  cursor: "📐",
+  gemini: "✨",
+  opencode: "◇",
+};
 
 export function McpSyncPanel() {
   const [rawData, setRawData] = useState<McpRawData | null>(null);

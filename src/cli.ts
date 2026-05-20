@@ -17,7 +17,7 @@ const { positionals, values } = parseArgs({
 const [command, ...rest] = positionals;
 
 if (values.version) {
-  console.log("ai-cli-inventory v0.1.0");
+  console.log("ai-shelf v0.2.0");
   process.exit(0);
 }
 
@@ -48,13 +48,13 @@ switch (command) {
 
 function printHelp() {
   console.log(`
-AI CLI Inventory v0.1.0
+AI Shelf v0.2.0
 
 Usage:
   ai inventory [models|skills|mcp|config]   Show AI tool overview
   ai doctor                                  Check environment health
   ai raw <tool> [args...]                    Pass-through to underlying CLI
-  ai update [tool|self]                      Update AI tools (claude, copilot, cursor, self)
+  ai update [tool|self]                      Update AI tools (claude, copilot, cursor, codex, gemini, aider, opencode, self)
 
 Options:
   --json       Output as JSON

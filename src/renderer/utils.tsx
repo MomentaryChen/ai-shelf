@@ -26,6 +26,22 @@ const TOOL_INSTALL: Record<string, InstallInfo> = {
     cmd: "winget install Anysphere.Cursor",
     url: "https://cursor.sh",
   },
+  codex: {
+    cmd: "npm install -g @openai/codex",
+    url: "https://developers.openai.com/codex/cli/",
+  },
+  gemini: {
+    cmd: "npm install -g @google/gemini-cli",
+    url: "https://github.com/google-gemini/gemini-cli",
+  },
+  aider: {
+    cmd: "pip install -U aider-chat",
+    url: "https://aider.chat/",
+  },
+  opencode: {
+    cmd: "opencode upgrade",
+    url: "https://opencode.ai/docs/cli/",
+  },
 };
 
 export function toolInstall(tool: string): InstallInfo | null {

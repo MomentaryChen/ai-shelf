@@ -28,20 +28,20 @@ import {
   type ExternalTerminal,
   SETTINGS_KEY,
 } from "../chat-settings";
-import { toolIdsFromInventory } from "../utils/available-tools";
+import { resolveLaunchTool, toolIdsFromInventory } from "../utils/available-tools";
 
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
-const SIDEBAR_MIN = 180;
-const SIDEBAR_MAX = 420;
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 440;
 
 function loadSidebarWidth(): number {
   try {
     const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    const n = raw ? Number(raw) : 240;
-    if (!Number.isFinite(n)) return 240;
+    const n = raw ? Number(raw) : 268;
+    if (!Number.isFinite(n)) return 268;
     return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n));
   } catch {
-    return 240;
+    return 268;
   }
 }
 
@@ -49,6 +49,10 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   claude: "Anthropic coding agent — context-rich, file-aware sessions",
   copilot: "GitHub Copilot CLI — explain, suggest and chat",
   cursor: "Cursor agent — AI pair programmer for your workspace",
+  codex: "OpenAI Codex CLI — read, edit, and run code locally",
+  gemini: "Google Gemini CLI — large-context terminal coding agent",
+  aider: "Aider — git-aware pair programming with diff edits",
+  opencode: "OpenCode — multi-provider terminal coding agent",
 };
 
 export function ChatTab({
@@ -75,6 +79,7 @@ export function ChatTab({
 
   const panes = layout ? collectPanes(layout) : [];
   const bg = settings.terminalBg || getAppBg();
+  const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
     const result = await window.api.ptySpawn(tool, cwd || undefined);
@@ -107,6 +112,8 @@ export function ChatTab({
     activateProfile,
     restoreLastProfile,
     discardProfileSessions,
+    syncActiveProfile,
+    getProfileDefaultCwd,
     getProfilePanes,
     getProfileFocusedPaneId,
     canAddPane,
@@ -196,12 +203,13 @@ export function ChatTab({
 
   const resolveCwd = useCallback(
     (override?: string) => {
-      if (override) return override;
-      if (settings.workingDir) return settings.workingDir;
-      if (activeProfile?.defaultCwd) return activeProfile.defaultCwd;
+      if (override?.trim()) return override.trim();
+      const fromProfile = getProfileDefaultCwd();
+      if (fromProfile) return fromProfile;
+      if (settings.workingDir?.trim()) return settings.workingDir.trim();
       return "";
     },
-    [settings.workingDir, activeProfile],
+    [settings.workingDir, getProfileDefaultCwd],
   );
 
   const addPane = useCallback(
@@ -282,10 +290,13 @@ export function ChatTab({
     async (paneId: string, direction: SplitDirection) => {
       if (!canAddPane) return;
       const parent = layout ? collectPanes(layout).find((p) => p.id === paneId) : null;
-      const tool = parent?.tool ?? data.find((e) => e.available)?.tool ?? "claude";
+      const tool = resolveLaunchTool(
+        parent?.tool ?? availableTools[0],
+        availableTools,
+      );
       await addPane(tool, parent?.cwd || resolveCwd(), paneId, direction);
     },
-    [layout, data, addPane, canAddPane, resolveCwd],
+    [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
 
   async function handleActivateProfile(profile: ProfileInfo) {
@@ -312,11 +323,15 @@ export function ChatTab({
     try {
       if (activeProfile?.id !== profile.id) {
         await handleActivateProfile(profile);
-      } else if (panes.length === 0) {
-        const r = await handleActivateProfile(profile);
-        if ((r?.paneCount ?? 0) > 0) return;
       }
-      const ok = await addPane(profile.defaultTool || "shell");
+      const cwd =
+        profile.id === activeProfile?.id
+          ? getProfileDefaultCwd() || profile.defaultCwd?.trim()
+          : profile.defaultCwd?.trim();
+      const ok = await addPane(
+        resolveLaunchTool(profile.defaultTool, availableTools),
+        cwd || undefined,
+      );
       if (!ok) {
         setTerminalError((prev) => prev ?? "無法開啟 terminal，請按 F12 查看 Console");
       }
@@ -350,8 +365,6 @@ export function ChatTab({
     setBroadcastInput(false);
   }
 
-  const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
-
   const sidebar = (
     <ProfileSidebar
       width={sidebarWidth}
@@ -375,14 +388,21 @@ export function ChatTab({
       onAddTerminal={(profile) => void handleNewTerminal(profile)}
       addingTerminal={addingTerminal}
       onToggleBroadcast={(id, v) => void handleToggleBroadcast(id, v)}
-      onUpdateDefaultCwd={(_id, cwd) => updateSettings({ workingDir: cwd })}
+      onProfileUpdated={(profile) => {
+        syncActiveProfile(profile);
+        if (profile.id === activeProfile?.id) {
+          updateSettings({ workingDir: profile.defaultCwd?.trim() ?? "" });
+        }
+      }}
       onProfileDeleted={handleProfileDeleted}
+      activeLivePaneCount={panes.length}
     />
   );
 
   const topBar = (
     <WarpTopBar
       profileLabel={profileLabel}
+      profileAccentColor={activeProfile?.accentColor ?? null}
       paneCount={panes.length}
       maxPanes={maxPanes}
       canAddPane={canAddPane}
@@ -405,6 +425,7 @@ export function ChatTab({
         node={layout}
         focusedPaneId={focusedPaneId}
         bg={bg}
+        profileAccentColor={activeProfile?.accentColor ?? null}
         onFocusPane={setFocusedPaneId}
         onClosePane={closePane}
         onSplitPane={(id, dir) => void splitPane(id, dir)}
@@ -455,22 +476,23 @@ export function ChatTab({
         </p>
       )}
       <div>
-        <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-[#6b6b6b]">
-          Available tools
-        </p>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {data.filter((e) => e.available).map((e) => (
-            <ToolCard
-              key={e.tool}
-              entry={e}
-              onInApp={() => addPane(e.tool)}
-              onExternal={() => openExternal(e.tool)}
-            />
-          ))}
-          {data.filter((e) => !e.available).map((e) => (
-            <ToolCard key={e.tool} entry={e} disabled />
-          ))}
-        </div>
+        {availableTools.length > 0 && (
+          <>
+            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-[#6b6b6b]">
+              可用的 Agent
+            </p>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {data.filter((e) => e.available).map((e) => (
+                <ToolCard
+                  key={e.tool}
+                  entry={e}
+                  onInApp={() => addPane(e.tool)}
+                  onExternal={() => openExternal(e.tool)}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -505,6 +527,7 @@ export function ChatTab({
 
 function WarpTopBar({
   profileLabel,
+  profileAccentColor = null,
   paneCount,
   maxPanes,
   canAddPane,
@@ -519,6 +542,7 @@ function WarpTopBar({
   available,
 }: {
   profileLabel: string | null;
+  profileAccentColor?: string | null;
   paneCount: number;
   maxPanes: number;
   canAddPane: boolean;
@@ -532,23 +556,47 @@ function WarpTopBar({
   onAddPane: (tool: string) => void;
   available: ProviderEntry[];
 }) {
+  const accent = profileAccentColor;
+  const hasAccent = Boolean(accent);
+
   return (
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[#1f1f1f] bg-[#0a0a0a] px-3">
-      <input
-        type="search"
-        placeholder="Search…"
-        className="min-w-0 max-w-md flex-1 rounded-md border border-[#252525] bg-[#111111] px-2.5 py-1 text-[12px] text-[#c0c0c0] placeholder:text-[#5a5a5a] focus:border-[#404040] focus:outline-none"
-      />
+    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[#1a1a1e] bg-[#0a0a0b]/95 px-3 backdrop-blur-sm">
       {profileLabel && (
-        <span className="hidden max-w-[200px] truncate text-[11px] text-[#6b9fff] lg:inline" title={profileLabel}>
-          {profileLabel}
+        <div
+          className="flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1"
+          style={
+            hasAccent && accent
+              ? {
+                  backgroundColor: `${accent}12`,
+                  borderColor: `${accent}30`,
+                }
+              : {
+                  backgroundColor: "rgba(126, 182, 255, 0.08)",
+                  borderColor: "rgba(126, 182, 255, 0.2)",
+                }
+          }
+          title={profileLabel}
+        >
+          {hasAccent && (
+            <span
+              className="h-2 w-2 shrink-0 rounded-[2px]"
+              style={{ backgroundColor: accent!, boxShadow: `0 0 6px ${accent}88` }}
+              aria-hidden
+            />
+          )}
+          <span
+            className="min-w-0 truncate text-[11px] font-medium"
+            style={{ color: hasAccent && accent ? accent : "#8ab4ff" }}
+          >
+            {profileLabel}
+          </span>
           {paneCount > 0 && (
-            <span className="ml-1 text-[#5a5a5a]">
-              · {paneCount}/{maxPanes}
-              {broadcastInput && paneCount > 1 ? " · 同步輸入" : ""}
+            <span className="shrink-0 text-[10px] tabular-nums text-[#6b6b72]">
+              {paneCount}/{maxPanes}
+              {broadcastInput && paneCount > 1 ? " · sync" : ""}
             </span>
           )}
-        </span>
+        </div>
       )}
       {restoring && <span className="text-[11px] text-[#6b6b6b]">Restoring…</span>}
       <div ref={newMenuRef} className="relative ml-auto flex items-center gap-2">

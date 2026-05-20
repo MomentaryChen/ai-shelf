@@ -1,4 +1,4 @@
-# ai-cli-inventory default configuration
+# ai-shelf default configuration
 workspaceRoot: ""
 defaultShell: pwsh
 logLevel: info

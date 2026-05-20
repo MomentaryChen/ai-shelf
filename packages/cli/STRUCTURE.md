@@ -1,26 +1,26 @@
-# ai-cli-inventory CLI — Terminal Workspace Manager
+# AI Shelf CLI — Terminal Workspace Manager
 
 Phase 1: MVP foundation (SQLite + CLI + TUI skeleton + runtime layer).
 
 ## Commands
 
 ```bash
-ai-cli-inventory workspace create <name> [--root <path>]
-ai-cli-inventory workspace list
-ai-cli-inventory group create <workspace> <group>
-ai-cli-inventory group list <workspace>
-ai-cli-inventory session create <workspace> <group> <session> [--cwd <path>] [--shell <shell>]
-ai-cli-inventory session list <workspace> [--group <name>]
-ai-cli-inventory session exec <workspace> <group> <command> [--session <name>]
-ai-cli-inventory session exec <workspace> <group> <command> --broadcast
-ai-cli-inventory tui
+ai-shelf workspace create <name> [--root <path>]
+ai-shelf workspace list
+ai-shelf group create <workspace> <group>
+ai-shelf group list <workspace>
+ai-shelf session create <workspace> <group> <session> [--cwd <path>] [--shell <shell>]
+ai-shelf session list <workspace> [--group <name>]
+ai-shelf session exec <workspace> <group> <command> [--session <name>]
+ai-shelf session exec <workspace> <group> <command> --broadcast
+ai-shelf tui
 ```
 
 ## Data paths (Windows)
 
-- Config: `%APPDATA%/ai-cli-inventory/config.yaml`
-- Database: `%APPDATA%/ai-cli-inventory/workspaces.db`
-- Logs: `%APPDATA%/ai-cli-inventory/logs/app.log`
+- Config: `%APPDATA%/ai-shelf/config.yaml`
+- Database: `%APPDATA%/ai-shelf/workspaces.db`
+- Logs: `%APPDATA%/ai-shelf/logs/app.log`
 
 ## Package layout
 

@@ -22,7 +22,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
       const nextMeta: UpdateMeta = {};
       let self: ToolUpdateInfo | null = null;
       for (const t of tools) {
-        if (t.tool === "ai-cli-inventory") {
+        if (t.tool === "ai-shelf") {
           self = t;
         } else {
           nextMeta[t.tool] = {
@@ -130,7 +130,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
         <ToolUpdateCard
           key={t.tool}
           tool={t}
-          isChecking={checking && t.latestVersion == null && t.tool !== "ai-cli-inventory"}
+          isChecking={checking && t.latestVersion == null && t.tool !== "ai-shelf"}
           isUpdating={updating[t.tool] ?? false}
           result={results[t.tool]}
           onUpdate={() => void handleUpdate(t.tool)}
@@ -153,7 +153,7 @@ function ToolUpdateCard({
   result?: { success: boolean; message: string };
   onUpdate: () => void;
 }) {
-  const icon = toolIcon(t.tool === "ai-cli-inventory" ? "" : t.tool);
+  const icon = toolIcon(t.tool === "ai-shelf" ? "" : t.tool);
   const isOutdated =
     t.latestVersion != null &&
     t.currentVersion != null &&
@@ -166,7 +166,7 @@ function ToolUpdateCard({
   const badge = isChecking
     ? <Badge text="Checking…" variant="info" />
     : !t.available
-      ? <Badge text="Not Installed" variant="fail" />
+      ? <Badge text="未安裝" variant="fail" />
       : isOutdated
         ? <Badge text="Update Available" variant="warn" />
         : isUpToDate

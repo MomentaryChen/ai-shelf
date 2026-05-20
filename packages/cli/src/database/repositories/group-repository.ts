@@ -15,17 +15,23 @@ export class GroupRepository implements GroupRepositoryPort {
   create(input: CreateGroupInput): GroupModel {
     const parsed = CreateGroupInputSchema.parse(input);
     const now = new Date().toISOString();
+    const maxRow = this.db
+      .prepare(
+        `SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM groups WHERE workspace_id = ?`,
+      )
+      .get(parsed.workspace_id) as { max_order: number };
     const row = {
       id: randomUUID(),
       workspace_id: parsed.workspace_id,
       name: parsed.name,
+      sort_order: maxRow.max_order + 1,
       created_at: now,
     };
 
     try {
       this.db
         .prepare(
-          `INSERT INTO groups (id, workspace_id, name, created_at) VALUES (@id, @workspace_id, @name, @created_at)`,
+          `INSERT INTO groups (id, workspace_id, name, sort_order, created_at) VALUES (@id, @workspace_id, @name, @sort_order, @created_at)`,
         )
         .run(row);
     } catch (err) {
@@ -37,7 +43,9 @@ export class GroupRepository implements GroupRepositoryPort {
 
   listByWorkspace(workspaceId: string): GroupModel[] {
     const rows = this.db
-      .prepare(`SELECT * FROM groups WHERE workspace_id = ? ORDER BY name`)
+      .prepare(
+        `SELECT * FROM groups WHERE workspace_id = ? ORDER BY sort_order, name COLLATE NOCASE`,
+      )
       .all(workspaceId);
     return rows.map((r) => GroupModelSchema.parse(r));
   }
@@ -47,6 +55,54 @@ export class GroupRepository implements GroupRepositoryPort {
       .prepare(`SELECT * FROM groups WHERE workspace_id = ? AND name = ?`)
       .get(workspaceId, name);
     return row ? GroupModelSchema.parse(row) : null;
+  }
+
+  rename(workspaceId: string, groupId: string, name: string): GroupModel {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new DatabaseError("Group name is required");
+    }
+    const existing = this.db
+      .prepare(`SELECT * FROM groups WHERE workspace_id = ? AND id = ?`)
+      .get(workspaceId, groupId);
+    if (!existing) {
+      throw new DatabaseError("Group not found");
+    }
+    const duplicate = this.findByName(workspaceId, trimmed);
+    if (duplicate && duplicate.id !== groupId) {
+      throw new DatabaseError(`Group "${trimmed}" already exists`);
+    }
+    try {
+      this.db
+        .prepare(`UPDATE groups SET name = ? WHERE workspace_id = ? AND id = ?`)
+        .run(trimmed, workspaceId, groupId);
+    } catch (err) {
+      throw new DatabaseError(`Failed to rename group to "${trimmed}"`, err);
+    }
+    const row = this.db
+      .prepare(`SELECT * FROM groups WHERE workspace_id = ? AND id = ?`)
+      .get(workspaceId, groupId);
+    return GroupModelSchema.parse(row);
+  }
+
+  reorder(workspaceId: string, orderedGroupIds: string[]): void {
+    const existing = this.listByWorkspace(workspaceId);
+    if (orderedGroupIds.length !== existing.length) {
+      throw new DatabaseError("Reorder list must include every group in the workspace");
+    }
+    const idSet = new Set(existing.map((g) => g.id));
+    for (const id of orderedGroupIds) {
+      if (!idSet.has(id)) {
+        throw new DatabaseError("Reorder list contains unknown group id");
+      }
+    }
+    const update = this.db.prepare(
+      `UPDATE groups SET sort_order = ? WHERE workspace_id = ? AND id = ?`,
+    );
+    const run = this.db.transaction((ids: string[]) => {
+      ids.forEach((id, index) => update.run(index, workspaceId, id));
+    });
+    run(orderedGroupIds);
   }
 
   deleteByName(workspaceId: string, name: string): boolean {

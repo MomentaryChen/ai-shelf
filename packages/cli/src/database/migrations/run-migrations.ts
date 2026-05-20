@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const MIGRATION_V2 = `
 ALTER TABLE sessions ADD COLUMN tool TEXT;
@@ -47,6 +47,10 @@ const MIGRATION_V7 = `
 ALTER TABLE group_layouts ADD COLUMN accent_color TEXT;
 `;
 
+const MIGRATION_V8 = `
+ALTER TABLE groups ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+`;
+
 const INITIAL_SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY
@@ -63,6 +67,7 @@ CREATE TABLE IF NOT EXISTS groups (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   UNIQUE(workspace_id, name)
 );
@@ -150,5 +155,29 @@ export function runMigrations(db: Database.Database): void {
       /* column may exist */
     }
     db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(7);
+  }
+
+  if (current < 8) {
+    try {
+      db.exec(MIGRATION_V8);
+    } catch {
+      /* column may exist */
+    }
+    backfillGroupSortOrder(db);
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(8);
+  }
+}
+
+function backfillGroupSortOrder(db: Database.Database): void {
+  const workspaces = db
+    .prepare(`SELECT DISTINCT workspace_id AS workspace_id FROM groups`)
+    .all() as { workspace_id: string }[];
+  const listStmt = db.prepare(
+    `SELECT id FROM groups WHERE workspace_id = ? ORDER BY name COLLATE NOCASE`,
+  );
+  const updateStmt = db.prepare(`UPDATE groups SET sort_order = ? WHERE id = ?`);
+  for (const { workspace_id } of workspaces) {
+    const groups = listStmt.all(workspace_id) as { id: string }[];
+    groups.forEach((g, index) => updateStmt.run(index, g.id));
   }
 }

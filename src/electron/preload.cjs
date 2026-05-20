@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld("api", {
   ptySpawn:  (tool, cwd)                    => ipcRenderer.invoke("pty-spawn", tool, cwd),
   ptyAttach: (sessionId)                    => ipcRenderer.invoke("pty-attach", sessionId),
   pickFolder: (defaultPath)                 => ipcRenderer.invoke("pick-folder", defaultPath),
+  clipboardReadText: ()                     => ipcRenderer.invoke("clipboard-read-text"),
+  clipboardWriteText: (text)                => ipcRenderer.invoke("clipboard-write-text", text),
   ptyWrite:  (sessionId, data)          => ipcRenderer.send("pty-write",  sessionId, data),
   ptyResize: (sessionId, cols, rows)    => ipcRenderer.send("pty-resize", sessionId, cols, rows),
   ptyKill:   (sessionId)                => ipcRenderer.send("pty-kill",   sessionId),
@@ -68,6 +70,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("profile-create", name, defaultCwd, defaultTool, accentColor),
   profileUpdate: (profileId, patch) => ipcRenderer.invoke("profile-update", profileId, patch),
   profileDelete: (profileId) => ipcRenderer.invoke("profile-delete", profileId),
+  profileReorder: (orderedProfileIds) =>
+    ipcRenderer.invoke("profile-reorder", orderedProfileIds),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),

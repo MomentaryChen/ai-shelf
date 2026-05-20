@@ -28,7 +28,7 @@ export function registerWorkspaceCommands(program: Command, getCtx: () => AppCon
       try {
         const list = getCtx().workspaceService.list();
         if (list.length === 0) {
-          console.log(chalk.yellow("No workspaces yet. Run: ai-cli-inventory workspace create <name>"));
+          console.log(chalk.yellow("No workspaces yet. Run: ai-shelf workspace create <name>"));
           return;
         }
         console.log(chalk.bold("\nWorkspaces\n"));

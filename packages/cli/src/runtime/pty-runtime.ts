@@ -11,6 +11,10 @@ export const TOOL_LAUNCH_CMD: Record<string, string> = {
   cursor: "cursor",
   "cursor-agent": "agent",
   agent: "agent",
+  codex: "codex",
+  gemini: "gemini",
+  aider: "aider",
+  opencode: "opencode",
 };
 
 export interface PtySpawnOptions {
@@ -78,7 +82,7 @@ export class PtyRuntime {
         ...process.env,
         COLORTERM: "truecolor",
         TERM_PROGRAM: "vscode",
-        WT_SESSION: process.env.WT_SESSION ?? "ai-cli-inventory",
+        WT_SESSION: process.env.WT_SESSION ?? "ai-shelf",
       } as Record<string, string>,
     };
 

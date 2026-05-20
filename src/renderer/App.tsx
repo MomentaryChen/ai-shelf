@@ -130,7 +130,7 @@ export function App() {
             </main>
 
             <footer className="flex h-8 shrink-0 items-center justify-between border-t border-border px-8 text-[11px] text-text-secondary">
-              <span>AI CLI Inventory v0.1.0</span>
+              <span>AI Shelf v0.2.0</span>
               <button
                 onClick={reload}
                 disabled={scanning && !hasData}

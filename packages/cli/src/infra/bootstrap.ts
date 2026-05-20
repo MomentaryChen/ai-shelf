@@ -69,7 +69,7 @@ export function bootstrap(): AppContext {
     logger.debug({ event: event.type }, "domain event");
   });
 
-  logger.info("ai-cli-inventory runtime initialized");
+  logger.info("ai-shelf runtime initialized");
 
   return {
     config,

@@ -26,3 +26,19 @@ export function AuthBadge({ auth }: { auth: string }) {
   if (auth === "missing") return <Badge text="✗ Missing" variant="fail" />;
   return <Badge text={auth} variant="warn" />;
 }
+
+export function InstallStatusBadge({ available }: { available: boolean }) {
+  return available ? (
+    <Badge text="已安裝" variant="ok" />
+  ) : (
+    <Badge text="未安裝" variant="fail" />
+  );
+}
+
+/** Auth column for tools that are not installed — avoid showing "Missing". */
+export function AuthBadgeForEntry({ entry }: { entry: { available: boolean; auth: string } }) {
+  if (!entry.available) {
+    return <span className="text-[12px] text-text-tertiary">—</span>;
+  }
+  return <AuthBadge auth={entry.auth} />;
+}

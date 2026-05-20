@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import { bindTerminalClipboard } from "../terminal/xterm-clipboard";
 
 interface Props {
   sessionId: string;
@@ -75,12 +76,14 @@ export function EmbeddedTerminal({
       cursorStyle: "block",
       scrollback: 5000,
       allowProposedApi: false,
+      rightClickSelectsWord: true,
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(el);
     termRef.current = term;
+    const unbindClipboard = bindTerminalClipboard(term, el);
 
     const pending: string[] = [];
     let opened = true;
@@ -202,6 +205,7 @@ export function EmbeddedTerminal({
       offData();
       offExit();
       el.removeEventListener("pointerdown", onPointerDown);
+      unbindClipboard();
       ro.disconnect();
       term.dispose();
     };

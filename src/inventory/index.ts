@@ -2,15 +2,31 @@ import type { DetectOptions, ProviderEntry } from "./types.js";
 import { detectClaude, fetchClaudeModelsForEntry } from "./claude.js";
 import { detectCopilot, fetchCopilotModelsForEntry } from "./copilot.js";
 import { detectCursor, fetchCursorModelsForEntry } from "./cursor.js";
+import { detectCodex } from "./codex.js";
+import { detectGemini } from "./gemini.js";
+import { detectAider } from "./aider.js";
+import { detectOpenCode } from "./opencode.js";
 import { sortProviderEntries } from "../tool-sort.js";
 
-const DETECTORS = [detectClaude, detectCopilot, detectCursor] as const;
+const DETECTORS = [
+  detectClaude,
+  detectCopilot,
+  detectCursor,
+  detectCodex,
+  detectGemini,
+  detectAider,
+  detectOpenCode,
+] as const;
 
 const DETECT_BY_TOOL: Record<string, (opts?: DetectOptions) => Promise<ProviderEntry>> = {
   claude: detectClaude,
   copilot: detectCopilot,
   agent: detectCursor,
   cursor: detectCursor,
+  codex: detectCodex,
+  gemini: detectGemini,
+  aider: detectAider,
+  opencode: detectOpenCode,
 };
 
 /** Detect a single tool by id (for per-tool IPC without running detectAll). */

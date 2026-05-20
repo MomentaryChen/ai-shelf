@@ -1,4 +1,4 @@
-import { bootstrap, type AppContext, type GroupLayoutSnapshot } from "ai-cli-inventory";
+import { bootstrap, type AppContext, type GroupLayoutSnapshot } from "ai-shelf";
 
 let ctx: AppContext | null = null;
 
@@ -77,6 +77,7 @@ export function createProfile(
 export function updateProfile(
   profileId: string,
   patch: {
+    name?: string;
     defaultCwd?: string;
     defaultTool?: string;
     broadcastInput?: boolean;
@@ -88,4 +89,8 @@ export function updateProfile(
 
 export function deleteProfile(profileId: string) {
   getWorkspaceContext().profileService.delete(profileId);
+}
+
+export function reorderProfiles(orderedProfileIds: string[]) {
+  return getWorkspaceContext().profileService.reorder(orderedProfileIds);
 }

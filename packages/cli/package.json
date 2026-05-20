@@ -1,7 +1,7 @@
 {
-  "name": "ai-cli-inventory",
+  "name": "ai-shelf",
   "version": "0.2.0",
-  "description": "AI CLI Inventory — terminal workspace orchestration CLI and TUI",
+  "description": "AI Shelf — terminal workspace orchestration CLI and TUI",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,7 +12,7 @@
     }
   },
   "bin": {
-    "ai-cli-inventory": "./dist/cli.js"
+    "ai-shelf": "./dist/cli.js"
   },
   "engines": {
     "node": ">=22"

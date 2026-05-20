@@ -79,7 +79,7 @@ function failHint(extra = "") {
 electron-rebuild failed.${extra}
 
 Common fixes on Windows:
-  1. Quit AI CLI Inventory and stop "pnpm electron" (Ctrl+C)
+  1. Quit AI Shelf and stop "pnpm electron" (Ctrl+C)
   2. pnpm install   (uses Electron 41 — required for better-sqlite3)
   3. pnpm run rebuild:native
 

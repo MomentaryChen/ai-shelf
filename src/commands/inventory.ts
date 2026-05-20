@@ -3,6 +3,10 @@ import { detectAll } from "../inventory/index.js";
 import { detectClaude } from "../inventory/claude.js";
 import { detectCopilot } from "../inventory/copilot.js";
 import { detectCursor } from "../inventory/cursor.js";
+import { detectCodex } from "../inventory/codex.js";
+import { detectGemini } from "../inventory/gemini.js";
+import { detectAider } from "../inventory/aider.js";
+import { detectOpenCode } from "../inventory/opencode.js";
 
 type Options = { json: boolean };
 
@@ -35,10 +39,10 @@ async function showOverview(opts: Options) {
     return;
   }
 
-  console.log("\n  AI CLI Inventory\n");
+  console.log("\n  AI Shelf\n");
 
   // Capability matrix table
-  const header = padRow("TOOL", "AUTH", "MCP", "MODEL", "CTX", "STREAM", "TOOLS", "SKILLS");
+  const header = padRow("TOOL", "STATUS", "AUTH", "MCP", "MODEL", "CTX", "STREAM", "TOOLS", "SKILLS");
   console.log(header);
   console.log("  " + "─".repeat(90));
 
@@ -50,13 +54,14 @@ async function showOverview(opts: Options) {
     console.log(
       padRow(
         e.tool,
-        e.available ? e.auth : "n/a",
-        e.mcp.supported ? "yes" : "no",
-        e.model ?? "default",
-        ctx,
-        e.capabilities.streaming ? "yes" : "no",
-        e.capabilities.toolCalls ? "yes" : "no",
-        skills
+        e.available ? "installed" : "missing",
+        e.available ? e.auth : "—",
+        e.available && e.mcp.supported ? "yes" : e.available ? "no" : "—",
+        e.available ? (e.model ?? "default") : "—",
+        e.available ? ctx : "—",
+        e.available && e.capabilities.streaming ? "yes" : "—",
+        e.available && e.capabilities.toolCalls ? "yes" : "—",
+        e.available ? skills : "—"
       )
     );
   }
@@ -96,10 +101,21 @@ async function showModels(opts: Options) {
     return;
   }
   console.log("\n  Models\n");
-  for (const e of entries) {
-    const status = e.available ? "✓" : "✗";
-    const ctx = e.capabilities.contextTokens ? `${Math.round(e.capabilities.contextTokens / 1000)}k ctx` : "";
-    console.log(`  ${status} ${e.tool.padEnd(16)} ${(e.model ?? "default").padEnd(24)} ${ctx}`);
+  const installed = entries.filter((e) => e.available);
+  const notInstalled = entries.filter((e) => !e.available);
+
+  if (installed.length > 0) {
+    console.log("  已安裝:\n");
+    for (const e of installed) {
+      const ctx = e.capabilities.contextTokens ? `${Math.round(e.capabilities.contextTokens / 1000)}k ctx` : "";
+      console.log(`  ✓ ${e.tool.padEnd(16)} ${(e.model ?? "default").padEnd(24)} ${ctx}`);
+    }
+  }
+  if (notInstalled.length > 0) {
+    console.log("\n  未安裝:\n");
+    for (const e of notInstalled) {
+      console.log(`  ✗ ${e.tool.padEnd(16)} ${"—".padEnd(24)}`);
+    }
   }
   console.log();
 }
@@ -177,6 +193,10 @@ async function showToolDetail(tool: string, opts: Options) {
     claude: detectClaude,
     copilot: detectCopilot,
     cursor: detectCursor,
+    codex: detectCodex,
+    gemini: detectGemini,
+    aider: detectAider,
+    opencode: detectOpenCode,
   };
   const detect = detectors[tool];
   if (!detect) {
@@ -220,6 +240,6 @@ async function showToolDetail(tool: string, opts: Options) {
 }
 
 function padRow(...cols: string[]): string {
-  const widths = [16, 6, 5, 24, 6, 8, 7, 20];
+  const widths = [16, 8, 6, 5, 24, 6, 8, 7, 20];
   return "  " + cols.map((c, i) => c.padEnd(widths[i] ?? 12)).join(" ");
 }

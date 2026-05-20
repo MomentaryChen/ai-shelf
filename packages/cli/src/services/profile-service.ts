@@ -106,6 +106,7 @@ export class ProfileService {
   update(
     profileId: string,
     patch: {
+      name?: string;
       defaultCwd?: string;
       defaultTool?: string;
       broadcastInput?: boolean;
@@ -113,8 +114,16 @@ export class ProfileService {
     },
   ): ProfileInfo {
     const ws = this.ensureProfilesWorkspace();
-    const group = this.groups.listByWorkspace(ws.id).find((g) => g.id === profileId);
+    let group = this.groups.listByWorkspace(ws.id).find((g) => g.id === profileId);
     if (!group) throw new AppError("Profile not found", "PROFILE_NOT_FOUND");
+
+    if (patch.name !== undefined) {
+      const trimmed = patch.name.trim();
+      if (!trimmed) throw new AppError("Profile name is required", "INVALID_PROFILE_NAME");
+      if (trimmed !== group.name) {
+        group = this.groups.rename(ws.id, profileId, trimmed);
+      }
+    }
 
     const snap =
       this.layouts.findByGroupId(profileId) ??
@@ -138,17 +147,48 @@ export class ProfileService {
             : nextAccent;
     }
 
+    const prevDefaultCwd = snap.defaultCwd;
+    const nextDefaultCwd =
+      patch.defaultCwd !== undefined ? patch.defaultCwd : snap.defaultCwd;
+    const defaultCwdChanged =
+      patch.defaultCwd !== undefined && patch.defaultCwd !== prevDefaultCwd;
+    const panes = defaultCwdChanged
+      ? snap.panes.map((slot) => ({
+          ...slot,
+          cwd: !slot.cwd || slot.cwd === prevDefaultCwd ? "" : slot.cwd,
+        }))
+      : snap.panes;
+
     const next: GroupLayoutSnapshot = {
       ...snap,
-      defaultCwd: patch.defaultCwd ?? snap.defaultCwd,
-      defaultTool: patch.defaultTool ?? snap.defaultTool ?? DEFAULT_PROFILE_TOOL,
-      broadcastInput: patch.broadcastInput ?? snap.broadcastInput ?? false,
+      defaultCwd: nextDefaultCwd,
+      defaultTool:
+        patch.defaultTool !== undefined ? patch.defaultTool : (snap.defaultTool ?? DEFAULT_PROFILE_TOOL),
+      broadcastInput:
+        patch.broadcastInput !== undefined ? patch.broadcastInput : (snap.broadcastInput ?? false),
       accentColor: nextAccent,
+      panes,
       updatedAt: new Date().toISOString(),
     };
     this.layouts.upsert(profileId, ws.id, next);
 
     return this.toProfileInfo(group, ws.id);
+  }
+
+  reorder(orderedProfileIds: string[]): ProfileTree {
+    const ws = this.ensureProfilesWorkspace();
+    const groups = this.groups.listByWorkspace(ws.id);
+    if (orderedProfileIds.length !== groups.length) {
+      throw new AppError("Reorder list must include every profile", "INVALID_PROFILE_ORDER");
+    }
+    const known = new Set(groups.map((g) => g.id));
+    for (const id of orderedProfileIds) {
+      if (!known.has(id)) {
+        throw new AppError("Unknown profile in reorder list", "INVALID_PROFILE_ORDER");
+      }
+    }
+    this.groups.reorder(ws.id, orderedProfileIds);
+    return this.getTree();
   }
 
   delete(profileId: string): void {

@@ -187,6 +187,8 @@ export interface ElectronAPI {
   ptySpawn:  (tool: string, cwd?: string)                           => Promise<{ success: boolean; sessionId?: string; error?: string }>;
   ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;
+  clipboardReadText: ()                                             => Promise<string>;
+  clipboardWriteText: (text: string)                                => Promise<void>;
   ptyWrite:  (sessionId: string, data: string)             => void;
   ptyResize: (sessionId: string, cols: number, rows: number) => void;
   ptyKill:   (sessionId: string)                           => void;
@@ -231,6 +233,7 @@ export interface ElectronAPI {
   profileUpdate: (
     profileId: string,
     patch: {
+      name?: string;
       defaultCwd?: string;
       defaultTool?: string;
       broadcastInput?: boolean;
@@ -238,6 +241,9 @@ export interface ElectronAPI {
     },
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileDelete: (profileId: string) => Promise<{ success: boolean; error?: string }>;
+  profileReorder: (
+    orderedProfileIds: string[],
+  ) => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
   toggleDevTools: () => Promise<void>;

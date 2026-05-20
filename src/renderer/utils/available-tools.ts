@@ -26,9 +26,20 @@ export function mergeToolIds(available: string[], ...extra: (string | undefined)
   return out;
 }
 
-/** Default-tool picker: plain shell first, then detected AI tools. */
+/** Default-tool picker: plain shell first, then installed AI tools only. */
 export function profileToolChoices(available: string[], ...extra: (string | undefined)[]): string[] {
-  return mergeToolIds([PLAIN_SHELL_TOOL_ID, ...available], ...extra);
+  const installed = new Set(available);
+  const extras = extra.filter(
+    (id): id is string =>
+      !!id && (isPlainShellTool(id) || installed.has(id)),
+  );
+  return mergeToolIds([PLAIN_SHELL_TOOL_ID, ...available], ...extras);
+}
+
+/** Pick a tool id that can actually be launched in Terminal (falls back to shell). */
+export function resolveLaunchTool(tool: string | undefined, available: string[]): string {
+  if (!tool || isPlainShellTool(tool)) return PLAIN_SHELL_TOOL_ID;
+  return available.includes(tool) ? tool : PLAIN_SHELL_TOOL_ID;
 }
 
 export function profileToolLabel(tool: string): string {

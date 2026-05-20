@@ -2,15 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import type { EnvVarGroup, ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { DataTable, Td } from "./DataTable";
-import { AuthBadge, Badge, YesNo } from "./Badge";
+import { AuthBadgeForEntry, Badge, YesNo } from "./Badge";
 import { Tag } from "./Tag";
-import { toolIcon, toolLabel, toolInstall, formatContext } from "../utils";
+import { ToolNameCell } from "./ToolNameCell";
+import { EmptyInventoryHint } from "./InventorySection";
+import { toolLabel, toolInstall, formatContext } from "../utils";
+import { partitionByInstalled, sortByInstalled, installedRowClass } from "../utils/inventory-display";
 
 export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry[]; modelOverrides?: Record<string, string> }) {
-  const available = data.filter((e) => e.available).length;
+  const sorted = sortByInstalled(data);
+  const { installed, notInstalled } = partitionByInstalled(data);
+  const available = installed.length;
   const totalMcp = new Set(data.flatMap((e) => e.mcp.servers)).size;
   const totalSkills = new Set(data.flatMap((e) => e.skills)).size;
-  const warnings = data.filter((e) => !e.available || e.auth === "missing").length;
+  const warnings = data.filter((e) => !e.available || (e.available && e.auth === "missing")).length;
 
   const [envGroups, setEnvGroups] = useState<EnvVarGroup[]>([]);
   const [openEnvId, setOpenEnvId] = useState<string | null>(null);
@@ -33,8 +38,8 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
     <>
       {/* Summary grid */}
       <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        <SummaryBox value={data.length} label="AI Tools Detected" />
-        <SummaryBox value={available} label="Available" />
+        <SummaryBox value={`${available}/${data.length}`} label="已安裝 / 偵測總數" />
+        <SummaryBox value={notInstalled.length} label="未安裝" className={notInstalled.length > 0 ? "text-text-tertiary" : "text-ok"} />
         <SummaryBox value={totalMcp} label="MCP Servers" />
         <SummaryBox
           value={warnings}
@@ -43,29 +48,40 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
         />
       </div>
 
-      {/* Main table */}
+      <EmptyInventoryHint entries={data} />
+
       <Card>
         <DataTable headers={["Tool", "Version", "Auth", "MCP", "Model", "Context", "Stream", "Tools", "Skills"]}>
-          {data.map((e) => (
-            <tr key={e.tool}>
+          {sorted.map((e) => (
+            <tr key={e.tool} className={installedRowClass(e.available)}>
               <Td>
-                <div className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span>{toolIcon(e.tool)}</span>
-                  <strong>{toolLabel(e.tool)}</strong>
-                  {!e.available && <span className="text-fail text-[12px]">(not found)</span>}
-                </div>
+                <ToolNameCell entry={e} />
               </Td>
-              <Td><span className="text-text-secondary">{e.version ?? "—"}</span></Td>
-              <Td><AuthBadge auth={e.auth} /></Td>
-              <Td>{e.mcp.supported ? <Badge text="Yes" variant="ok" /> : <Badge text="No" variant="fail" />}</Td>
-              <Td>{modelOverrides[e.tool] ?? e.model ?? "default"}</Td>
-              <Td>{formatContext(e.capabilities.contextTokens)}</Td>
-              <Td><YesNo value={e.capabilities.streaming} /></Td>
-              <Td><YesNo value={e.capabilities.toolCalls} /></Td>
               <Td>
-                <div className="flex flex-wrap gap-1.5">
-                  {e.skills.map((s) => <Tag key={s}>{s}</Tag>)}
-                </div>
+                <span className="text-text-secondary">{e.available ? (e.version ?? "—") : "—"}</span>
+              </Td>
+              <Td><AuthBadgeForEntry entry={e} /></Td>
+              <Td>
+                {!e.available ? (
+                  <span className="text-text-tertiary">—</span>
+                ) : e.mcp.supported ? (
+                  <Badge text="Yes" variant="ok" />
+                ) : (
+                  <Badge text="No" variant="fail" />
+                )}
+              </Td>
+              <Td>{e.available ? (modelOverrides[e.tool] ?? e.model ?? "default") : "—"}</Td>
+              <Td>{e.available ? formatContext(e.capabilities.contextTokens) : "—"}</Td>
+              <Td>{e.available ? <YesNo value={e.capabilities.streaming} /> : <span className="text-text-tertiary">—</span>}</Td>
+              <Td>{e.available ? <YesNo value={e.capabilities.toolCalls} /> : <span className="text-text-tertiary">—</span>}</Td>
+              <Td>
+                {e.available ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {e.skills.map((s) => <Tag key={s}>{s}</Tag>)}
+                  </div>
+                ) : (
+                  <span className="text-text-tertiary">—</span>
+                )}
               </Td>
             </tr>
           ))}
@@ -76,13 +92,13 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
       {warnings > 0 && (
         <Card title="⚠️ Warnings">
           {data
-            .filter((e) => !e.available || e.auth === "missing")
+            .filter((e) => !e.available || (e.available && e.auth === "missing"))
             .map((w) => (
               <div key={w.tool} className="border-t border-border py-2 first:border-none first:pt-0">
                 {!w.available && (
                   <InstallPrompt tool={w.tool} />
                 )}
-                {w.auth === "missing" && (
+                {w.available && w.auth === "missing" && (
                   <div className="flex items-center gap-2 py-1 text-[13px]">
                     <span className="w-5 text-center">✗</span>
                     <strong>{toolLabel(w.tool)}</strong>: auth not configured
@@ -148,7 +164,7 @@ function SummaryBox({
   label,
   className = "text-accent",
 }: {
-  value: number;
+  value: number | string;
   label: string;
   className?: string;
 }) {

@@ -13,6 +13,8 @@ export interface GroupRepositoryPort {
   create(input: CreateGroupInput): GroupModel;
   listByWorkspace(workspaceId: string): GroupModel[];
   findByName(workspaceId: string, name: string): GroupModel | null;
+  rename(workspaceId: string, groupId: string, name: string): GroupModel;
+  reorder(workspaceId: string, orderedGroupIds: string[]): void;
   deleteByName(workspaceId: string, name: string): boolean;
 }
 

@@ -1,4 +1,4 @@
-# AI CLI Inventory
+# AI Shelf
 
 > 統一工具集：一次檢視、啟動與編排 Claude Code、GitHub Copilot、Cursor 等 AI CLI。
 
@@ -6,7 +6,7 @@
 
 [English](README.md)
 
-**v0.2.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機工作區管理 CLI（`ai-cli-inventory`）。
+**v0.2.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機工作區管理 CLI（`ai-shelf`）。
 
 ---
 
@@ -15,7 +15,7 @@
 | 元件 | 指令 / 進入點 | 用途 |
 |---|---|---|
 | **清單 CLI** | `ai` | 掃描模型、技能、MCP、設定；執行 doctor / update / raw |
-| **工作區 CLI** | `ai-cli-inventory` | 管理 workspace、group、session；廣播指令；TUI |
+| **工作區 CLI** | `ai-shelf` | 管理 workspace、group、session；廣播指令；TUI |
 | **桌面應用** | `pnpm electron` | 內嵌終端機啟動器 + 清單儀表板（Electron + React） |
 
 桌面應用整合兩者：偵測邏輯在 `src/`，Profile 與版面配置則透過 `packages/cli` 的 SQLite 持久化。
@@ -35,12 +35,12 @@
 - **Update（更新）** — 檢查版本並一鍵更新各工具與本身
 - **JSON 輸出** — 所有清單指令支援 `--json`
 
-### 終端機工作區（`ai-cli-inventory`）
+### 終端機工作區（`ai-shelf`）
 
 - **Workspace 與 Group** — 以 SQLite 組織專案與終端機群組
-- **Session** — 建立 / 啟動 / 停止 PTY，可選擇啟動 AI 工具（`claude`、`copilot`、`cursor`）
+- **Session** — 建立 / 啟動 / 停止 PTY，可選擇啟動 AI 工具（`claude`、`copilot`、`cursor`、`codex`、`gemini`、`aider`、`opencode`）
 - **廣播執行** — 對群組內所有執行中的 session 送出相同指令
-- **TUI** — 全螢幕終端機介面（`ai-cli-inventory tui`，neo-blessed）
+- **TUI** — 全螢幕終端機介面（`ai-shelf tui`，neo-blessed）
 - **Profile API** — 供桌面應用使用的具名終端機 Profile 函式庫
 
 ### 桌面應用（Electron）
@@ -61,6 +61,10 @@
 | Claude Code | `claude` | `claude` |
 | GitHub Copilot CLI | `copilot` / `gh copilot` | `copilot` |
 | Cursor | `agent` | `cursor` |
+| OpenAI Codex CLI | `codex` | `codex` |
+| Google Gemini CLI | `gemini` | `gemini` |
+| Aider | `aider` | `aider` |
+| OpenCode | `opencode` | `opencode` |
 
 ---
 
@@ -79,19 +83,19 @@
 ### 從 npm（清單 CLI）
 
 ```bash
-npm install -g ai-cli-inventory
-pnpm add -g ai-cli-inventory
+npm install -g ai-shelf
+pnpm add -g ai-shelf
 ```
 
 ### 從原始碼（monorepo）
 
 ```bash
-git clone <repo-url> ai-cli-inventory
-cd ai-cli-inventory
+git clone <repo-url> ai-shelf
+cd ai-shelf
 pnpm install          # 會重建原生模組（node-pty、better-sqlite3）
 pnpm build
 pnpm start            # ai inventory / doctor / …
-pnpm exec ai-cli-inventory workspace list
+pnpm exec ai-shelf workspace list
 pnpm electron         # 桌面應用
 ```
 
@@ -121,7 +125,7 @@ ai inventory claude     # 單一工具詳細資訊
 **輸出範例：**
 
 ```
-  AI CLI Inventory
+  AI Shelf
 
   TOOL             AUTH   MCP   MODEL                    CTX    STREAM   TOOLS   SKILLS
   ──────────────────────────────────────────────────────────────────────────────────────
@@ -172,38 +176,38 @@ ai update self
 
 ---
 
-### 工作區 CLI — `ai-cli-inventory`
+### 工作區 CLI — `ai-shelf`
 
 持久化路徑（Windows）：
 
 | 路徑 | 用途 |
 |---|---|
-| `%APPDATA%/ai-cli-inventory/config.yaml` | 應用設定 |
-| `%APPDATA%/ai-cli-inventory/workspaces.db` | SQLite 資料庫 |
-| `%APPDATA%/ai-cli-inventory/logs/app.log` | 日誌 |
+| `%APPDATA%/ai-shelf/config.yaml` | 應用設定 |
+| `%APPDATA%/ai-shelf/workspaces.db` | SQLite 資料庫 |
+| `%APPDATA%/ai-shelf/logs/app.log` | 日誌 |
 
 ```bash
 # Workspace
-ai-cli-inventory workspace create <名稱> [--root <路徑>]
-ai-cli-inventory workspace list
-ai-cli-inventory workspace delete <名稱>
+ai-shelf workspace create <名稱> [--root <路徑>]
+ai-shelf workspace list
+ai-shelf workspace delete <名稱>
 
 # Group（隸屬於 workspace）
-ai-cli-inventory group create <workspace> <group>
-ai-cli-inventory group list <workspace>
-ai-cli-inventory group delete <workspace> <group>
+ai-shelf group create <workspace> <group>
+ai-shelf group list <workspace>
+ai-shelf group delete <workspace> <group>
 
 # Session
-ai-cli-inventory session create <workspace> <group> <名稱> [--cwd <路徑>] [--shell <shell>] [--tool <工具>]
-ai-cli-inventory session start <workspace> <group> <名稱>
-ai-cli-inventory session stop <workspace> <group> <名稱>
-ai-cli-inventory session list <workspace> [--group <名稱>]
-ai-cli-inventory session exec <workspace> <group> <指令...> [--session <名稱>]
-ai-cli-inventory session exec <workspace> <group> <指令...> --broadcast
-ai-cli-inventory session delete <workspace> <group> <名稱>
+ai-shelf session create <workspace> <group> <名稱> [--cwd <路徑>] [--shell <shell>] [--tool <工具>]
+ai-shelf session start <workspace> <group> <名稱>
+ai-shelf session stop <workspace> <group> <名稱>
+ai-shelf session list <workspace> [--group <名稱>]
+ai-shelf session exec <workspace> <group> <指令...> [--session <名稱>]
+ai-shelf session exec <workspace> <group> <指令...> --broadcast
+ai-shelf session delete <workspace> <group> <名稱>
 
 # 全螢幕 TUI
-ai-cli-inventory tui
+ai-shelf tui
 ```
 
 套件內部說明見 [`packages/cli/STRUCTURE.md`](packages/cli/STRUCTURE.md)。
@@ -241,7 +245,7 @@ pnpm dist:win                # Windows 可攜版（electron-builder → release/
 ### 專案結構
 
 ```
-ai-cli-inventory/                 # 根 workspace（Electron + 清單 CLI）
+ai-shelf/                 # 根 workspace（Electron + 清單 CLI）
 ├── src/
 │   ├── cli.ts                    # `ai` 進入點 — inventory、doctor、raw、update
 │   ├── commands/                 # CLI 指令處理
@@ -252,7 +256,7 @@ ai-cli-inventory/                 # 根 workspace（Electron + 清單 CLI）
 │   │   ├── hooks/                # useInventoryScan、useProfileWorkspace 等
 │   │   └── terminal/             # 分割樹、版面序列化、SQLite 同步
 │   └── utils/
-├── packages/cli/                 # `ai-cli-inventory` 工作區管理器
+├── packages/cli/                 # `ai-shelf` 工作區管理器
 │   └── src/
 │       ├── cli/                  # Commander 指令
 │       ├── core/                 # ports、entities、errors

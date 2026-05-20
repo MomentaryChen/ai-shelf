@@ -17,6 +17,23 @@ body,
   width: 100% !important;
 }
 
+/* Profile sidebar — live session indicator */
+@keyframes profile-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+}
+
+.profile-live-dot {
+  animation: profile-live-pulse 2s ease-in-out infinite;
+}
+
 @theme {
   --color-bg-primary: #0f172a;
   --color-bg-secondary: #1e293b;
