@@ -78,11 +78,19 @@ function hasMod(ev: KeyboardEvent): boolean {
   return ev.ctrlKey || ev.metaKey;
 }
 
+export interface TerminalClipboardOptions {
+  onOpenFind?: () => void;
+}
+
 /**
  * Bind copy/paste/select-all shortcuts and a minimal context menu.
  * Returns a dispose function.
  */
-export function bindTerminalClipboard(term: Terminal, container: HTMLElement): () => void {
+export function bindTerminalClipboard(
+  term: Terminal,
+  container: HTMLElement,
+  options?: TerminalClipboardOptions,
+): () => void {
   const clipboardAddon = new ClipboardAddon(new ElectronClipboardProvider());
   term.loadAddon(clipboardAddon);
 
@@ -91,6 +99,13 @@ export function bindTerminalClipboard(term: Terminal, container: HTMLElement): (
     if (tryConsumePaneShortcut(ev)) return false;
 
     const key = ev.key.toLowerCase();
+
+    // Find in terminal: Ctrl+F
+    if (hasMod(ev) && !ev.shiftKey && key === "f") {
+      consumeKey(ev);
+      options?.onOpenFind?.();
+      return false;
+    }
 
     // Paste: Ctrl+V, Ctrl+Shift+V, Shift+Insert
     if (
@@ -174,6 +189,7 @@ export function bindTerminalClipboard(term: Terminal, container: HTMLElement): (
 
     addItem("Copy", hasSelection, () => void copyTerminalSelection(term));
     addItem("Paste", true, () => void pasteIntoTerminal(term));
+    addItem("Find…", true, () => options?.onOpenFind?.());
     addItem("Select all", true, () => term.selectAll());
 
     document.body.appendChild(menuEl);

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
 import {
@@ -17,6 +17,7 @@ import { MCP_SYNC_TOOL_IDS, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } fro
 import { run } from "../utils/exec.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
+import { searchPtyOutput } from "../shared/pty-output-search.js";
 import {
   getWorkspaceContext,
   closeWorkspaceContext,
@@ -688,6 +689,21 @@ const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
 const PTY_OUTPUT_BUFFERS = new Map<string, string>();
 const PTY_BUFFER_MAX_CHARS = 256 * 1024;
 
+function ptyLogDir(): string {
+  return join(app.getPath("userData"), "pty-logs");
+}
+
+/** Mirror PTY transcript for external tools / agents (grep, read). */
+function mirrorPtyLog(sessionId: string, text: string) {
+  try {
+    const dir = ptyLogDir();
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${sessionId}.log`), text, "utf8");
+  } catch {
+    /* best-effort */
+  }
+}
+
 function appendPtyBuffer(sessionId: string, data: string) {
   const prev = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
   let next = prev + data;
@@ -695,10 +711,17 @@ function appendPtyBuffer(sessionId: string, data: string) {
     next = next.slice(-PTY_BUFFER_MAX_CHARS);
   }
   PTY_OUTPUT_BUFFERS.set(sessionId, next);
+  mirrorPtyLog(sessionId, next);
 }
 
 function clearPtyBuffer(sessionId: string) {
   PTY_OUTPUT_BUFFERS.delete(sessionId);
+  try {
+    const file = join(ptyLogDir(), `${sessionId}.log`);
+    if (existsSync(file)) unlinkSync(file);
+  } catch {
+    /* ignore */
+  }
 }
 
 function broadcastPtyData(sessionId: string, data: string) {
@@ -837,6 +860,27 @@ ipcMain.handle("pty-attach", (_event, sessionId: string) => {
     buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
   };
 });
+
+ipcMain.handle("pty-get-output-buffer", (_event, sessionId: string) => ({
+  buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
+}));
+
+ipcMain.handle(
+  "pty-search-output",
+  (
+    _event,
+    sessionId: string,
+    query: string,
+    opts?: { caseSensitive?: boolean; maxMatches?: number; contextChars?: number },
+  ) => {
+    const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
+    return searchPtyOutput(buffer, query ?? "", opts ?? {});
+  },
+);
+
+ipcMain.handle("pty-get-log-path", (_event, sessionId: string) => ({
+  path: join(ptyLogDir(), `${sessionId}.log`),
+}));
 
 ipcMain.on("pty-write",  (_e, sessionId: string, data: string)                    => { PTY_SESSIONS.get(sessionId)?.write(data); });
 ipcMain.on("pty-resize", (_e, sessionId: string, cols: number, rows: number)       => { PTY_SESSIONS.get(sessionId)?.resize(cols, rows); });

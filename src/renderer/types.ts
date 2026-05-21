@@ -161,6 +161,21 @@ export interface WorkspaceTree {
   lastActiveGroupKey?: string | null;
 }
 
+export interface PtySearchHit {
+  line: number;
+  col: number;
+  size: number;
+  lineText: string;
+  before: string;
+  after: string;
+}
+
+export interface PtySearchResult {
+  matches: PtySearchHit[];
+  total: number;
+  capped: boolean;
+}
+
 export interface ElectronAPI {
   getInventory: () => Promise<ProviderEntry[]>;
   startInventoryScan: () => Promise<void>;
@@ -187,6 +202,13 @@ export interface ElectronAPI {
   launchInTerminal: (tool: string, terminal?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
   ptySpawn:  (tool: string, cwd?: string)                           => Promise<{ success: boolean; sessionId?: string; error?: string }>;
   ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
+  ptyGetOutputBuffer: (sessionId: string)                            => Promise<{ buffer: string }>;
+  ptySearchOutput: (
+    sessionId: string,
+    query: string,
+    opts?: { caseSensitive?: boolean; maxMatches?: number; contextChars?: number },
+  ) => Promise<PtySearchResult>;
+  ptyGetLogPath: (sessionId: string)                                => Promise<{ path: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;
   clipboardReadText: ()                                             => Promise<string>;
   clipboardWriteText: (text: string)                                => Promise<void>;
