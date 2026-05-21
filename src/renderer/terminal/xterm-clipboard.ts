@@ -4,6 +4,7 @@ import {
   type ClipboardSelectionType,
   type IClipboardProvider,
 } from "@xterm/addon-clipboard";
+import { tryConsumePaneShortcut } from "./pane-shortcuts";
 
 /** Electron clipboard via preload — more reliable than navigator.clipboard in xterm. */
 class ElectronClipboardProvider implements IClipboardProvider {
@@ -87,6 +88,7 @@ export function bindTerminalClipboard(term: Terminal, container: HTMLElement): (
 
   const onKey = (ev: KeyboardEvent): boolean => {
     if (!isKeyDown(ev)) return true;
+    if (tryConsumePaneShortcut(ev)) return false;
 
     const key = ev.key.toLowerCase();
 
