@@ -78,11 +78,20 @@ function hasMod(ev: KeyboardEvent): boolean {
   return ev.ctrlKey || ev.metaKey;
 }
 
+export interface TerminalClipboardOptions {
+  onClear?: () => void;
+  onRestart?: () => void;
+}
+
 /**
  * Bind copy/paste/select-all shortcuts and a minimal context menu.
  * Returns a dispose function.
  */
-export function bindTerminalClipboard(term: Terminal, container: HTMLElement): () => void {
+export function bindTerminalClipboard(
+  term: Terminal,
+  container: HTMLElement,
+  options: TerminalClipboardOptions = {},
+): () => void {
   const clipboardAddon = new ClipboardAddon(new ElectronClipboardProvider());
   term.loadAddon(clipboardAddon);
 
@@ -131,6 +140,20 @@ export function bindTerminalClipboard(term: Terminal, container: HTMLElement): (
       return false;
     }
 
+    // Clear screen: Ctrl+L (also handled globally via pane-shortcuts when focused)
+    if (hasMod(ev) && !ev.shiftKey && key === "l") {
+      consumeKey(ev);
+      options.onClear?.();
+      return false;
+    }
+
+    // Restart session: Ctrl+Shift+R
+    if (hasMod(ev) && ev.shiftKey && key === "r") {
+      consumeKey(ev);
+      options.onRestart?.();
+      return false;
+    }
+
     return true;
   };
 
@@ -175,6 +198,8 @@ export function bindTerminalClipboard(term: Terminal, container: HTMLElement): (
     addItem("Copy", hasSelection, () => void copyTerminalSelection(term));
     addItem("Paste", true, () => void pasteIntoTerminal(term));
     addItem("Select all", true, () => term.selectAll());
+    if (options.onClear) addItem("清屏", true, options.onClear);
+    if (options.onRestart) addItem("重啟 session", true, options.onRestart);
 
     document.body.appendChild(menuEl);
     requestAnimationFrame(() => {

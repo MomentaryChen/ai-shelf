@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { bindTerminalClipboard } from "../terminal/xterm-clipboard";
+import { registerTerminalClear } from "../terminal/terminal-session-actions";
 
 interface Props {
   sessionId: string;
@@ -12,6 +13,7 @@ interface Props {
   onExit: () => void;
   onSessionLost?: (sessionId: string) => void;
   onWrite?: (data: string, sessionId: string) => void;
+  onRestart?: () => void;
 }
 
 export function EmbeddedTerminal({
@@ -22,6 +24,7 @@ export function EmbeddedTerminal({
   onExit,
   onSessionLost,
   onWrite,
+  onRestart,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -83,7 +86,15 @@ export function EmbeddedTerminal({
     term.loadAddon(fitAddon);
     term.open(el);
     termRef.current = term;
-    const unbindClipboard = bindTerminalClipboard(term, el);
+    const doClear = () => {
+      term.clear();
+      window.api.ptyWrite(sessionId, "\x0c");
+    };
+    const unregisterClear = registerTerminalClear(sessionId, doClear);
+    const unbindClipboard = bindTerminalClipboard(term, el, {
+      onClear: doClear,
+      onRestart: onRestart,
+    });
 
     const pending: string[] = [];
     let opened = true;
@@ -205,11 +216,12 @@ export function EmbeddedTerminal({
       offData();
       offExit();
       el.removeEventListener("pointerdown", onPointerDown);
+      unregisterClear();
       unbindClipboard();
       ro.disconnect();
       term.dispose();
     };
-  }, [sessionId, stableOnExit, bg]);
+  }, [sessionId, stableOnExit, bg, onRestart]);
 
   useEffect(() => {
     if (!active) return;
