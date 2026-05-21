@@ -15,6 +15,7 @@ import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { MCP_SYNC_TOOL_IDS, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
 import { run } from "../utils/exec.js";
+import { readGitBuildInfo } from "../utils/git-build-info.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
 import {
@@ -570,7 +571,14 @@ function detectSelfUpdateCmd(): string {
 ipcMain.handle("get-self-info", () => {
   let version = "unknown";
   try { version = app.getVersion(); } catch { /* ok */ }
-  return { version, updateCommand: detectSelfUpdateCmd() };
+  const git = readGitBuildInfo(app.getAppPath());
+  return {
+    version,
+    updateCommand: detectSelfUpdateCmd(),
+    branch: git.branch,
+    commitShort: git.commitShort,
+    dirty: git.dirty,
+  };
 });
 
 // --- MCP Sync ---
