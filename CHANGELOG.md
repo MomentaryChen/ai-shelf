@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 GitHub Releases use the matching `## [x.y.z]` section here as the release description (see `scripts/release-notes.mjs` and `.github/workflows/release.yml`).
 
+## [1.2.0] - 2026-05-21
+
+Terminal search, clickable links in output, and desktop update UX polish.
+
+### Added
+
+- **Find in terminal output** — search bar with match navigation backed by a PTY output buffer API
+- **Ctrl+click links** — open file paths and URLs directly from xterm output
+- **Version badge** beside the app title with refresh in the inventory header
+
+### Fixed
+
+- **Windows in-app update** — reliable installer execution and clearer Update tab UX
+
 ## [1.1.1] - 2026-05-21
 
 Hotfix for packaged desktop startup crash when loading in-app auto-update.
@@ -91,6 +105,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[1.2.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.2.0
 [1.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.1
 [1.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.0.0

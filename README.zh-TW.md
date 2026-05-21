@@ -6,7 +6,7 @@
 
 [English](README.md) · [Changelog](CHANGELOG.md)
 
-**v1.1.1** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機工作區管理 CLI（`ai-shelf`）。
+**v1.2.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機工作區管理 CLI（`ai-shelf`）。
 
 ---
 
