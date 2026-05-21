@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { bindTerminalClipboard } from "../terminal/xterm-clipboard";
+import { bindTerminalLinks } from "../terminal/xterm-links";
 
 interface Props {
   sessionId: string;
@@ -84,6 +85,7 @@ export function EmbeddedTerminal({
     term.open(el);
     termRef.current = term;
     const unbindClipboard = bindTerminalClipboard(term, el);
+    const unbindLinks = bindTerminalLinks(term);
 
     const pending: string[] = [];
     let opened = true;
@@ -206,6 +208,7 @@ export function EmbeddedTerminal({
       offExit();
       el.removeEventListener("pointerdown", onPointerDown);
       unbindClipboard();
+      unbindLinks();
       ro.disconnect();
       term.dispose();
     };

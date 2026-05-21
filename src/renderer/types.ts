@@ -184,6 +184,7 @@ export interface ElectronAPI {
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
   openPath: (filePath: string) => Promise<void>;
+  openExternal: (url: string) => Promise<void>;
   launchInTerminal: (tool: string, terminal?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
   ptySpawn:  (tool: string, cwd?: string)                           => Promise<{ success: boolean; sessionId?: string; error?: string }>;
   ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
