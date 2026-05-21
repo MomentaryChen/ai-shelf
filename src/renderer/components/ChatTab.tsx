@@ -83,6 +83,9 @@ export function ChatTab({
 
   const panes = layout ? collectPanes(layout) : [];
   const bg = settings.terminalBg || getAppBg();
+  const terminalFontFamily = settings.terminalFontFamily;
+  const terminalFontSize = settings.terminalFontSize;
+  const terminalScrollback = settings.terminalScrollback;
   const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
@@ -581,6 +584,9 @@ export function ChatTab({
             key={pane.sessionId}
             sessionId={pane.sessionId}
             bg={bg}
+            fontFamily={terminalFontFamily}
+            fontSize={terminalFontSize}
+            scrollback={terminalScrollback}
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}

@@ -7,7 +7,7 @@ export function SettingsWindowApp() {
         <div>
           <h1 className="text-[15px] font-semibold">⚙️ Terminal Settings</h1>
           <p className="mt-0.5 text-[12px] text-text-secondary">
-            Working directory, external terminal, and background color
+            Working directory, external terminal, display, and background
           </p>
         </div>
       </header>
