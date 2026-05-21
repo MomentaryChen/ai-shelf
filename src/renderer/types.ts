@@ -121,7 +121,7 @@ export interface GroupLayoutMeta {
 
 export interface GroupLayoutSnapshot {
   defaultCwd: string;
-  panes: { tool: string; cwd: string }[];
+  panes: { tool: string; cwd: string; title?: string }[];
   layout: unknown;
   broadcastInput?: boolean;
   accentColor?: string | null;
@@ -131,6 +131,7 @@ export interface GroupLayoutSnapshot {
 export interface ProfileTerminal {
   tool: string;
   cwd: string;
+  title?: string;
 }
 
 export interface ProfileInfo {

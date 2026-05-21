@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ToolLogo } from "./ToolLogo";
-import { toolLabel } from "../utils";
+import { EditablePaneTitle } from "./EditablePaneTitle";
+import { paneDisplayLabel, paneMatchesQuery } from "../utils/pane-label";
 import type { PaneInfo } from "../terminal/split-tree";
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
   focusedPaneId: string | null;
   onSelectPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
+  onRenamePane?: (paneId: string, title: string) => void;
   onNewSession: () => void;
   workspaceSlot?: ReactNode;
 }
@@ -17,6 +19,7 @@ export function TerminalSessionSidebar({
   focusedPaneId,
   onSelectPane,
   onClosePane,
+  onRenamePane,
   onNewSession,
   workspaceSlot,
 }: Props) {
@@ -25,7 +28,7 @@ export function TerminalSessionSidebar({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return panes;
-    return panes.filter((p) => toolLabel(p.tool).toLowerCase().includes(q));
+    return panes.filter((p) => paneMatchesQuery(p, q));
   }, [panes, query]);
 
   return (
@@ -58,7 +61,16 @@ export function TerminalSessionSidebar({
               }`}
             >
               <ToolLogo tool={pane.tool} size={14} />
-              <span className="min-w-0 flex-1 truncate text-[12px]">{toolLabel(pane.tool)}</span>
+              {onRenamePane ? (
+                <EditablePaneTitle
+                  label={paneDisplayLabel(pane)}
+                  onRename={(title) => onRenamePane(pane.id, title)}
+                  className="text-[12px]"
+                  inputClassName="text-[12px]"
+                />
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-[12px]">{paneDisplayLabel(pane)}</span>
+              )}
               <span
                 role="button"
                 tabIndex={0}

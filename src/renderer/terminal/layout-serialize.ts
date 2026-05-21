@@ -4,6 +4,7 @@ import { newSplitId } from "./split-tree";
 export interface SavedPaneSlot {
   tool: string;
   cwd: string;
+  title?: string;
 }
 
 export type SerializedLayoutNode =
@@ -26,7 +27,10 @@ export function serializeLayout(root: LayoutNode): {
   function walk(node: LayoutNode): SerializedLayoutNode {
     if (node.kind === "pane") {
       const index = panes.length;
-      panes.push({ tool: node.pane.tool, cwd: node.pane.cwd });
+      const slot: SavedPaneSlot = { tool: node.pane.tool, cwd: node.pane.cwd };
+      const title = node.pane.title?.trim();
+      if (title) slot.title = title;
+      panes.push(slot);
       return { kind: "pane", index };
     }
     return {

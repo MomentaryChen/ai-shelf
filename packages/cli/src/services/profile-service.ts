@@ -22,7 +22,7 @@ export interface ProfileInfo {
   broadcastInput: boolean;
   accentColor: string | null;
   paneCount: number;
-  terminals: { tool: string; cwd: string }[];
+  terminals: { tool: string; cwd: string; title?: string }[];
   updatedAt: string | null;
 }
 

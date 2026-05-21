@@ -19,6 +19,7 @@ import {
   type PaneInfo,
   type SplitDirection,
 } from "../terminal/split-tree";
+import { normalizePaneTitle } from "../utils/pane-label";
 import {
   TERMINAL_OPTIONS,
   getAppBg,
@@ -266,7 +267,7 @@ export function ChatTab({
         prev
           ? mapPanesInTree(prev, (p) =>
               p.id === paneId
-                ? { ...next, id: paneId, cwd: victim.cwd || next.cwd }
+                ? { ...next, id: paneId, cwd: victim.cwd || next.cwd, title: victim.title }
                 : p,
             )
           : prev,
@@ -274,6 +275,17 @@ export function ChatTab({
     },
     [layout, spawnPaneResilient, resolveCwd],
   );
+
+  const renamePane = useCallback((paneId: string, title: string) => {
+    const normalized = normalizePaneTitle(title);
+    setLayout((prev) =>
+      prev
+        ? mapPanesInTree(prev, (p) =>
+            p.id === paneId ? { ...p, title: normalized } : p,
+          )
+        : prev,
+    );
+  }, []);
 
   const closePane = useCallback((paneId: string) => {
     setLayout((prev) => {
@@ -385,6 +397,7 @@ export function ChatTab({
         }
       }}
       onClosePane={(_profileId, paneId) => closePane(paneId)}
+      onRenamePane={(_profileId, paneId, title) => renamePane(paneId, title)}
       onAddTerminal={(profile) => void handleNewTerminal(profile)}
       addingTerminal={addingTerminal}
       onToggleBroadcast={(id, v) => void handleToggleBroadcast(id, v)}
@@ -428,6 +441,7 @@ export function ChatTab({
         profileAccentColor={activeProfile?.accentColor ?? null}
         onFocusPane={setFocusedPaneId}
         onClosePane={closePane}
+        onRenamePane={renamePane}
         onSplitPane={(id, dir) => void splitPane(id, dir)}
         onResizeSplit={(splitId, ratio) =>
           setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
