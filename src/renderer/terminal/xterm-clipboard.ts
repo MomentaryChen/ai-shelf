@@ -82,6 +82,8 @@ export interface TerminalClipboardOptions {
   onOpenFind?: () => void;
   onClear?: () => void;
   onRestart?: () => void;
+  /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
+  getRightClickPaste?: () => boolean;
 }
 
 /**
@@ -176,7 +178,7 @@ export function bindTerminalClipboard(
     document.removeEventListener("contextmenu", removeMenu);
   };
 
-  const onContextMenu = (ev: MouseEvent) => {
+  const showContextMenu = (ev: MouseEvent) => {
     ev.preventDefault();
     ev.stopPropagation();
     removeMenu();
@@ -215,6 +217,19 @@ export function bindTerminalClipboard(
       document.addEventListener("click", removeMenu);
       document.addEventListener("contextmenu", removeMenu);
     });
+  };
+
+  const onContextMenu = (ev: MouseEvent) => {
+    const rightClickPaste = options.getRightClickPaste?.() ?? true;
+    if (rightClickPaste && !ev.shiftKey) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      removeMenu();
+      if (term.hasSelection()) void copyTerminalSelection(term);
+      else void pasteIntoTerminal(term);
+      return;
+    }
+    showContextMenu(ev);
   };
 
   container.addEventListener("contextmenu", onContextMenu);

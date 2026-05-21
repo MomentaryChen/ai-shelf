@@ -17,6 +17,8 @@ export interface ChatSettings {
   terminalFontFamily: string;
   terminalFontSize: number;
   terminalScrollback: number;
+  /** Right-click pastes clipboard; with selection, copies first. Shift+right-click opens menu. */
+  terminalRightClickPaste: boolean;
   workingDir: string;
   dirHistory: string[];
 }
@@ -58,12 +60,18 @@ function normalizeFontFamily(raw: unknown): string {
   return t || DEFAULT_TERMINAL_FONT_FAMILY;
 }
 
+function normalizeRightClickPaste(raw: unknown): boolean {
+  if (typeof raw === "boolean") return raw;
+  return true;
+}
+
 const DEFAULTS: ChatSettings = {
   externalTerminal: "auto",
   terminalBg: "#0c0c0c",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
   terminalScrollback: DEFAULT_TERMINAL_SCROLLBACK,
+  terminalRightClickPaste: true,
   workingDir: "",
   dirHistory: [],
 };
@@ -87,6 +95,7 @@ export function loadSettings(): ChatSettings {
         MAX_TERMINAL_SCROLLBACK,
         DEFAULT_TERMINAL_SCROLLBACK,
       ),
+      terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
     };
   } catch {
     return { ...DEFAULTS };

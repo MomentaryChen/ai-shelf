@@ -594,6 +594,7 @@ export function ChatTab({
             fontFamily={terminalFontFamily}
             fontSize={terminalFontSize}
             scrollback={terminalScrollback}
+            rightClickPaste={settings.terminalRightClickPaste}
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}

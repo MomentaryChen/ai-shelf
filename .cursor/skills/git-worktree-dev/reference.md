@@ -87,6 +87,8 @@ Pane `cwd` values persist in the profile snapshot; switching profiles restores e
 
 Right-click inside a terminal pane, or use shortcuts while the pane (or its xterm) is focused.
 
+With **Right-click to paste** enabled in Terminal Settings (default): plain right-click copies the selection or pastes from the clipboard; **Shift+right-click** opens the context menu. When disabled, right-click opens the menu and selects a word under the cursor.
+
 ## Clickable paths and URLs in terminal output
 
 In an embedded terminal pane, **Ctrl+click** (Windows/Linux) or **Cmd+click** (macOS) on:
