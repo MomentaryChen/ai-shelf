@@ -22,6 +22,7 @@ interface Props {
   fontFamily: string;
   fontSize: number;
   scrollback: number;
+  rightClickPaste?: boolean;
   active?: boolean;
   focused?: boolean;
   onExit: () => void;
@@ -57,6 +58,7 @@ export function EmbeddedTerminal({
   fontFamily,
   fontSize,
   scrollback,
+  rightClickPaste = true,
   active = true,
   focused = true,
   onExit,
@@ -235,6 +237,9 @@ export function EmbeddedTerminal({
   const openFindRef = useRef(openFind);
   openFindRef.current = openFind;
 
+  const rightClickPasteRef = useRef(rightClickPaste);
+  rightClickPasteRef.current = rightClickPaste;
+
   activeRef.current = active;
   onWriteRef.current = onWrite;
   onSessionLostRef.current = onSessionLost;
@@ -285,7 +290,7 @@ export function EmbeddedTerminal({
       scrollOnUserInput: false,
       smoothScrollDuration: 0,
       allowProposedApi: false,
-      rightClickSelectsWord: true,
+      rightClickSelectsWord: !rightClickPasteRef.current,
     });
 
     const fitAddon = new FitAddon();
@@ -304,6 +309,7 @@ export function EmbeddedTerminal({
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
       onRestart: onRestart,
+      getRightClickPaste: () => rightClickPasteRef.current,
     });
     const unbindLinks = bindTerminalLinks(term);
 
@@ -484,6 +490,11 @@ export function EmbeddedTerminal({
       term.dispose();
     };
   }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback, onRestart]);
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (term) term.options.rightClickSelectsWord = !rightClickPaste;
+  }, [rightClickPaste]);
 
   useEffect(() => {
     if (!findOpen) return;

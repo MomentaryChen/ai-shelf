@@ -269,6 +269,22 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
               <span className="text-[11px] text-text-tertiary">lines — open panes reload on change</span>
             </div>
           </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors hover:border-accent/40">
+            <input
+              type="checkbox"
+              checked={settings.terminalRightClickPaste}
+              onChange={(e) => updateSettings({ terminalRightClickPaste: e.target.checked })}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded accent-accent"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">Right-click to paste</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                When enabled, right-click pastes from the clipboard; with a selection, it copies first.
+                Hold Shift and right-click for the context menu (Copy, Paste, Find…).
+              </span>
+            </span>
+          </label>
         </div>
       </div>
     </div>
