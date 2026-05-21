@@ -8,6 +8,7 @@ import { ProfileSidebar } from "./ProfileSidebar";
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
+import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import {
   collectPanes,
   findPane,
@@ -299,6 +300,15 @@ export function ChatTab({
     [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
 
+  usePaneShortcuts({
+    panes,
+    focusedPaneId,
+    enabled: active && layout !== null && !profileBusy && !restoring,
+    onFocusPane: setFocusedPaneId,
+    onClosePane: closePane,
+    onSplitPane: (id, dir) => void splitPane(id, dir),
+  });
+
   async function handleActivateProfile(profile: ProfileInfo) {
     setProfileBusy(true);
     setTerminalError(null);
@@ -463,6 +473,13 @@ export function ChatTab({
             <p className="mt-2 text-[12px] text-red-400">{terminalError}</p>
           )}
           <p className="mt-2 text-[11px] text-[#505050]">
+            窗格快捷鍵：<kbd className="rounded border border-[#333] px-1">Ctrl+Tab</kbd> 切換、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+W</kbd> 關閉、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+\\</kbd> /{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+\\</kbd> 分割、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+1–9</kbd> 跳至第 N 窗格
+          </p>
+          <p className="mt-1 text-[11px] text-[#505050]">
             除錯：按 <kbd className="rounded border border-[#333] px-1">F12</kbd> 或{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+I</kbd>
             開啟開發者工具；也可按 <kbd className="rounded border border-[#333] px-1">Alt</kbd>{" "}
@@ -604,7 +621,11 @@ function WarpTopBar({
           type="button"
           disabled={!canAddPane}
           onClick={onToggleNewMenu}
-          title={canAddPane ? "Add terminal pane" : `Maximum ${maxPanes} panes`}
+          title={
+            canAddPane
+              ? "Add terminal pane (Ctrl+\\ split right, Ctrl+Shift+\\ split down)"
+              : `Maximum ${maxPanes} panes`
+          }
           className="cursor-pointer rounded-md border border-[#2a2a2a] px-2.5 py-1 text-[12px] text-[#a0a0a0] hover:border-[#404040] disabled:opacity-40"
         >
           + Pane

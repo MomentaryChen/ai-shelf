@@ -116,6 +116,19 @@ The **可用的 Agent** section lists installed tools. Each card shows version, 
 - Focused pane receives keyboard input; with **broadcast input** on, keystrokes go to **all** panes
 - Restoring a profile replays the saved layout and sessions when possible
 
+### Pane keyboard shortcuts (Terminal mode, when panes are open)
+
+Ignored while typing in inputs (e.g. profile rename).
+
+| Shortcut | Action |
+|---|---|
+| **Ctrl+Tab** | Next pane |
+| **Ctrl+Shift+Tab** | Previous pane |
+| **Ctrl+1 … Ctrl+9** | Focus pane N (tree order) |
+| **Ctrl+W** | Close focused pane |
+| **Ctrl+\\** | Split right (horizontal) |
+| **Ctrl+Shift+\\** | Split down (vertical) |
+
 ---
 
 ## 3. Models
