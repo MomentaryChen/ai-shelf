@@ -79,6 +79,7 @@ function hasMod(ev: KeyboardEvent): boolean {
 }
 
 export interface TerminalClipboardOptions {
+  onOpenFind?: () => void;
   onClear?: () => void;
   onRestart?: () => void;
 }
@@ -100,6 +101,13 @@ export function bindTerminalClipboard(
     if (tryConsumePaneShortcut(ev)) return false;
 
     const key = ev.key.toLowerCase();
+
+    // Find in terminal: Ctrl+F
+    if (hasMod(ev) && !ev.shiftKey && key === "f") {
+      consumeKey(ev);
+      options?.onOpenFind?.();
+      return false;
+    }
 
     // Paste: Ctrl+V, Ctrl+Shift+V, Shift+Insert
     if (
@@ -197,6 +205,7 @@ export function bindTerminalClipboard(
 
     addItem("Copy", hasSelection, () => void copyTerminalSelection(term));
     addItem("Paste", true, () => void pasteIntoTerminal(term));
+    addItem("Find…", true, () => options?.onOpenFind?.());
     addItem("Select all", true, () => term.selectAll());
     if (options.onClear) addItem("清屏", true, options.onClear);
     if (options.onRestart) addItem("重啟 session", true, options.onRestart);

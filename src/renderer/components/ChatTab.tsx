@@ -614,7 +614,8 @@ export function ChatTab({
             <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+R</kbd> 重啟 session、{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+\\</kbd> /{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+\\</kbd> 分割、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+1–9</kbd> 跳至第 N 窗格。
+            <kbd className="rounded border border-[#333] px-1">Ctrl+1–9</kbd> 跳至第 N 窗格、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+F</kbd> 搜尋輸出。
             右鍵選單亦可清屏／重啟。
           </p>
           <p className="mt-1 text-[11px] text-[#505050]">
