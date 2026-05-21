@@ -13,6 +13,10 @@ body,
   width: 100%;
 }
 
+.xterm .xterm-scrollable-element {
+  height: 100%;
+}
+
 .xterm .xterm-screen {
   width: 100% !important;
 }
