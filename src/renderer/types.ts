@@ -202,6 +202,9 @@ export interface ElectronAPI {
     version: string;
     updateCommand: string;
     desktopUpdate?: boolean;
+    branch: string | null;
+    commitShort: string | null;
+    dirty: boolean;
   }>;
   getAppUpdateChannel: () => Promise<AppUpdateChannelInfo>;
   checkAppUpdate: () => Promise<AppUpdateStatePayload>;

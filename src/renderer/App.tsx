@@ -10,6 +10,7 @@ import { UpdateTab } from "./components/UpdateTab";
 import { AppUpdateModal } from "./components/AppUpdateModal";
 import { ChatTab } from "./components/ChatTab";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
+import { AppVersionBadge } from "./components/AppVersionBadge";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 
 type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update";
@@ -79,12 +80,16 @@ export function App() {
         )}
 
         {appMode === "terminal" && (scanning || enriching) && hasData && (
-          <span className="ml-auto shrink-0 px-3 text-[11px] text-text-secondary">
+          <span className="shrink-0 px-3 text-[11px] text-text-secondary">
             {scanning && "detecting…"}
             {scanning && enriching && " · "}
             {enriching && "loading models…"}
           </span>
         )}
+
+        <div className="ml-auto flex shrink-0 items-center gap-3 px-3">
+          <AppVersionBadge />
+        </div>
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -132,7 +137,7 @@ export function App() {
             </main>
 
             <footer className="flex h-8 shrink-0 items-center justify-between border-t border-border px-8 text-[11px] text-text-secondary">
-              <span>AI Shelf v{__APP_VERSION__}</span>
+              <AppVersionBadge />
               <button
                 onClick={reload}
                 disabled={scanning && !hasData}
