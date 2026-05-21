@@ -28,6 +28,36 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.removeAllListeners("scan-complete");
   },
   runUpdate: (tool) => ipcRenderer.invoke("run-update", tool),
+  getAppUpdateChannel: () => ipcRenderer.invoke("get-app-update-channel"),
+  checkAppUpdate: () => ipcRenderer.invoke("check-app-update"),
+  getAppUpdateState: () => ipcRenderer.invoke("get-app-update-state"),
+  confirmAppUpdateDownload: () => ipcRenderer.invoke("confirm-app-update-download"),
+  quitAndInstallAppUpdate: () => ipcRenderer.invoke("quit-and-install-app-update"),
+  onAppUpdateAvailable: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-available", handler);
+    return () => ipcRenderer.off("app-update-available", handler);
+  },
+  onAppUpdateNotAvailable: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-not-available", handler);
+    return () => ipcRenderer.off("app-update-not-available", handler);
+  },
+  onAppUpdateProgress: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-progress", handler);
+    return () => ipcRenderer.off("app-update-progress", handler);
+  },
+  onAppUpdateDownloaded: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-downloaded", handler);
+    return () => ipcRenderer.off("app-update-downloaded", handler);
+  },
+  onAppUpdateError: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-error", handler);
+    return () => ipcRenderer.off("app-update-error", handler);
+  },
   getMcpRaw: () => ipcRenderer.invoke("get-mcp-raw"),
   syncMcp: (opts) => ipcRenderer.invoke("sync-mcp", opts),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),

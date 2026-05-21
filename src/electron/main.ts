@@ -19,6 +19,18 @@ import { readGitBuildInfo } from "../utils/git-build-info.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
 import {
+  checkAppUpdate,
+  downloadAppUpdate,
+  getAppUpdateState,
+  getDesktopSelfLatestVersion,
+  initAppUpdater,
+  isDesktopAutoUpdateEnabled,
+  isDesktopUpdateDownloaded,
+  quitAndInstallAppUpdate,
+  scheduleStartupUpdateCheck,
+  syncAppUpdateUiToRenderer,
+} from "./app-updater.js";
+import {
   getWorkspaceContext,
   closeWorkspaceContext,
   getWorkspaceTree,
@@ -432,18 +444,10 @@ ipcMain.handle("check-update", async () => {
     // detectAll failed — continue with self only
   }
 
-  // Self (ai-shelf)
-  let selfVersion = "unknown";
-  try { selfVersion = app.getVersion(); } catch { /* ok */ }
-
-  results.push({
-    tool: "ai-shelf",
-    label: "AI Shelf (self)",
-    currentVersion: selfVersion,
-    latestVersion: null,
-    available: true,
-    updateCommand: detectSelfUpdateCmd(),
-  });
+  const selfLatest = app.isPackaged
+    ? await resolveDesktopSelfLatestVersion()
+    : null;
+  results.push(buildAiShelfSelfEntry(selfLatest));
 
   return { tools: results };
 });
@@ -473,17 +477,7 @@ ipcMain.handle("get-tools-list", async () => {
     });
   }
 
-  let selfVersion = "unknown";
-  try { selfVersion = app.getVersion(); } catch { /* ok */ }
-
-  results.push({
-    tool: "ai-shelf",
-    label: "AI Shelf (self)",
-    currentVersion: selfVersion,
-    latestVersion: null,
-    available: true,
-    updateCommand: detectSelfUpdateCmd(),
-  });
+  results.push(buildAiShelfSelfEntry(null));
 
   return { tools: results };
 });
@@ -497,20 +491,14 @@ ipcMain.handle("start-update-scan", async (event) => {
   type ToolInfo = {
     tool: string; label: string; currentVersion: string | null;
     latestVersion: string | null; available: boolean; updateCommand: string;
+    desktopUpdate?: boolean;
   };
 
   const push = (channel: string, payload: unknown) => {
     if (!event.sender.isDestroyed()) event.sender.send(channel, payload);
   };
 
-  // Self entry immediately
-  let selfVersion = "unknown";
-  try { selfVersion = app.getVersion(); } catch { /* ok */ }
-  const selfEntry: ToolInfo = {
-    tool: "ai-shelf", label: "AI Shelf (self)",
-    currentVersion: selfVersion, latestVersion: null,
-    available: true, updateCommand: detectSelfUpdateCmd(),
-  };
+  const selfEntry: ToolInfo = buildAiShelfSelfEntry(null);
   push("tool-detected", selfEntry);
 
   // Detect each AI tool individually in parallel, push as each resolves
@@ -533,10 +521,15 @@ ipcMain.handle("start-update-scan", async (event) => {
     } catch { /* skip failed detectors */ }
   }));
 
-  // Now check npm latest for each tool in parallel, push as each resolves
+  // Now check npm latest (or desktop updater for ai-shelf) per tool
   await Promise.all(allTools.map(async ({ tool }) => {
-    const pkg = TOOL_NPM_PACKAGE[tool];
-    const latestVersion = pkg ? fetchLatestNpmVersion(pkg) : null;
+    let latestVersion: string | null = null;
+    if (tool === "ai-shelf" && app.isPackaged) {
+      latestVersion = await resolveDesktopSelfLatestVersion();
+    } else {
+      const pkg = TOOL_NPM_PACKAGE[tool];
+      latestVersion = pkg ? fetchLatestNpmVersion(pkg) : null;
+    }
     push("tool-latest", { tool, latestVersion });
   }));
 
@@ -544,6 +537,48 @@ ipcMain.handle("start-update-scan", async (event) => {
 });
 
 ipcMain.handle("run-update", async (_event, tool: string) => {
+  if (tool === "ai-shelf" && app.isPackaged) {
+    if (isDesktopUpdateDownloaded()) {
+      syncAppUpdateUiToRenderer();
+      return { success: true, message: "Update ready — confirm restart in the dialog." };
+    }
+
+    let updateState = getAppUpdateState();
+    if (
+      updateState.status === "idle" ||
+      updateState.status === "not-available" ||
+      updateState.status === "checking"
+    ) {
+      updateState = await checkAppUpdate();
+    }
+
+    if (updateState.status === "available") {
+      syncAppUpdateUiToRenderer();
+      return { success: true, message: "See the update dialog to download." };
+    }
+    if (updateState.status === "downloading" || updateState.status === "downloaded") {
+      syncAppUpdateUiToRenderer();
+      return {
+        success: true,
+        message:
+          updateState.status === "downloaded"
+            ? "Update ready — confirm restart in the dialog."
+            : "Update download in progress — see the dialog.",
+      };
+    }
+    if (updateState.status === "error") {
+      syncAppUpdateUiToRenderer();
+      return {
+        success: false,
+        message: updateState.error ?? "Update check failed.",
+      };
+    }
+    return {
+      success: false,
+      message: "No desktop update available.",
+    };
+  }
+
   const cliPath = join(import.meta.dirname, "..", "cli.js");
   const cliArg = tool === "ai-shelf" ? "self" : tool;
   const result = await run("node", [cliPath, "update", cliArg], 60_000);
@@ -567,6 +602,52 @@ function detectSelfUpdateCmd(): string {
   return "npm update -g ai-shelf";
 }
 
+type SelfUpdateEntry = {
+  tool: string;
+  label: string;
+  currentVersion: string | null;
+  latestVersion: string | null;
+  available: boolean;
+  updateCommand: string;
+  desktopUpdate: boolean;
+};
+
+function buildAiShelfSelfEntry(latestVersion: string | null = null): SelfUpdateEntry {
+  let selfVersion = "unknown";
+  try {
+    selfVersion = app.getVersion();
+  } catch {
+    /* ok */
+  }
+
+  if (app.isPackaged) {
+    return {
+      tool: "ai-shelf",
+      label: "AI Shelf (desktop)",
+      currentVersion: selfVersion,
+      latestVersion: latestVersion ?? getDesktopSelfLatestVersion(),
+      available: true,
+      updateCommand: "",
+      desktopUpdate: true,
+    };
+  }
+
+  return {
+    tool: "ai-shelf",
+    label: "AI Shelf (self)",
+    currentVersion: selfVersion,
+    latestVersion,
+    available: true,
+    updateCommand: detectSelfUpdateCmd(),
+    desktopUpdate: false,
+  };
+}
+
+async function resolveDesktopSelfLatestVersion(): Promise<string | null> {
+  await checkAppUpdate();
+  return getDesktopSelfLatestVersion();
+}
+
 /** Returns only the self (ai-shelf) version and update command — no detectAll(). */
 ipcMain.handle("get-self-info", () => {
   let version = "unknown";
@@ -574,11 +655,31 @@ ipcMain.handle("get-self-info", () => {
   const git = readGitBuildInfo(app.getAppPath());
   return {
     version,
-    updateCommand: detectSelfUpdateCmd(),
+    updateCommand: app.isPackaged ? "" : detectSelfUpdateCmd(),
+    desktopUpdate: app.isPackaged,
     branch: git.branch,
     commitShort: git.commitShort,
     dirty: git.dirty,
   };
+});
+
+ipcMain.handle("get-app-update-channel", () => ({
+  isPackaged: app.isPackaged,
+  desktopAutoUpdate: isDesktopAutoUpdateEnabled(),
+}));
+
+ipcMain.handle("check-app-update", () => checkAppUpdate());
+
+ipcMain.handle("get-app-update-state", () => getAppUpdateState());
+
+ipcMain.handle("confirm-app-update-download", () => {
+  downloadAppUpdate();
+  return { ok: true };
+});
+
+ipcMain.handle("quit-and-install-app-update", () => {
+  quitAndInstallAppUpdate();
+  return { ok: true };
 });
 
 // --- MCP Sync ---
@@ -1129,6 +1230,8 @@ ipcMain.handle("profile-reorder", (_e, orderedProfileIds: string[]) => {
 app.whenReady().then(() => {
   setupAppMenu();
   createWindow();
+  initAppUpdater(() => mainWindow);
+  scheduleStartupUpdateCheck();
 });
 
 // Kill all active PTY sessions before the app exits
