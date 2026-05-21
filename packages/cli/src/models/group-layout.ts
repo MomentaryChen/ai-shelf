@@ -3,6 +3,7 @@ import { z } from "zod";
 export const SavedPaneSlotSchema = z.object({
   tool: z.string().min(1),
   cwd: z.string(),
+  title: z.string().max(64).optional(),
 });
 
 export type SerializedLayoutNode =

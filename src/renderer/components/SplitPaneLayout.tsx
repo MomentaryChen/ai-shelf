@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ToolLogo } from "./ToolLogo";
-import { toolLabel } from "../utils";
+import { EditablePaneTitle } from "./EditablePaneTitle";
+import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
 import type { LayoutNode, PaneInfo, SplitDirection } from "../terminal/split-tree";
 import {
@@ -23,6 +24,7 @@ interface Props {
   onClosePane: (paneId: string) => void;
   onSplitPane: (paneId: string, direction: SplitDirection) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
+  onRenamePane?: (paneId: string, title: string) => void;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
 }
@@ -35,6 +37,7 @@ export function SplitPaneLayout({
   onClosePane,
   onSplitPane,
   onResizeSplit,
+  onRenamePane,
   renderTerminal,
   profileAccentColor = null,
 }: Props) {
@@ -51,6 +54,9 @@ export function SplitPaneLayout({
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
           onSplit={(dir) => onSplitPane(node.pane.id, dir)}
+          onRename={
+            onRenamePane ? (title) => onRenamePane(node.pane.id, title) : undefined
+          }
         >
           {renderTerminal(node.pane, focused)}
         </WarpPaneShell>
@@ -80,6 +86,7 @@ export function SplitPaneLayout({
           onClosePane={onClosePane}
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
+          onRenamePane={onRenamePane}
           renderTerminal={renderTerminal}
           profileAccentColor={profileAccentColor}
         />
@@ -108,6 +115,7 @@ export function SplitPaneLayout({
           onClosePane={onClosePane}
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
+          onRenamePane={onRenamePane}
           renderTerminal={renderTerminal}
           profileAccentColor={profileAccentColor}
         />
@@ -124,6 +132,7 @@ function WarpPaneShell({
   onFocus,
   onClose,
   onSplit,
+  onRename,
   children,
 }: {
   pane: PaneInfo;
@@ -133,6 +142,7 @@ function WarpPaneShell({
   onFocus: () => void;
   onClose: () => void;
   onSplit: (dir: SplitDirection) => void;
+  onRename?: (title: string) => void;
   children: ReactNode;
 }) {
   const chromeStyle = profilePaneChromeStyle(profileAccentColor, focused);
@@ -157,7 +167,18 @@ function WarpPaneShell({
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.03]">
           <ToolLogo tool={pane.tool} size={14} />
         </span>
-        <span className="truncate text-[12px] font-medium text-[#ececef]">{toolLabel(pane.tool)}</span>
+        {onRename ? (
+          <EditablePaneTitle
+            label={paneDisplayLabel(pane)}
+            onRename={onRename}
+            className="text-[12px] font-medium text-[#ececef]"
+            inputClassName="text-[12px] font-medium"
+          />
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[#ececef]">
+            {paneDisplayLabel(pane)}
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate text-[11px] text-[#6b6b6b]" title={pane.cwd}>
           {pane.cwd ? pane.cwd.replace(/^.*[/\\]/, "") || pane.cwd : "~"}
         </span>

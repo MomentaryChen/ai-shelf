@@ -1,0 +1,86 @@
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { normalizePaneTitle } from "../utils/pane-label";
+
+interface Props {
+  label: string;
+  onRename: (title: string) => void;
+  className?: string;
+  inputClassName?: string;
+  disabled?: boolean;
+  title?: string;
+}
+
+export function EditablePaneTitle({
+  label,
+  onRename,
+  className = "",
+  inputClassName = "",
+  disabled = false,
+  title,
+}: Props) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) setDraft(label);
+  }, [label, editing]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  function commit() {
+    setEditing(false);
+    onRename(normalizePaneTitle(draft) ?? "");
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft(label);
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancel();
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={onKeyDown}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        className={`min-w-0 flex-1 rounded border border-[#404040] bg-[#141414] px-1.5 py-0.5 text-[12px] text-[#f0f0f0] outline-none focus:border-[#6b8cff] ${inputClassName}`}
+        aria-label="Tab title"
+      />
+    );
+  }
+
+  return (
+    <span
+      className={`min-w-0 flex-1 truncate ${disabled ? "" : "cursor-text"} ${className}`}
+      title={title ?? (disabled ? label : `${label} — double-click to rename`)}
+      onDoubleClick={(e) => {
+        if (disabled) return;
+        e.stopPropagation();
+        e.preventDefault();
+        setDraft(label);
+        setEditing(true);
+      }}
+    >
+      {label}
+    </span>
+  );
+}

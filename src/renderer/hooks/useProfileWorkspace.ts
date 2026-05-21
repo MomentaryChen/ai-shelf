@@ -11,6 +11,7 @@ import {
   deserializeLayout,
   serializeLayout,
 } from "../terminal/layout-serialize";
+import { normalizePaneTitle } from "../utils/pane-label";
 import {
   loadGroupSnapshot,
   MAX_GROUP_PANES,
@@ -64,7 +65,7 @@ async function reconcileLayoutPtys(
 
     next = mapPanesInTree(next, (p) =>
       p.id === pane.id
-        ? { ...replacement, id: pane.id, cwd: pane.cwd || replacement.cwd }
+        ? { ...replacement, id: pane.id, cwd: pane.cwd || replacement.cwd, title: pane.title }
         : p,
     );
   }
@@ -174,7 +175,10 @@ export function useProfileWorkspace(
         if (!pane && slot.tool !== "shell") {
           pane = await spawnPane("shell", paneCwd);
         }
-        if (pane) spawned.push(pane);
+        if (pane) {
+          const title = normalizePaneTitle(slot.title ?? "");
+          spawned.push(title ? { ...pane, title } : pane);
+        }
       }
 
       if (spawned.length === 0) {

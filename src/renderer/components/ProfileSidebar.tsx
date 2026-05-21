@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ProfileInfo, ProfileTree } from "../types";
 import { ToolLogo } from "./ToolLogo";
+import { EditablePaneTitle } from "./EditablePaneTitle";
+import { paneDisplayLabel } from "../utils/pane-label";
 import { toolLabel } from "../utils";
 import { profileToolLabel } from "../utils/available-tools";
 import type { PaneInfo } from "../terminal/split-tree";
@@ -38,6 +40,7 @@ interface Props {
   onActivateProfile: (profile: ProfileInfo) => void;
   onSelectPane: (profile: ProfileInfo, paneId: string) => void;
   onClosePane: (profileId: string, paneId: string) => void;
+  onRenamePane?: (profileId: string, paneId: string, title: string) => void;
   onAddTerminal: (profile: ProfileInfo) => void;
   addingTerminal?: boolean;
   onToggleBroadcast: (profileId: string, enabled: boolean) => void | Promise<void>;
@@ -59,6 +62,7 @@ export function ProfileSidebar({
   onActivateProfile,
   onSelectPane,
   onClosePane,
+  onRenamePane,
   onAddTerminal,
   addingTerminal = false,
   onToggleBroadcast,
@@ -465,8 +469,13 @@ export function ProfileSidebar({
                       const tool = item.tool;
                       const paneId = "id" in item ? item.id : `saved-${i}`;
                       const isLive = profilePanes.length > 0;
+                      const isPaneInfo = "id" in item;
                       const selected = isActive && isLive && profileFocusId === paneId;
                       const showLiveDot = isLive && isActive;
+                      const sessionLabel = isPaneInfo
+                        ? paneDisplayLabel(item)
+                        : item.title?.trim() || `${toolLabel(tool)} ${i + 1}`;
+                      const canRename = Boolean(isActive && isLive && isPaneInfo && onRenamePane);
 
                       return (
                         <button
@@ -507,9 +516,16 @@ export function ProfileSidebar({
                           >
                             <ToolLogo tool={tool} size={14} />
                           </span>
-                          <span className="min-w-0 flex-1 truncate">
-                            {toolLabel(tool)} {i + 1}
-                          </span>
+                          {canRename ? (
+                            <EditablePaneTitle
+                              label={sessionLabel}
+                              onRename={(title) => onRenamePane!(profile.id, paneId, title)}
+                              className="text-[11px]"
+                              inputClassName="text-[11px]"
+                            />
+                          ) : (
+                            <span className="min-w-0 flex-1 truncate">{sessionLabel}</span>
+                          )}
                           {isActive && isLive && (
                             <span
                               role="button"

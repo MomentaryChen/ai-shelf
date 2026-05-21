@@ -3,6 +3,8 @@ export interface PaneInfo {
   tool: string;
   sessionId: string;
   cwd: string;
+  /** User-defined tab label; falls back to tool name when empty. */
+  title?: string;
 }
 
 export type SplitDirection = "horizontal" | "vertical";
