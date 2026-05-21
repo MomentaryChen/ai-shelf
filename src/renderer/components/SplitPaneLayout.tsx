@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { ToolLogo } from "./ToolLogo";
-import { toolLabel } from "../utils";
+import { EditablePaneTitle } from "./EditablePaneTitle";
+import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
 import type { LayoutNode, PaneInfo, SplitDirection } from "../terminal/split-tree";
+import { formatPaneCwdShort } from "../utils/pane-cwd";
 import {
   profilePaneChromeStyle,
   profilePaneHeaderDotStyle,
@@ -23,6 +25,8 @@ interface Props {
   onClosePane: (paneId: string) => void;
   onSplitPane: (paneId: string, direction: SplitDirection) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
+  onRenamePane?: (paneId: string, title: string) => void;
+  onPaneCwdClick?: (paneId: string) => void;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
 }
@@ -35,6 +39,8 @@ export function SplitPaneLayout({
   onClosePane,
   onSplitPane,
   onResizeSplit,
+  onRenamePane,
+  onPaneCwdClick,
   renderTerminal,
   profileAccentColor = null,
 }: Props) {
@@ -51,6 +57,10 @@ export function SplitPaneLayout({
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
           onSplit={(dir) => onSplitPane(node.pane.id, dir)}
+          onRename={
+            onRenamePane ? (title) => onRenamePane(node.pane.id, title) : undefined
+          }
+          onCwdClick={onPaneCwdClick ? () => onPaneCwdClick(node.pane.id) : undefined}
         >
           {renderTerminal(node.pane, focused)}
         </WarpPaneShell>
@@ -80,6 +90,8 @@ export function SplitPaneLayout({
           onClosePane={onClosePane}
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
+          onRenamePane={onRenamePane}
+          onPaneCwdClick={onPaneCwdClick}
           renderTerminal={renderTerminal}
           profileAccentColor={profileAccentColor}
         />
@@ -108,6 +120,8 @@ export function SplitPaneLayout({
           onClosePane={onClosePane}
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
+          onRenamePane={onRenamePane}
+          onPaneCwdClick={onPaneCwdClick}
           renderTerminal={renderTerminal}
           profileAccentColor={profileAccentColor}
         />
@@ -124,6 +138,8 @@ function WarpPaneShell({
   onFocus,
   onClose,
   onSplit,
+  onRename,
+  onCwdClick,
   children,
 }: {
   pane: PaneInfo;
@@ -133,8 +149,11 @@ function WarpPaneShell({
   onFocus: () => void;
   onClose: () => void;
   onSplit: (dir: SplitDirection) => void;
+  onRename?: (title: string) => void;
+  onCwdClick?: () => void;
   children: ReactNode;
 }) {
+  const cwdShort = formatPaneCwdShort(pane.cwd);
   const chromeStyle = profilePaneChromeStyle(profileAccentColor, focused);
   const headerStyle = profilePaneHeaderStyle(profileAccentColor, focused);
   const dotStyle = profilePaneHeaderDotStyle(profileAccentColor);
@@ -157,10 +176,35 @@ function WarpPaneShell({
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.03]">
           <ToolLogo tool={pane.tool} size={14} />
         </span>
-        <span className="truncate text-[12px] font-medium text-[#ececef]">{toolLabel(pane.tool)}</span>
-        <span className="min-w-0 flex-1 truncate text-[11px] text-[#6b6b6b]" title={pane.cwd}>
-          {pane.cwd ? pane.cwd.replace(/^.*[/\\]/, "") || pane.cwd : "~"}
-        </span>
+        {onRename ? (
+          <EditablePaneTitle
+            label={paneDisplayLabel(pane)}
+            onRename={onRename}
+            className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-[#ececef]"
+            inputClassName="text-[12px] font-medium"
+          />
+        ) : (
+          <span className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-[#ececef]">
+            {paneDisplayLabel(pane)}
+          </span>
+        )}
+        {onCwdClick ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCwdClick();
+            }}
+            className="min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-[#6b6b6b] transition-colors hover:bg-white/[0.06] hover:text-[#b4b4ba]"
+            title={pane.cwd ? `${pane.cwd}\n\n點擊變更工作目錄` : "點擊選擇工作目錄"}
+          >
+            {cwdShort || "~"}
+          </button>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-[11px] text-[#6b6b6b]" title={pane.cwd}>
+            {cwdShort || "~"}
+          </span>
+        )}
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/pane:opacity-100">
           <IconBtn title="Split right" onClick={() => onSplit("horizontal")}>
             ⫽

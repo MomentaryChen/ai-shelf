@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 GitHub Releases use the matching `## [x.y.z]` section here as the release description (see `scripts/release-notes.mjs` and `.github/workflows/release.yml`).
 
+## [1.1.0] - 2026-05-21
+
+Terminal UX improvements, version badge in the UI, and in-app desktop auto-update.
+
+### Added
+
+- **Editable terminal tab titles** — rename tabs inline
+- **Pane keyboard shortcuts** — split, focus, and navigate panes from the keyboard
+- **Per-pane working directory** — each pane keeps its own cwd with one-click folder open
+- **Clear screen and restart session** shortcuts in the terminal
+- **Scroll-to-bottom hint** and more reliable mouse wheel scrollback in the terminal
+- **Version badge** in the desktop UI showing app version, git branch, and commit
+- **In-app auto-update** for the Windows desktop app via `electron-updater` (requires `latest.yml` and blockmap assets on GitHub Releases)
+
+### Changed
+
+- Desktop update flow unified through a single confirm modal
+
+### Notes
+
+- This is the first release that ships **in-app auto-update**. Users on installers older than this build must upgrade **once manually** from [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases); later versions can update inside the app.
+
 ## [1.0.0] - 2026-05-20
 
 First public release of **AI Shelf** — a unified toolkit to inspect, launch, and orchestrate AI coding CLIs on Windows.
@@ -61,4 +83,5 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[1.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.0.0

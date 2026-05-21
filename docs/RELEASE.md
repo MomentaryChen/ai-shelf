@@ -32,7 +32,7 @@ git push origin v1.0.0
 
 1. Open **Actions** → **Release** workflow on the tag commit
 2. When green, open **Releases** on GitHub
-3. Confirm the only attached asset is **`AI-Shelf-Setup-<version>.exe`**
+3. Confirm release assets include **`AI-Shelf-Setup-<version>.exe`**, **`latest.yml`**, and **`*.blockmap`** (required for in-app auto-update via `electron-updater`)
 4. Confirm the **release description** matches **[CHANGELOG.md](../CHANGELOG.md)** for that version (CI builds it via [scripts/release-notes.mjs](../scripts/release-notes.mjs))
 5. Optionally tweak wording on GitHub only for hotfixes — then mirror edits back into `CHANGELOG.md` so they stay aligned
 
@@ -54,7 +54,7 @@ pnpm build
 pnpm dist:win
 ```
 
-Upload `release/AI-Shelf-Setup-<version>.exe` to a GitHub Release. Do **not** attach portable builds or `win-unpacked` folders for end users.
+Upload `release/AI-Shelf-Setup-<version>.exe`, `release/latest.yml`, and `release/*.blockmap` to a GitHub Release. Do **not** attach portable builds or `win-unpacked` folders for end users.
 
 ### Developer-only targets
 
@@ -95,6 +95,16 @@ This is expected until the project adds an Authenticode certificate.
 - Windows 10 or 11 (64-bit)
 - AI CLIs (`claude`, `copilot`, `agent`, etc.) must be installed separately and available on `PATH` for inventory and launch features
 - Node.js is **not** required for the installed desktop app (only for building from source)
+
+### In-app updates (desktop installer)
+
+Installed **NSIS** builds check [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) on startup (after a short delay). When a newer version exists, a dialog asks to download; progress shows 0–100%, then you confirm **Restart** to finish installing.
+
+- **First time** this feature ships: install that release manually once; later upgrades can stay in-app.
+- **Unsigned builds**: SmartScreen may appear again when the updater runs the new installer.
+- **Dev / `electron .`**: no update checks (not packaged).
+
+Maintainers: `package.json` → `build.publish` must point at this repo; CI must upload `latest.yml` (see workflow above).
 
 ### Uninstall
 

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { bindTerminalClipboard } from "../terminal/xterm-clipboard";
+import { registerTerminalClear } from "../terminal/terminal-session-actions";
 
 interface Props {
   sessionId: string;
@@ -12,6 +13,28 @@ interface Props {
   onExit: () => void;
   onSessionLost?: (sessionId: string) => void;
   onWrite?: (data: string, sessionId: string) => void;
+  onRestart?: () => void;
+}
+
+/** True when the viewport is pinned to the latest output (ydisp === ybase). */
+function isTerminalAtBottom(term: Terminal): boolean {
+  const buffer = term.buffer.active;
+  return buffer.viewportY === buffer.baseY;
+}
+
+function wheelLines(term: Terminal, ev: WheelEvent): number {
+  const sensitivity = term.options.scrollSensitivity ?? 1;
+  let lines = 0;
+  if (ev.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    lines = ev.deltaY;
+  } else if (ev.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    lines = ev.deltaY * term.rows;
+  } else {
+    lines = ev.deltaY / 50;
+  }
+  const scaled = Math.round(lines * sensitivity);
+  if (scaled === 0) return ev.deltaY > 0 ? 1 : ev.deltaY < 0 ? -1 : 0;
+  return scaled;
 }
 
 export function EmbeddedTerminal({
@@ -22,6 +45,7 @@ export function EmbeddedTerminal({
   onExit,
   onSessionLost,
   onWrite,
+  onRestart,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -29,11 +53,17 @@ export function EmbeddedTerminal({
   const onWriteRef = useRef(onWrite);
   const onSessionLostRef = useRef(onSessionLost);
   const fitRef = useRef<(() => void) | null>(null);
+  const scrollToBottomRef = useRef<(() => void) | null>(null);
+  const [hasNewOutput, setHasNewOutput] = useState(false);
   const stableOnExit = useCallback(onExit, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   activeRef.current = active;
   onWriteRef.current = onWrite;
   onSessionLostRef.current = onSessionLost;
+
+  useEffect(() => {
+    setHasNewOutput(false);
+  }, [sessionId]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -75,6 +105,8 @@ export function EmbeddedTerminal({
       cursorBlink: true,
       cursorStyle: "block",
       scrollback: 5000,
+      scrollOnUserInput: false,
+      smoothScrollDuration: 0,
       allowProposedApi: false,
       rightClickSelectsWord: true,
     });
@@ -83,7 +115,15 @@ export function EmbeddedTerminal({
     term.loadAddon(fitAddon);
     term.open(el);
     termRef.current = term;
-    const unbindClipboard = bindTerminalClipboard(term, el);
+    const doClear = () => {
+      term.clear();
+      window.api.ptyWrite(sessionId, "\x0c");
+    };
+    const unregisterClear = registerTerminalClear(sessionId, doClear);
+    const unbindClipboard = bindTerminalClipboard(term, el, {
+      onClear: doClear,
+      onRestart: onRestart,
+    });
 
     const pending: string[] = [];
     let opened = true;
@@ -92,27 +132,44 @@ export function EmbeddedTerminal({
     let statusTimer = 0;
     let receivedBytes = 0;
 
+    const syncNewOutputHint = () => {
+      if (isTerminalAtBottom(term)) setHasNewOutput(false);
+    };
+
     const writeSafe = (data: string) => {
       if (!opened) {
         pending.push(data);
         return;
       }
+      const wasAtBottom = isTerminalAtBottom(term);
       try {
         term.write(data);
       } catch (err) {
         console.error("[xterm-write]", sessionId, err);
+        return;
       }
+      if (!wasAtBottom) setHasNewOutput(true);
     };
 
     const flushPending = () => {
       if (!opened || pending.length === 0) return;
       const chunk = pending.splice(0, pending.length).join("");
+      const wasAtBottom = isTerminalAtBottom(term);
       try {
         term.write(chunk);
       } catch (err) {
         console.error("[xterm-flush]", sessionId, err);
+        return;
       }
+      if (!wasAtBottom) setHasNewOutput(true);
     };
+
+    const scrollToBottom = () => {
+      term.scrollToBottom();
+      setHasNewOutput(false);
+      term.focus();
+    };
+    scrollToBottomRef.current = scrollToBottom;
 
     const syncPtySize = () => {
       const cols = Math.max(term.cols, 2);
@@ -141,6 +198,28 @@ export function EmbeddedTerminal({
     scheduleFit();
     flushPending();
 
+    const offScroll = term.onScroll(syncNewOutputHint);
+
+    /** Ensure mouse wheel scrolls history in Electron (xterm viewport may not receive the event). */
+    const onWheel = (ev: WheelEvent) => {
+      if (ev.ctrlKey || ev.metaKey) return;
+      const buffer = term.buffer.active;
+      if (buffer.baseY <= 0) return;
+
+      const before = buffer.viewportY;
+      const lines = wheelLines(term, ev);
+      if (lines === 0) return;
+
+      term.scrollLines(lines);
+      syncNewOutputHint();
+
+      if (term.buffer.active.viewportY !== before) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false, capture: true });
+
     const offData = window.api.onPtyData(({ sessionId: sid, data }) => {
       if (sid !== sessionId) return;
       receivedBytes += data.length;
@@ -149,7 +228,9 @@ export function EmbeddedTerminal({
 
     const offExit = window.api.onPtyExit(({ sessionId: sid }) => {
       if (sid !== sessionId) return;
+      const wasAtBottom = isTerminalAtBottom(term);
       term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
+      if (!wasAtBottom) setHasNewOutput(true);
       const d = term.onKey(() => {
         d.dispose();
         stableOnExit();
@@ -184,7 +265,9 @@ export function EmbeddedTerminal({
 
       statusTimer = window.setTimeout(() => {
         if (cancelled || receivedBytes > 0) return;
+        const wasAtBottom = isTerminalAtBottom(term);
         term.writeln("\r\n\x1b[33m[terminal] waiting for shell output — click here and press Enter\x1b[0m");
+        if (!wasAtBottom) setHasNewOutput(true);
       }, 2500);
     });
 
@@ -201,15 +284,19 @@ export function EmbeddedTerminal({
       window.clearTimeout(statusTimer);
       cancelAnimationFrame(rafId);
       fitRef.current = null;
+      scrollToBottomRef.current = null;
       termRef.current = null;
+      offScroll.dispose();
       offData();
       offExit();
+      el.removeEventListener("wheel", onWheel, { capture: true });
       el.removeEventListener("pointerdown", onPointerDown);
+      unregisterClear();
       unbindClipboard();
       ro.disconnect();
       term.dispose();
     };
-  }, [sessionId, stableOnExit, bg]);
+  }, [sessionId, stableOnExit, bg, onRestart]);
 
   useEffect(() => {
     if (!active) return;
@@ -226,5 +313,23 @@ export function EmbeddedTerminal({
     return () => cancelAnimationFrame(id);
   }, [focused, sessionId]);
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return (
+    <div className="absolute inset-0">
+      <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+      {hasNewOutput && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            scrollToBottomRef.current?.();
+          }}
+          className="pointer-events-auto absolute bottom-3 right-3 z-10 flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#3d3d42] bg-[#1e1e22]/95 px-2.5 py-1.5 text-[11px] font-medium text-[#ececef] shadow-lg backdrop-blur-sm transition-colors hover:border-[#5a5a62] hover:bg-[#28282e]"
+          title="捲動到底部"
+        >
+          <span aria-hidden>↓</span>
+          <span>新輸出</span>
+        </button>
+      )}
+    </div>
+  );
 }

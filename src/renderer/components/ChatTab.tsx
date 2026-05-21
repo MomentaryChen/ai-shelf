@@ -8,6 +8,8 @@ import { ProfileSidebar } from "./ProfileSidebar";
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
+import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
+import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
   collectPanes,
   findPane,
@@ -19,9 +21,11 @@ import {
   type PaneInfo,
   type SplitDirection,
 } from "../terminal/split-tree";
+import { normalizePaneTitle } from "../utils/pane-label";
 import {
   TERMINAL_OPTIONS,
   getAppBg,
+  bumpDirHistory,
   loadSettings,
   saveSettings,
   type ChatSettings,
@@ -136,6 +140,23 @@ export function ChatTab({
     });
   }, []);
 
+  const recordDirHistory = useCallback(
+    (dir: string) => {
+      const d = dir.trim();
+      if (!d) return;
+      setSettings((prev) => {
+        const next = {
+          ...prev,
+          workingDir: d,
+          dirHistory: bumpDirHistory(prev.dirHistory, d),
+        };
+        saveSettings(next);
+        return next;
+      });
+    },
+    [],
+  );
+
   const panesRef = useRef(panes);
   panesRef.current = panes;
 
@@ -247,6 +268,35 @@ export function ChatTab({
     [canAddPane, maxPanes, restoring, resolveCwd, spawnPaneResilient, focusedPaneId],
   );
 
+  const respawnPaneWithCwd = useCallback(
+    async (paneId: string, cwdOverride?: string) => {
+      const victim = layout ? findPane(layout, paneId) : null;
+      if (!victim) return;
+      const cwd = cwdOverride?.trim() || victim.cwd || resolveCwd();
+      window.api.ptyKill(victim.sessionId);
+      const next = await spawnPaneResilient(victim.tool, cwd);
+      if (!next) {
+        setTerminalError(
+          (prev) =>
+            prev ??
+            `Terminal session 已失效且無法重新啟動（${victim.tool}）。請關閉此 pane 後再按 + Terminal。`,
+        );
+        return;
+      }
+      setTerminalError(null);
+      setLayout((prev) =>
+        prev
+          ? mapPanesInTree(prev, (p) =>
+              p.id === paneId
+                ? { ...next, id: paneId, cwd, title: victim.title }
+                : p,
+            )
+          : prev,
+      );
+    },
+    [layout, spawnPaneResilient, resolveCwd],
+  );
+
   const respawnPane = useCallback(
     async (paneId: string) => {
       const victim = layout ? findPane(layout, paneId) : null;
@@ -266,13 +316,79 @@ export function ChatTab({
         prev
           ? mapPanesInTree(prev, (p) =>
               p.id === paneId
-                ? { ...next, id: paneId, cwd: victim.cwd || next.cwd }
+                ? { ...next, id: paneId, cwd: victim.cwd || next.cwd, title: victim.title }
                 : p,
             )
           : prev,
       );
     },
     [layout, spawnPaneResilient, resolveCwd],
+  );
+
+  const renamePane = useCallback((paneId: string, title: string) => {
+    const normalized = normalizePaneTitle(title);
+    setLayout((prev) =>
+      prev
+        ? mapPanesInTree(prev, (p) =>
+            p.id === paneId ? { ...p, title: normalized } : p,
+          )
+        : prev,
+    );
+  }, []);
+
+  const changePaneCwd = useCallback(
+    async (paneId: string) => {
+      const pane = layout ? findPane(layout, paneId) : null;
+      if (!pane) return;
+      const picked = await window.api.pickFolder(pane.cwd || resolveCwd() || undefined);
+      if (!picked) return;
+      recordDirHistory(picked);
+      await respawnPaneWithCwd(paneId, picked);
+    },
+    [layout, resolveCwd, recordDirHistory, respawnPaneWithCwd],
+  );
+
+  const openFolderPane = useCallback(
+    async (cwdHint?: string) => {
+      if (restoring) {
+        setTerminalError("正在還原 profile，請稍候再試…");
+        return;
+      }
+      if (!canAddPane) {
+        setTerminalError(`已達上限 ${maxPanes} 個 terminal，請先關閉一個 pane`);
+        return;
+      }
+      const picked = await window.api.pickFolder(cwdHint?.trim() || resolveCwd() || undefined);
+      if (!picked) return;
+      recordDirHistory(picked);
+      const tool = resolveLaunchTool(
+        activeProfile?.defaultTool ?? availableTools[0],
+        availableTools,
+      );
+      const ok = await addPane(tool, picked);
+      if (!ok) {
+        setTerminalError((prev) => prev ?? "無法開啟 terminal，請按 F12 查看 Console");
+      }
+    },
+    [
+      restoring,
+      canAddPane,
+      maxPanes,
+      resolveCwd,
+      recordDirHistory,
+      activeProfile?.defaultTool,
+      availableTools,
+      addPane,
+    ],
+  );
+
+  const clearPaneScreen = useCallback(
+    (paneId: string) => {
+      const pane = layout ? findPane(layout, paneId) : null;
+      if (!pane) return;
+      clearTerminalSession(pane.sessionId);
+    },
+    [layout],
   );
 
   const closePane = useCallback((paneId: string) => {
@@ -298,6 +414,17 @@ export function ChatTab({
     },
     [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
+
+  usePaneShortcuts({
+    panes,
+    focusedPaneId,
+    enabled: active && layout !== null && !profileBusy && !restoring,
+    onFocusPane: setFocusedPaneId,
+    onClosePane: closePane,
+    onClearPane: clearPaneScreen,
+    onRestartPane: (id) => void respawnPane(id),
+    onSplitPane: (id, dir) => void splitPane(id, dir),
+  });
 
   async function handleActivateProfile(profile: ProfileInfo) {
     setProfileBusy(true);
@@ -385,7 +512,21 @@ export function ChatTab({
         }
       }}
       onClosePane={(_profileId, paneId) => closePane(paneId)}
+      onRenamePane={(_profileId, paneId, title) => renamePane(paneId, title)}
       onAddTerminal={(profile) => void handleNewTerminal(profile)}
+      onOpenFolder={(profile) => {
+        void (async () => {
+          if (activeProfile?.id !== profile.id) {
+            await handleActivateProfile(profile);
+          }
+          const hint =
+            profile.defaultCwd?.trim() ||
+            getProfileDefaultCwd() ||
+            settings.workingDir?.trim() ||
+            undefined;
+          await openFolderPane(hint);
+        })();
+      }}
       addingTerminal={addingTerminal}
       onToggleBroadcast={(id, v) => void handleToggleBroadcast(id, v)}
       onProfileUpdated={(profile) => {
@@ -414,6 +555,7 @@ export function ChatTab({
       showNewMenu={showNewMenu}
       onToggleNewMenu={() => setShowNewMenu((o) => !o)}
       onAddPane={(tool) => void addPane(tool)}
+      onOpenFolder={() => void openFolderPane()}
       available={data.filter((e) => e.available)}
     />
   );
@@ -428,7 +570,9 @@ export function ChatTab({
         profileAccentColor={activeProfile?.accentColor ?? null}
         onFocusPane={setFocusedPaneId}
         onClosePane={closePane}
+        onRenamePane={renamePane}
         onSplitPane={(id, dir) => void splitPane(id, dir)}
+        onPaneCwdClick={(paneId) => void changePaneCwd(paneId)}
         onResizeSplit={(splitId, ratio) =>
           setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
         }
@@ -441,6 +585,7 @@ export function ChatTab({
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onSessionLost={() => void respawnPane(pane.id)}
+            onRestart={() => void respawnPane(pane.id)}
             onExit={() => closePane(pane.id)}
           />
         )}
@@ -463,6 +608,16 @@ export function ChatTab({
             <p className="mt-2 text-[12px] text-red-400">{terminalError}</p>
           )}
           <p className="mt-2 text-[11px] text-[#505050]">
+            窗格快捷鍵：<kbd className="rounded border border-[#333] px-1">Ctrl+Tab</kbd> 切換、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+W</kbd> 關閉、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+L</kbd> 清屏、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+R</kbd> 重啟 session、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+\\</kbd> /{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+\\</kbd> 分割、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+1–9</kbd> 跳至第 N 窗格。
+            右鍵選單亦可清屏／重啟。
+          </p>
+          <p className="mt-1 text-[11px] text-[#505050]">
             除錯：按 <kbd className="rounded border border-[#333] px-1">F12</kbd> 或{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+I</kbd>
             開啟開發者工具；也可按 <kbd className="rounded border border-[#333] px-1">Alt</kbd>{" "}
@@ -539,6 +694,7 @@ function WarpTopBar({
   showNewMenu,
   onToggleNewMenu,
   onAddPane,
+  onOpenFolder,
   available,
 }: {
   profileLabel: string | null;
@@ -554,6 +710,7 @@ function WarpTopBar({
   showNewMenu: boolean;
   onToggleNewMenu: () => void;
   onAddPane: (tool: string) => void;
+  onOpenFolder: () => void;
   available: ProviderEntry[];
 }) {
   const accent = profileAccentColor;
@@ -602,9 +759,26 @@ function WarpTopBar({
       <div ref={newMenuRef} className="relative ml-auto flex items-center gap-2">
         <button
           type="button"
+          disabled={!canAddPane || restoring}
+          onClick={onOpenFolder}
+          title={
+            canAddPane
+              ? "選擇資料夾並開啟新窗格（獨立工作目錄）"
+              : `Maximum ${maxPanes} panes`
+          }
+          className="cursor-pointer rounded-md border border-[#2a2a2a] px-2 py-1 text-[12px] text-[#a0a0a0] hover:border-[#404040] disabled:opacity-40"
+        >
+          📁 Folder
+        </button>
+        <button
+          type="button"
           disabled={!canAddPane}
           onClick={onToggleNewMenu}
-          title={canAddPane ? "Add terminal pane" : `Maximum ${maxPanes} panes`}
+          title={
+            canAddPane
+              ? "Add terminal pane (Ctrl+\\ split right, Ctrl+Shift+\\ split down)"
+              : `Maximum ${maxPanes} panes`
+          }
           className="cursor-pointer rounded-md border border-[#2a2a2a] px-2.5 py-1 text-[12px] text-[#a0a0a0] hover:border-[#404040] disabled:opacity-40"
         >
           + Pane

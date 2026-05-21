@@ -116,6 +116,19 @@ The **可用的 Agent** section lists installed tools. Each card shows version, 
 - Focused pane receives keyboard input; with **broadcast input** on, keystrokes go to **all** panes
 - Restoring a profile replays the saved layout and sessions when possible
 
+### Pane keyboard shortcuts (Terminal mode, when panes are open)
+
+Ignored while typing in inputs (e.g. profile rename).
+
+| Shortcut | Action |
+|---|---|
+| **Ctrl+Tab** | Next pane |
+| **Ctrl+Shift+Tab** | Previous pane |
+| **Ctrl+1 … Ctrl+9** | Focus pane N (tree order) |
+| **Ctrl+W** | Close focused pane |
+| **Ctrl+\\** | Split right (horizontal) |
+| **Ctrl+Shift+\\** | Split down (vertical) |
+
 ---
 
 ## 3. Models
@@ -267,9 +280,9 @@ The desktop UI ultimately runs `node dist/cli.js update <tool>` (`ai update …`
 | Google Gemini CLI | `gemini update` |
 | Aider | `pip install -U aider-chat` |
 | OpenCode | `opencode upgrade` |
-| AI Shelf (**self**) | Detected first among `pnpm update -g ai-shelf`, `yarn global upgrade ai-shelf`, or `npm update -g ai-shelf` |
+| AI Shelf (**self** / **desktop**) | **Installed NSIS app**: GitHub Release check on startup; in-app download with progress and restart to install (**Download & upgrade desktop** on the Update tab). **From source / dev**: `pnpm` / `yarn` / `npm` global update command as detected |
 
-`ai-shelf` compares current versions against npm metadata for packaged CLIs (`TOOL_NPM_PACKAGE`); entries without published packages still render their update command but may not show npm “latest” semantics.
+Packaged CLIs use npm registry metadata (`TOOL_NPM_PACKAGE`). The installed desktop app uses `electron-updater` and `latest.yml` on GitHub Releases.
 
 ### Per-Tool Cards
 Each card shows:

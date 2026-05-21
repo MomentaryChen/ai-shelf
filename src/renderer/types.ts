@@ -53,6 +53,32 @@ export interface ToolUpdateInfo {
   latestVersion: string | null;
   available: boolean;
   updateCommand: string;
+  desktopUpdate?: boolean;
+}
+
+export interface AppUpdateChannelInfo {
+  isPackaged: boolean;
+  desktopAutoUpdate: boolean;
+}
+
+export interface AppUpdateAvailablePayload {
+  version: string | null;
+  releaseNotes: string | null;
+}
+
+export interface AppUpdateProgressPayload {
+  percent: number;
+  transferred?: number;
+  total?: number;
+}
+
+export interface AppUpdateStatePayload {
+  status: string;
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseNotes: string | null;
+  error: string | null;
+  downloadPercent: number;
 }
 
 export interface UpdateCheckResult {
@@ -121,7 +147,7 @@ export interface GroupLayoutMeta {
 
 export interface GroupLayoutSnapshot {
   defaultCwd: string;
-  panes: { tool: string; cwd: string }[];
+  panes: { tool: string; cwd: string; title?: string }[];
   layout: unknown;
   broadcastInput?: boolean;
   accentColor?: string | null;
@@ -131,6 +157,7 @@ export interface GroupLayoutSnapshot {
 export interface ProfileTerminal {
   tool: string;
   cwd: string;
+  title?: string;
 }
 
 export interface ProfileInfo {
@@ -171,7 +198,24 @@ export interface ElectronAPI {
   runDoctor: () => Promise<DoctorResult[]>;
   runDoctorTool: (tool: string) => Promise<DoctorResult>;
   checkUpdate: () => Promise<UpdateCheckResult>;
-  getSelfInfo: () => Promise<{ version: string; updateCommand: string }>;
+  getSelfInfo: () => Promise<{
+    version: string;
+    updateCommand: string;
+    desktopUpdate?: boolean;
+    branch: string | null;
+    commitShort: string | null;
+    dirty: boolean;
+  }>;
+  getAppUpdateChannel: () => Promise<AppUpdateChannelInfo>;
+  checkAppUpdate: () => Promise<AppUpdateStatePayload>;
+  getAppUpdateState: () => Promise<AppUpdateStatePayload>;
+  confirmAppUpdateDownload: () => Promise<{ ok: boolean }>;
+  quitAndInstallAppUpdate: () => Promise<{ ok: boolean }>;
+  onAppUpdateAvailable: (cb: (payload: AppUpdateAvailablePayload) => void) => () => void;
+  onAppUpdateNotAvailable: (cb: (payload: { version: string | null }) => void) => () => void;
+  onAppUpdateProgress: (cb: (payload: AppUpdateProgressPayload) => void) => () => void;
+  onAppUpdateDownloaded: (cb: (payload: { version: string | null }) => void) => () => void;
+  onAppUpdateError: (cb: (payload: { message: string }) => void) => () => void;
   getToolsList: () => Promise<UpdateCheckResult>;
   checkToolLatest: (tool: string) => Promise<{ tool: string; latestVersion: string | null }>;
   startUpdateScan: () => Promise<void>;

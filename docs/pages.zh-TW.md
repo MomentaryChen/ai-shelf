@@ -118,6 +118,19 @@
 - 焦點窗格接收鍵盤輸入；啟用廣播時，輸入會送到**所有**窗格
 - 還原 Profile 時會盡力恢復上次版面與工作階段
 
+### 窗格快捷鍵（Terminal 模式、有開啟窗格時）
+
+在文字輸入框（例如 Profile 重新命名）內不會觸發。
+
+| 快捷鍵 | 動作 |
+|---|---|
+| **Ctrl+Tab** | 下一個窗格 |
+| **Ctrl+Shift+Tab** | 上一個窗格 |
+| **Ctrl+1 … Ctrl+9** | 跳到第 N 個窗格（依版面樹順序） |
+| **Ctrl+W** | 關閉目前焦點窗格 |
+| **Ctrl+\\** | 向右分割（水平） |
+| **Ctrl+Shift+\\** | 向下分割（垂直） |
+
 ---
 
 ## 3. 模型
@@ -262,9 +275,9 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 | Google Gemini CLI | `gemini update` |
 | Aider | `pip install -U aider-chat` |
 | OpenCode | `opencode upgrade` |
-| AI Shelf（self） | 依環境自動顯示 `pnpm`、`yarn` 或 `npm` 的全域更新指令列 |
+| AI Shelf（self / desktop） | **安裝版**：啟動後檢查 GitHub Release，確認後在 App 內下載並重啟安裝（Update 分頁 **Download & upgrade desktop**）。**開發／原始碼**：依環境顯示 `pnpm` / `yarn` / `npm` 全域更新指令 |
 
-對列在 `TOOL_NPM_PACKAGE` 的 CLI，程式會請 npm registry 協助決定是否有較新版本；未列在對照表的工具仍會顯示更新指令，惟「最新版」語意可能不完整。
+對列在 `TOOL_NPM_PACKAGE` 的 CLI，程式會請 npm registry 協助決定是否有較新版本；桌面安裝版改以 `electron-updater` 比對 GitHub 上的 `latest.yml`。
 
 ---
 
