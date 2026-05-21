@@ -15,7 +15,7 @@ import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { MCP_SYNC_TOOL_IDS, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
 import { run } from "../utils/exec.js";
-import { readGitBuildInfo } from "../utils/git-build-info.js";
+import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
@@ -70,6 +70,22 @@ const sharedWebPreferences = {
   contextIsolation: true,
   nodeIntegration: false,
 } as const;
+
+/** Window title: app name + version (+ dev git label). Version lives here only — not duplicated in the in-app header. */
+function formatWindowTitle(base: string): string {
+  let title = base;
+  try {
+    title = `${base} v${app.getVersion()}`;
+  } catch {
+    /* keep base */
+  }
+  const gitRoot = app.isPackaged ? app.getAppPath() : process.cwd();
+  const gitLabel = formatGitBuildLabel(readGitBuildInfo(gitRoot));
+  if (gitLabel) {
+    title += ` — ${gitLabel}`;
+  }
+  return title;
+}
 
 const INVENTORY_CACHE_TTL_MS = 30_000;
 let inventoryCache: { at: number; entries: ProviderEntry[] } | null = null;
@@ -172,8 +188,21 @@ function setupAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function attachWindow(win: BrowserWindow) {
+/** Keep formatted title; renderer index.html <title> would otherwise reset it to "AI Shelf". */
+function bindWindowTitle(win: BrowserWindow, base: string): void {
+  const apply = () => {
+    if (!win.isDestroyed()) win.setTitle(formatWindowTitle(base));
+  };
+  win.on("page-title-updated", (event) => {
+    event.preventDefault();
+    apply();
+  });
+  win.webContents.on("did-finish-load", apply);
+}
+
+function attachWindow(win: BrowserWindow, titleBase: string) {
   bindDevToolsShortcuts(win);
+  bindWindowTitle(win, titleBase);
 }
 
 function createWindow() {
@@ -182,7 +211,7 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: "AI Shelf",
+    title: formatWindowTitle("AI Shelf"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
@@ -190,7 +219,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(RENDERER_HTML);
-  attachWindow(mainWindow);
+  attachWindow(mainWindow, "AI Shelf");
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -207,14 +236,14 @@ function createChatWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: "AI Terminal",
+    title: formatWindowTitle("AI Terminal"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
   chatWindow.loadFile(RENDERER_HTML, { hash: "chat" });
-  attachWindow(chatWindow);
+  attachWindow(chatWindow, "AI Terminal");
   chatWindow.on("closed", () => {
     chatWindow = null;
   });
@@ -230,14 +259,14 @@ function createSettingsWindow() {
     height: 680,
     minWidth: 440,
     minHeight: 520,
-    title: "Terminal Settings",
+    title: formatWindowTitle("Terminal Settings"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
   settingsWindow.loadFile(RENDERER_HTML, { hash: "settings" });
-  attachWindow(settingsWindow);
+  attachWindow(settingsWindow, "Terminal Settings");
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
