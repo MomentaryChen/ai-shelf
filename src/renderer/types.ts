@@ -172,7 +172,13 @@ export interface ElectronAPI {
   runDoctor: () => Promise<DoctorResult[]>;
   runDoctorTool: (tool: string) => Promise<DoctorResult>;
   checkUpdate: () => Promise<UpdateCheckResult>;
-  getSelfInfo: () => Promise<{ version: string; updateCommand: string }>;
+  getSelfInfo: () => Promise<{
+    version: string;
+    updateCommand: string;
+    branch: string | null;
+    commitShort: string | null;
+    dirty: boolean;
+  }>;
   getToolsList: () => Promise<UpdateCheckResult>;
   checkToolLatest: (tool: string) => Promise<{ tool: string; latestVersion: string | null }>;
   startUpdateScan: () => Promise<void>;
