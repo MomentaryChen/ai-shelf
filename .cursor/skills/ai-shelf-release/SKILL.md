@@ -85,11 +85,19 @@ git tag -a vX.Y.Z -m "AI Shelf X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Pushing **`v*`** triggers [.github/workflows/release.yml](../../../.github/workflows/release.yml) (Windows NSIS + Release body from CHANGELOG).
+Pushing **`v*`** triggers [.github/workflows/release.yml](../../../.github/workflows/release.yml) (Windows NSIS + Release body from CHANGELOG). CI attaches **`AI-Shelf-Setup-*.exe`**, **`latest.yml`**, and **`*.blockmap`** — the latter two are required for packaged desktop **in-app auto-update** (`electron-updater`; see [docs/RELEASE.md](../../../docs/RELEASE.md)).
 
 ## 6. After push
 
-Tell the user to open **Actions → Release** and then **Releases**; confirm asset `AI-Shelf-Setup-X.Y.Z.exe` and that release notes match CHANGELOG.
+Tell the user to open **Actions → Release** and then **Releases**. Confirm on that release:
+
+- **`AI-Shelf-Setup-X.Y.Z.exe`**
+- **`latest.yml`** and **`*.blockmap`** (if missing, installed apps cannot auto-update in-app)
+- Release description matches CHANGELOG
+
+If this is the **first release** that ships in-app auto-update, mention in CHANGELOG (or release notes) that users on older installers must install that build **once manually**; later versions can upgrade inside the app.
+
+**Manual publish fallback:** after `pnpm dist:win`, upload `release/AI-Shelf-Setup-<version>.exe`, `release/latest.yml`, and `release/*.blockmap` together — not the installer alone.
 
 Local preview of GitHub release body:
 
