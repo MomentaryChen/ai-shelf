@@ -28,6 +28,7 @@ import {
   isDesktopUpdateDownloaded,
   quitAndInstallAppUpdate,
   scheduleStartupUpdateCheck,
+  syncAppUpdateUiToRenderer,
 } from "./app-updater.js";
 import {
   getWorkspaceContext,
@@ -538,30 +539,43 @@ ipcMain.handle("start-update-scan", async (event) => {
 ipcMain.handle("run-update", async (_event, tool: string) => {
   if (tool === "ai-shelf" && app.isPackaged) {
     if (isDesktopUpdateDownloaded()) {
-      quitAndInstallAppUpdate();
-      return { success: true, message: "Restarting to install the update…" };
+      syncAppUpdateUiToRenderer();
+      return { success: true, message: "Update ready — confirm restart in the dialog." };
     }
-    const updateState = getAppUpdateState();
-    if (updateState.status === "available" || updateState.status === "error") {
-      downloadAppUpdate();
-      return { success: true, message: "Downloading update… watch the progress dialog." };
+
+    let updateState = getAppUpdateState();
+    if (
+      updateState.status === "idle" ||
+      updateState.status === "not-available" ||
+      updateState.status === "checking"
+    ) {
+      updateState = await checkAppUpdate();
     }
-    if (updateState.status === "downloading") {
-      return { success: true, message: "Update download already in progress." };
+
+    if (updateState.status === "available") {
+      syncAppUpdateUiToRenderer();
+      return { success: true, message: "See the update dialog to download." };
     }
-    await checkAppUpdate();
-    const after = getAppUpdateState();
-    if (after.status === "available") {
-      downloadAppUpdate();
-      return { success: true, message: "Downloading update… watch the progress dialog." };
+    if (updateState.status === "downloading" || updateState.status === "downloaded") {
+      syncAppUpdateUiToRenderer();
+      return {
+        success: true,
+        message:
+          updateState.status === "downloaded"
+            ? "Update ready — confirm restart in the dialog."
+            : "Update download in progress — see the dialog.",
+      };
     }
-    if (after.status === "downloaded") {
-      quitAndInstallAppUpdate();
-      return { success: true, message: "Restarting to install the update…" };
+    if (updateState.status === "error") {
+      syncAppUpdateUiToRenderer();
+      return {
+        success: false,
+        message: updateState.error ?? "Update check failed.",
+      };
     }
     return {
       success: false,
-      message: after.error ?? "No desktop update available.",
+      message: "No desktop update available.",
     };
   }
 

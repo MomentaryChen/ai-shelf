@@ -46,7 +46,7 @@ export function AppUpdateModal() {
     });
 
     const unsubDownloaded = window.api.onAppUpdateDownloaded((payload) => {
-      setVersion(payload.version ?? version);
+      setVersion((v) => payload.version ?? v);
       setPercent(100);
       setPhase("ready");
     });
@@ -63,7 +63,7 @@ export function AppUpdateModal() {
       unsubDownloaded();
       unsubError();
     };
-  }, [enabled, version]);
+  }, [enabled]);
 
   const startDownload = () => {
     setPhase("downloading");

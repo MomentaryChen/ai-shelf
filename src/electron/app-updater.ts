@@ -111,8 +111,40 @@ function bindAutoUpdaterEvents(): void {
   autoUpdater.on("error", (err) => {
     state.status = "error";
     state.error = err.message;
+    console.error("[app-updater]", err.message);
     sendToRenderer("app-update-error", { message: err.message });
   });
+}
+
+/** Re-push current updater state so the renderer modal can open (e.g. from Update tab). */
+export function syncAppUpdateUiToRenderer(): void {
+  if (!app.isPackaged) return;
+
+  switch (state.status) {
+    case "available":
+      sendToRenderer("app-update-available", {
+        version: state.latestVersion,
+        releaseNotes: state.releaseNotes,
+      });
+      break;
+    case "downloading":
+      sendToRenderer("app-update-progress", {
+        percent: state.downloadPercent,
+        transferred: 0,
+        total: 0,
+      });
+      break;
+    case "downloaded":
+      sendToRenderer("app-update-downloaded", { version: state.latestVersion });
+      break;
+    case "error":
+      if (state.error) {
+        sendToRenderer("app-update-error", { message: state.error });
+      }
+      break;
+    default:
+      break;
+  }
 }
 
 export function isDesktopAutoUpdateEnabled(): boolean {
@@ -153,6 +185,7 @@ export async function checkAppUpdate(): Promise<AppUpdateState> {
   } catch (err: unknown) {
     state.status = "error";
     state.error = err instanceof Error ? err.message : String(err);
+    console.error("[app-updater]", state.error);
     sendToRenderer("app-update-error", { message: state.error });
   }
   return getAppUpdateState();
@@ -160,10 +193,19 @@ export async function checkAppUpdate(): Promise<AppUpdateState> {
 
 export function downloadAppUpdate(): void {
   if (!app.isPackaged) return;
-  if (state.status !== "available" && state.status !== "error") return;
-  state.error = null;
-  state.downloadPercent = 0;
-  void autoUpdater.downloadUpdate();
+  if (state.status === "available") {
+    state.error = null;
+    state.downloadPercent = 0;
+    void autoUpdater.downloadUpdate();
+    return;
+  }
+  // Retry only when a version was already identified (avoid blind download on generic errors).
+  if (state.status === "error" && state.latestVersion) {
+    state.error = null;
+    state.downloadPercent = 0;
+    state.status = "available";
+    void autoUpdater.downloadUpdate();
+  }
 }
 
 export function quitAndInstallAppUpdate(): void {

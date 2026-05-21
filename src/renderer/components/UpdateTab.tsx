@@ -64,7 +64,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
     try {
       const res = await window.api.runUpdate(tool);
       setResults((prev) => ({ ...prev, [tool]: res }));
-      if (res.success) await runCheck();
+      if (res.success && tool !== "ai-shelf") await runCheck();
     } catch {
       setResults((prev) => ({
         ...prev,
