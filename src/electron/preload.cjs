@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld("api", {
   getMcpRaw: () => ipcRenderer.invoke("get-mcp-raw"),
   syncMcp: (opts) => ipcRenderer.invoke("sync-mcp", opts),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
+  openExternal: (url) => ipcRenderer.invoke("open-external", url),
   launchInTerminal: (tool, terminal, cwd) => ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd),
   ptySpawn:  (tool, cwd)                    => ipcRenderer.invoke("pty-spawn", tool, cwd),
   ptyAttach: (sessionId)                    => ipcRenderer.invoke("pty-attach", sessionId),

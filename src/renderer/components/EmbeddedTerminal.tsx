@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { bindTerminalClipboard } from "../terminal/xterm-clipboard";
+import { bindTerminalLinks } from "../terminal/xterm-links";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
 
 interface Props {
@@ -124,6 +125,7 @@ export function EmbeddedTerminal({
       onClear: doClear,
       onRestart: onRestart,
     });
+    const unbindLinks = bindTerminalLinks(term);
 
     const pending: string[] = [];
     let opened = true;
@@ -293,6 +295,7 @@ export function EmbeddedTerminal({
       el.removeEventListener("pointerdown", onPointerDown);
       unregisterClear();
       unbindClipboard();
+      unbindLinks();
       ro.disconnect();
       term.dispose();
     };

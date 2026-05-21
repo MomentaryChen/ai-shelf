@@ -785,8 +785,42 @@ ipcMain.handle("sync-mcp", async (_event, opts: {
   return results;
 });
 
-ipcMain.handle("open-path", async (_event, filePath: string) => {
+function normalizeOpenPath(raw: string): string {
+  let p = raw.trim();
+  if (
+    (p.startsWith('"') && p.endsWith('"')) ||
+    (p.startsWith("'") && p.endsWith("'"))
+  ) {
+    p = p.slice(1, -1);
+  }
+  p = p.replace(/[,;:!?.)]+$/g, "");
+  if (/^file:\/\//i.test(p)) {
+    try {
+      const u = new URL(p);
+      p = decodeURIComponent(u.pathname);
+      if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+    } catch {
+      p = p.replace(/^file:\/\/\/?/i, "");
+    }
+  }
+  return p;
+}
+
+ipcMain.handle("open-path", async (_event, rawPath: string) => {
+  const filePath = normalizeOpenPath(rawPath);
+  if (!filePath) return;
   await shell.openPath(filePath);
+});
+
+ipcMain.handle("open-external", async (_event, url: string) => {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+  await shell.openExternal(url);
 });
 
 // --- PTY (In-App Terminal) ---
