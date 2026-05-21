@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { sanitizeReleaseNotesHtml } from "../utils/releaseNotesHtml";
 
 type Phase = "hidden" | "confirm" | "downloading" | "ready" | "error";
 
@@ -9,6 +10,11 @@ export function AppUpdateModal() {
   const [releaseNotes, setReleaseNotes] = useState<string | null>(null);
   const [percent, setPercent] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const releaseNotesHtml = useMemo(
+    () => (releaseNotes ? sanitizeReleaseNotesHtml(releaseNotes) : null),
+    [releaseNotes],
+  );
 
   const dismiss = useCallback(() => {
     if (phase === "downloading") return;
@@ -65,6 +71,15 @@ export function AppUpdateModal() {
     };
   }, [enabled]);
 
+  const onReleaseNotesClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const anchor = (e.target as HTMLElement).closest("a");
+    if (!anchor || !(anchor instanceof HTMLAnchorElement)) return;
+    const href = anchor.getAttribute("href");
+    if (!href || !/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    void window.api.openExternal(href);
+  };
+
   const startDownload = () => {
     setPhase("downloading");
     setPercent(0);
@@ -108,10 +123,12 @@ export function AppUpdateModal() {
               ) : null}
               . Download now?
             </p>
-            {releaseNotes && (
-              <pre className="mb-4 max-h-32 overflow-y-auto rounded-lg bg-bg-primary/60 p-3 text-xs whitespace-pre-wrap text-text-secondary">
-                {releaseNotes}
-              </pre>
+            {releaseNotesHtml && (
+              <div
+                className="release-notes mb-4 max-h-40 overflow-y-auto rounded-lg bg-bg-primary/60 p-3 text-xs text-text-secondary"
+                onClick={onReleaseNotesClick}
+                dangerouslySetInnerHTML={{ __html: releaseNotesHtml }}
+              />
             )}
             <div className="flex justify-end gap-2">
               <button
