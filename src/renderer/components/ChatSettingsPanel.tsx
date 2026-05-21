@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   BG_PRESETS,
+  DEFAULT_TERMINAL_FONT_FAMILY,
+  DEFAULT_TERMINAL_FONT_SIZE,
+  SCROLLBACK_PRESETS,
   TERMINAL_OPTIONS,
   getAppBg,
   bumpDirHistory,
@@ -172,7 +175,102 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         </div>
       </div>
 
+      {/* Terminal display */}
+      <div>
+        <p className={sectionTitle}>Terminal display</p>
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="mb-1.5 block text-[12px] text-text-secondary">Font family</label>
+            <input
+              type="text"
+              value={settings.terminalFontFamily}
+              onChange={(e) => updateSettings({ terminalFontFamily: e.target.value })}
+              spellCheck={false}
+              className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+              title={DEFAULT_TERMINAL_FONT_FAMILY}
+            />
+            <div className="mt-1.5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => updateSettings({ terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY })}
+                className="cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-text-primary"
+              >
+                Reset to default
+              </button>
+            </div>
+          </div>
 
+          <div>
+            <label className="mb-1.5 block text-[12px] text-text-secondary">
+              Font size ({settings.terminalFontSize}px)
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={8}
+                max={32}
+                step={1}
+                value={settings.terminalFontSize}
+                onChange={(e) => updateSettings({ terminalFontSize: Number(e.target.value) })}
+                className="min-w-0 flex-1 cursor-pointer accent-accent"
+              />
+              <input
+                type="number"
+                min={8}
+                max={32}
+                value={settings.terminalFontSize}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (Number.isFinite(n)) updateSettings({ terminalFontSize: n });
+                }}
+                className="w-14 shrink-0 rounded-lg border border-border bg-bg-secondary px-2 py-1.5 text-center font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => updateSettings({ terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE })}
+                className="shrink-0 cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-text-primary"
+              >
+                {DEFAULT_TERMINAL_FONT_SIZE}px
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12px] text-text-secondary">Scrollback</label>
+            <div className="flex flex-wrap gap-2">
+              {SCROLLBACK_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => updateSettings({ terminalScrollback: p.value })}
+                  className={`cursor-pointer rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
+                    settings.terminalScrollback === p.value
+                      ? "border-accent/60 bg-accent/10 font-medium text-accent"
+                      : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="number"
+                min={1000}
+                max={100000}
+                step={1000}
+                value={settings.terminalScrollback}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (Number.isFinite(n)) updateSettings({ terminalScrollback: n });
+                }}
+                className="w-28 rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+              />
+              <span className="text-[11px] text-text-tertiary">lines — open panes reload on change</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

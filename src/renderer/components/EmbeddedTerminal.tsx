@@ -11,7 +11,6 @@ import {
   jumpToSessionMatch,
   type ResolvedSessionMatch,
   SEARCH_DEBOUNCE_MS,
-  XTERM_SCROLLBACK_LINES,
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
@@ -20,6 +19,9 @@ import { TerminalFindBar } from "./TerminalFindBar";
 interface Props {
   sessionId: string;
   bg?: string;
+  fontFamily: string;
+  fontSize: number;
+  scrollback: number;
   active?: boolean;
   focused?: boolean;
   onExit: () => void;
@@ -52,6 +54,9 @@ function wheelLines(term: Terminal, ev: WheelEvent): number {
 export function EmbeddedTerminal({
   sessionId,
   bg,
+  fontFamily,
+  fontSize,
+  scrollback,
   active = true,
   focused = true,
   onExit,
@@ -271,13 +276,12 @@ export function EmbeddedTerminal({
         white: "#cccccc",
         brightWhite: "#f2f2f2",
       },
-      fontFamily:
-        "'CaskaydiaCove Nerd Font', 'CaskaydiaMono Nerd Font', 'Cascadia Code NF', 'FiraCode Nerd Font', 'JetBrainsMono Nerd Font', 'MesloLGS NF', 'Hack Nerd Font', 'Consolas', 'Courier New', monospace",
-      fontSize: 14,
+      fontFamily,
+      fontSize,
       lineHeight: 1.5,
       cursorBlink: true,
       cursorStyle: "block",
-      scrollback: XTERM_SCROLLBACK_LINES,
+      scrollback,
       scrollOnUserInput: false,
       smoothScrollDuration: 0,
       allowProposedApi: false,
@@ -479,7 +483,7 @@ export function EmbeddedTerminal({
       searchAddon.dispose();
       term.dispose();
     };
-  }, [sessionId, stableOnExit, bg, onRestart]);
+  }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback, onRestart]);
 
   useEffect(() => {
     if (!findOpen) return;
