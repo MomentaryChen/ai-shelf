@@ -453,6 +453,37 @@ ipcMain.handle("check-update", async () => {
   return { tools: results };
 });
 
+/** Re-detect one tool's installed version and npm latest (after a single-tool update). */
+ipcMain.handle("refresh-tool-update-info", async (_event, tool: string) => {
+  if (tool === "ai-shelf") {
+    const selfLatest = app.isPackaged ? await resolveDesktopSelfLatestVersion() : null;
+    return buildAiShelfSelfEntry(selfLatest);
+  }
+
+  const detected = await detectTool(tool, { quick: true });
+  if (!detected) return null;
+
+  const cfg = TOOL_UPDATE_COMMANDS[detected.tool] ?? TOOL_UPDATE_COMMANDS[tool];
+  const pkg = TOOL_NPM_PACKAGE[detected.tool] ?? TOOL_NPM_PACKAGE[tool];
+  const latestVersion = pkg
+    ? fetchLatestNpmVersion(pkg)
+    : (detected.version ?? null);
+
+  const cached = getCachedInventory();
+  if (cached) {
+    setInventoryCache(mergeInventoryEntry(cached, detected));
+  }
+
+  return {
+    tool: detected.tool,
+    label: cfg?.label ?? detected.provider,
+    currentVersion: detected.version ?? null,
+    latestVersion,
+    available: detected.available,
+    updateCommand: cfg ? cfg.update.join(" ") : "",
+  };
+});
+
 /** Returns tool list with current versions immediately (no npm checks). */
 ipcMain.handle("get-tools-list", async () => {
   const results: {
@@ -582,7 +613,9 @@ ipcMain.handle("run-update", async (_event, tool: string) => {
 
   const cliPath = join(import.meta.dirname, "..", "cli.js");
   const cliArg = tool === "ai-shelf" ? "self" : tool;
-  const result = await run("node", [cliPath, "update", cliArg], 60_000);
+  const result = await run(process.execPath, [cliPath, "update", cliArg], 60_000, {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+  });
   if (result.ok) {
     return { success: true, message: result.stdout || "Update completed" };
   }
@@ -653,7 +686,9 @@ async function resolveDesktopSelfLatestVersion(): Promise<string | null> {
 ipcMain.handle("get-self-info", () => {
   let version = "unknown";
   try { version = app.getVersion(); } catch { /* ok */ }
-  const git = readGitBuildInfo(app.getAppPath());
+  const git = app.isPackaged
+    ? { branch: null, commitShort: null, dirty: false }
+    : readGitBuildInfo(app.getAppPath());
   return {
     version,
     updateCommand: app.isPackaged ? "" : detectSelfUpdateCmd(),

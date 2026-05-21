@@ -51,3 +51,8 @@ export const TOOL_NPM_PACKAGE: Record<string, string> = {
   codex: "@openai/codex",
   gemini: "@google/gemini-cli",
 };
+
+/** Tools without an npm registry entry — latest is inferred after a successful update check. */
+export function toolHasNpmLatest(tool: string): boolean {
+  return tool in TOOL_NPM_PACKAGE;
+}
