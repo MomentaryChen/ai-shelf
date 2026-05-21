@@ -1,7 +1,7 @@
 {
   "name": "ai-shelf-workspace",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "AI Shelf monorepo — inventory, workspace orchestration, and desktop app",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -43,6 +43,11 @@
       "dist/**/*",
       "src/assets/icon.ico"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "MomentaryChen",
+      "repo": "ai-shelf"
+    },
     "win": {
       "target": [
         {
@@ -55,6 +60,7 @@
       "icon": "src/assets/icon.ico"
     },
     "nsis": {
+      "guid": "com.ai-shelf",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
@@ -109,8 +115,10 @@
     "@xterm/addon-clipboard": "^0.2.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
+    "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0",
     "ai-shelf": "workspace:*",
+    "electron-updater": "^6.8.3",
     "node-pty": "^1.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"

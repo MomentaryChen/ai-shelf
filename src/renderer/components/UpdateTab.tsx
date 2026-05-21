@@ -64,7 +64,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
     try {
       const res = await window.api.runUpdate(tool);
       setResults((prev) => ({ ...prev, [tool]: res }));
-      if (res.success) await runCheck();
+      if (res.success && tool !== "ai-shelf") await runCheck();
     } catch {
       setResults((prev) => ({
         ...prev,
@@ -130,7 +130,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
         <ToolUpdateCard
           key={t.tool}
           tool={t}
-          isChecking={checking && t.latestVersion == null && t.tool !== "ai-shelf"}
+          isChecking={checking && t.latestVersion == null}
           isUpdating={updating[t.tool] ?? false}
           result={results[t.tool]}
           onUpdate={() => void handleUpdate(t.tool)}
@@ -205,7 +205,13 @@ function ToolUpdateCard({
           </div>
         )}
 
-        {t.available && t.updateCommand && !isChecking && (
+        {t.desktopUpdate && !t.updateCommand && (
+          <p className="text-xs text-text-secondary">
+            Installed desktop app — updates download from GitHub Releases and install on restart.
+          </p>
+        )}
+
+        {t.available && (t.updateCommand || t.desktopUpdate) && !isChecking && (
           isUpToDate ? (
             <div className="flex items-center gap-2 text-sm text-ok">
               <span>✅</span>
@@ -217,7 +223,11 @@ function ToolUpdateCard({
               disabled={isUpdating}
               className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent transition-all hover:bg-accent/25 disabled:opacity-50"
             >
-              {isUpdating ? "⏳ Updating…" : "⬆️ Update"}
+              {isUpdating
+                ? "⏳ Updating…"
+                : t.desktopUpdate
+                  ? "⬆️ Download & upgrade desktop"
+                  : "⬆️ Update"}
             </button>
           )
         )}

@@ -9,6 +9,7 @@ import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
+import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
   collectPanes,
   findPane,
@@ -381,6 +382,15 @@ export function ChatTab({
     ],
   );
 
+  const clearPaneScreen = useCallback(
+    (paneId: string) => {
+      const pane = layout ? findPane(layout, paneId) : null;
+      if (!pane) return;
+      clearTerminalSession(pane.sessionId);
+    },
+    [layout],
+  );
+
   const closePane = useCallback((paneId: string) => {
     setLayout((prev) => {
       if (prev) {
@@ -411,6 +421,8 @@ export function ChatTab({
     enabled: active && layout !== null && !profileBusy && !restoring,
     onFocusPane: setFocusedPaneId,
     onClosePane: closePane,
+    onClearPane: clearPaneScreen,
+    onRestartPane: (id) => void respawnPane(id),
     onSplitPane: (id, dir) => void splitPane(id, dir),
   });
 
@@ -573,6 +585,7 @@ export function ChatTab({
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onSessionLost={() => void respawnPane(pane.id)}
+            onRestart={() => void respawnPane(pane.id)}
             onExit={() => closePane(pane.id)}
           />
         )}
@@ -597,10 +610,13 @@ export function ChatTab({
           <p className="mt-2 text-[11px] text-[#505050]">
             窗格快捷鍵：<kbd className="rounded border border-[#333] px-1">Ctrl+Tab</kbd> 切換、{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+W</kbd> 關閉、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+L</kbd> 清屏、{" "}
+            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+R</kbd> 重啟 session、{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+\\</kbd> /{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+\\</kbd> 分割、{" "}
             <kbd className="rounded border border-[#333] px-1">Ctrl+1–9</kbd> 跳至第 N 窗格、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+F</kbd> 搜尋輸出
+            <kbd className="rounded border border-[#333] px-1">Ctrl+F</kbd> 搜尋輸出。
+            右鍵選單亦可清屏／重啟。
           </p>
           <p className="mt-1 text-[11px] text-[#505050]">
             除錯：按 <kbd className="rounded border border-[#333] px-1">F12</kbd> 或{" "}

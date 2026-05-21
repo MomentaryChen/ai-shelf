@@ -13,8 +13,17 @@ body,
   width: 100%;
 }
 
+.xterm .xterm-scrollable-element {
+  height: 100%;
+}
+
 .xterm .xterm-screen {
   width: 100% !important;
+}
+
+/* Clickable paths / URLs (Ctrl+click / Cmd+click) */
+.xterm .xterm-link {
+  cursor: pointer;
 }
 
 /* Profile sidebar — live session indicator */
