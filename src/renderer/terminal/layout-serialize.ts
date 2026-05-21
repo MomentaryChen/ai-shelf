@@ -73,8 +73,7 @@ export function deserializeLayout(
   return build(serialized);
 }
 
-/** Build a simple horizontal strip when no layout tree was saved. */
-export function buildHorizontalLayout(panes: PaneInfo[]): LayoutNode | null {
+function buildStripLayout(panes: PaneInfo[], direction: SplitDirection): LayoutNode | null {
   if (panes.length === 0) return null;
   if (panes.length === 1) return { kind: "pane", pane: panes[0]! };
   let root: LayoutNode = { kind: "pane", pane: panes[0]! };
@@ -82,11 +81,21 @@ export function buildHorizontalLayout(panes: PaneInfo[]): LayoutNode | null {
     root = {
       kind: "split",
       id: newSplitId(),
-      direction: "horizontal",
+      direction,
       ratio: i / (i + 1),
       first: root,
       second: { kind: "pane", pane: panes[i]! },
     };
   }
   return root;
+}
+
+/** Build a simple horizontal strip when no layout tree was saved. */
+export function buildHorizontalLayout(panes: PaneInfo[]): LayoutNode | null {
+  return buildStripLayout(panes, "horizontal");
+}
+
+/** Build a simple vertical stack (top-to-bottom pane order). */
+export function buildVerticalLayout(panes: PaneInfo[]): LayoutNode | null {
+  return buildStripLayout(panes, "vertical");
 }

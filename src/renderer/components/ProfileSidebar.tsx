@@ -20,6 +20,8 @@ import {
   profileSessionRowStyle,
   profileSessionsWellStyle,
 } from "../utils/profile-colors";
+import { hitPaneDropZone1D, type PaneDropZone } from "../terminal/pane-drop-zone";
+import { reorderById } from "../utils/reorder-by-id";
 import {
   Chevron,
   DragHandle,
@@ -42,6 +44,7 @@ interface Props {
   onSelectPane: (profile: ProfileInfo, paneId: string) => void;
   onClosePane: (profileId: string, paneId: string) => void;
   onRenamePane?: (profileId: string, paneId: string, title: string) => void;
+  onMovePane?: (profileId: string, dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onAddTerminal: (profile: ProfileInfo) => void;
   onOpenFolder?: (profile: ProfileInfo) => void;
   addingTerminal?: boolean;
@@ -65,6 +68,7 @@ export function ProfileSidebar({
   onSelectPane,
   onClosePane,
   onRenamePane,
+  onMovePane,
   onAddTerminal,
   onOpenFolder,
   addingTerminal = false,
@@ -82,6 +86,9 @@ export function ProfileSidebar({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
+  const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
+  const [paneDropZone, setPaneDropZone] = useState<"above" | "below" | null>(null);
 
   const settingsProfile = useMemo(
     () => tree?.profiles.find((p) => p.id === settingsProfileId) ?? null,
@@ -147,16 +154,28 @@ export function ProfileSidebar({
     });
   }
 
-  async function handleReorder(dragId: string, dropId: string) {
-    if (!tree || dragId === dropId) return;
-    const ids = tree.profiles.map((p) => p.id);
-    const from = ids.indexOf(dragId);
-    const to = ids.indexOf(dropId);
-    if (from < 0 || to < 0) return;
+  function handlePaneMove(
+    profileId: string,
+    dragId: string,
+    targetId: string,
+    zone: PaneDropZone,
+  ) {
+    if (!onMovePane || dragId === targetId) return;
+    onMovePane(profileId, dragId, targetId, zone);
+  }
 
-    const nextIds = [...ids];
-    nextIds.splice(from, 1);
-    nextIds.splice(to, 0, dragId);
+  function clearPaneDrag() {
+    setDraggingPaneId(null);
+    setDragOverPaneId(null);
+    setPaneDropZone(null);
+  }
+
+  async function handleReorder(dragId: string, dropId: string) {
+    if (!tree) return;
+    const reordered = reorderById(tree.profiles, dragId, dropId, (p) => p.id);
+    if (!reordered) return;
+
+    const nextIds = reordered.map((p) => p.id);
     const prevTree = tree;
     reorderLocalProfiles(nextIds);
     setBusy(true);
@@ -335,6 +354,8 @@ export function ProfileSidebar({
                   ? []
                   : profile.terminals;
             const sessionCount = listedSessions.length;
+            const canReorderPanes =
+              canReorder && isActive && profilePanes.length > 1 && Boolean(onMovePane);
             const accent = profile.accentColor;
             const hasAccent = Boolean(accent);
             const accentDefault = profileAccentOrDefault(accent);
@@ -495,15 +516,73 @@ export function ProfileSidebar({
                       const canRename = Boolean(isActive && isLive && isPaneInfo && onRenamePane);
 
                       return (
-                        <button
+                        <div
                           key={isLive ? paneId : `${tool}-${i}`}
+                          className={`relative flex min-h-[32px] items-center gap-0.5 rounded-lg transition-all duration-150 ${
+                            dragOverPaneId === paneId && draggingPaneId !== paneId
+                              ? "ring-2 ring-[#7eb6ff]/35"
+                              : draggingPaneId === paneId
+                                ? "opacity-45 scale-[0.99]"
+                                : ""
+                          }`}
+                          onDragOver={(e) => {
+                            if (!canReorderPanes || !draggingPaneId || !isPaneInfo) return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setPaneDropZone(hitPaneDropZone1D(e.clientY, rect));
+                            setDragOverPaneId(paneId);
+                          }}
+                          onDragLeave={(e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                              if (dragOverPaneId === paneId) {
+                                setDragOverPaneId(null);
+                                setPaneDropZone(null);
+                              }
+                            }
+                          }}
+                          onDrop={(e) => {
+                            if (!canReorderPanes || !draggingPaneId || !isPaneInfo) return;
+                            e.preventDefault();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const zone = hitPaneDropZone1D(e.clientY, rect);
+                            handlePaneMove(profile.id, draggingPaneId, paneId, zone);
+                            clearPaneDrag();
+                          }}
+                        >
+                          {dragOverPaneId === paneId &&
+                            draggingPaneId !== paneId &&
+                            paneDropZone && (
+                              <span
+                                className={`pointer-events-none absolute left-1 right-1 h-0.5 rounded-full bg-[#7eb6ff] ${
+                                  paneDropZone === "above" ? "top-0" : "bottom-0"
+                                }`}
+                                aria-hidden
+                              />
+                            )}
+                          {canReorderPanes && isPaneInfo && (
+                            <span
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggingPaneId(paneId);
+                                e.dataTransfer.effectAllowed = "move";
+                              }}
+                              onDragEnd={clearPaneDrag}
+                              className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
+                              title="拖曳到目標上方或下方"
+                              aria-label="拖曳到目標上方或下方"
+                            >
+                              <DragHandle />
+                            </span>
+                          )}
+                        <button
                           type="button"
                           onClick={() => {
                             if (isLive) onSelectPane(profile, paneId);
                             else void onActivateProfile(profile);
                           }}
                           style={profileSessionRowStyle(accent, selected)}
-                          className={`group/session flex min-h-[32px] w-full cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left text-[11px] transition-colors ${
+                          className={`group/session flex min-h-[32px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left text-[11px] transition-colors ${
                             selected
                               ? "font-medium text-[#f4f4f6]"
                               : "text-[#8b8b92] hover:bg-white/[0.04] hover:text-[#d4d4d8]"
@@ -571,6 +650,7 @@ export function ProfileSidebar({
                             </span>
                           )}
                         </button>
+                        </div>
                       );
                     })}
 

@@ -15,6 +15,7 @@ import {
   findPane,
   mapPanesInTree,
   removePaneFromTree,
+  movePaneInTree,
   splitPaneInTree,
   updateSplitRatio,
   type LayoutNode,
@@ -516,6 +517,9 @@ export function ChatTab({
       }}
       onClosePane={(_profileId, paneId) => closePane(paneId)}
       onRenamePane={(_profileId, paneId, title) => renamePane(paneId, title)}
+      onMovePane={(_profileId, dragPaneId, targetPaneId, zone) => {
+        setLayout((prev) => (prev ? movePaneInTree(prev, dragPaneId, targetPaneId, zone) : prev));
+      }}
       onAddTerminal={(profile) => void handleNewTerminal(profile)}
       onOpenFolder={(profile) => {
         void (async () => {
@@ -579,6 +583,9 @@ export function ChatTab({
         onResizeSplit={(splitId, ratio) =>
           setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
         }
+        onMovePane={(dragPaneId, targetPaneId, zone) => {
+          setLayout((prev) => (prev ? movePaneInTree(prev, dragPaneId, targetPaneId, zone) : prev));
+        }}
         renderTerminal={(pane, paneFocused) => (
           <EmbeddedTerminal
             key={pane.sessionId}

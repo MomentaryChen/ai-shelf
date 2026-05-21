@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
+import { DragHandle } from "./ProfileSidebarUI";
 import { paneDisplayLabel, paneMatchesQuery } from "../utils/pane-label";
 import type { PaneInfo } from "../terminal/split-tree";
 
@@ -10,6 +11,7 @@ interface Props {
   onSelectPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
   onRenamePane?: (paneId: string, title: string) => void;
+  onReorderPanes?: (dragPaneId: string, dropPaneId: string) => void;
   onNewSession: () => void;
   workspaceSlot?: ReactNode;
 }
@@ -20,16 +22,21 @@ export function TerminalSessionSidebar({
   onSelectPane,
   onClosePane,
   onRenamePane,
+  onReorderPanes,
   onNewSession,
   workspaceSlot,
 }: Props) {
   const [query, setQuery] = useState("");
+  const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
+  const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return panes;
     return panes.filter((p) => paneMatchesQuery(p, q));
   }, [panes, query]);
+
+  const canReorderPanes = !query.trim() && panes.length > 1 && Boolean(onReorderPanes);
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#1f1f1f] bg-[#0a0a0a]">
@@ -52,11 +59,54 @@ export function TerminalSessionSidebar({
         {filtered.map((pane) => {
           const active = focusedPaneId === pane.id;
           return (
-            <button
+            <div
               key={pane.id}
+              className={`mb-0.5 flex min-h-[32px] items-center gap-0.5 rounded-lg transition-all duration-150 ${
+                dragOverPaneId === pane.id && draggingPaneId !== pane.id
+                  ? "ring-2 ring-[#7eb6ff]/35"
+                  : draggingPaneId === pane.id
+                    ? "opacity-45 scale-[0.99]"
+                    : ""
+              }`}
+              onDragOver={(e) => {
+                if (!canReorderPanes || !draggingPaneId) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDragOverPaneId(pane.id);
+              }}
+              onDragLeave={() => {
+                if (dragOverPaneId === pane.id) setDragOverPaneId(null);
+              }}
+              onDrop={(e) => {
+                if (!canReorderPanes || !draggingPaneId) return;
+                e.preventDefault();
+                onReorderPanes!(draggingPaneId, pane.id);
+                setDraggingPaneId(null);
+                setDragOverPaneId(null);
+              }}
+            >
+              {canReorderPanes && (
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggingPaneId(pane.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={() => {
+                    setDraggingPaneId(null);
+                    setDragOverPaneId(null);
+                  }}
+                  className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
+                  title="拖曳以調整順序"
+                  aria-label="拖曳以調整順序"
+                >
+                  <DragHandle />
+                </span>
+              )}
+            <button
               type="button"
               onClick={() => onSelectPane(pane.id)}
-              className={`mb-0.5 flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors ${
+              className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors ${
                 active ? "bg-[#1f1f1f] text-[#f0f0f0]" : "text-[#a0a0a0] hover:bg-[#151515]"
               }`}
             >
@@ -89,6 +139,7 @@ export function TerminalSessionSidebar({
                 ✕
               </span>
             </button>
+            </div>
           );
         })}
 

@@ -1,9 +1,12 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
+import { DragHandle } from "./ProfileSidebarUI";
+import { PaneDropOverlay } from "./PaneDropOverlay";
 import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
-import type { LayoutNode, PaneInfo, SplitDirection } from "../terminal/split-tree";
+import { hitPaneDropZone, type PaneDropZone } from "../terminal/pane-drop-zone";
+import { collectPanes, type LayoutNode, type PaneInfo, type SplitDirection } from "../terminal/split-tree";
 import { formatPaneCwdShort } from "../utils/pane-cwd";
 import {
   profilePaneChromeStyle,
@@ -27,11 +30,44 @@ interface Props {
   onResizeSplit: (splitId: string, ratio: number) => void;
   onRenamePane?: (paneId: string, title: string) => void;
   onPaneCwdClick?: (paneId: string) => void;
+  onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
 }
 
-export function SplitPaneLayout({
+type PaneDragState = {
+  draggingPaneId: string | null;
+  dragOverPaneId: string | null;
+  dropZone: PaneDropZone | null;
+  canReorder: boolean;
+  setDraggingPaneId: (id: string | null) => void;
+  setDragOverPaneId: (id: string | null) => void;
+  setDropZone: (zone: PaneDropZone | null) => void;
+  onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
+};
+
+export function SplitPaneLayout(props: Props) {
+  const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
+  const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
+  const [dropZone, setDropZone] = useState<PaneDropZone | null>(null);
+  const paneCount = collectPanes(props.node).length;
+  const canReorder = paneCount > 1 && Boolean(props.onMovePane);
+
+  const drag: PaneDragState = {
+    draggingPaneId,
+    dragOverPaneId,
+    dropZone,
+    canReorder,
+    setDraggingPaneId,
+    setDragOverPaneId,
+    setDropZone,
+    onMovePane: props.onMovePane,
+  };
+
+  return <SplitPaneLayoutInner {...props} drag={drag} />;
+}
+
+function SplitPaneLayoutInner({
   node,
   focusedPaneId,
   bg,
@@ -43,7 +79,8 @@ export function SplitPaneLayout({
   onPaneCwdClick,
   renderTerminal,
   profileAccentColor = null,
-}: Props) {
+  drag,
+}: Props & { drag: PaneDragState }) {
   if (node.kind === "pane") {
     const focused = focusedPaneId === node.pane.id;
     return (
@@ -54,6 +91,7 @@ export function SplitPaneLayout({
           focused={focused}
           bg={bg}
           profileAccentColor={profileAccentColor}
+          drag={drag}
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
           onSplit={(dir) => onSplitPane(node.pane.id, dir)}
@@ -82,7 +120,7 @@ export function SplitPaneLayout({
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
         style={{ flex: `${ratio} 1 0px` }}
       >
-        <SplitPaneLayout
+        <SplitPaneLayoutInner
           node={node.first}
           focusedPaneId={focusedPaneId}
           bg={bg}
@@ -94,6 +132,7 @@ export function SplitPaneLayout({
           onPaneCwdClick={onPaneCwdClick}
           renderTerminal={renderTerminal}
           profileAccentColor={profileAccentColor}
+          drag={drag}
         />
       </div>
 
@@ -112,7 +151,7 @@ export function SplitPaneLayout({
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
         style={{ flex: `${rest} 1 0px` }}
       >
-        <SplitPaneLayout
+        <SplitPaneLayoutInner
           node={node.second}
           focusedPaneId={focusedPaneId}
           bg={bg}
@@ -124,6 +163,7 @@ export function SplitPaneLayout({
           onPaneCwdClick={onPaneCwdClick}
           renderTerminal={renderTerminal}
           profileAccentColor={profileAccentColor}
+          drag={drag}
         />
       </div>
     </div>
@@ -135,6 +175,7 @@ function WarpPaneShell({
   focused,
   bg,
   profileAccentColor,
+  drag,
   onFocus,
   onClose,
   onSplit,
@@ -146,6 +187,7 @@ function WarpPaneShell({
   focused: boolean;
   bg: string;
   profileAccentColor?: string | null;
+  drag: PaneDragState;
   onFocus: () => void;
   onClose: () => void;
   onSplit: (dir: SplitDirection) => void;
@@ -157,19 +199,90 @@ function WarpPaneShell({
   const chromeStyle = profilePaneChromeStyle(profileAccentColor, focused);
   const headerStyle = profilePaneHeaderStyle(profileAccentColor, focused);
   const dotStyle = profilePaneHeaderDotStyle(profileAccentColor);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const {
+    draggingPaneId,
+    dragOverPaneId,
+    dropZone,
+    canReorder,
+    setDraggingPaneId,
+    setDragOverPaneId,
+    setDropZone,
+    onMovePane,
+  } = drag;
+  const isDragOver = dragOverPaneId === pane.id && draggingPaneId !== pane.id;
+  const isDragging = draggingPaneId === pane.id;
+
+  function clearDrag() {
+    setDraggingPaneId(null);
+    setDragOverPaneId(null);
+    setDropZone(null);
+  }
 
   return (
     <div
-      className={`group/pane flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
-        focused && !profileAccentColor ? "border-[#3d3d42] ring-1 ring-white/[0.08]" : "border-[#1a1a1e]"
+      ref={shellRef}
+      className={`group/pane relative flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
+        isDragOver
+          ? "ring-2 ring-[#7eb6ff]/35"
+          : isDragging
+            ? "opacity-45 scale-[0.99]"
+            : focused && !profileAccentColor
+              ? "border-[#3d3d42] ring-1 ring-white/[0.08]"
+              : "border-[#1a1a1e]"
       }`}
       style={{ background: bg, ...chromeStyle }}
       onMouseDown={onFocus}
+      onDragOver={(e) => {
+        if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+        const rect = shellRef.current?.getBoundingClientRect();
+        if (rect) {
+          setDropZone(hitPaneDropZone(e.clientX, e.clientY, rect));
+        }
+        setDragOverPaneId(pane.id);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          if (dragOverPaneId === pane.id) {
+            setDragOverPaneId(null);
+            setDropZone(null);
+          }
+        }
+      }}
+      onDrop={(e) => {
+        if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = shellRef.current?.getBoundingClientRect();
+        const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "swap";
+        onMovePane?.(draggingPaneId, pane.id, zone);
+        clearDrag();
+      }}
     >
       <div
-        className="flex h-9 shrink-0 items-center gap-2 border-b px-2.5"
+        className="flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
         style={headerStyle}
       >
+        {canReorder && (
+          <span
+            draggable
+            onMouseDown={(e) => e.stopPropagation()}
+            onDragStart={(e) => {
+              e.stopPropagation();
+              setDraggingPaneId(pane.id);
+              e.dataTransfer.effectAllowed = "move";
+            }}
+            onDragEnd={clearDrag}
+            className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
+            title="拖曳到窗格上／下／左／右，中央為交換"
+            aria-label="拖曳到窗格上／下／左／右，中央為交換"
+          >
+            <DragHandle />
+          </span>
+        )}
         {focused && (
           <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={dotStyle} aria-hidden />
         )}
@@ -225,7 +338,10 @@ function WarpPaneShell({
           ✕
         </button>
       </div>
-      <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {isDragOver && dropZone && <PaneDropOverlay zone={dropZone} />}
+        {children}
+      </div>
     </div>
   );
 }
