@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 GitHub Releases use the matching `## [x.y.z]` section here as the release description (see `scripts/release-notes.mjs` and `.github/workflows/release.yml`).
 
+## [1.1.1] - 2026-05-21
+
+Hotfix for packaged desktop startup crash when loading in-app auto-update.
+
+### Fixed
+
+- **Desktop startup crash** — `electron-updater` is CommonJS; use default import so `autoUpdater` loads correctly under project ESM (`type: module`)
+
 ## [1.1.0] - 2026-05-21
 
 Terminal UX improvements, version badge in the UI, and in-app desktop auto-update.
@@ -83,5 +91,6 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[1.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.1
 [1.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.0.0

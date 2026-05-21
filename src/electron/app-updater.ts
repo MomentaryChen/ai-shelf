@@ -1,5 +1,7 @@
 import { app, type BrowserWindow } from "electron";
-import { autoUpdater } from "electron-updater";
+import electronUpdater from "electron-updater";
+
+const { autoUpdater } = electronUpdater;
 
 export type AppUpdateStatus =
   | "idle"
