@@ -75,6 +75,18 @@ Typical worktree flow:
 
 Pane `cwd` values persist in the profile snapshot; switching profiles restores each pane’s directory independently.
 
+## Terminal pane: 清屏 / 重啟 session
+
+| Action | Shortcut | Context menu |
+|--------|----------|----------------|
+| **清屏** | `Ctrl+L` | 清屏 |
+| **重啟 session** | `Ctrl+Shift+R` | 重啟 session |
+
+- **清屏** clears the xterm scrollback and sends form-feed (`\x0c`) to the shell (same as most terminals’ clear).
+- **重啟 session** kills the pane’s PTY and respawns with the same tool, cwd, and custom title (layout pane id unchanged).
+
+Right-click inside a terminal pane, or use shortcuts while the pane (or its xterm) is focused.
+
 ## Remove worktree safely
 
 1. Ensure no uncommitted work the user needs (or they approved discard).

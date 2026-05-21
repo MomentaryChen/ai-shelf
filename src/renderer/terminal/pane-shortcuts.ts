@@ -5,6 +5,8 @@ export type PaneShortcutAction =
   | { type: "focus-prev" }
   | { type: "focus-index"; index: number }
   | { type: "close" }
+  | { type: "clear-screen" }
+  | { type: "restart-session" }
   | { type: "split"; direction: "horizontal" | "vertical" };
 
 function hasMod(ev: KeyboardEvent): boolean {
@@ -25,7 +27,15 @@ function applyPaneShortcutAction(
   action: PaneShortcutAction,
   h: PaneShortcutHandlers,
 ): void {
-  const { panes, focusedPaneId, onFocusPane, onClosePane, onSplitPane } = h;
+  const {
+    panes,
+    focusedPaneId,
+    onFocusPane,
+    onClosePane,
+    onSplitPane,
+    onClearPane,
+    onRestartPane,
+  } = h;
   if (panes.length === 0) return;
 
   const focusId = focusedPaneId ?? panes[0]!.id;
@@ -49,6 +59,12 @@ function applyPaneShortcutAction(
     case "close":
       onClosePane(focusId);
       break;
+    case "clear-screen":
+      onClearPane?.(focusId);
+      break;
+    case "restart-session":
+      onRestartPane?.(focusId);
+      break;
     case "split":
       onSplitPane(focusId, action.direction);
       break;
@@ -61,6 +77,8 @@ export interface PaneShortcutHandlers {
   enabled?: boolean;
   onFocusPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
+  onClearPane?: (paneId: string) => void;
+  onRestartPane?: (paneId: string) => void;
   onSplitPane: (paneId: string, direction: "horizontal" | "vertical") => void;
 }
 
@@ -88,6 +106,13 @@ export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null 
 
   if (!ev.shiftKey && key === "w") {
     return { type: "close" };
+  }
+
+  if (!ev.shiftKey && key === "l") {
+    return { type: "clear-screen" };
+  }
+  if (ev.shiftKey && key === "r") {
+    return { type: "restart-session" };
   }
 
   if (!ev.shiftKey && (key === "\\" || key === "|")) {
