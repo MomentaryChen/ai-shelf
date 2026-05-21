@@ -32,7 +32,12 @@ export function AppVersionBadge({ className = "" }: { className?: string }) {
       title={title}
     >
       v{__APP_VERSION__}
-      {gitLabel && <span className="text-text-secondary/80"> · {gitLabel}</span>}
+      {gitLabel && (
+        <span className="text-text-secondary/80" title="Dev build: current git branch (hidden in packaged app)">
+          {" "}
+          · {gitLabel}
+        </span>
+      )}
     </span>
   );
 }

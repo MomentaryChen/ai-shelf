@@ -19,7 +19,8 @@ function gitOutput(repoRoot: string, args: string[]): string | null {
 }
 
 /** Best-effort git metadata for build / dev identification (e.g. worktree branch). */
-export function readGitBuildInfo(repoRoot: string): GitBuildInfo {
+export function readGitBuildInfo(startDir: string): GitBuildInfo {
+  const repoRoot = gitOutput(startDir, ["rev-parse", "--show-toplevel"]) ?? startDir;
   const branch = gitOutput(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
   const commitShort = gitOutput(repoRoot, ["rev-parse", "--short", "HEAD"]);
   const status = gitOutput(repoRoot, ["status", "--porcelain"]);

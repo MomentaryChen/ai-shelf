@@ -217,7 +217,8 @@ export interface ElectronAPI {
   onAppUpdateDownloaded: (cb: (payload: { version: string | null }) => void) => () => void;
   onAppUpdateError: (cb: (payload: { message: string }) => void) => () => void;
   getToolsList: () => Promise<UpdateCheckResult>;
-  checkToolLatest: (tool: string) => Promise<{ tool: string; latestVersion: string | null }>;
+  checkToolLatest: (tool: string) => Promise<ToolUpdateInfo | null>;
+  refreshToolUpdateInfo: (tool: string) => Promise<ToolUpdateInfo | null>;
   startUpdateScan: () => Promise<void>;
   onToolDetected: (cb: (data: ToolUpdateInfo) => void) => void;
   onToolLatest: (cb: (data: { tool: string; latestVersion: string | null }) => void) => void;

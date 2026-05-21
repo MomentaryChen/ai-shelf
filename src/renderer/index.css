@@ -38,6 +38,30 @@ body,
   animation: profile-live-pulse 2s ease-in-out infinite;
 }
 
+/* Dark-themed scrollbars (inventory / settings overflow areas) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) var(--color-bg-secondary);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 @theme {
   --color-bg-primary: #0f172a;
   --color-bg-secondary: #1e293b;

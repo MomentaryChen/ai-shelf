@@ -1,58 +1,143 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProviderEntry, ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { toolIcon, toolLabel } from "../utils";
+import { toolHasNpmLatest } from "../../tools.js";
 import { versionsEqual } from "../../utils/version.js";
 
+/** Cursor / Aider / OpenCode etc. — `agent update` reports already current. */
+function updateMessageIndicatesUpToDate(message: string): boolean {
+  return /already up to date|no update available|nothing to update|已是最新/i.test(message);
+}
+
+/** For tools without npm registry, treat current as latest after a successful update. */
+function effectiveLatestVersion(
+  tool: string,
+  currentVersion: string | null,
+  latestVersion: string | null,
+  syncedAfterUpdate?: boolean,
+): string | null {
+  if (latestVersion != null) return latestVersion;
+  if (syncedAfterUpdate && !toolHasNpmLatest(tool) && currentVersion) return currentVersion;
+  return null;
+}
+
 type UpdateMeta = Record<string, { latestVersion: string | null; updateCommand: string }>;
+
+function applyCheckResult(
+  tools: ToolUpdateInfo[],
+  setMeta: Dispatch<SetStateAction<UpdateMeta>>,
+  setSelfTool: Dispatch<SetStateAction<ToolUpdateInfo | null>>,
+  setVersionOverrides: Dispatch<SetStateAction<Record<string, string | null>>>,
+) {
+  const nextMeta: UpdateMeta = {};
+  let self: ToolUpdateInfo | null = null;
+  const versions: Record<string, string | null> = {};
+  for (const t of tools) {
+    if (t.tool === "ai-shelf") {
+      self = t;
+      versions["ai-shelf"] = t.currentVersion;
+    } else {
+      nextMeta[t.tool] = {
+        latestVersion: t.latestVersion,
+        updateCommand: t.updateCommand,
+      };
+      versions[t.tool] = t.currentVersion;
+    }
+  }
+  setMeta(nextMeta);
+  setSelfTool(self);
+  setVersionOverrides(versions);
+}
 
 export function UpdateTab({ data }: { data: ProviderEntry[] }) {
   const [meta, setMeta] = useState<UpdateMeta>({});
   const [selfTool, setSelfTool] = useState<ToolUpdateInfo | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [versionOverrides, setVersionOverrides] = useState<Record<string, string | null>>({});
+  const [checkingAll, setCheckingAll] = useState(true);
+  const [checkingTools, setCheckingTools] = useState<Record<string, boolean>>({});
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, { success: boolean; message: string }>>({});
 
-  const runCheck = useCallback(async () => {
-    setChecking(true);
-    setResults({});
+  const runCheckAll = useCallback(async (clearResults = true) => {
+    setCheckingAll(true);
+    if (clearResults) setResults({});
     try {
       const { tools } = await window.api.checkUpdate();
-      const nextMeta: UpdateMeta = {};
-      let self: ToolUpdateInfo | null = null;
-      for (const t of tools) {
-        if (t.tool === "ai-shelf") {
-          self = t;
-        } else {
-          nextMeta[t.tool] = {
-            latestVersion: t.latestVersion,
-            updateCommand: t.updateCommand,
-          };
-        }
-      }
-      setMeta(nextMeta);
-      setSelfTool(self);
+      applyCheckResult(tools, setMeta, setSelfTool, setVersionOverrides);
     } finally {
-      setChecking(false);
+      setCheckingAll(false);
+    }
+  }, []);
+
+  const refreshOneTool = useCallback(async (tool: string) => {
+    setCheckingTools((prev) => ({ ...prev, [tool]: true }));
+    try {
+      const info = await window.api.refreshToolUpdateInfo(tool);
+      if (!info) return;
+      if (info.tool === "ai-shelf") {
+        setSelfTool(info);
+        setVersionOverrides((prev) => ({ ...prev, "ai-shelf": info.currentVersion }));
+      } else {
+        const latest = effectiveLatestVersion(
+          info.tool,
+          info.currentVersion,
+          info.latestVersion,
+          true,
+        );
+        setMeta((prev) => ({
+          ...prev,
+          [info.tool]: {
+            latestVersion: latest,
+            updateCommand: info.updateCommand,
+          },
+        }));
+        setVersionOverrides((prev) => ({ ...prev, [info.tool]: info.currentVersion }));
+      }
+    } finally {
+      setCheckingTools((prev) => {
+        const next = { ...prev };
+        delete next[tool];
+        return next;
+      });
     }
   }, []);
 
   useEffect(() => {
-    void runCheck();
-  }, [runCheck, data]);
+    void runCheckAll(false);
+  }, [runCheckAll]);
 
   const tools = useMemo((): ToolUpdateInfo[] => {
-    const fromInventory = data.map((e) => ({
-      tool: e.tool,
-      label: toolLabel(e.tool),
-      currentVersion: e.version ?? null,
-      latestVersion: meta[e.tool]?.latestVersion ?? null,
-      available: e.available,
-      updateCommand: meta[e.tool]?.updateCommand ?? "",
-    }));
-    return selfTool ? [...fromInventory, selfTool] : fromInventory;
-  }, [data, meta, selfTool]);
+    const fromInventory = data.map((e) => {
+      const currentVersion = versionOverrides[e.tool] ?? e.version ?? null;
+      const rawLatest = meta[e.tool]?.latestVersion ?? null;
+      const syncedAfterUpdate =
+        results[e.tool]?.success &&
+        (!toolHasNpmLatest(e.tool) || updateMessageIndicatesUpToDate(results[e.tool]!.message));
+      const latestVersion = effectiveLatestVersion(
+        e.tool,
+        currentVersion,
+        rawLatest,
+        syncedAfterUpdate,
+      );
+      return {
+        tool: e.tool,
+        label: toolLabel(e.tool),
+        currentVersion,
+        latestVersion,
+        available: e.available,
+        updateCommand: meta[e.tool]?.updateCommand ?? "",
+      };
+    });
+    const self = selfTool
+      ? {
+          ...selfTool,
+          currentVersion: versionOverrides["ai-shelf"] ?? selfTool.currentVersion,
+        }
+      : null;
+    return self ? [...fromInventory, self] : fromInventory;
+  }, [data, meta, selfTool, versionOverrides, results]);
 
   const handleUpdate = async (tool: string) => {
     setUpdating((prev) => ({ ...prev, [tool]: true }));
@@ -64,7 +149,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
     try {
       const res = await window.api.runUpdate(tool);
       setResults((prev) => ({ ...prev, [tool]: res }));
-      if (res.success && tool !== "ai-shelf") await runCheck();
+      if (res.success) await refreshOneTool(tool);
     } catch {
       setResults((prev) => ({
         ...prev,
@@ -78,29 +163,30 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
   const outdatedTools = tools.filter(
     (t) => t.latestVersion != null && !versionsEqual(t.currentVersion, t.latestVersion),
   );
-  const allUpToDate = !checking && tools.length > 0 && outdatedTools.length === 0;
-  const hasUpdates = !checking && outdatedTools.length > 0;
+  const anyChecking = checkingAll || Object.keys(checkingTools).length > 0;
+  const allUpToDate = !anyChecking && tools.length > 0 && outdatedTools.length === 0;
+  const hasUpdates = !anyChecking && outdatedTools.length > 0;
 
   return (
     <>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
         🔄 Update
-        {checking && (
+        {checkingAll && (
           <span className="animate-pulse text-sm font-normal text-text-secondary">checking…</span>
         )}
       </h2>
 
       <div className="mb-3 flex justify-end">
         <button
-          onClick={() => void runCheck()}
-          disabled={checking}
+          onClick={() => void runCheckAll()}
+          disabled={checkingAll}
           className="cursor-pointer rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-primary transition-all hover:border-accent disabled:opacity-50"
         >
           🔍 Re-check All
         </button>
       </div>
 
-      {!checking && tools.length === 0 && (
+      {!anyChecking && tools.length === 0 && (
         <p className="py-10 text-center text-text-secondary">No tools detected</p>
       )}
 
@@ -130,7 +216,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
         <ToolUpdateCard
           key={t.tool}
           tool={t}
-          isChecking={checking && t.latestVersion == null}
+          isChecking={(checkingAll && t.latestVersion == null) || (checkingTools[t.tool] ?? false)}
           isUpdating={updating[t.tool] ?? false}
           result={results[t.tool]}
           onUpdate={() => void handleUpdate(t.tool)}
@@ -233,8 +319,16 @@ function ToolUpdateCard({
         )}
 
         {result && (
-          <div className={`rounded-lg p-3 text-sm ${result.success ? "bg-ok/10 text-ok" : "bg-fail/10 text-fail"}`}>
-            {result.success ? "✅" : "❌"} {result.message}
+          <div
+            className={`rounded-lg p-3 text-sm ${result.success ? "bg-ok/10 text-ok" : "bg-fail/10 text-fail"}`}
+          >
+            {result.success ? (
+              <p className="mb-0">✅ {result.message}</p>
+            ) : (
+              <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap font-mono text-xs">
+                ❌ {result.message}
+              </pre>
+            )}
           </div>
         )}
       </div>
