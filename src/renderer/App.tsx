@@ -9,7 +9,7 @@ import { DoctorTab } from "./components/DoctorTab";
 import { UpdateTab } from "./components/UpdateTab";
 import { ChatTab } from "./components/ChatTab";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
-import { AppVersionBadge } from "./components/AppVersionBadge";
+import { AppBrand } from "./components/AppBrand";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 
 type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update";
@@ -51,6 +51,8 @@ export function App() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
       <header className="flex h-8 shrink-0 items-center border-b border-border bg-bg-primary px-1">
+        <AppBrand className="px-2" />
+        <div className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
         <AppModeSwitch mode={appMode} onChange={handleModeChange} disabled={!ready && scanning} />
 
         {appMode === "inventory" && (
@@ -85,9 +87,18 @@ export function App() {
           </span>
         )}
 
-        <div className="ml-auto flex shrink-0 items-center gap-3 px-3">
-          <AppVersionBadge />
-        </div>
+        {appMode === "inventory" && (
+          <div className="ml-auto flex shrink-0 items-center px-3">
+            <button
+              type="button"
+              onClick={reload}
+              disabled={scanning && !hasData}
+              className="cursor-pointer rounded border border-border bg-bg-secondary px-2.5 py-1 font-sans text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+        )}
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -133,17 +144,6 @@ export function App() {
                 </>
               )}
             </main>
-
-            <footer className="flex h-8 shrink-0 items-center justify-between border-t border-border px-8 text-[11px] text-text-secondary">
-              <AppVersionBadge />
-              <button
-                onClick={reload}
-                disabled={scanning && !hasData}
-                className="cursor-pointer rounded-lg border border-border bg-bg-secondary px-3.5 py-1.5 font-sans text-xs text-text-primary transition-all duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
-              >
-                🔄 Refresh
-              </button>
-            </footer>
           </div>
         )}
       </div>
