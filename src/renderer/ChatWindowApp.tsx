@@ -1,4 +1,5 @@
 import { ChatTab } from "./components/ChatTab";
+import { AppVersionBadge } from "./components/AppVersionBadge";
 import { Spinner } from "./components/Spinner";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 
@@ -8,6 +9,9 @@ export function ChatWindowApp() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
+      <header className="flex h-8 shrink-0 items-center justify-end border-b border-border px-3">
+        <AppVersionBadge />
+      </header>
       {scanning && !hasData && !error && (
         <div className="flex flex-1 items-center justify-center">
           <Spinner label="Detecting AI tools…" />
