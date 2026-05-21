@@ -419,30 +419,36 @@ ipcMain.handle("check-update", async () => {
     updateCommand: string;
   }[] = [];
 
+  let entries: Awaited<ReturnType<typeof detectAll>> = [];
+  try {
+    entries = getCachedInventory() ?? await detectAll({ quick: true });
+    if (!getCachedInventory()) setInventoryCache(entries);
+  } catch {
+    entries = [];
+  }
+
+  const installedToolIds = new Set(
+    entries.filter((e) => e.available).map((e) => e.tool),
+  );
   const latestVersionMap: Record<string, string | null> = {};
   await Promise.all(
-    Object.entries(TOOL_NPM_PACKAGE).map(async ([tool, pkg]) => {
-      latestVersionMap[tool] = fetchLatestNpmVersion(pkg);
-    }),
+    Object.entries(TOOL_NPM_PACKAGE)
+      .filter(([tool]) => installedToolIds.has(tool))
+      .map(async ([tool, pkg]) => {
+        latestVersionMap[tool] = fetchLatestNpmVersion(pkg);
+      }),
   );
 
-  // Per-tool checks
-  try {
-    const entries = getCachedInventory() ?? await detectAll({ quick: true });
-    if (!getCachedInventory()) setInventoryCache(entries);
-    for (const entry of entries) {
-      const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
-      results.push({
-        tool: entry.tool,
-        label: cfg?.label ?? entry.provider,
-        currentVersion: entry.version ?? null,
-        latestVersion: latestVersionMap[entry.tool] ?? null,
-        available: entry.available,
-        updateCommand: cfg ? cfg.update.join(" ") : "",
-      });
-    }
-  } catch {
-    // detectAll failed — continue with self only
+  for (const entry of entries) {
+    const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
+    results.push({
+      tool: entry.tool,
+      label: cfg?.label ?? entry.provider,
+      currentVersion: entry.version ?? null,
+      latestVersion: entry.available ? (latestVersionMap[entry.tool] ?? null) : null,
+      available: entry.available,
+      updateCommand: cfg ? cfg.update.join(" ") : "",
+    });
   }
 
   const selfLatest = app.isPackaged
@@ -465,9 +471,11 @@ ipcMain.handle("refresh-tool-update-info", async (_event, tool: string) => {
 
   const cfg = TOOL_UPDATE_COMMANDS[detected.tool] ?? TOOL_UPDATE_COMMANDS[tool];
   const pkg = TOOL_NPM_PACKAGE[detected.tool] ?? TOOL_NPM_PACKAGE[tool];
-  const latestVersion = pkg
-    ? fetchLatestNpmVersion(pkg)
-    : (detected.version ?? null);
+  const latestVersion = !detected.available
+    ? null
+    : pkg
+      ? fetchLatestNpmVersion(pkg)
+      : (detected.version ?? null);
 
   const cached = getCachedInventory();
   if (cached) {
@@ -553,8 +561,13 @@ ipcMain.handle("start-update-scan", async (event) => {
     } catch { /* skip failed detectors */ }
   }));
 
-  // Now check npm latest (or desktop updater for ai-shelf) per tool
-  await Promise.all(allTools.map(async ({ tool }) => {
+  // Now check npm latest (or desktop updater for ai-shelf) — installed tools only
+  await Promise.all(allTools.map(async (info) => {
+    const { tool, available } = info;
+    if (tool !== "ai-shelf" && !available) {
+      push("tool-latest", { tool, latestVersion: null });
+      return;
+    }
     let latestVersion: string | null = null;
     if (tool === "ai-shelf" && app.isPackaged) {
       latestVersion = await resolveDesktopSelfLatestVersion();

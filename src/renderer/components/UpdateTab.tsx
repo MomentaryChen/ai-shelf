@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProviderEntry, ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
-import { Badge } from "./Badge";
+import { Badge, InstallStatusBadge } from "./Badge";
+import { ToolNameCell } from "./ToolNameCell";
+import { InventorySectionHeader } from "./InventorySection";
+import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { toolIcon, toolLabel } from "../utils";
 import { toolHasNpmLatest } from "../../tools.js";
 import { versionsEqual } from "../../utils/version.js";
@@ -24,6 +27,33 @@ function effectiveLatestVersion(
 }
 
 type UpdateMeta = Record<string, { latestVersion: string | null; updateCommand: string }>;
+
+function buildToolUpdateInfo(
+  entry: ProviderEntry,
+  meta: UpdateMeta,
+  versionOverrides: Record<string, string | null>,
+  results: Record<string, { success: boolean; message: string }>,
+): ToolUpdateInfo {
+  const currentVersion = versionOverrides[entry.tool] ?? entry.version ?? null;
+  const rawLatest = meta[entry.tool]?.latestVersion ?? null;
+  const syncedAfterUpdate =
+    results[entry.tool]?.success &&
+    (!toolHasNpmLatest(entry.tool) || updateMessageIndicatesUpToDate(results[entry.tool]!.message));
+  const latestVersion = effectiveLatestVersion(
+    entry.tool,
+    currentVersion,
+    rawLatest,
+    syncedAfterUpdate,
+  );
+  return {
+    tool: entry.tool,
+    label: toolLabel(entry.tool),
+    currentVersion,
+    latestVersion,
+    available: entry.available,
+    updateCommand: meta[entry.tool]?.updateCommand ?? "",
+  };
+}
 
 function applyCheckResult(
   tools: ToolUpdateInfo[],
@@ -52,6 +82,7 @@ function applyCheckResult(
 }
 
 export function UpdateTab({ data }: { data: ProviderEntry[] }) {
+  const { installed, notInstalled } = partitionByInstalled(data);
   const [meta, setMeta] = useState<UpdateMeta>({});
   const [selfTool, setSelfTool] = useState<ToolUpdateInfo | null>(null);
   const [versionOverrides, setVersionOverrides] = useState<Record<string, string | null>>({});
@@ -108,36 +139,24 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
     void runCheckAll(false);
   }, [runCheckAll]);
 
-  const tools = useMemo((): ToolUpdateInfo[] => {
-    const fromInventory = data.map((e) => {
-      const currentVersion = versionOverrides[e.tool] ?? e.version ?? null;
-      const rawLatest = meta[e.tool]?.latestVersion ?? null;
-      const syncedAfterUpdate =
-        results[e.tool]?.success &&
-        (!toolHasNpmLatest(e.tool) || updateMessageIndicatesUpToDate(results[e.tool]!.message));
-      const latestVersion = effectiveLatestVersion(
-        e.tool,
-        currentVersion,
-        rawLatest,
-        syncedAfterUpdate,
-      );
-      return {
-        tool: e.tool,
-        label: toolLabel(e.tool),
-        currentVersion,
-        latestVersion,
-        available: e.available,
-        updateCommand: meta[e.tool]?.updateCommand ?? "",
-      };
-    });
-    const self = selfTool
-      ? {
-          ...selfTool,
-          currentVersion: versionOverrides["ai-shelf"] ?? selfTool.currentVersion,
-        }
-      : null;
-    return self ? [...fromInventory, self] : fromInventory;
-  }, [data, meta, selfTool, versionOverrides, results]);
+  const installedTools = useMemo(
+    () => installed.map((e) => buildToolUpdateInfo(e, meta, versionOverrides, results)),
+    [installed, meta, versionOverrides, results],
+  );
+
+  const selfEntry = useMemo((): ToolUpdateInfo | null => {
+    if (!selfTool) return null;
+    return {
+      ...selfTool,
+      currentVersion: versionOverrides["ai-shelf"] ?? selfTool.currentVersion,
+    };
+  }, [selfTool, versionOverrides]);
+
+  const checkableTools = useMemo(() => {
+    const list = [...installedTools];
+    if (selfEntry) list.push(selfEntry);
+    return list;
+  }, [installedTools, selfEntry]);
 
   const handleUpdate = async (tool: string) => {
     setUpdating((prev) => ({ ...prev, [tool]: true }));
@@ -160,12 +179,13 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
     }
   };
 
-  const outdatedTools = tools.filter(
+  const outdatedTools = checkableTools.filter(
     (t) => t.latestVersion != null && !versionsEqual(t.currentVersion, t.latestVersion),
   );
   const anyChecking = checkingAll || Object.keys(checkingTools).length > 0;
-  const allUpToDate = !anyChecking && tools.length > 0 && outdatedTools.length === 0;
+  const allUpToDate = !anyChecking && checkableTools.length > 0 && outdatedTools.length === 0;
   const hasUpdates = !anyChecking && outdatedTools.length > 0;
+  const installedSectionCount = installed.length + (selfEntry ? 1 : 0);
 
   return (
     <>
@@ -186,16 +206,18 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
         </button>
       </div>
 
-      {!anyChecking && tools.length === 0 && (
-        <p className="py-10 text-center text-text-secondary">No tools detected</p>
+      {!anyChecking && checkableTools.length === 0 && (
+        <p className="py-10 text-center text-text-secondary">No installed tools to check</p>
       )}
 
       {allUpToDate && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-ok/30 bg-ok/10 px-4 py-3">
           <span className="text-2xl">🎉</span>
           <div>
-            <p className="font-semibold text-ok">All tools are up to date</p>
-            <p className="text-xs text-text-secondary">{tools.length} tools checked — nothing to update</p>
+            <p className="font-semibold text-ok">All installed tools are up to date</p>
+            <p className="text-xs text-text-secondary">
+              {checkableTools.length} installed tool{checkableTools.length === 1 ? "" : "s"} checked — nothing to update
+            </p>
           </div>
         </div>
       )}
@@ -212,7 +234,17 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
         </div>
       )}
 
-      {tools.map((t) => (
+      <InventorySectionHeader title="已安裝" count={installedSectionCount} variant="installed" />
+      {selfEntry && (
+        <ToolUpdateCard
+          tool={selfEntry}
+          isChecking={(checkingAll && selfEntry.latestVersion == null) || (checkingTools["ai-shelf"] ?? false)}
+          isUpdating={updating["ai-shelf"] ?? false}
+          result={results["ai-shelf"]}
+          onUpdate={() => void handleUpdate("ai-shelf")}
+        />
+      )}
+      {installedTools.map((t) => (
         <ToolUpdateCard
           key={t.tool}
           tool={t}
@@ -222,7 +254,24 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
           onUpdate={() => void handleUpdate(t.tool)}
         />
       ))}
+
+      <InventorySectionHeader title="未安裝" count={notInstalled.length} variant="notInstalled" />
+      {notInstalled.map((entry) => (
+        <NotInstalledUpdateCard key={entry.tool} entry={entry} />
+      ))}
     </>
+  );
+}
+
+function NotInstalledUpdateCard({ entry }: { entry: ProviderEntry }) {
+  return (
+    <Card
+      className={installedCardClass(false)}
+      title={<ToolNameCell entry={entry} />}
+      trailing={<InstallStatusBadge available={false} />}
+    >
+      <p className="text-[13px] text-text-tertiary">未安裝，已略過更新檢查</p>
+    </Card>
   );
 }
 
@@ -251,13 +300,11 @@ function ToolUpdateCard({
 
   const badge = isChecking
     ? <Badge text="Checking…" variant="info" />
-    : !t.available
-      ? <Badge text="未安裝" variant="fail" />
-      : isOutdated
-        ? <Badge text="Update Available" variant="warn" />
-        : isUpToDate
-          ? <Badge text="Up to Date" variant="ok" />
-          : <Badge text="Installed" variant="info" />;
+    : isOutdated
+      ? <Badge text="Update Available" variant="warn" />
+      : isUpToDate
+        ? <Badge text="Up to Date" variant="ok" />
+        : <Badge text="Installed" variant="info" />;
 
   return (
     <Card title={<>{icon} {t.label}</>} trailing={badge}>
@@ -297,7 +344,7 @@ function ToolUpdateCard({
           </p>
         )}
 
-        {t.available && (t.updateCommand || t.desktopUpdate) && !isChecking && (
+        {(t.updateCommand || t.desktopUpdate) && !isChecking && (
           isUpToDate ? (
             <div className="flex items-center gap-2 text-sm text-ok">
               <span>✅</span>
