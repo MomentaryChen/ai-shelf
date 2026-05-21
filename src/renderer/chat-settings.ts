@@ -43,6 +43,12 @@ export function saveSettings(s: ChatSettings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
 }
 
+export function bumpDirHistory(history: string[], dir: string, max = 12): string[] {
+  const d = dir.trim();
+  if (!d) return history;
+  return [d, ...history.filter((x) => x !== d)].slice(0, max);
+}
+
 export function getAppBg(): string {
   return getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() || "#0f172a";
 }

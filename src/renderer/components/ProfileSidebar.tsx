@@ -6,6 +6,7 @@ import { paneDisplayLabel } from "../utils/pane-label";
 import { toolLabel } from "../utils";
 import { profileToolLabel } from "../utils/available-tools";
 import type { PaneInfo } from "../terminal/split-tree";
+import { formatPaneCwdShort } from "../utils/pane-cwd";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import {
   ProfileSettingsDialog,
@@ -42,6 +43,7 @@ interface Props {
   onClosePane: (profileId: string, paneId: string) => void;
   onRenamePane?: (profileId: string, paneId: string, title: string) => void;
   onAddTerminal: (profile: ProfileInfo) => void;
+  onOpenFolder?: (profile: ProfileInfo) => void;
   addingTerminal?: boolean;
   onToggleBroadcast: (profileId: string, enabled: boolean) => void | Promise<void>;
   onProfileUpdated: (profile: ProfileInfo) => void;
@@ -64,6 +66,7 @@ export function ProfileSidebar({
   onClosePane,
   onRenamePane,
   onAddTerminal,
+  onOpenFolder,
   addingTerminal = false,
   onToggleBroadcast,
   onProfileUpdated,
@@ -441,6 +444,18 @@ export function ProfileSidebar({
                       className="h-3.5 w-3.5 rounded accent-[#7eb6ff]"
                     />
                   </label>
+                  {onOpenFolder && (
+                    <SidebarIconBtn
+                      title="選擇資料夾並開啟新窗格"
+                      disabled={busy || profileBusy || addingTerminal}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenFolder(profile);
+                      }}
+                    >
+                      📁
+                    </SidebarIconBtn>
+                  )}
                   <SidebarIconBtn
                     title={`新增 terminal（${profileToolLabel(defaultTool)}）`}
                     disabled={busy || profileBusy || addingTerminal}
@@ -468,6 +483,8 @@ export function ProfileSidebar({
                     {listedSessions.map((item, i) => {
                       const tool = item.tool;
                       const paneId = "id" in item ? item.id : `saved-${i}`;
+                      const paneCwd = "cwd" in item ? item.cwd : "";
+                      const cwdShort = formatPaneCwdShort(paneCwd);
                       const isLive = profilePanes.length > 0;
                       const isPaneInfo = "id" in item;
                       const selected = isActive && isLive && profileFocusId === paneId;
@@ -516,16 +533,24 @@ export function ProfileSidebar({
                           >
                             <ToolLogo tool={tool} size={14} />
                           </span>
-                          {canRename ? (
-                            <EditablePaneTitle
-                              label={sessionLabel}
-                              onRename={(title) => onRenamePane!(profile.id, paneId, title)}
-                              className="text-[11px]"
-                              inputClassName="text-[11px]"
-                            />
-                          ) : (
-                            <span className="min-w-0 flex-1 truncate">{sessionLabel}</span>
-                          )}
+                          <div
+                            className="flex min-w-0 flex-1 items-center gap-1 truncate"
+                            title={paneCwd ? `${sessionLabel}\n${paneCwd}` : sessionLabel}
+                          >
+                            {canRename ? (
+                              <EditablePaneTitle
+                                label={sessionLabel}
+                                onRename={(title) => onRenamePane!(profile.id, paneId, title)}
+                                className="min-w-0 truncate text-[11px]"
+                                inputClassName="text-[11px]"
+                              />
+                            ) : (
+                              <span className="min-w-0 truncate">{sessionLabel}</span>
+                            )}
+                            {cwdShort ? (
+                              <span className="shrink-0 text-[10px] text-[#5c5c64]">· {cwdShort}</span>
+                            ) : null}
+                          </div>
                           {isActive && isLive && (
                             <span
                               role="button"

@@ -3,6 +3,7 @@ import {
   BG_PRESETS,
   TERMINAL_OPTIONS,
   getAppBg,
+  bumpDirHistory,
   loadSettings,
   saveSettings,
   type ChatSettings,
@@ -53,8 +54,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   async function browsePath() {
     const dir = await window.api.pickFolder(settings.workingDir || undefined);
     if (dir) {
-      const history = [dir, ...settings.dirHistory.filter((d) => d !== dir)].slice(0, 10);
-      updateSettings({ workingDir: dir, dirHistory: history });
+      updateSettings({ workingDir: dir, dirHistory: bumpDirHistory(settings.dirHistory, dir, 10) });
     }
   }
 
@@ -63,8 +63,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
       updateSettings({ workingDir: "" });
       return;
     }
-    const history = [dir, ...settings.dirHistory.filter((d) => d !== dir)].slice(0, 10);
-    updateSettings({ workingDir: dir, dirHistory: history });
+    updateSettings({ workingDir: dir, dirHistory: bumpDirHistory(settings.dirHistory, dir, 10) });
   }
 
   const dirOptions = buildDirOptions(settings.workingDir, settings.dirHistory);
