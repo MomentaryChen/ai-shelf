@@ -9,9 +9,23 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-21
+
+Terminal layout, display settings, right-click paste, and update-tab polish.
+
 ### Added
 
-- **Drag-to-move terminal panes** — drag any pane onto another: drop on top/bottom/left/right edges to insert, center to swap; works with multi-pane split layouts (sidebar tabs support above/below)
+- **Drag-to-move terminal panes** — drop on top/bottom/left/right edges to insert, center to swap; works with multi-pane split layouts (sidebar tabs support above/below)
+- **Right-click paste** in the terminal with a settings toggle
+- **Terminal display settings** — font family, size, and scrollback buffer
+
+### Changed
+
+- **Update tab** skips version checks for tools that are not installed
+
+### Fixed
+
+- **Desktop update UX** — release notes render as HTML; app version shown in the window title
 
 ## [1.2.0] - 2026-05-21
 
@@ -111,6 +125,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[1.3.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.3.0
 [1.2.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.2.0
 [1.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.1
 [1.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.0
