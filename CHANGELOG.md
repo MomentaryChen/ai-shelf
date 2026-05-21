@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 GitHub Releases use the matching `## [x.y.z]` section here as the release description (see `scripts/release-notes.mjs` and `.github/workflows/release.yml`).
 
+## [Unreleased]
+
+### Added
+
+- **Drag-to-move terminal panes** — drag any pane onto another: drop on top/bottom/left/right edges to insert, center to swap; works with multi-pane split layouts (sidebar tabs support above/below)
+
 ## [1.2.0] - 2026-05-21
 
 Terminal search, clickable links in output, and desktop update UX polish.
