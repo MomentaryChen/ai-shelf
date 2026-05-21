@@ -21,6 +21,11 @@ body,
   width: 100% !important;
 }
 
+/* Clickable paths / URLs (Ctrl+click / Cmd+click) */
+.xterm .xterm-link {
+  cursor: pointer;
+}
+
 /* Profile sidebar — live session indicator */
 @keyframes profile-live-pulse {
   0%,

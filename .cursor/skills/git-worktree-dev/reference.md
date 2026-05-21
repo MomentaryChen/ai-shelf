@@ -87,6 +87,15 @@ Pane `cwd` values persist in the profile snapshot; switching profiles restores e
 
 Right-click inside a terminal pane, or use shortcuts while the pane (or its xterm) is focused.
 
+## Clickable paths and URLs in terminal output
+
+In an embedded terminal pane, **Ctrl+click** (Windows/Linux) or **Cmd+click** (macOS) on:
+
+- Absolute paths (`D:/projects/...`, `D:\...`, `/home/...`, `file:///...`) → opens in the system file manager / default app via `openPath`
+- `http://` / `https://` links → opens in the default browser via `openExternal`
+
+OSC 8 hyperlinks in command output use the same modifier + click behavior.
+
 ## Remove worktree safely
 
 1. Ensure no uncommitted work the user needs (or they approved discard).
