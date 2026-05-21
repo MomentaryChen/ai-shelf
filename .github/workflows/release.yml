@@ -46,6 +46,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/AI-Shelf-Setup-*.exe
+          files: |
+            release/AI-Shelf-Setup-*.exe
+            release/latest.yml
+            release/*.blockmap
           body_path: release-notes.md
           generate_release_notes: false

@@ -7,6 +7,7 @@ import { McpTab } from "./components/McpTab";
 import { ConfigTab } from "./components/ConfigTab";
 import { DoctorTab } from "./components/DoctorTab";
 import { UpdateTab } from "./components/UpdateTab";
+import { AppUpdateModal } from "./components/AppUpdateModal";
 import { ChatTab } from "./components/ChatTab";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
 import { AppBrand } from "./components/AppBrand";
@@ -50,6 +51,7 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
+      <AppUpdateModal />
       <header className="flex h-8 shrink-0 items-center border-b border-border bg-bg-primary px-1">
         <AppBrand className="px-2" />
         <div className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
