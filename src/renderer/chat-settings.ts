@@ -1,6 +1,8 @@
+import { DEFAULT_APP_THEME, normalizeAppTheme, type AppColorTheme } from "./app-theme";
 import { detectSystemLocale, resolveLocale, type AppLocale } from "./i18n/index.js";
 
-export type { AppLocale };
+export type { AppColorTheme, AppLocale };
+
 export type ExternalTerminal = "auto" | "wt" | "pwsh" | "powershell" | "cmd";
 
 export const DEFAULT_TERMINAL_FONT_FAMILY =
@@ -16,6 +18,8 @@ const MAX_TERMINAL_SCROLLBACK = 100_000;
 
 export interface ChatSettings {
   locale: AppLocale;
+  /** App UI color theme (light / dark / high contrast). */
+  appTheme: AppColorTheme;
   externalTerminal: ExternalTerminal;
   terminalBg: string;
   terminalFontFamily: string;
@@ -71,6 +75,7 @@ function normalizeRightClickPaste(raw: unknown): boolean {
 
 const DEFAULTS: ChatSettings = {
   locale: detectSystemLocale(),
+  appTheme: DEFAULT_APP_THEME,
   externalTerminal: "auto",
   terminalBg: "#0c0c0c",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
@@ -88,6 +93,7 @@ export function loadSettings(): ChatSettings {
       ...DEFAULTS,
       ...stored,
       locale: resolveLocale(stored.locale ?? DEFAULTS.locale),
+      appTheme: normalizeAppTheme(stored.appTheme),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),
       terminalFontSize: clampInt(
         stored.terminalFontSize,

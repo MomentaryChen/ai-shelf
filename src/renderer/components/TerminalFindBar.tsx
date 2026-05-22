@@ -77,7 +77,7 @@ export function TerminalFindBar({
 
   return (
     <div
-      className="absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-[#333] bg-[#1a1a1a]/95 px-2 py-1.5 shadow-lg backdrop-blur-sm"
+      className="absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-chrome-border-strong bg-chrome-surface-hover/95 px-2 py-1.5 shadow-lg backdrop-blur-sm"
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => {
         e.stopPropagation();
@@ -102,15 +102,16 @@ export function TerminalFindBar({
           }
         }}
         placeholder={t("find.placeholder")}
-        className="w-44 min-w-0 rounded border border-[#333] bg-[#0f0f0f] px-2 py-1 text-[12px] text-[#e8e8e8] outline-none ring-[#3b78ff] focus:ring-1"
+        className="w-44 min-w-0 rounded border border-chrome-border-strong bg-chrome-bg px-2 py-1 text-[12px] text-chrome-text outline-none ring-accent focus:ring-1"
         aria-label={t("find.aria")}
+
       />
-      <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-[#8a8a8a]">
+      <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-chrome-text-muted">
         <input
           type="checkbox"
           checked={caseSensitive}
           onChange={(e) => onCaseSensitiveChange(e.target.checked)}
-          className="accent-[#3b78ff]"
+          className="accent-accent"
         />
         Aa
       </label>
@@ -119,7 +120,7 @@ export function TerminalFindBar({
         title={t("find.prev")}
         onClick={onPrevious}
         disabled={!hasQuery || matchCount === 0}
-        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-[#c0c0c0] hover:bg-[#2a2a2a] disabled:cursor-default disabled:text-[#555]"
+        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim"
       >
         ↑
       </button>
@@ -128,13 +129,13 @@ export function TerminalFindBar({
         title={t("find.next")}
         onClick={onNext}
         disabled={!hasQuery || matchCount === 0}
-        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-[#c0c0c0] hover:bg-[#2a2a2a] disabled:cursor-default disabled:text-[#555]"
+        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim"
       >
         ↓
       </button>
       {status ? (
         <span
-          className="max-w-[14rem] truncate text-center text-[11px] tabular-nums text-[#6b6b6b]"
+          className="max-w-[14rem] truncate text-center text-[11px] tabular-nums text-chrome-text-subtle"
           title={status}
         >
           {status}
@@ -144,7 +145,7 @@ export function TerminalFindBar({
         type="button"
         title={t("find.close")}
         onClick={onClose}
-        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-[#8a8a8a] hover:bg-[#2a2a2a] hover:text-[#e8e8e8]"
+        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-muted hover:bg-chrome-surface-hover hover:text-chrome-text"
       >
         ✕
       </button>

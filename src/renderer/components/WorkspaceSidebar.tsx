@@ -127,7 +127,7 @@ export function WorkspaceSidebar({
   }
 
   const shellClass = embedded
-    ? "flex h-full w-full min-h-0 flex-col bg-transparent text-[12px] text-[#8a8a8a]"
+    ? "flex h-full w-full min-h-0 flex-col bg-transparent text-[12px] text-chrome-text-muted"
     : "flex w-56 shrink-0 flex-col border-r border-border bg-bg-secondary";
 
   if (!tree) {
@@ -141,10 +141,10 @@ export function WorkspaceSidebar({
   return (
     <aside className={shellClass}>
       <div
-        className={`flex items-center justify-between px-3 py-2 ${embedded ? "border-b border-[#1f1f1f]" : "border-b border-border"}`}
+        className={`flex items-center justify-between px-3 py-2 ${embedded ? "border-b border-chrome-border" : "border-b border-border"}`}
       >
         <span
-          className={`text-[11px] font-semibold uppercase tracking-wider ${embedded ? "text-[#6b6b6b]" : "text-text-secondary"}`}
+          className={`text-[11px] font-semibold uppercase tracking-wider ${embedded ? "text-chrome-text-subtle" : "text-text-secondary"}`}
         >
           {t("workspace.title")}
         </span>
@@ -159,8 +159,9 @@ export function WorkspaceSidebar({
         </button>
       </div>
 
-      <p className={`px-3 py-1 text-[10px] ${embedded ? "text-[#5a5a5a]" : "text-text-tertiary"}`}>
+      <p className={`px-3 py-1 text-[10px] ${embedded ? "text-chrome-text-dim" : "text-text-tertiary"}`}>
         {t("workspace.restoreHint")}
+
       </p>
 
       {err && <p className="px-3 py-1 text-[11px] text-fail">{err}</p>}
@@ -185,7 +186,7 @@ export function WorkspaceSidebar({
                 <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{ws.name}</span>
                 {ws.root_path && (
                   <span
-                    className="max-w-[72px] truncate text-[9px] text-[#5a5a5a]"
+                    className="max-w-[72px] truncate text-[9px] text-chrome-text-dim"
                     title={ws.root_path}
                   >
                     {ws.root_path.replace(/^.*[/\\]/, "")}
@@ -223,8 +224,8 @@ export function WorkspaceSidebar({
                           onClick={() => openGroup(ws, grp)}
                           className={`min-w-0 flex-1 cursor-pointer truncate rounded px-1 py-0.5 text-left text-[11px] transition-colors ${
                             isActiveGroup
-                              ? "bg-[#2a3a55] font-medium text-[#8ab4ff]"
-                              : "text-[#b0b0b0] hover:bg-[#1a1a1a]"
+                              ? "bg-accent/20 font-medium text-chrome-accent-text"
+                              : "text-chrome-text-secondary hover:bg-chrome-surface-hover"
                           }`}
                           title={t("workspace.restoreLayout")}
                         >
@@ -272,7 +273,7 @@ export function WorkspaceSidebar({
       </div>
 
       {selected && (
-        <div className={`border-t p-2 ${embedded ? "border-[#1f1f1f]" : "border-border"}`}>
+        <div className={`border-t p-2 ${embedded ? "border-chrome-border" : "border-border"}`}>
           <p className="mb-1.5 truncate text-[10px] opacity-60" title={selected.session.cwd}>
             {selected.session.cwd}
           </p>
@@ -294,7 +295,7 @@ export function WorkspaceSidebar({
       <button
         type="button"
         onClick={() => void refresh()}
-        className={`border-t py-2 text-[11px] ${embedded ? "border-[#1f1f1f]" : "border-border"}`}
+        className={`border-t py-2 text-[11px] ${embedded ? "border-chrome-border" : "border-border"}`}
       >
         ↻ Refresh
       </button>

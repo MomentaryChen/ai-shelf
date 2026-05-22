@@ -76,36 +76,40 @@ export function ProfileCreateDialog({
       onClick={onClose}
     >
       <form
-        className="w-full max-w-sm rounded-xl border border-[#2a2a2a] bg-[#141414] p-5 shadow-2xl"
+        className="w-full max-w-sm rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
       >
-        <h2 className="mb-4 text-[15px] font-semibold text-[#f0f0f0]">{t("profile.dialog.createTitle")}</h2>
+        <h2 className="mb-4 text-[15px] font-semibold text-chrome-text">{t("profile.dialog.createTitle")}</h2>
 
         <label className="mb-3 block">
-          <span className="mb-1 block text-[11px] text-[#6b6b6b]">{t("profile.dialog.name")}</span>
+          <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.name")}</span>
+
           <input
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("profile.dialog.namePlaceholder")}
-            className="w-full rounded-md border border-[#252525] bg-[#0a0a0a] px-3 py-2 text-[13px] focus:border-[#404040] focus:outline-none"
+            className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] focus:border-chrome-border-hover focus:outline-none"
+
           />
         </label>
 
         <label className="mb-3 block">
-          <span className="mb-1 block text-[11px] text-[#6b6b6b]">{t("profile.dialog.defaultDir")}</span>
+          <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.defaultDir")}</span>
+
           <div className="flex gap-2">
             <input
               value={cwd}
               onChange={(e) => setCwd(e.target.value)}
               placeholder={t("profile.dialog.cwdPlaceholder")}
-              className="min-w-0 flex-1 rounded-md border border-[#252525] bg-[#0a0a0a] px-3 py-2 text-[13px] focus:border-[#404040] focus:outline-none"
+              className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] focus:border-chrome-border-hover focus:outline-none"
+
             />
             <button
               type="button"
               onClick={() => void handleBrowse()}
-              className="shrink-0 cursor-pointer rounded-md border border-[#2a2a2a] px-3 py-2 text-[12px] text-[#a0a0a0] hover:border-[#404040]"
+              className="shrink-0 cursor-pointer rounded-md border border-chrome-border-strong px-3 py-2 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover"
             >
               {t("profile.dialog.browse")}
             </button>
@@ -113,16 +117,17 @@ export function ProfileCreateDialog({
         </label>
 
         <fieldset className="mb-4">
-          <legend className="mb-2 block text-[11px] text-[#6b6b6b]">{t("profile.dialog.accentLegend")}</legend>
-          <p className="mb-2 text-[10px] text-[#5a5a5a]">{t("profile.dialog.accentAuto")}</p>
+          <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.accentLegend")}</legend>
+          <p className="mb-2 text-[10px] text-chrome-text-dim">{t("profile.dialog.accentAuto")}</p>
+
           <ProfileColorPicker value={accentColor} onChange={setAccentColor} />
         </fieldset>
 
         <fieldset className="mb-5">
-          <legend className="mb-2 flex items-center gap-2 text-[11px] text-[#6b6b6b]">
+          <legend className="mb-2 flex items-center gap-2 text-[11px] text-chrome-text-subtle">
             {t("profile.dialog.defaultTool")}
             {inventoryScanning && tools.length > 0 && (
-              <span className="text-[10px] text-[#5a5a5a]">· {t("profile.dialog.detectingMore")}</span>
+              <span className="text-[10px] text-chrome-text-dim">· {t("profile.dialog.detectingMore")}</span>
             )}
           </legend>
           <div className="flex flex-col gap-1">
@@ -131,8 +136,8 @@ export function ProfileCreateDialog({
                 key={toolId}
                 className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors ${
                   effectiveTool === toolId
-                    ? "border-[#3d5a80] bg-[#1a2a40]/50 text-[#8ab4ff]"
-                    : "border-[#252525] text-[#a0a0a0] hover:border-[#353535]"
+                    ? "border-accent/50 bg-accent/15 text-chrome-accent-text"
+                    : "border-chrome-border-subtle text-chrome-text-secondary hover:border-chrome-border-hover"
                 }`}
               >
                 <input
@@ -147,6 +152,7 @@ export function ProfileCreateDialog({
                 <span className="text-[13px]">{profileToolLabel(toolId)}</span>
               </label>
             ))}
+
           </div>
         </fieldset>
 
@@ -154,14 +160,14 @@ export function ProfileCreateDialog({
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-md px-4 py-2 text-[13px] text-[#8a8a8a] hover:text-[#e0e0e0]"
+            className="cursor-pointer rounded-md px-4 py-2 text-[13px] text-chrome-text-muted hover:text-chrome-text"
           >
             {t("profile.dialog.cancel")}
           </button>
           <button
             type="submit"
             disabled={!name.trim()}
-            className="cursor-pointer rounded-md bg-[#2a4a7a] px-4 py-2 text-[13px] font-medium text-[#e8f0ff] hover:bg-[#355f9e] disabled:opacity-40"
+            className="cursor-pointer rounded-md bg-accent px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-accent-hover disabled:opacity-40"
           >
             {t("profile.dialog.create")}
           </button>

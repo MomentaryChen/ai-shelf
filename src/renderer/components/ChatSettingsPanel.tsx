@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { APP_THEME_OPTIONS, applyAppTheme } from "../app-theme";
 import {
   BG_PRESETS,
   DEFAULT_TERMINAL_FONT_FAMILY,
@@ -14,6 +15,7 @@ import {
   type ExternalTerminal,
 } from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
+import type { AppColorTheme } from "../app-theme";
 import type { AppLocale } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
 
@@ -49,6 +51,12 @@ const LOCALE_OPTIONS: { value: AppLocale; labelKey: MessageKey }[] = [
   { value: "zh", labelKey: "settings.language.zh" },
 ];
 
+const THEME_LABEL_KEYS: Record<AppColorTheme, MessageKey> = {
+  light: "settings.theme.light",
+  dark: "settings.theme.dark",
+  contrast: "settings.theme.contrast",
+};
+
 function buildDirOptions(workingDir: string, dirHistory: string[]): string[] {
   const seen = new Set<string>();
   const options: string[] = [];
@@ -75,13 +83,18 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
     setSettings((prev) => {
       const next = { ...prev, ...partial };
       saveSettings(next);
+      if (partial.appTheme !== undefined) applyAppTheme(next.appTheme);
       return next;
     });
   }, []);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY) setSettings(loadSettings());
+      if (e.key === SETTINGS_KEY) {
+        const next = loadSettings();
+        setSettings(next);
+        applyAppTheme(next.appTheme);
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -132,6 +145,38 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* App color theme */}
+      <div>
+        <p className={sectionTitle}>{t("settings.theme")}</p>
+        <div className="flex flex-wrap gap-2">
+          {APP_THEME_OPTIONS.map((opt) => {
+            const active = settings.appTheme === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => updateSettings({ appTheme: opt.value })}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
+                  active
+                    ? "border-accent/60 bg-accent/10 font-medium text-accent"
+                    : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
+                }`}
+              >
+                <span
+                  className="inline-flex h-3.5 w-3.5 shrink-0 overflow-hidden rounded-sm border border-border"
+                  aria-hidden
+                >
+                  <span className="h-full w-1/2" style={{ background: opt.preview.bg }} />
+                  <span className="h-full w-1/2" style={{ background: opt.preview.accent }} />
+                </span>
+                {t(THEME_LABEL_KEYS[opt.value])}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-[11px] text-text-tertiary">{t("settings.themeHint")}</p>
       </div>
 
       {/* Working directory */}

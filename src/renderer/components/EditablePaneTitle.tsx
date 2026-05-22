@@ -64,8 +64,9 @@ export function EditablePaneTitle({
         onKeyDown={onKeyDown}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        className={`min-w-0 flex-1 rounded border border-[#404040] bg-[#141414] px-1.5 py-0.5 text-[12px] text-[#f0f0f0] outline-none focus:border-[#6b8cff] ${inputClassName}`}
+        className={`min-w-0 flex-1 rounded border border-chrome-border-hover bg-chrome-surface-raised px-1.5 py-0.5 text-[12px] text-chrome-text outline-none focus:border-accent ${inputClassName}`}
         aria-label={t("pane.tabTitle")}
+
       />
     );
   }

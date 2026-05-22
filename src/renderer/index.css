@@ -64,7 +64,7 @@ body,
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: var(--color-scrollbar-thumb-hover);
 }
 
 /* In-app update dialog — GitHub release notes (HTML) */
@@ -108,10 +108,139 @@ body,
   --color-bg-card: #334155;
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #94a3b8;
+  --color-text-tertiary: #64748b;
   --color-accent: #38bdf8;
   --color-accent-hover: #7dd3fc;
   --color-ok: #4ade80;
   --color-fail: #f87171;
   --color-warn: #fbbf24;
   --color-border: #475569;
+  --color-scrollbar-thumb-hover: #64748b;
+  /* Terminal chrome (sidebar, pane headers, top bar) */
+  --color-chrome-bg: #0a0a0a;
+  --color-chrome-bg-top: #0c0c0e;
+  --color-chrome-bg-bottom: #09090b;
+  --color-chrome-surface: #111114;
+  --color-chrome-surface-raised: #141414;
+  --color-chrome-surface-focus: #131316;
+  --color-chrome-surface-hover: #1a1a1a;
+  --color-chrome-surface-hover-strong: #1f1f1f;
+  --color-chrome-surface-menu: #151515;
+  --color-chrome-border: #1a1a1e;
+  --color-chrome-border-subtle: #252525;
+  --color-chrome-border-input: #252528;
+  --color-chrome-border-strong: #2a2a2a;
+  --color-chrome-border-hover: #404040;
+  --color-chrome-border-focus: #3a3a42;
+  --color-chrome-text: #e8e8ec;
+  --color-chrome-text-secondary: #b4b4ba;
+  --color-chrome-text-muted: #8b8b92;
+  --color-chrome-text-subtle: #6b6b6b;
+  --color-chrome-text-faint: #6b6b72;
+  --color-chrome-text-dim: #5c5c64;
+  --color-chrome-accent-text: #8ab4ff;
+  --color-chrome-hover: rgb(255 255 255 / 0.04);
+  --color-chrome-hover-strong: rgb(255 255 255 / 0.06);
+  --color-chrome-profile-card-bg: #111113;
+  --color-chrome-profile-card-active-bg: #12161f;
+  --color-chrome-profile-card-border: #232326;
+  --color-chrome-profile-card-active-border: #2d3f5c;
+  --color-chrome-badge-bg: #1e1e22;
+  --color-chrome-sessions-well-bg: rgb(0 0 0 / 0.22);
+  --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.4);
+}
+
+/* App color themes (default: dark — matches @theme above) */
+html[data-app-theme="light"] {
+  --color-bg-primary: #f8fafc;
+  --color-bg-secondary: #e2e8f0;
+  --color-bg-card: #cbd5e1;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94a3b8;
+  --color-accent: #0284c7;
+  --color-accent-hover: #0369a1;
+  --color-ok: #16a34a;
+  --color-fail: #dc2626;
+  --color-warn: #ca8a04;
+  --color-border: #94a3b8;
+  --color-scrollbar-thumb-hover: #64748b;
+  --color-chrome-bg: #f1f5f9;
+  --color-chrome-bg-top: #f8fafc;
+  --color-chrome-bg-bottom: #e2e8f0;
+  --color-chrome-surface: #ffffff;
+  --color-chrome-surface-raised: #f8fafc;
+  --color-chrome-surface-focus: #ffffff;
+  --color-chrome-surface-hover: #e2e8f0;
+  --color-chrome-surface-hover-strong: #cbd5e1;
+  --color-chrome-surface-menu: #f1f5f9;
+  --color-chrome-border: #cbd5e1;
+  --color-chrome-border-subtle: #94a3b8;
+  --color-chrome-border-input: #94a3b8;
+  --color-chrome-border-strong: #64748b;
+  --color-chrome-border-hover: #475569;
+  --color-chrome-border-focus: #0284c7;
+  --color-chrome-text: #0f172a;
+  --color-chrome-text-secondary: #334155;
+  --color-chrome-text-muted: #475569;
+  --color-chrome-text-subtle: #64748b;
+  --color-chrome-text-faint: #64748b;
+  --color-chrome-text-dim: #94a3b8;
+  --color-chrome-accent-text: #0284c7;
+  --color-chrome-hover: rgb(15 23 42 / 0.04);
+  --color-chrome-hover-strong: rgb(15 23 42 / 0.08);
+  --color-chrome-profile-card-bg: #f8fafc;
+  --color-chrome-profile-card-active-bg: #e0f2fe;
+  --color-chrome-profile-card-border: #cbd5e1;
+  --color-chrome-profile-card-active-border: #0284c7;
+  --color-chrome-badge-bg: #e2e8f0;
+  --color-chrome-sessions-well-bg: rgb(15 23 42 / 0.04);
+  --color-chrome-pane-header-unfocused: rgb(241 245 249 / 0.9);
+}
+
+html[data-app-theme="contrast"] {
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #000000;
+  --color-bg-card: #1a1a1a;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #ffffff;
+  --color-text-tertiary: #e5e5e5;
+  --color-accent: #ffff00;
+  --color-accent-hover: #ffff99;
+  --color-ok: #00ff00;
+  --color-fail: #ff4444;
+  --color-warn: #ffff00;
+  --color-border: #ffffff;
+  --color-scrollbar-thumb-hover: #ffffff;
+  --color-chrome-bg: #000000;
+  --color-chrome-bg-top: #000000;
+  --color-chrome-bg-bottom: #000000;
+  --color-chrome-surface: #000000;
+  --color-chrome-surface-raised: #000000;
+  --color-chrome-surface-focus: #000000;
+  --color-chrome-surface-hover: #1a1a1a;
+  --color-chrome-surface-hover-strong: #333333;
+  --color-chrome-surface-menu: #000000;
+  --color-chrome-border: #ffffff;
+  --color-chrome-border-subtle: #ffffff;
+  --color-chrome-border-input: #ffffff;
+  --color-chrome-border-strong: #ffffff;
+  --color-chrome-border-hover: #ffff00;
+  --color-chrome-border-focus: #ffff00;
+  --color-chrome-text: #ffffff;
+  --color-chrome-text-secondary: #ffffff;
+  --color-chrome-text-muted: #ffffff;
+  --color-chrome-text-subtle: #e5e5e5;
+  --color-chrome-text-faint: #e5e5e5;
+  --color-chrome-text-dim: #cccccc;
+  --color-chrome-accent-text: #ffff00;
+  --color-chrome-hover: rgb(255 255 0 / 0.12);
+  --color-chrome-hover-strong: rgb(255 255 0 / 0.2);
+  --color-chrome-profile-card-bg: #000000;
+  --color-chrome-profile-card-active-bg: #000000;
+  --color-chrome-profile-card-border: #ffffff;
+  --color-chrome-profile-card-active-border: #ffff00;
+  --color-chrome-badge-bg: #000000;
+  --color-chrome-sessions-well-bg: rgb(255 255 255 / 0.08);
+  --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.85);
 }

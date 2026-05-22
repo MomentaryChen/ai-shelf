@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { applyAppTheme } from "../app-theme.js";
 import { loadSettings, saveSettings, SETTINGS_KEY } from "../chat-settings.js";
 import {
   DEFAULT_LOCALE,
@@ -38,7 +39,9 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>(() => readLocaleFromStorage());
 
   const syncFromStorage = useCallback(() => {
-    setLocaleState(readLocaleFromStorage());
+    const settings = loadSettings();
+    setLocaleState(resolveLocale(settings.locale));
+    applyAppTheme(settings.appTheme);
   }, []);
 
   useEffect(() => {

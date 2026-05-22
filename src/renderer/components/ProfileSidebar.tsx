@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAppThemeRevision } from "../app-theme";
 import type { ProfileInfo, ProfileTree } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
@@ -89,6 +90,7 @@ export function ProfileSidebar({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
+  useAppThemeRevision();
   const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
   const [paneDropZone, setPaneDropZone] = useState<"above" | "below" | null>(null);
 
@@ -290,9 +292,9 @@ export function ProfileSidebar({
 
       <aside
         style={{ width }}
-        className="flex shrink-0 flex-col border-r border-[#1a1a1e] bg-gradient-to-b from-[#0c0c0e] to-[#09090b] text-[#e8e8ec]"
+        className="flex shrink-0 flex-col border-r border-chrome-border bg-gradient-to-b from-chrome-bg-top to-chrome-bg-bottom text-chrome-text"
       >
-        <div className="border-b border-[#1a1a1e]/80 px-2.5 py-2.5">
+        <div className="border-b border-chrome-border/80 px-2.5 py-2.5">
           <div className="relative">
             <SearchIcon />
             <input
@@ -300,14 +302,16 @@ export function ProfileSidebar({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("profile.search")}
-              className="h-8 w-full rounded-lg border border-[#252528] bg-[#111114] pl-8 pr-2.5 text-[12px] text-[#e8e8ec] placeholder:text-[#5c5c64] transition-colors focus:border-[#3a3a42] focus:bg-[#131316] focus:outline-none focus:ring-1 focus:ring-white/[0.06]"
+              className="h-8 w-full rounded-lg border border-chrome-border-input bg-chrome-surface pl-8 pr-2.5 text-[12px] text-chrome-text placeholder:text-chrome-text-dim transition-colors focus:border-chrome-border-focus focus:bg-[#131316] focus:outline-none focus:ring-1 focus:ring-white/[0.06]"
+
             />
           </div>
         </div>
 
         <div className="flex h-9 shrink-0 items-center justify-between px-2.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5c5c64]">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-dim">
             {t("profile.title")}
+
           </span>
           <div className="flex items-center gap-0.5">
             <SidebarIconBtn
@@ -336,11 +340,12 @@ export function ProfileSidebar({
 
         <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2.5">
           {!tree && (
-            <p className="px-2 py-6 text-center text-[11px] text-[#5c5c64]">{t("profile.loading")}</p>
+            <p className="px-2 py-6 text-center text-[11px] text-chrome-text-dim">{t("profile.loading")}</p>
           )}
           {tree && filtered.length === 0 && (
-            <p className="px-2 py-6 text-center text-[11px] text-[#5c5c64]">
+            <p className="px-2 py-6 text-center text-[11px] text-chrome-text-dim">
               {query.trim() ? t("profile.noMatch") : t("profile.empty")}
+
             </p>
           )}
           {filtered.map((profile) => {
@@ -370,11 +375,11 @@ export function ProfileSidebar({
                 key={profile.id}
                 className={`overflow-hidden rounded-xl border transition-all duration-150 ${
                   dragOverId === profile.id && draggingId !== profile.id
-                    ? "ring-2 ring-[#7eb6ff]/35"
+                    ? "ring-2 ring-accent/35"
                     : draggingId === profile.id
                       ? "opacity-45 scale-[0.99]"
                       : ""
-                } ${isActive && !hasAccent ? "border-[#2d3f5c]" : "border-transparent"}`}
+                } ${isActive && !hasAccent ? "border-chrome-profile-card-active-border" : "border-transparent"}`}
                 style={cardStyle}
                 onDragOver={(e) => {
                   if (!canReorder || !draggingId) return;
@@ -407,9 +412,10 @@ export function ProfileSidebar({
                         setDraggingId(null);
                         setDragOverId(null);
                       }}
-                      className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
+                      className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-chrome-hover active:cursor-grabbing"
                       title={t("sidebar.dragReorder")}
                       aria-label={t("sidebar.dragReorder")}
+
                     >
                       <DragHandle />
                     </span>
@@ -429,10 +435,10 @@ export function ProfileSidebar({
                     style={rowStyle}
                     className={`flex min-h-[32px] min-w-0 flex-1 cursor-pointer items-center truncate rounded-lg px-2 text-left text-[12px] font-medium transition-colors ${
                       isActive && !hasAccent
-                        ? "text-[#8ab4ff]"
+                        ? "text-chrome-accent-text"
                         : hasAccent
-                          ? "text-[#ececef]"
-                          : "text-[#b4b4ba] hover:bg-white/[0.04]"
+                          ? "text-chrome-text"
+                          : "text-chrome-text-secondary hover:bg-chrome-hover"
                     }`}
                     title={profile.defaultCwd}
                   >
@@ -464,7 +470,7 @@ export function ProfileSidebar({
                         handleBroadcastToggle(profile.id, e.target.checked);
                       }}
                       disabled={profileBusy || busy}
-                      className="h-3.5 w-3.5 rounded accent-[#7eb6ff]"
+                      className="h-3.5 w-3.5 rounded accent-accent"
                     />
                   </label>
                   {onOpenFolder && (
@@ -522,7 +528,7 @@ export function ProfileSidebar({
                           key={isLive ? paneId : `${tool}-${i}`}
                           className={`relative flex min-h-[32px] items-center gap-0.5 rounded-lg transition-all duration-150 ${
                             dragOverPaneId === paneId && draggingPaneId !== paneId
-                              ? "ring-2 ring-[#7eb6ff]/35"
+                              ? "ring-2 ring-accent/35"
                               : draggingPaneId === paneId
                                 ? "opacity-45 scale-[0.99]"
                                 : ""
@@ -556,7 +562,7 @@ export function ProfileSidebar({
                             draggingPaneId !== paneId &&
                             paneDropZone && (
                               <span
-                                className={`pointer-events-none absolute left-1 right-1 h-0.5 rounded-full bg-[#7eb6ff] ${
+                                className={`pointer-events-none absolute left-1 right-1 h-0.5 rounded-full bg-accent ${
                                   paneDropZone === "above" ? "top-0" : "bottom-0"
                                 }`}
                                 aria-hidden
@@ -570,9 +576,10 @@ export function ProfileSidebar({
                                 e.dataTransfer.effectAllowed = "move";
                               }}
                               onDragEnd={clearPaneDrag}
-                              className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
+                              className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-chrome-hover active:cursor-grabbing"
                               title={t("profile.dragReorder")}
                               aria-label={t("profile.dragReorder")}
+
                             >
                               <DragHandle />
                             </span>
@@ -586,8 +593,8 @@ export function ProfileSidebar({
                           style={profileSessionRowStyle(accent, selected)}
                           className={`group/session flex min-h-[32px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left text-[11px] transition-colors ${
                             selected
-                              ? "font-medium text-[#f4f4f6]"
-                              : "text-[#8b8b92] hover:bg-white/[0.04] hover:text-[#d4d4d8]"
+                              ? "font-medium text-chrome-text"
+                              : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text-secondary"
                           } ${!isLive ? "opacity-65" : ""}`}
                         >
                           {showLiveDot ? (
@@ -629,7 +636,7 @@ export function ProfileSidebar({
                               <span className="min-w-0 truncate">{sessionLabel}</span>
                             )}
                             {cwdShort ? (
-                              <span className="shrink-0 text-[10px] text-[#5c5c64]">· {cwdShort}</span>
+                              <span className="shrink-0 text-[10px] text-chrome-text-dim">· {cwdShort}</span>
                             ) : null}
                           </div>
                           {isActive && isLive && (
@@ -646,7 +653,7 @@ export function ProfileSidebar({
                                   onClosePane(profile.id, paneId);
                                 }
                               }}
-                              className="mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] text-[#6b6b72] opacity-0 transition-opacity hover:bg-white/10 hover:text-[#f0f0f2] group-hover/session:opacity-100"
+                              className="mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] text-chrome-text-faint opacity-0 transition-opacity hover:bg-chrome-hover-strong hover:text-chrome-text group-hover/session:opacity-100"
                             >
                               ✕
                             </span>
@@ -657,14 +664,15 @@ export function ProfileSidebar({
                     })}
 
                     {listedSessions.length === 0 && (
-                      <p className="px-2 py-2.5 text-[10px] text-[#5c5c64]">{t("profile.noSessions")}</p>
+                      <p className="px-2 py-2.5 text-[10px] text-chrome-text-dim">{t("profile.noSessions")}</p>
+
                     )}
 
                     <button
                       type="button"
                       disabled={busy || profileBusy || addingTerminal}
                       onClick={() => onAddTerminal(profile)}
-                      className="mt-0.5 flex min-h-[30px] w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-[11px] text-[#6b6b72] transition-colors hover:bg-white/[0.04] hover:text-[#b4b4ba] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="mt-0.5 flex min-h-[30px] w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-[11px] text-chrome-text-faint transition-colors hover:bg-chrome-hover hover:text-chrome-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
                       style={hasAccent && accent ? { color: accent } : undefined}
                     >
                       <span
@@ -690,11 +698,11 @@ export function ProfileSidebar({
           })}
         </div>
 
-        <div className="shrink-0 border-t border-[#1a1a1e] p-2">
+        <div className="shrink-0 border-t border-chrome-border p-2">
           <button
             type="button"
             onClick={() => void window.api.openSettingsWindow()}
-            className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-[12px] text-[#8b8b92] transition-colors hover:bg-white/[0.04] hover:text-[#e8e8ec]"
+            className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-[12px] text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
           >
             <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/[0.04] text-[11px]">
               ⚙
