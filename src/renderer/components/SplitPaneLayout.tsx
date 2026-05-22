@@ -265,7 +265,7 @@ function WarpPaneShell({
       }}
     >
       <div
-        className="flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
+        className="relative z-10 flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
         style={headerStyle}
       >
         {canReorder && (
@@ -343,7 +343,7 @@ function WarpPaneShell({
           ✕
         </button>
       </div>
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="relative z-0 min-h-0 flex-1 overflow-hidden">
         {isDragOver && dropZone && <PaneDropOverlay zone={dropZone} />}
         {children}
       </div>

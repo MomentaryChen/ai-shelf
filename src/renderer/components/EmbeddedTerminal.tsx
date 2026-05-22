@@ -525,37 +525,42 @@ export function EmbeddedTerminal({
   }, [focused, sessionId, findOpen]);
 
   return (
-    <div className="absolute inset-0">
-      <div ref={containerRef} className="absolute inset-0 h-full w-full" />
-      <TerminalFindBar
-        open={findOpen}
-        focusKey={findInputFocusKey}
-        query={findQuery}
-        caseSensitive={caseSensitive}
-        matchIndex={matchIndex}
-        matchCount={matchCount}
-        matchCapped={matchCapped}
-        onQueryChange={setFindQuery}
-        onCaseSensitiveChange={setCaseSensitive}
-        onNext={() => void runSearch("next")}
-        onPrevious={() => void runSearch("prev")}
-        onClose={closeFind}
-      />
-      {hasNewOutput && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            scrollToBottomRef.current?.();
-          }}
-          className="pointer-events-auto absolute bottom-3 right-3 z-10 flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#3d3d42] bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-lg backdrop-blur-sm transition-colors hover:border-[#5a5a62] hover:bg-[#28282e]"
-          title={t("terminal.scrollToBottom")}
+    <div
+      className="absolute inset-0 isolate"
+      data-terminal-overlay-open={findOpen ? "" : undefined}
+    >
+      <div ref={containerRef} className="absolute inset-0 z-0 h-full w-full" />
+      <div className="pointer-events-none absolute inset-0 z-10">
+        <TerminalFindBar
+          open={findOpen}
+          focusKey={findInputFocusKey}
+          query={findQuery}
+          caseSensitive={caseSensitive}
+          matchIndex={matchIndex}
+          matchCount={matchCount}
+          matchCapped={matchCapped}
+          onQueryChange={setFindQuery}
+          onCaseSensitiveChange={setCaseSensitive}
+          onNext={() => void runSearch("next")}
+          onPrevious={() => void runSearch("prev")}
+          onClose={closeFind}
+        />
+        {hasNewOutput && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              scrollToBottomRef.current?.();
+            }}
+            className="pointer-events-auto absolute bottom-3 right-3 flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#3d3d42] bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-lg backdrop-blur-sm transition-colors hover:border-[#5a5a62] hover:bg-[#28282e]"
+            title={t("terminal.scrollToBottom")}
 
-        >
-          <span aria-hidden>↓</span>
-          <span>{t("terminal.newOutput")}</span>
-        </button>
-      )}
+          >
+            <span aria-hidden>↓</span>
+            <span>{t("terminal.newOutput")}</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

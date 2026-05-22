@@ -13,6 +13,11 @@ body,
   width: 100%;
 }
 
+/* Find bar and other pane overlays sit above xterm's canvas/textarea */
+[data-terminal-overlay-open] .xterm {
+  pointer-events: none;
+}
+
 .xterm .xterm-scrollable-element {
   height: 100%;
 }
