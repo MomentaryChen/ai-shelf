@@ -733,7 +733,7 @@ function WarpTopBar({
   const defaultAccent = getChromeCssVar("--color-chrome-accent-text", "#8ab4ff");
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
+    <div className="relative z-20 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
       {profileLabel && (
         <div
           className="flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1"
