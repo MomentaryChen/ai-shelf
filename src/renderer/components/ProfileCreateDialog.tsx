@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ToolLogo } from "./ToolLogo";
 import {
   PLAIN_SHELL_TOOL_ID,
@@ -34,11 +34,17 @@ export function ProfileCreateDialog({
   const [tool, setTool] = useState("");
   const [accentColor, setAccentColor] = useState<string | null>(null);
 
-  const tools = profileToolChoices(availableTools);
+  const tools = useMemo(
+    () => profileToolChoices(availableTools),
+    [availableTools],
+  );
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
     if (!open) return;
-    setAccentColor(null);
+    if (justOpened) setAccentColor(null);
     setTool((prev) => {
       if (prev && tools.includes(prev)) return prev;
       return tools[0] ?? PLAIN_SHELL_TOOL_ID;
