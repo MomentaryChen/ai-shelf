@@ -5,6 +5,7 @@ import { App } from "./App";
 import { ChatWindowApp } from "./ChatWindowApp";
 import { loadSettings } from "./chat-settings";
 import { SettingsWindowApp } from "./SettingsWindowApp";
+import { LocaleProvider } from "./i18n/LocaleProvider";
 import "./index.css";
 
 applyAppTheme(loadSettings().appTheme);
@@ -19,6 +20,8 @@ function Root() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Root />
+    <LocaleProvider>
+      <Root />
+    </LocaleProvider>
   </StrictMode>,
 );

@@ -35,6 +35,16 @@ import {
   SETTINGS_KEY,
 } from "../chat-settings";
 import { resolveLaunchTool, toolIdsFromInventory } from "../utils/available-tools";
+import { useLocale } from "../i18n/LocaleProvider";
+import type { MessageKey } from "../i18n/messages/en";
+
+const TERMINAL_LABEL_KEYS: Record<ExternalTerminal, MessageKey> = {
+  auto: "terminal.auto",
+  wt: "terminal.wt",
+  pwsh: "terminal.pwsh",
+  powershell: "terminal.powershell",
+  cmd: "terminal.cmd",
+};
 
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
 const SIDEBAR_MIN = 200;
@@ -70,6 +80,7 @@ export function ChatTab({
   active?: boolean;
   inventoryScanning?: boolean;
 }) {
+  const { t } = useLocale();
   const [layout, setLayout] = useState<LayoutNode | null>(null);
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
@@ -96,7 +107,7 @@ export function ChatTab({
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
-      setTerminalError(`無法啟動 terminal（${tool}）：${msg}`);
+      setTerminalError(t("chat.err.startFailed", { tool, msg }));
       return null;
     }
     setTerminalError(null);
@@ -251,15 +262,15 @@ export function ChatTab({
       direction: SplitDirection = "horizontal",
     ) => {
       if (restoring) {
-        setTerminalError("正在還原 profile，請稍候再試…");
+        setTerminalError(t("chat.err.restoringWait"));
         return false;
       }
       if (!canAddPane) {
-        setTerminalError(`已達上限 ${maxPanes} 個 terminal，請先關閉一個 pane`);
+        setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
         return false;
       }
       if (!window.api?.ptySpawn) {
-        setTerminalError("Terminal API 未就緒，請重啟應用程式");
+        setTerminalError(t("chat.err.apiNotReady"));
         return false;
       }
 
@@ -289,7 +300,7 @@ export function ChatTab({
         setTerminalError(
           (prev) =>
             prev ??
-            `Terminal session 已失效且無法重新啟動（${victim.tool}）。請關閉此 pane 後再按 + Terminal。`,
+            t("chat.err.sessionDead", { tool: victim.tool }),
         );
         return;
       }
@@ -317,7 +328,7 @@ export function ChatTab({
         setTerminalError(
           (prev) =>
             prev ??
-            `Terminal session 已失效且無法重新啟動（${victim.tool}）。請關閉此 pane 後再按 + Terminal。`,
+            t("chat.err.sessionDead", { tool: victim.tool }),
         );
         return;
       }
@@ -361,11 +372,11 @@ export function ChatTab({
   const openFolderPane = useCallback(
     async (cwdHint?: string) => {
       if (restoring) {
-        setTerminalError("正在還原 profile，請稍候再試…");
+        setTerminalError(t("chat.err.restoringWait"));
         return;
       }
       if (!canAddPane) {
-        setTerminalError(`已達上限 ${maxPanes} 個 terminal，請先關閉一個 pane`);
+        setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
         return;
       }
       const picked = await window.api.pickFolder(cwdHint?.trim() || resolveCwd() || undefined);
@@ -377,7 +388,7 @@ export function ChatTab({
       );
       const ok = await addPane(tool, picked);
       if (!ok) {
-        setTerminalError((prev) => prev ?? "無法開啟 terminal，請按 F12 查看 Console");
+        setTerminalError((prev) => prev ?? t("chat.err.cannotOpen"));
       }
     },
     [
@@ -446,7 +457,7 @@ export function ChatTab({
       return r;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setTerminalError(`無法啟用 profile：${msg}`);
+      setTerminalError(t("chat.err.enableProfile", { msg }));
       return undefined;
     } finally {
       setProfileBusy(false);
@@ -470,7 +481,7 @@ export function ChatTab({
         cwd || undefined,
       );
       if (!ok) {
-        setTerminalError((prev) => prev ?? "無法開啟 terminal，請按 F12 查看 Console");
+        setTerminalError((prev) => prev ?? t("chat.err.cannotOpen"));
       }
     } catch (err) {
       setTerminalError(err instanceof Error ? err.message : String(err));
@@ -618,44 +629,26 @@ export function ChatTab({
         <div className="rounded-lg border border-chrome-border-subtle bg-chrome-surface px-4 py-3 text-[13px] text-chrome-text-muted">
           Profile <span className="text-chrome-accent-text">{profileLabel}</span>
           {restoring || profileBusy ? (
-            <span className="ml-2">正在還原 terminal…</span>
+            <span className="ml-2">{t("chat.restoring")}</span>
           ) : (
-            <span className="ml-2">
-              — 點上方「+ Pane」開啟 terminal（最多 {maxPanes} 個，會自動記住）
-            </span>
+            <span className="ml-2">{t("chat.restorePaneHint", { max: maxPanes })}</span>
           )}
           {terminalError && (
             <p className="mt-2 text-[12px] text-red-400">{terminalError}</p>
           )}
-          <p className="mt-2 text-[11px] text-chrome-text-dim">
-            窗格快捷鍵：<kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Tab</kbd> 切換、{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+W</kbd> 關閉、{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+L</kbd> 清屏、{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Shift+R</kbd> 重啟 session、{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+\\</kbd> /{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Shift+\\</kbd> 分割、{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+1–9</kbd> 跳至第 N 窗格、{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+F</kbd> 搜尋輸出。
-            右鍵選單亦可清屏／重啟。
-          </p>
-          <p className="mt-1 text-[11px] text-chrome-text-dim">
-            除錯：按 <kbd className="rounded border border-chrome-border-strong px-1">F12</kbd> 或{" "}
-            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Shift+I</kbd>
-            開啟開發者工具；也可按 <kbd className="rounded border border-chrome-border-strong px-1">Alt</kbd>{" "}
-            → View → Developer Tools
-          </p>
+          <p className="mt-2 text-[11px] text-chrome-text-dim">{t("chat.shortcutHint")}</p>
+          <p className="mt-1 text-[11px] text-chrome-text-dim">{t("chat.debugHint")}</p>
         </div>
       ) : (
-        <p className="text-[13px] text-chrome-text-subtle">
-          從左側選擇或建立 <strong className="text-chrome-text-secondary">Profile</strong>
-          ，會自動還原上次的 terminal 視窗與預設目錄。
-        </p>
+        <p className="text-[13px] text-chrome-text-subtle">{t("chat.pickProfile")}</p>
+
       )}
       <div>
         {availableTools.length > 0 && (
           <>
             <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-chrome-text-subtle">
-              可用的 Agent
+              {t("chat.availableAgents")}
+
             </p>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {data.filter((e) => e.available).map((e) => (
@@ -734,6 +727,7 @@ function WarpTopBar({
   onOpenFolder: () => void;
   available: ProviderEntry[];
 }) {
+  const { t } = useLocale();
   const accent = profileAccentColor;
   const hasAccent = Boolean(accent);
   const defaultAccent = getChromeCssVar("--color-chrome-accent-text", "#8ab4ff");
@@ -772,38 +766,33 @@ function WarpTopBar({
           {paneCount > 0 && (
             <span className="shrink-0 text-[10px] tabular-nums text-chrome-text-faint">
               {paneCount}/{maxPanes}
-              {broadcastInput && paneCount > 1 ? " · sync" : ""}
+              {broadcastInput && paneCount > 1 ? ` · ${t("chat.syncLabel")}` : ""}
             </span>
           )}
         </div>
       )}
-      {restoring && <span className="text-[11px] text-chrome-text-subtle">Restoring…</span>}
+      {restoring && <span className="text-[11px] text-chrome-text-subtle">{t("chat.restoringShort")}</span>}
+
       <div ref={newMenuRef} className="relative ml-auto flex items-center gap-2">
         <button
           type="button"
           disabled={!canAddPane || restoring}
           onClick={onOpenFolder}
-          title={
-            canAddPane
-              ? "選擇資料夾並開啟新窗格（獨立工作目錄）"
-              : `Maximum ${maxPanes} panes`
-          }
+          title={canAddPane ? t("chat.pickFolderPane") : t("chat.maxPanesTitle", { max: maxPanes })}
           className="cursor-pointer rounded-md border border-chrome-border-strong px-2 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
+
         >
-          📁 Folder
+          📁 {t("chat.folderBtn")}
         </button>
         <button
           type="button"
           disabled={!canAddPane}
           onClick={onToggleNewMenu}
-          title={
-            canAddPane
-              ? "Add terminal pane (Ctrl+\\ split right, Ctrl+Shift+\\ split down)"
-              : `Maximum ${maxPanes} panes`
-          }
+          title={canAddPane ? t("chat.addPaneTitle") : t("chat.maxPanesTitle", { max: maxPanes })}
           className="cursor-pointer rounded-md border border-chrome-border-strong px-2.5 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
+
         >
-          + Pane
+          {t("chat.addPane")}
         </button>
         {showNewMenu && canAddPane && (
           <div className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
@@ -840,6 +829,7 @@ function ToolCard({
   onInApp?: () => void;
   onExternal?: () => Promise<{ success: boolean; error?: string }>;
 }) {
+  const { t } = useLocale();
   const [extBusy, setExtBusy] = useState(false);
   const [inAppBusy, setInAppBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -850,7 +840,7 @@ function ToolCard({
     setErr("");
     const r = await onExternal();
     setExtBusy(false);
-    if (!r.success) setErr(r.error ?? "Failed to launch terminal");
+    if (!r.success) setErr(r.error ?? t("chat.launchFailed"));
   }
 
   async function handleInApp() {
@@ -881,11 +871,12 @@ function ToolCard({
         </div>
       </div>
       <p className="text-[13px] leading-relaxed text-chrome-text-muted">
-        {TOOL_DESCRIPTIONS[entry.tool] ?? "AI coding assistant"}
+        {TOOL_DESCRIPTIONS[entry.tool] ?? t("chat.aiAssistant")}
       </p>
       {err && <p className="rounded-md bg-red-500/10 px-3 py-2 text-[12px] text-red-400">{err}</p>}
       {disabled ? (
-        <p className="text-center text-[13px] text-chrome-text-subtle">Not installed</p>
+        <p className="text-center text-[13px] text-chrome-text-subtle">{t("chat.notInstalled")}</p>
+
       ) : (
         <div className="mt-auto grid grid-cols-2 gap-3">
           <button
@@ -893,14 +884,14 @@ function ToolCard({
             onClick={handleExternal}
             className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-chrome-border-strong py-2.5 text-[13px] disabled:opacity-50"
           >
-            {extBusy ? <span className="animate-spin">⟳</span> : "🖥️"} External
+            {extBusy ? <span className="animate-spin">⟳</span> : "🖥️"} {t("chat.externalBtn")}
           </button>
           <button
             disabled={inAppBusy}
             onClick={handleInApp}
             className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-accent/50 bg-accent/15 py-2.5 text-[13px] font-medium text-accent disabled:opacity-50"
           >
-            {inAppBusy ? <span className="animate-spin">⟳</span> : "⌨️"} In-App
+            {inAppBusy ? <span className="animate-spin">⟳</span> : "⌨️"} {t("chat.inAppBtn")}
           </button>
         </div>
       )}
@@ -915,6 +906,7 @@ function TerminalSelector({
   value: ExternalTerminal;
   onChange: (v: ExternalTerminal) => void;
 }) {
+  const { t } = useLocale();
   return (
     <select
       value={value}
@@ -923,7 +915,7 @@ function TerminalSelector({
     >
       {TERMINAL_OPTIONS.map((o) => (
         <option key={o.value} value={o.value}>
-          {o.label}
+          {t(TERMINAL_LABEL_KEYS[o.value])}
         </option>
       ))}
     </select>

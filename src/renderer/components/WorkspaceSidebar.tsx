@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { GroupInfo, SessionInfo, WorkspaceInfo, WorkspaceTree } from "../types";
 import { getGroupPaneCount, groupKey } from "../terminal/group-layout-storage";
 import { toolDisplayName } from "../../tool-sort.js";
+import { useLocale } from "../i18n/LocaleProvider";
 
 export interface WorkspaceSelection {
   workspace: WorkspaceInfo;
@@ -32,6 +33,7 @@ export function WorkspaceSidebar({
   activeGroupKey = null,
   embedded = false,
 }: Props) {
+  const { t } = useLocale();
   const [tree, setTree] = useState<WorkspaceTree | null>(null);
   const [expandedWs, setExpandedWs] = useState<Set<string>>(new Set());
   const [expandedGrp, setExpandedGrp] = useState<Set<string>>(new Set());
@@ -42,13 +44,13 @@ export function WorkspaceSidebar({
   const refresh = useCallback(async () => {
     setErr("");
     try {
-      const t = await window.api.wsGetTree();
-      setTree(t);
+      const data = await window.api.wsGetTree();
+      setTree(data);
     } catch {
       setTree({ workspaces: [], groups: {}, sessions: {}, groupLayouts: {}, lastActiveGroupKey: null });
-      setErr("Failed to load workspaces (database unavailable — try restarting after pnpm install)");
+      setErr(t("workspace.failedLoad"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void refresh();
@@ -91,7 +93,7 @@ export function WorkspaceSidebar({
     setErr("");
     const r = await window.api.wsWorkspaceCreate(name.trim(), root?.trim() || undefined);
     setBusy(false);
-    if (!r.success) setErr(r.error ?? "Failed");
+    if (!r.success) setErr(r.error ?? t("workspace.failed"));
     else void refresh();
   }
 
@@ -101,7 +103,7 @@ export function WorkspaceSidebar({
     setBusy(true);
     const r = await window.api.wsGroupCreate(ws.name, name.trim());
     setBusy(false);
-    if (!r.success) setErr(r.error ?? "Failed");
+    if (!r.success) setErr(r.error ?? t("workspace.failed"));
     else {
       setExpandedWs((p) => new Set(p).add(ws.id));
       void refresh();
@@ -116,7 +118,7 @@ export function WorkspaceSidebar({
       cwd: ws.root_path ?? undefined,
     });
     setBusy(false);
-    if (!r.success) setErr(r.error ?? "Failed");
+    if (!r.success) setErr(r.error ?? t("workspace.failed"));
     else {
       setExpandedWs((p) => new Set(p).add(ws.id));
       setExpandedGrp((p) => new Set(p).add(`${ws.id}:${grp.id}`));
@@ -131,7 +133,7 @@ export function WorkspaceSidebar({
   if (!tree) {
     return (
       <aside className={`${shellClass} p-3`}>
-        {err ? <p className="text-[11px] text-fail">{err}</p> : "Loading workspaces…"}
+        {err ? <p className="text-[11px] text-fail">{err}</p> : t("workspace.loading")}
       </aside>
     );
   }
@@ -144,28 +146,29 @@ export function WorkspaceSidebar({
         <span
           className={`text-[11px] font-semibold uppercase tracking-wider ${embedded ? "text-chrome-text-subtle" : "text-text-secondary"}`}
         >
-          Workspaces
+          {t("workspace.title")}
         </span>
         <button
           type="button"
           disabled={busy}
           onClick={() => void createWorkspace()}
           className="cursor-pointer rounded px-1.5 py-0.5 text-[14px] hover:text-accent"
-          title="New workspace"
+          title={t("workspace.newWorkspace")}
         >
           +
         </button>
       </div>
 
       <p className={`px-3 py-1 text-[10px] ${embedded ? "text-chrome-text-dim" : "text-text-tertiary"}`}>
-        點選群組還原上次最多 4 個視窗與預設目錄
+        {t("workspace.restoreHint")}
+
       </p>
 
       {err && <p className="px-3 py-1 text-[11px] text-fail">{err}</p>}
 
       <div className="flex-1 overflow-y-auto px-1 py-2">
         {tree.workspaces.length === 0 && (
-          <p className="px-2 py-4 text-center text-[11px] text-text-tertiary">No workspaces yet</p>
+          <p className="px-2 py-4 text-center text-[11px] text-text-tertiary">{t("workspace.empty")}</p>
         )}
         {tree.workspaces.map((ws) => {
           const groups = tree.groups[ws.id] ?? [];
@@ -193,7 +196,7 @@ export function WorkspaceSidebar({
                   type="button"
                   onClick={() => void createGroup(ws)}
                   className="cursor-pointer rounded px-1 text-[11px] hover:text-accent"
-                  title="New group"
+                  title={t("workspace.newGroup")}
                 >
                   +
                 </button>
@@ -224,7 +227,7 @@ export function WorkspaceSidebar({
                               ? "bg-accent/20 font-medium text-chrome-accent-text"
                               : "text-chrome-text-secondary hover:bg-chrome-surface-hover"
                           }`}
-                          title="還原此群組的上次視窗配置"
+                          title={t("workspace.restoreLayout")}
                         >
                           {grp.name}
                           {savedCount > 0 && (
@@ -235,7 +238,7 @@ export function WorkspaceSidebar({
                           type="button"
                           onClick={() => void createSession(ws, grp)}
                           className="cursor-pointer rounded px-1 text-[10px] hover:text-accent"
-                          title="New named session"
+                          title={t("workspace.newSession")}
                         >
                           +
                         </button>

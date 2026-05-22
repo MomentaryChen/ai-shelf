@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { normalizePaneTitle } from "../utils/pane-label";
+import { useLocale } from "../i18n/LocaleProvider";
 
 interface Props {
   label: string;
@@ -18,6 +19,7 @@ export function EditablePaneTitle({
   disabled = false,
   title,
 }: Props) {
+  const { t } = useLocale();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +65,8 @@ export function EditablePaneTitle({
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         className={`min-w-0 flex-1 rounded border border-chrome-border-hover bg-chrome-surface-raised px-1.5 py-0.5 text-[12px] text-chrome-text outline-none focus:border-accent ${inputClassName}`}
-        aria-label="Tab title"
+        aria-label={t("pane.tabTitle")}
+
       />
     );
   }
@@ -71,7 +74,7 @@ export function EditablePaneTitle({
   return (
     <span
       className={`min-w-0 flex-1 truncate ${disabled ? "" : "cursor-text"} ${className}`}
-      title={title ?? (disabled ? label : `${label} — double-click to rename`)}
+      title={title ?? (disabled ? label : t("pane.renameHint", { label }))}
       onDoubleClick={(e) => {
         if (disabled) return;
         e.stopPropagation();

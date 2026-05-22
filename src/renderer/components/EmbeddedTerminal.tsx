@@ -16,6 +16,7 @@ import { bindTerminalLinks } from "../terminal/xterm-links";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
 import { getXtermTheme } from "../app-theme";
 import { TerminalFindBar } from "./TerminalFindBar";
+import { useLocale } from "../i18n/LocaleProvider";
 
 interface Props {
   sessionId: string;
@@ -67,6 +68,7 @@ export function EmbeddedTerminal({
   onWrite,
   onRestart,
 }: Props) {
+  const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
@@ -546,11 +548,12 @@ export function EmbeddedTerminal({
             e.stopPropagation();
             scrollToBottomRef.current?.();
           }}
-          className="pointer-events-auto absolute bottom-3 right-3 z-10 flex cursor-pointer items-center gap-1.5 rounded-lg border border-chrome-border-focus bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-lg backdrop-blur-sm transition-colors hover:border-chrome-border-hover hover:bg-chrome-surface-hover"
-          title="捲動到底部"
+          className="pointer-events-auto absolute bottom-3 right-3 z-10 flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#3d3d42] bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-lg backdrop-blur-sm transition-colors hover:border-[#5a5a62] hover:bg-[#28282e]"
+          title={t("terminal.scrollToBottom")}
+
         >
           <span aria-hidden>↓</span>
-          <span>新輸出</span>
+          <span>{t("terminal.newOutput")}</span>
         </button>
       )}
     </div>

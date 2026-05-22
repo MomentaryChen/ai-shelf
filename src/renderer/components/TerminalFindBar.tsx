@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useLocale } from "../i18n/LocaleProvider";
 interface Props {
   open: boolean;
   /** Increment to (re)focus the search input without stealing focus back to xterm. */
@@ -34,6 +35,7 @@ export function TerminalFindBar({
   onPrevious,
   onClose,
 }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const wasOpenRef = useRef(false);
 
@@ -67,7 +69,7 @@ export function TerminalFindBar({
   let status = "";
   if (hasQuery) {
     if (matchCount === 0) {
-      status = "無符合";
+      status = t("find.noMatch");
     } else {
       status = `${matchIndex} / ${formatCount(matchCount, matchCapped)}`;
     }
@@ -99,9 +101,10 @@ export function TerminalFindBar({
             else onNext();
           }
         }}
-        placeholder="搜尋輸出…"
+        placeholder={t("find.placeholder")}
         className="w-44 min-w-0 rounded border border-chrome-border-strong bg-chrome-bg px-2 py-1 text-[12px] text-chrome-text outline-none ring-accent focus:ring-1"
-        aria-label="搜尋終端機輸出"
+        aria-label={t("find.aria")}
+
       />
       <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-chrome-text-muted">
         <input
@@ -114,7 +117,7 @@ export function TerminalFindBar({
       </label>
       <button
         type="button"
-        title="上一個 (Shift+Enter)"
+        title={t("find.prev")}
         onClick={onPrevious}
         disabled={!hasQuery || matchCount === 0}
         className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim"
@@ -123,7 +126,7 @@ export function TerminalFindBar({
       </button>
       <button
         type="button"
-        title="下一個 (Enter)"
+        title={t("find.next")}
         onClick={onNext}
         disabled={!hasQuery || matchCount === 0}
         className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim"
@@ -140,7 +143,7 @@ export function TerminalFindBar({
       ) : null}
       <button
         type="button"
-        title="關閉 (Esc)"
+        title={t("find.close")}
         onClick={onClose}
         className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-muted hover:bg-chrome-surface-hover hover:text-chrome-text"
       >

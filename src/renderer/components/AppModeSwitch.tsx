@@ -1,3 +1,6 @@
+import { useLocale } from "../i18n/LocaleProvider";
+import type { MessageKey } from "../i18n/messages/en";
+
 export type AppMode = "terminal" | "inventory";
 
 interface AppModeSwitchProps {
@@ -6,14 +9,16 @@ interface AppModeSwitchProps {
   disabled?: boolean;
 }
 
-const MODES: { id: AppMode; label: string }[] = [
-  { id: "terminal", label: "Terminal" },
-  { id: "inventory", label: "Inventory" },
+const MODES: { id: AppMode; labelKey: MessageKey }[] = [
+  { id: "terminal", labelKey: "app.mode.terminal" },
+  { id: "inventory", labelKey: "app.mode.inventory" },
 ];
 
 export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitchProps) {
+  const { t } = useLocale();
+
   return (
-    <nav role="tablist" aria-label="Application mode" className="flex shrink-0 items-center">
+    <nav role="tablist" aria-label={t("app.mode.aria")} className="flex shrink-0 items-center">
       {MODES.map((m) => {
         const active = mode === m.id;
         return (
@@ -32,7 +37,7 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
                 : "border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
-            {m.label}
+            {t(m.labelKey)}
           </button>
         );
       })}

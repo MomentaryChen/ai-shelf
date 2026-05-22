@@ -1,8 +1,19 @@
-import { PANE_DROP_ZONE_HINT, type PaneDropZone } from "../terminal/pane-drop-zone";
+import type { MessageKey } from "../i18n/messages/en";
+import { useLocale } from "../i18n/LocaleProvider";
+import type { PaneDropZone } from "../terminal/pane-drop-zone";
 
 const ACTIVE = "bg-accent/28 ring-1 ring-inset ring-accent/45";
 
+const ZONE_KEYS: Record<PaneDropZone, MessageKey> = {
+  above: "pane.dropAbove",
+  below: "pane.dropBelow",
+  left: "pane.dropLeft",
+  right: "pane.dropRight",
+  swap: "pane.dropSwap",
+};
+
 export function PaneDropOverlay({ zone }: { zone: PaneDropZone }) {
+  const { t } = useLocale();
   return (
     <div className="pointer-events-none absolute inset-0 z-20 flex flex-col">
       <div className={`h-[22%] shrink-0 transition-colors ${zone === "above" ? ACTIVE : ""}`} />
@@ -14,7 +25,8 @@ export function PaneDropOverlay({ zone }: { zone: PaneDropZone }) {
           }`}
         >
           <span className="rounded-md bg-chrome-bg/90 px-2 py-1 text-[10px] font-medium text-chrome-accent-text shadow-lg">
-            {PANE_DROP_ZONE_HINT[zone]}
+            {t(ZONE_KEYS[zone])}
+
           </span>
         </div>
         <div className={`w-[22%] shrink-0 transition-colors ${zone === "right" ? ACTIVE : ""}`} />

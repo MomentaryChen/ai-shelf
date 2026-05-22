@@ -1,5 +1,6 @@
 import type { ProviderEntry } from "../types";
 import { toolDisplayName } from "../../tool-sort.js";
+import { getStoredT } from "../i18n/stored-locale.js";
 
 /** Profile default: interactive shell only, no AI CLI launched on spawn. */
 export const PLAIN_SHELL_TOOL_ID = "shell";
@@ -43,6 +44,6 @@ export function resolveLaunchTool(tool: string | undefined, available: string[])
 }
 
 export function profileToolLabel(tool: string): string {
-  if (isPlainShellTool(tool)) return "純終端機（不開 AI）";
+  if (isPlainShellTool(tool)) return getStoredT("profile.tool.plainShell");
   return toolDisplayName(tool);
 }

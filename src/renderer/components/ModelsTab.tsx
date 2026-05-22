@@ -7,6 +7,7 @@ import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { formatContext, toolInstall } from "../utils";
 import { partitionByInstalled, installedRowClass } from "../utils/inventory-display";
+import { useLocale } from "../i18n/LocaleProvider";
 
 function ModelChip({ name, active }: { name: string; active?: boolean }) {
   return (
@@ -29,6 +30,7 @@ function ModelsTable({
   expanded: Set<string>;
   toggleExpand: (tool: string) => void;
 }) {
+  const { t } = useLocale();
   const LIMIT = 10;
 
   if (entries.length === 0) return null;
@@ -49,10 +51,10 @@ function ModelsTable({
                     <div className="text-[11px] text-text-tertiary">
                       {e.model ? (
                         <span>
-                          僅設定檔：<span className="font-mono text-text-secondary">{e.model}</span>
+                          {t("inventory.configOnly")}<span className="font-mono text-text-secondary">{e.model}</span>
                         </span>
                       ) : (
-                        <span>請先安裝 CLI 後才能使用模型</span>
+                        <span>{t("inventory.installCliForModel")}</span>
                       )}
                       {install && (
                         <code className="mt-1 block truncate rounded bg-bg-primary px-1.5 py-0.5 font-mono text-[10px] text-text-secondary">
@@ -77,7 +79,7 @@ function ModelsTable({
                         onClick={() => toggleExpand(e.tool)}
                         className="cursor-pointer rounded-md border border-border px-1.5 py-0.5 text-[11px] text-text-secondary transition-all hover:border-accent hover:text-accent"
                       >
-                        {isExpanded ? "Show less" : `+${hidden} more`}
+                        {isExpanded ? t("inventory.models.showLess") : t("inventory.models.showMore", { n: hidden })}
                       </button>
                     )}
                   </div>
@@ -96,6 +98,7 @@ function ModelsTable({
 }
 
 export function ModelsTab({ data }: { data: ProviderEntry[] }) {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { installed, notInstalled } = partitionByInstalled(data);
 
@@ -108,12 +111,12 @@ export function ModelsTab({ data }: { data: ProviderEntry[] }) {
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">🧠 Models</h2>
+      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">🧠 {t("app.tab.models")}</h2>
 
-      <InventorySectionHeader title="已安裝" count={installed.length} variant="installed" />
+      <InventorySectionHeader count={installed.length} variant="installed" />
       <ModelsTable entries={installed} expanded={expanded} toggleExpand={toggleExpand} />
 
-      <InventorySectionHeader title="未安裝" count={notInstalled.length} variant="notInstalled" />
+      <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
       <ModelsTable entries={notInstalled} expanded={expanded} toggleExpand={toggleExpand} />
     </>
   );

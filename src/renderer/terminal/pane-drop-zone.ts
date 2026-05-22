@@ -19,10 +19,17 @@ export function hitPaneDropZone1D(clientY: number, rect: DOMRect): "above" | "be
   return y < 0.5 ? "above" : "below";
 }
 
-export const PANE_DROP_ZONE_HINT: Record<PaneDropZone, string> = {
-  above: "放到上方",
-  below: "放到下方",
-  left: "放到左側",
-  right: "放到右側",
-  swap: "交換位置",
+import { getStoredT } from "../i18n/stored-locale.js";
+import type { MessageKey } from "../i18n/messages/en.js";
+
+const PANE_DROP_ZONE_KEYS: Record<PaneDropZone, MessageKey> = {
+  above: "pane.dropAbove",
+  below: "pane.dropBelow",
+  left: "pane.dropLeft",
+  right: "pane.dropRight",
+  swap: "pane.dropSwap",
 };
+
+export function paneDropZoneHint(zone: PaneDropZone): string {
+  return getStoredT(PANE_DROP_ZONE_KEYS[zone]);
+}

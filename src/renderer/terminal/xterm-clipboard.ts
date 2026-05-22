@@ -5,6 +5,7 @@ import {
   type IClipboardProvider,
 } from "@xterm/addon-clipboard";
 import { tryConsumePaneShortcut } from "./pane-shortcuts";
+import { getStoredT } from "../i18n/stored-locale.js";
 
 /** Electron clipboard via preload — more reliable than navigator.clipboard in xterm. */
 class ElectronClipboardProvider implements IClipboardProvider {
@@ -205,12 +206,12 @@ export function bindTerminalClipboard(
       menuEl!.appendChild(btn);
     };
 
-    addItem("Copy", hasSelection, () => void copyTerminalSelection(term));
-    addItem("Paste", true, () => void pasteIntoTerminal(term));
-    addItem("Find…", true, () => options?.onOpenFind?.());
-    addItem("Select all", true, () => term.selectAll());
-    if (options.onClear) addItem("清屏", true, options.onClear);
-    if (options.onRestart) addItem("重啟 session", true, options.onRestart);
+    addItem(getStoredT("terminal.ctx.copy"), hasSelection, () => void copyTerminalSelection(term));
+    addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal(term));
+    addItem(getStoredT("terminal.ctx.find"), true, () => options?.onOpenFind?.());
+    addItem(getStoredT("terminal.ctx.selectAll"), true, () => term.selectAll());
+    if (options.onClear) addItem(getStoredT("terminal.ctx.clear"), true, options.onClear);
+    if (options.onRestart) addItem(getStoredT("terminal.ctx.restart"), true, options.onRestart);
 
     document.body.appendChild(menuEl);
     requestAnimationFrame(() => {
