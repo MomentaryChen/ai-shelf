@@ -14,6 +14,7 @@ import {
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
+import { getXtermTheme } from "../app-theme";
 import { TerminalFindBar } from "./TerminalFindBar";
 
 interface Props {
@@ -258,29 +259,7 @@ export function EmbeddedTerminal({
       "#0f172a";
 
     const term = new Terminal({
-      theme: {
-        background,
-        foreground: "#cccccc",
-        cursor: "#ffffff",
-        cursorAccent: background,
-        selectionBackground: "#ffffff40",
-        black: "#0c0c0c",
-        brightBlack: "#767676",
-        red: "#c50f1f",
-        brightRed: "#e74856",
-        green: "#13a10e",
-        brightGreen: "#16c60c",
-        yellow: "#c19c00",
-        brightYellow: "#f9f1a5",
-        blue: "#0037da",
-        brightBlue: "#3b78ff",
-        magenta: "#881798",
-        brightMagenta: "#b4009e",
-        cyan: "#3a96dd",
-        brightCyan: "#61d6d6",
-        white: "#cccccc",
-        brightWhite: "#f2f2f2",
-      },
+      theme: getXtermTheme(background),
       fontFamily,
       fontSize,
       lineHeight: 1.5,
@@ -493,6 +472,21 @@ export function EmbeddedTerminal({
 
   useEffect(() => {
     const term = termRef.current;
+    if (!term) return;
+    const applyTheme = () => {
+      const background =
+        bg ||
+        getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() ||
+        "#0f172a";
+      term.options.theme = getXtermTheme(background);
+    };
+    applyTheme();
+    window.addEventListener("app-theme-change", applyTheme);
+    return () => window.removeEventListener("app-theme-change", applyTheme);
+  }, [bg]);
+
+  useEffect(() => {
+    const term = termRef.current;
     if (term) term.options.rightClickSelectsWord = !rightClickPaste;
   }, [rightClickPaste]);
 
@@ -552,7 +546,7 @@ export function EmbeddedTerminal({
             e.stopPropagation();
             scrollToBottomRef.current?.();
           }}
-          className="pointer-events-auto absolute bottom-3 right-3 z-10 flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#3d3d42] bg-[#1e1e22]/95 px-2.5 py-1.5 text-[11px] font-medium text-[#ececef] shadow-lg backdrop-blur-sm transition-colors hover:border-[#5a5a62] hover:bg-[#28282e]"
+          className="pointer-events-auto absolute bottom-3 right-3 z-10 flex cursor-pointer items-center gap-1.5 rounded-lg border border-chrome-border-focus bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-lg backdrop-blur-sm transition-colors hover:border-chrome-border-hover hover:bg-chrome-surface-hover"
           title="捲動到底部"
         >
           <span aria-hidden>↓</span>

@@ -16,9 +16,9 @@ export function ProfileColorPicker({ value, onChange, disabled = false }: Props)
         onClick={() => onChange(null)}
         className={`h-7 w-7 cursor-pointer rounded-md border transition-all ${
           value === null
-            ? "border-[#6b9fff] ring-1 ring-[#6b9fff]/50"
-            : "border-[#333] hover:border-[#555]"
-        } bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-40`}
+            ? "border-accent ring-1 ring-accent/50"
+            : "border-chrome-border-strong hover:border-chrome-border-hover"
+        } bg-chrome-surface-hover disabled:cursor-not-allowed disabled:opacity-40`}
         aria-label="無標記色"
       />
       {PROFILE_ACCENT_COLORS.map((color) => {
@@ -33,8 +33,8 @@ export function ProfileColorPicker({ value, onChange, disabled = false }: Props)
             style={{ backgroundColor: color }}
             className={`h-7 w-7 cursor-pointer rounded-md border transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
               selected
-                ? "border-[#e8e8e8] ring-2 ring-[#6b9fff]/60"
-                : "border-transparent hover:scale-105 hover:border-[#666]"
+                ? "border-chrome-text ring-2 ring-accent/60"
+                : "border-transparent hover:scale-105 hover:border-chrome-border-hover"
             }`}
             aria-label={`標記色 ${color}`}
             aria-pressed={selected}

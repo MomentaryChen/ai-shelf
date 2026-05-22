@@ -186,7 +186,7 @@ export function bindTerminalClipboard(
     const hasSelection = term.hasSelection();
     menuEl = document.createElement("div");
     menuEl.className =
-      "fixed z-[100] min-w-[140px] overflow-hidden rounded-md border border-[#333] bg-[#1a1a1a] py-1 shadow-xl";
+      "fixed z-[100] min-w-[140px] overflow-hidden rounded-md border border-chrome-border-strong bg-chrome-surface-hover py-1 shadow-xl";
     menuEl.style.left = `${ev.clientX}px`;
     menuEl.style.top = `${ev.clientY}px`;
 
@@ -196,7 +196,7 @@ export function bindTerminalClipboard(
       btn.textContent = label;
       btn.disabled = !enabled;
       btn.className =
-        "block w-full cursor-pointer px-3 py-1.5 text-left text-[12px] text-[#e0e0e0] hover:bg-[#2a2a2a] disabled:cursor-default disabled:text-[#555]";
+        "block w-full cursor-pointer px-3 py-1.5 text-left text-[12px] text-chrome-text hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim";
       if (enabled) btn.addEventListener("click", () => {
         removeMenu();
         action();

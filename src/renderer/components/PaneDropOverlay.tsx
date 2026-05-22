@@ -1,6 +1,6 @@
 import { PANE_DROP_ZONE_HINT, type PaneDropZone } from "../terminal/pane-drop-zone";
 
-const ACTIVE = "bg-[#7eb6ff]/28 ring-1 ring-inset ring-[#7eb6ff]/45";
+const ACTIVE = "bg-accent/28 ring-1 ring-inset ring-accent/45";
 
 export function PaneDropOverlay({ zone }: { zone: PaneDropZone }) {
   return (
@@ -10,10 +10,10 @@ export function PaneDropOverlay({ zone }: { zone: PaneDropZone }) {
         <div className={`w-[22%] shrink-0 transition-colors ${zone === "left" ? ACTIVE : ""}`} />
         <div
           className={`relative flex min-w-0 flex-1 items-center justify-center transition-colors ${
-            zone === "swap" ? "bg-[#7eb6ff]/18 ring-2 ring-inset ring-[#7eb6ff]/55" : ""
+            zone === "swap" ? "bg-accent/18 ring-2 ring-inset ring-accent/55" : ""
           }`}
         >
-          <span className="rounded-md bg-[#0c0c0e]/90 px-2 py-1 text-[10px] font-medium text-[#c8daf4] shadow-lg">
+          <span className="rounded-md bg-chrome-bg/90 px-2 py-1 text-[10px] font-medium text-chrome-accent-text shadow-lg">
             {PANE_DROP_ZONE_HINT[zone]}
           </span>
         </div>
