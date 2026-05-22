@@ -6,6 +6,7 @@ import {
   profileToolLabel,
 } from "../utils/available-tools";
 import { ProfileColorPicker } from "./ProfileColorPicker";
+import { useLocale } from "../i18n/LocaleProvider";
 
 interface Props {
   open: boolean;
@@ -27,6 +28,7 @@ export function ProfileCreateDialog({
   onClose,
   onCreate,
 }: Props) {
+  const { t } = useLocale();
   const [name, setName] = useState("");
   const [cwd, setCwd] = useState("");
   const [tool, setTool] = useState("");
@@ -78,26 +80,26 @@ export function ProfileCreateDialog({
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
       >
-        <h2 className="mb-4 text-[15px] font-semibold text-[#f0f0f0]">New Profile</h2>
+        <h2 className="mb-4 text-[15px] font-semibold text-[#f0f0f0]">{t("profile.dialog.createTitle")}</h2>
 
         <label className="mb-3 block">
-          <span className="mb-1 block text-[11px] text-[#6b6b6b]">Profile name</span>
+          <span className="mb-1 block text-[11px] text-[#6b6b6b]">{t("profile.dialog.name")}</span>
           <input
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Work, Side project"
+            placeholder={t("profile.dialog.namePlaceholder")}
             className="w-full rounded-md border border-[#252525] bg-[#0a0a0a] px-3 py-2 text-[13px] focus:border-[#404040] focus:outline-none"
           />
         </label>
 
         <label className="mb-3 block">
-          <span className="mb-1 block text-[11px] text-[#6b6b6b]">Default directory</span>
+          <span className="mb-1 block text-[11px] text-[#6b6b6b]">{t("profile.dialog.defaultDir")}</span>
           <div className="flex gap-2">
             <input
               value={cwd}
               onChange={(e) => setCwd(e.target.value)}
-              placeholder="Leave empty for home directory"
+              placeholder={t("profile.dialog.cwdPlaceholder")}
               className="min-w-0 flex-1 rounded-md border border-[#252525] bg-[#0a0a0a] px-3 py-2 text-[13px] focus:border-[#404040] focus:outline-none"
             />
             <button
@@ -105,46 +107,46 @@ export function ProfileCreateDialog({
               onClick={() => void handleBrowse()}
               className="shrink-0 cursor-pointer rounded-md border border-[#2a2a2a] px-3 py-2 text-[12px] text-[#a0a0a0] hover:border-[#404040]"
             >
-              Browse
+              {t("profile.dialog.browse")}
             </button>
           </div>
         </label>
 
         <fieldset className="mb-4">
-          <legend className="mb-2 block text-[11px] text-[#6b6b6b]">標記色（淺色塊）</legend>
-          <p className="mb-2 text-[10px] text-[#5a5a5a]">未選擇時會自動分配下一個可用色</p>
+          <legend className="mb-2 block text-[11px] text-[#6b6b6b]">{t("profile.dialog.accentLegend")}</legend>
+          <p className="mb-2 text-[10px] text-[#5a5a5a]">{t("profile.dialog.accentAuto")}</p>
           <ProfileColorPicker value={accentColor} onChange={setAccentColor} />
         </fieldset>
 
         <fieldset className="mb-5">
           <legend className="mb-2 flex items-center gap-2 text-[11px] text-[#6b6b6b]">
-            Default terminal tool
+            {t("profile.dialog.defaultTool")}
             {inventoryScanning && tools.length > 0 && (
-              <span className="text-[10px] text-[#5a5a5a]">· detecting more…</span>
+              <span className="text-[10px] text-[#5a5a5a]">· {t("profile.dialog.detectingMore")}</span>
             )}
           </legend>
           <div className="flex flex-col gap-1">
-              {tools.map((t) => (
-                <label
-                  key={t}
-                  className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors ${
-                    effectiveTool === t
-                      ? "border-[#3d5a80] bg-[#1a2a40]/50 text-[#8ab4ff]"
-                      : "border-[#252525] text-[#a0a0a0] hover:border-[#353535]"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="defaultTool"
-                    value={t}
-                    checked={effectiveTool === t}
-                    onChange={() => setTool(t)}
-                    className="sr-only"
-                  />
-                  <ToolLogo tool={t} size={16} />
-                  <span className="text-[13px]">{profileToolLabel(t)}</span>
-                </label>
-              ))}
+            {tools.map((toolId) => (
+              <label
+                key={toolId}
+                className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors ${
+                  effectiveTool === toolId
+                    ? "border-[#3d5a80] bg-[#1a2a40]/50 text-[#8ab4ff]"
+                    : "border-[#252525] text-[#a0a0a0] hover:border-[#353535]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="defaultTool"
+                  value={toolId}
+                  checked={effectiveTool === toolId}
+                  onChange={() => setTool(toolId)}
+                  className="sr-only"
+                />
+                <ToolLogo tool={toolId} size={16} />
+                <span className="text-[13px]">{profileToolLabel(toolId)}</span>
+              </label>
+            ))}
           </div>
         </fieldset>
 
@@ -154,14 +156,14 @@ export function ProfileCreateDialog({
             onClick={onClose}
             className="cursor-pointer rounded-md px-4 py-2 text-[13px] text-[#8a8a8a] hover:text-[#e0e0e0]"
           >
-            Cancel
+            {t("profile.dialog.cancel")}
           </button>
           <button
             type="submit"
             disabled={!name.trim()}
             className="cursor-pointer rounded-md bg-[#2a4a7a] px-4 py-2 text-[13px] font-medium text-[#e8f0ff] hover:bg-[#355f9e] disabled:opacity-40"
           >
-            Create
+            {t("profile.dialog.create")}
           </button>
         </div>
       </form>

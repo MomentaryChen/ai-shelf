@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ChatWindowApp } from "./ChatWindowApp";
 import { SettingsWindowApp } from "./SettingsWindowApp";
+import { LocaleProvider } from "./i18n/LocaleProvider";
 import "./index.css";
 
 const route = window.location.hash.replace(/^#\/?/, "");
@@ -15,6 +16,8 @@ function Root() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Root />
+    <LocaleProvider>
+      <Root />
+    </LocaleProvider>
   </StrictMode>,
 );

@@ -21,6 +21,7 @@ import {
   profileSessionsWellStyle,
 } from "../utils/profile-colors";
 import { hitPaneDropZone1D, type PaneDropZone } from "../terminal/pane-drop-zone";
+import { useLocale } from "../i18n/LocaleProvider";
 import { reorderById } from "../utils/reorder-by-id";
 import {
   Chevron,
@@ -77,6 +78,7 @@ export function ProfileSidebar({
   onProfileDeleted,
   activeLivePaneCount = 0,
 }: Props) {
+  const { t } = useLocale();
   const [tree, setTree] = useState<ProfileTree | null>(null);
   const [query, setQuery] = useState("");
   const [err, setErr] = useState("");
@@ -100,7 +102,7 @@ export function ProfileSidebar({
     const r = await window.api.profileGetTree();
     if (!r.success || !r.tree) {
       setTree({ workspaceId: "", profiles: [], lastActiveProfileId: null });
-      setErr(r.error ?? "Failed to load profiles");
+      setErr(r.error ?? t("profile.failedLoad"));
       return;
     }
     setTree(r.tree);
@@ -183,7 +185,7 @@ export function ProfileSidebar({
     setBusy(false);
     if (!r.success) {
       setTree(prevTree);
-      setErr(r.error ?? "Failed to reorder profiles");
+      setErr(r.error ?? t("profile.failedReorder"));
       return;
     }
     if (r.tree) setTree(r.tree);
@@ -204,7 +206,7 @@ export function ProfileSidebar({
       opts.accentColor,
     );
     setBusy(false);
-    if (!r.success) setErr(r.error ?? "Failed to create profile");
+    if (!r.success) setErr(r.error ?? t("profile.failedCreate"));
     else {
       void refresh();
       if (r.profile) onActivateProfile(r.profile);
@@ -216,7 +218,7 @@ export function ProfileSidebar({
     const r = await window.api.profileUpdate(profileId, patch);
     setBusy(false);
     if (!r.success) {
-      setErr(r.error ?? "Failed to save settings");
+      setErr(r.error ?? t("profile.failedSave"));
       return;
     }
     if (r.profile) {
@@ -239,13 +241,13 @@ export function ProfileSidebar({
 
   async function handleDelete(profile: ProfileInfo) {
     const ok = confirm(
-      `Delete profile "${profile.name}"?\n\nSaved terminals and layout will be removed.`,
+      t("profile.deleteConfirm", { name: profile.name }),
     );
     if (!ok) return;
     setBusy(true);
     const r = await window.api.profileDelete(profile.id);
     setBusy(false);
-    if (!r.success) setErr(r.error ?? "Failed to delete");
+    if (!r.success) setErr(r.error ?? t("profile.failedDelete"));
     else {
       if (settingsProfileId === profile.id) setSettingsProfileId(null);
       onProfileDeleted(profile.id);
@@ -297,7 +299,7 @@ export function ProfileSidebar({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search profiles…"
+              placeholder={t("profile.search")}
               className="h-8 w-full rounded-lg border border-[#252528] bg-[#111114] pl-8 pr-2.5 text-[12px] text-[#e8e8ec] placeholder:text-[#5c5c64] transition-colors focus:border-[#3a3a42] focus:bg-[#131316] focus:outline-none focus:ring-1 focus:ring-white/[0.06]"
             />
           </div>
@@ -305,11 +307,11 @@ export function ProfileSidebar({
 
         <div className="flex h-9 shrink-0 items-center justify-between px-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5c5c64]">
-            Profiles
+            {t("profile.title")}
           </span>
           <div className="flex items-center gap-0.5">
             <SidebarIconBtn
-              title={allProfilesExpanded ? "收合全部" : "展開全部"}
+              title={allProfilesExpanded ? t("profile.collapseAll") : t("profile.expandAll")}
               disabled={profileIds.length === 0}
               onClick={() =>
                 allProfilesExpanded ? collapseAllProfiles() : expandAllProfiles()
@@ -320,7 +322,7 @@ export function ProfileSidebar({
               </span>
             </SidebarIconBtn>
             <SidebarIconBtn
-              title="New profile"
+              title={t("profile.new")}
               disabled={busy}
               onClick={() => setCreateOpen(true)}
               className="text-[15px] font-light"
@@ -334,11 +336,11 @@ export function ProfileSidebar({
 
         <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2.5">
           {!tree && (
-            <p className="px-2 py-6 text-center text-[11px] text-[#5c5c64]">Loading…</p>
+            <p className="px-2 py-6 text-center text-[11px] text-[#5c5c64]">{t("profile.loading")}</p>
           )}
           {tree && filtered.length === 0 && (
             <p className="px-2 py-6 text-center text-[11px] text-[#5c5c64]">
-              {query.trim() ? "No matching profiles" : "No profiles yet"}
+              {query.trim() ? t("profile.noMatch") : t("profile.empty")}
             </p>
           )}
           {filtered.map((profile) => {
@@ -406,8 +408,8 @@ export function ProfileSidebar({
                         setDragOverId(null);
                       }}
                       className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
-                      title="拖曳以調整順序"
-                      aria-label="拖曳以調整順序"
+                      title={t("sidebar.dragReorder")}
+                      aria-label={t("sidebar.dragReorder")}
                     >
                       <DragHandle />
                     </span>
@@ -416,7 +418,7 @@ export function ProfileSidebar({
                     type="button"
                     onClick={() => toggleExpanded(profile.id)}
                     className="flex h-7 w-6 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-white/[0.05]"
-                    title={expanded ? "收合" : "展開"}
+                    title={expanded ? t("profile.collapse") : t("profile.expand")}
                     aria-expanded={expanded}
                   >
                     <Chevron expanded={expanded} />
@@ -451,7 +453,7 @@ export function ProfileSidebar({
                   </button>
                   <label
                     className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-white/[0.05]"
-                    title="同步輸入至所有 terminal"
+                    title={t("profile.syncBroadcast")}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
@@ -467,7 +469,7 @@ export function ProfileSidebar({
                   </label>
                   {onOpenFolder && (
                     <SidebarIconBtn
-                      title="選擇資料夾並開啟新窗格"
+                      title={t("profile.pickFolderNewPane")}
                       disabled={busy || profileBusy || addingTerminal}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -478,7 +480,7 @@ export function ProfileSidebar({
                     </SidebarIconBtn>
                   )}
                   <SidebarIconBtn
-                    title={`新增 terminal（${profileToolLabel(defaultTool)}）`}
+                    title={t("profile.addTerminal", { tool: profileToolLabel(defaultTool) })}
                     disabled={busy || profileBusy || addingTerminal}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -488,7 +490,7 @@ export function ProfileSidebar({
                     <ToolLogo tool={defaultTool} size={15} />
                   </SidebarIconBtn>
                   <SidebarIconBtn
-                    title="Profile 設定"
+                    title={t("profile.settings")}
                     onClick={(e) => openSettings(e, profile)}
                     className="text-[13px]"
                   >
@@ -569,8 +571,8 @@ export function ProfileSidebar({
                               }}
                               onDragEnd={clearPaneDrag}
                               className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
-                              title="拖曳到目標上方或下方"
-                              aria-label="拖曳到目標上方或下方"
+                              title={t("profile.dragReorder")}
+                              aria-label={t("profile.dragReorder")}
                             >
                               <DragHandle />
                             </span>
@@ -655,7 +657,7 @@ export function ProfileSidebar({
                     })}
 
                     {listedSessions.length === 0 && (
-                      <p className="px-2 py-2.5 text-[10px] text-[#5c5c64]">尚無 session</p>
+                      <p className="px-2 py-2.5 text-[10px] text-[#5c5c64]">{t("profile.noSessions")}</p>
                     )}
 
                     <button
@@ -679,7 +681,7 @@ export function ProfileSidebar({
                       >
                         +
                       </span>
-                      {addingTerminal && isActive ? "開啟中…" : "New Terminal"}
+                      {addingTerminal && isActive ? t("profile.opening") : t("profile.newTerminal")}
                     </button>
                   </div>
                 )}
@@ -697,7 +699,7 @@ export function ProfileSidebar({
             <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/[0.04] text-[11px]">
               ⚙
             </span>
-            Settings
+            {t("sidebar.settings")}
           </button>
         </div>
       </aside>

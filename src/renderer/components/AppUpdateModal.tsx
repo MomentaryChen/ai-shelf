@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { sanitizeReleaseNotesHtml } from "../utils/releaseNotesHtml";
+import { useLocale } from "../i18n/LocaleProvider";
 
 type Phase = "hidden" | "confirm" | "downloading" | "ready" | "error";
 
 export function AppUpdateModal() {
+  const { t } = useLocale();
   const [enabled, setEnabled] = useState(false);
   const [phase, setPhase] = useState<Phase>("hidden");
   const [version, setVersion] = useState<string | null>(null);
@@ -108,20 +110,24 @@ export function AppUpdateModal() {
     >
       <div className="w-full max-w-md rounded-xl border border-border bg-bg-card p-6 shadow-xl">
         <h2 id="app-update-title" className="mb-2 text-lg font-semibold text-text-primary">
-          {phase === "ready" ? "Update ready" : phase === "error" ? "Update failed" : "Update available"}
+          {phase === "ready"
+            ? t("appUpdate.ready")
+            : phase === "error"
+              ? t("appUpdate.failed")
+              : t("appUpdate.available")}
         </h2>
 
         {phase === "confirm" && (
           <>
             <p className="mb-3 text-sm text-text-secondary">
-              A new version of AI Shelf is available
+              {t("appUpdate.newVersion")}
               {version ? (
                 <>
                   {" "}
                   (<span className="font-mono text-accent">v{version}</span>)
                 </>
               ) : null}
-              . Download now?
+              {t("appUpdate.downloadPrompt")}
             </p>
             {releaseNotesHtml && (
               <div
@@ -136,14 +142,14 @@ export function AppUpdateModal() {
                 onClick={dismiss}
                 className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
               >
-                Later
+                {t("appUpdate.later")}
               </button>
               <button
                 type="button"
                 onClick={startDownload}
                 className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
               >
-                Update now
+                {t("appUpdate.now")}
               </button>
             </div>
           </>
@@ -152,7 +158,8 @@ export function AppUpdateModal() {
         {phase === "downloading" && (
           <>
             <p className="mb-3 text-sm text-text-secondary">
-              Downloading{version ? ` v${version}` : ""}…
+              {t("appUpdate.downloading")}
+              {version ? ` v${version}` : ""}…
             </p>
             <div className="mb-2 h-2 overflow-hidden rounded-full bg-bg-primary">
               <div
@@ -167,7 +174,8 @@ export function AppUpdateModal() {
         {phase === "ready" && (
           <>
             <p className="mb-4 text-sm text-text-secondary">
-              Download complete{version ? ` (v${version})` : ""}. Restart AI Shelf to finish installing.
+              {t("appUpdate.downloadComplete")}
+              {version ? ` (v${version})` : ""}. {t("appUpdate.restartFinish")}
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -175,14 +183,14 @@ export function AppUpdateModal() {
                 onClick={dismiss}
                 className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
               >
-                Restart later
+                {t("appUpdate.restartLater")}
               </button>
               <button
                 type="button"
                 onClick={restartToInstall}
                 className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
               >
-                Restart now
+                {t("appUpdate.restartNow")}
               </button>
             </div>
           </>
@@ -190,21 +198,21 @@ export function AppUpdateModal() {
 
         {phase === "error" && (
           <>
-            <p className="mb-4 text-sm text-fail">{errorMessage ?? "Could not check or download the update."}</p>
+            <p className="mb-4 text-sm text-fail">{errorMessage ?? t("appUpdate.errorDefault")}</p>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={dismiss}
                 className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
               >
-                Close
+                {t("appUpdate.close")}
               </button>
               <button
                 type="button"
                 onClick={retryCheck}
                 className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
               >
-                Retry
+                {t("appUpdate.retry")}
               </button>
             </div>
           </>

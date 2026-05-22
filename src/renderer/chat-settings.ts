@@ -1,3 +1,6 @@
+import { detectSystemLocale, resolveLocale, type AppLocale } from "./i18n/index.js";
+
+export type { AppLocale };
 export type ExternalTerminal = "auto" | "wt" | "pwsh" | "powershell" | "cmd";
 
 export const DEFAULT_TERMINAL_FONT_FAMILY =
@@ -12,6 +15,7 @@ const MIN_TERMINAL_SCROLLBACK = 1_000;
 const MAX_TERMINAL_SCROLLBACK = 100_000;
 
 export interface ChatSettings {
+  locale: AppLocale;
   externalTerminal: ExternalTerminal;
   terminalBg: string;
   terminalFontFamily: string;
@@ -66,6 +70,7 @@ function normalizeRightClickPaste(raw: unknown): boolean {
 }
 
 const DEFAULTS: ChatSettings = {
+  locale: detectSystemLocale(),
   externalTerminal: "auto",
   terminalBg: "#0c0c0c",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
@@ -82,6 +87,7 @@ export function loadSettings(): ChatSettings {
     return {
       ...DEFAULTS,
       ...stored,
+      locale: resolveLocale(stored.locale ?? DEFAULTS.locale),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),
       terminalFontSize: clampInt(
         stored.terminalFontSize,

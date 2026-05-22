@@ -4,6 +4,7 @@ import { Card } from "./Card";
 import { Badge } from "./Badge";
 
 import { MCP_SYNC_TOOL_IDS } from "../../tools.js";
+import { useLocale } from "../i18n/LocaleProvider";
 
 const TOOLS = MCP_SYNC_TOOL_IDS;
 const TOOL_ICONS: Record<string, string> = {
@@ -15,6 +16,7 @@ const TOOL_ICONS: Record<string, string> = {
 };
 
 export function McpSyncPanel() {
+  const { t } = useLocale();
   const [rawData, setRawData] = useState<McpRawData | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetTools, setTargetTools] = useState<Set<string>>(new Set(TOOLS));
@@ -77,7 +79,7 @@ export function McpSyncPanel() {
   };
 
   return (
-    <Card title="🔌 MCP Server Matrix">
+    <Card title={`🔌 ${t("inventory.mcpSync.title")}`}>
       {/* Sync results */}
       {results && (
         <div className="mb-4 rounded-lg border border-border bg-bg-primary p-3">
@@ -96,7 +98,7 @@ export function McpSyncPanel() {
                     <span className="text-text-secondary">{r.skipped.length} skipped</span>
                   )}
                   {r.added.length === 0 && r.skipped.length === 0 && (
-                    <span className="text-text-secondary">no changes</span>
+                    <span className="text-text-secondary">{t("inventory.mcpSync.noChanges")}</span>
                   )}
                 </>
               )}
@@ -110,9 +112,9 @@ export function McpSyncPanel() {
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-ok/30 bg-ok/10 px-4 py-3">
           <span className="text-2xl">✅</span>
           <div>
-            <p className="font-semibold text-ok">所有 MCP Server 已同步完成</p>
+            <p className="font-semibold text-ok">{t("inventory.mcpSync.allSynced")}</p>
             <p className="text-xs text-text-secondary">
-              共 {allServerNames.length} 個 server，所有工具均已配置
+              {t("inventory.mcpSync.serverCount", { count: allServerNames.length })}
             </p>
           </div>
         </div>
@@ -122,7 +124,7 @@ export function McpSyncPanel() {
       {syncableServers.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-bg-primary px-3 py-2.5">
           <div className="flex items-center gap-2 text-xs text-text-secondary">
-            <span className="font-semibold uppercase tracking-wider">Sync to:</span>
+            <span className="font-semibold uppercase tracking-wider">{t("inventory.mcpSync.syncTo")}</span>
             {TOOLS.map((tool) => (
               <label key={tool} className="flex cursor-pointer items-center gap-1 text-sm text-text-primary">
                 <input
@@ -166,7 +168,7 @@ export function McpSyncPanel() {
                     checked={allMissingSelected}
                     onChange={() => setSelected(allMissingSelected ? new Set() : new Set(syncableServers))}
                     className="accent-accent"
-                    title="Select all with missing"
+                    title={t("inventory.mcpSync.selectMissing")}
                   />
                 )}
               </th>
@@ -227,7 +229,7 @@ export function McpSyncPanel() {
         {allServerNames.length} servers total ·{" "}
         {syncableServers.length > 0
           ? <span className="text-amber-400">{syncableServers.length} need sync</span>
-          : <span className="text-green-400">all synced ✅</span>}
+          : <span className="text-green-400">{t("inventory.mcpSync.allSyncedShort")}</span>}
         {syncedCount > 0 && ` · ${syncedCount} fully synced`}
       </div>
     </Card>

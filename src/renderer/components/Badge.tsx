@@ -1,3 +1,5 @@
+import { useLocale } from "../i18n/LocaleProvider";
+
 type Variant = "ok" | "fail" | "warn" | "info";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
@@ -18,20 +20,27 @@ export function Badge({ text, variant }: { text: string; variant: Variant }) {
 }
 
 export function YesNo({ value }: { value?: boolean }) {
-  return value ? <Badge text="Yes" variant="ok" /> : <Badge text="No" variant="fail" />;
+  const { t } = useLocale();
+  return value ? (
+    <Badge text={t("inventory.yes")} variant="ok" />
+  ) : (
+    <Badge text={t("inventory.no")} variant="fail" />
+  );
 }
 
 export function AuthBadge({ auth }: { auth: string }) {
-  if (auth === "ok") return <Badge text="✓ OK" variant="ok" />;
-  if (auth === "missing") return <Badge text="✗ Missing" variant="fail" />;
+  const { t } = useLocale();
+  if (auth === "ok") return <Badge text={t("inventory.authOk")} variant="ok" />;
+  if (auth === "missing") return <Badge text={t("inventory.authMissing")} variant="fail" />;
   return <Badge text={auth} variant="warn" />;
 }
 
 export function InstallStatusBadge({ available }: { available: boolean }) {
+  const { t } = useLocale();
   return available ? (
-    <Badge text="已安裝" variant="ok" />
+    <Badge text={t("inventory.installedBadge")} variant="ok" />
   ) : (
-    <Badge text="未安裝" variant="fail" />
+    <Badge text={t("inventory.notInstalledBadge")} variant="fail" />
   );
 }
 

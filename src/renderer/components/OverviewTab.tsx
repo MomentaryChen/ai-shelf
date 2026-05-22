@@ -8,8 +8,10 @@ import { ToolNameCell } from "./ToolNameCell";
 import { EmptyInventoryHint } from "./InventorySection";
 import { toolLabel, toolInstall, formatContext } from "../utils";
 import { partitionByInstalled, sortByInstalled, installedRowClass } from "../utils/inventory-display";
+import { useLocale } from "../i18n/LocaleProvider";
 
 export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry[]; modelOverrides?: Record<string, string> }) {
+  const { t } = useLocale();
   const sorted = sortByInstalled(data);
   const { installed, notInstalled } = partitionByInstalled(data);
   const available = installed.length;
@@ -38,12 +40,12 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
     <>
       {/* Summary grid */}
       <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        <SummaryBox value={`${available}/${data.length}`} label="已安裝 / 偵測總數" />
-        <SummaryBox value={notInstalled.length} label="未安裝" className={notInstalled.length > 0 ? "text-text-tertiary" : "text-ok"} />
-        <SummaryBox value={totalMcp} label="MCP Servers" />
+        <SummaryBox value={`${available}/${data.length}`} label={t("inventory.overview.available")} />
+        <SummaryBox value={notInstalled.length} label={t("inventory.notInstalled")} className={notInstalled.length > 0 ? "text-text-tertiary" : "text-ok"} />
+        <SummaryBox value={totalMcp} label={t("inventory.overview.mcpServers")} />
         <SummaryBox
           value={warnings}
-          label="Warnings"
+          label={t("inventory.overview.warnings")}
           className={warnings > 0 ? "text-warn" : "text-ok"}
         />
       </div>
@@ -90,7 +92,7 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
 
       {/* Warnings */}
       {warnings > 0 && (
-        <Card title="⚠️ Warnings">
+        <Card title={`⚠️ ${t("inventory.overview.cardWarnings")}`}>
           {data
             .filter((e) => !e.available || (e.available && e.auth === "missing"))
             .map((w) => (
@@ -101,7 +103,7 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
                 {w.available && w.auth === "missing" && (
                   <div className="flex items-center gap-2 py-1 text-[13px]">
                     <span className="w-5 text-center">✗</span>
-                    <strong>{toolLabel(w.tool)}</strong>: auth not configured
+                    <strong>{toolLabel(w.tool)}</strong>: {t("inventory.overview.authNotConfigured")}
                   </div>
                 )}
               </div>
@@ -110,7 +112,7 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
       )}
       {/* Environment Variables */}
       {envGroups.length > 0 && (
-        <Card title="🔑 Environment">
+        <Card title={`🔑 ${t("inventory.overview.cardEnvironment")}`}>
           {envGroups.map((group) => (
             <div key={group.provider} className="flex items-start gap-4 border-t border-border py-2.5 first:border-none first:pt-0 text-[13px]">
               <span className="w-20 shrink-0 font-medium text-text-primary">{group.provider}</span>
@@ -135,7 +137,15 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
                             ? "cursor-pointer hover:text-accent"
                             : "cursor-default opacity-80"
                         }`}
-                        title={canReveal ? (isOpen ? "隱藏值" : "點擊查看值") : v.set ? "已設定（無可顯示的值）" : "未設定"}
+                        title={
+                          canReveal
+                            ? isOpen
+                              ? t("inventory.overview.hideValue")
+                              : t("inventory.overview.revealValue")
+                            : v.set
+                              ? t("inventory.overview.setNoValue")
+                              : t("inventory.overview.notSet")
+                        }
                       >
                         {v.key}
                       </button>
@@ -177,6 +187,7 @@ function SummaryBox({
 }
 
 function InstallPrompt({ tool }: { tool: string }) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   const info = toolInstall(tool);
 
@@ -191,7 +202,7 @@ function InstallPrompt({ tool }: { tool: string }) {
     <div className="text-[13px]">
       <div className="flex items-center gap-2 py-1">
         <span className="w-5 text-center">✗</span>
-        <strong>{toolLabel(tool)}</strong>: not found in PATH
+        <strong>{toolLabel(tool)}</strong>: {t("inventory.overview.notInPath")}
         {info?.url && (
           <a
             href={info.url}
@@ -199,13 +210,13 @@ function InstallPrompt({ tool }: { tool: string }) {
             rel="noreferrer"
             className="ml-1 text-accent underline-offset-2 hover:underline"
           >
-            官網
+            {t("inventory.overview.website")}
           </a>
         )}
       </div>
       {info && (
         <div className="ml-7 mt-1 flex items-center gap-2">
-          <span className="text-text-secondary text-[11px]">安裝：</span>
+          <span className="text-text-secondary text-[11px]">{t("inventory.overview.install")}</span>
           <code className="flex-1 rounded bg-bg-secondary px-2 py-1 font-mono text-[11px] text-text-primary">
             {info.cmd}
           </code>
@@ -213,7 +224,7 @@ function InstallPrompt({ tool }: { tool: string }) {
             onClick={copy}
             className="cursor-pointer rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-all hover:border-accent hover:text-accent"
           >
-            {copied ? "✓ 已複製" : "複製"}
+            {copied ? t("inventory.overview.copied") : t("inventory.overview.copy")}
           </button>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { useLocale } from "../i18n/LocaleProvider";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { DragHandle } from "./ProfileSidebarUI";
@@ -26,6 +27,7 @@ export function TerminalSessionSidebar({
   onNewSession,
   workspaceSlot,
 }: Props) {
+  const { t } = useLocale();
   const [query, setQuery] = useState("");
   const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
   const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function TerminalSessionSidebar({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tabs…"
+          placeholder={t("sidebar.searchTabs")}
           className="w-full rounded-md border border-[#252525] bg-[#111111] px-2.5 py-1.5 text-[12px] text-[#e8e8e8] placeholder:text-[#5a5a5a] focus:border-[#404040] focus:outline-none"
         />
       </div>
@@ -53,7 +55,7 @@ export function TerminalSessionSidebar({
       <div className="flex-1 overflow-y-auto px-1.5 py-2">
         {filtered.length === 0 && (
           <p className="px-2 py-3 text-center text-[11px] text-[#5a5a5a]">
-            {panes.length === 0 ? "No sessions" : "No matching tabs"}
+            {panes.length === 0 ? t("sidebar.noSessions") : t("sidebar.noMatchingTabs")}
           </p>
         )}
         {filtered.map((pane) => {
@@ -97,8 +99,8 @@ export function TerminalSessionSidebar({
                     setDragOverPaneId(null);
                   }}
                   className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
-                  title="拖曳以調整順序"
-                  aria-label="拖曳以調整順序"
+                  title={t("sidebar.dragReorder")}
+                  aria-label={t("sidebar.dragReorder")}
                 >
                   <DragHandle />
                 </span>
@@ -149,7 +151,7 @@ export function TerminalSessionSidebar({
           className="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-[12px] text-[#6b6b6b] transition-colors hover:bg-[#151515] hover:text-[#c0c0c0]"
         >
           <span className="flex h-[14px] w-[14px] items-center justify-center text-[13px]">+</span>
-          New session
+          {t("sidebar.newSession")}
         </button>
       </div>
 
@@ -164,7 +166,7 @@ export function TerminalSessionSidebar({
           className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-[12px] text-[#8a8a8a] transition-colors hover:bg-[#151515] hover:text-[#e0e0e0]"
         >
           <span>⚙</span>
-          Settings
+          {t("sidebar.settings")}
         </button>
       </div>
     </aside>

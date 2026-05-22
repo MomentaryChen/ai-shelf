@@ -8,6 +8,7 @@ import { ResizeDivider } from "./ResizeDivider";
 import { hitPaneDropZone, type PaneDropZone } from "../terminal/pane-drop-zone";
 import { collectPanes, type LayoutNode, type PaneInfo, type SplitDirection } from "../terminal/split-tree";
 import { formatPaneCwdShort } from "../utils/pane-cwd";
+import { useLocale } from "../i18n/LocaleProvider";
 import {
   profilePaneChromeStyle,
   profilePaneHeaderDotStyle,
@@ -195,6 +196,7 @@ function WarpPaneShell({
   onCwdClick?: () => void;
   children: ReactNode;
 }) {
+  const { t } = useLocale();
   const cwdShort = formatPaneCwdShort(pane.cwd);
   const chromeStyle = profilePaneChromeStyle(profileAccentColor, focused);
   const headerStyle = profilePaneHeaderStyle(profileAccentColor, focused);
@@ -277,8 +279,8 @@ function WarpPaneShell({
             }}
             onDragEnd={clearDrag}
             className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
-            title="拖曳到窗格上／下／左／右，中央為交換"
-            aria-label="拖曳到窗格上／下／左／右，中央為交換"
+            title={t("pane.dragHint")}
+            aria-label={t("pane.dragHint")}
           >
             <DragHandle />
           </span>
@@ -309,7 +311,7 @@ function WarpPaneShell({
               onCwdClick();
             }}
             className="min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-[#6b6b6b] transition-colors hover:bg-white/[0.06] hover:text-[#b4b4ba]"
-            title={pane.cwd ? `${pane.cwd}\n\n點擊變更工作目錄` : "點擊選擇工作目錄"}
+            title={pane.cwd ? `${pane.cwd}\n\n${t("pane.clickChangeCwd")}` : t("pane.clickPickCwd")}
           >
             {cwdShort || "~"}
           </button>
@@ -319,10 +321,10 @@ function WarpPaneShell({
           </span>
         )}
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/pane:opacity-100">
-          <IconBtn title="Split right" onClick={() => onSplit("horizontal")}>
+          <IconBtn title={t("pane.splitRight")} onClick={() => onSplit("horizontal")}>
             ⫽
           </IconBtn>
-          <IconBtn title="Split down" onClick={() => onSplit("vertical")}>
+          <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
             ⫼
           </IconBtn>
         </div>
@@ -333,7 +335,7 @@ function WarpPaneShell({
             onClose();
           }}
           className="cursor-pointer rounded px-1 text-[11px] text-[#6b6b6b] transition-colors hover:bg-white/10 hover:text-[#f0f0f0]"
-          title="Close pane"
+          title={t("pane.close")}
         >
           ✕
         </button>

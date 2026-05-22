@@ -1,15 +1,16 @@
 import type { ProviderEntry } from "../types";
+import { useLocale } from "../i18n/LocaleProvider";
 
 export function InventorySectionHeader({
-  title,
   count,
   variant,
 }: {
-  title: string;
   count: number;
   variant: "installed" | "notInstalled";
 }) {
+  const { t } = useLocale();
   if (count === 0) return null;
+  const title = variant === "installed" ? t("inventory.installed") : t("inventory.notInstalled");
   const color =
     variant === "installed"
       ? "text-ok border-ok/30"
@@ -30,11 +31,12 @@ export function InventorySectionHeader({
 }
 
 export function EmptyInventoryHint({ entries }: { entries: ProviderEntry[] }) {
+  const { t } = useLocale();
   const none = entries.every((e) => !e.available);
   if (!none) return null;
   return (
     <p className="mb-4 rounded-lg border border-warn/30 bg-warn/10 px-4 py-3 text-[13px] text-warn">
-      尚未偵測到任何已安裝的 AI CLI。請在下方「未安裝」區塊查看安裝指令。
+      {t("inventory.emptyHint")}
     </p>
   );
 }

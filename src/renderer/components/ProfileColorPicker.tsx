@@ -1,3 +1,4 @@
+import { useLocale } from "../i18n/LocaleProvider";
 import { PROFILE_ACCENT_COLORS } from "../utils/profile-colors";
 
 interface Props {
@@ -7,40 +8,34 @@ interface Props {
 }
 
 export function ProfileColorPicker({ value, onChange, disabled = false }: Props) {
+  const { t } = useLocale();
+
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       <button
         type="button"
         disabled={disabled}
-        title="無標記色"
+        title={t("profile.color.none")}
         onClick={() => onChange(null)}
-        className={`h-7 w-7 cursor-pointer rounded-md border transition-all ${
-          value === null
-            ? "border-[#6b9fff] ring-1 ring-[#6b9fff]/50"
-            : "border-[#333] hover:border-[#555]"
-        } bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-40`}
-        aria-label="無標記色"
+        className={`h-7 w-7 cursor-pointer rounded-md border border-dashed border-white/20 transition-all hover:border-white/40 disabled:cursor-not-allowed disabled:opacity-40 ${
+          value === null ? "ring-2 ring-[#6b9fff]/60" : ""
+        }`}
+        aria-label={t("profile.color.none")}
       />
-      {PROFILE_ACCENT_COLORS.map((color) => {
-        const selected = value === color;
-        return (
-          <button
-            key={color}
-            type="button"
-            disabled={disabled}
-            title={color}
-            onClick={() => onChange(color)}
-            style={{ backgroundColor: color }}
-            className={`h-7 w-7 cursor-pointer rounded-md border transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
-              selected
-                ? "border-[#e8e8e8] ring-2 ring-[#6b9fff]/60"
-                : "border-transparent hover:scale-105 hover:border-[#666]"
-            }`}
-            aria-label={`標記色 ${color}`}
-            aria-pressed={selected}
-          />
-        );
-      })}
+      {PROFILE_ACCENT_COLORS.map((color) => (
+        <button
+          key={color}
+          type="button"
+          disabled={disabled}
+          title={t("profile.color.swatch", { color })}
+          onClick={() => onChange(color)}
+          className={`h-7 w-7 cursor-pointer rounded-md border border-white/10 transition-all hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 ${
+            value === color ? "ring-2 ring-[#6b9fff]/60" : ""
+          }`}
+          style={{ backgroundColor: color }}
+          aria-label={t("profile.color.swatch", { color })}
+        />
+      ))}
     </div>
   );
 }

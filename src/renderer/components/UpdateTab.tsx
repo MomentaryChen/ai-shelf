@@ -8,6 +8,7 @@ import { partitionByInstalled, installedCardClass } from "../utils/inventory-dis
 import { toolIcon, toolLabel } from "../utils";
 import { toolHasNpmLatest } from "../../tools.js";
 import { versionsEqual } from "../../utils/version.js";
+import { useLocale } from "../i18n/LocaleProvider";
 
 /** Cursor / Aider / OpenCode etc. — `agent update` reports already current. */
 function updateMessageIndicatesUpToDate(message: string): boolean {
@@ -82,6 +83,7 @@ function applyCheckResult(
 }
 
 export function UpdateTab({ data }: { data: ProviderEntry[] }) {
+  const { t } = useLocale();
   const { installed, notInstalled } = partitionByInstalled(data);
   const [meta, setMeta] = useState<UpdateMeta>({});
   const [selfTool, setSelfTool] = useState<ToolUpdateInfo | null>(null);
@@ -190,9 +192,9 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
   return (
     <>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-        🔄 Update
+        🔄 {t("app.tab.update")}
         {checkingAll && (
-          <span className="animate-pulse text-sm font-normal text-text-secondary">checking…</span>
+          <span className="animate-pulse text-sm font-normal text-text-secondary">{t("inventory.update.checking")}</span>
         )}
       </h2>
 
@@ -202,21 +204,21 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
           disabled={checkingAll}
           className="cursor-pointer rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-primary transition-all hover:border-accent disabled:opacity-50"
         >
-          🔍 Re-check All
+          🔍 {t("inventory.update.recheckAll")}
         </button>
       </div>
 
       {!anyChecking && checkableTools.length === 0 && (
-        <p className="py-10 text-center text-text-secondary">No installed tools to check</p>
+        <p className="py-10 text-center text-text-secondary">{t("inventory.update.noTools")}</p>
       )}
 
       {allUpToDate && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-ok/30 bg-ok/10 px-4 py-3">
           <span className="text-2xl">🎉</span>
           <div>
-            <p className="font-semibold text-ok">All installed tools are up to date</p>
+            <p className="font-semibold text-ok">{t("inventory.update.allUpToDate")}</p>
             <p className="text-xs text-text-secondary">
-              {checkableTools.length} installed tool{checkableTools.length === 1 ? "" : "s"} checked — nothing to update
+              {t("inventory.update.toolsChecked", { n: checkableTools.length })}
             </p>
           </div>
         </div>
@@ -227,14 +229,14 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
           <span className="text-2xl">⬆️</span>
           <div>
             <p className="font-semibold text-warn">
-              {outdatedTools.length} tool{outdatedTools.length === 1 ? "" : "s"} can be updated
+              {t("inventory.update.toolsCanUpdate", { n: outdatedTools.length })}
             </p>
-            <p className="text-xs text-text-secondary">Use the cards below to update</p>
+            <p className="text-xs text-text-secondary">{t("inventory.update.useCards")}</p>
           </div>
         </div>
       )}
 
-      <InventorySectionHeader title="已安裝" count={installedSectionCount} variant="installed" />
+      <InventorySectionHeader count={installedSectionCount} variant="installed" />
       {selfEntry && (
         <ToolUpdateCard
           tool={selfEntry}
@@ -255,7 +257,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
         />
       ))}
 
-      <InventorySectionHeader title="未安裝" count={notInstalled.length} variant="notInstalled" />
+      <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
       {notInstalled.map((entry) => (
         <NotInstalledUpdateCard key={entry.tool} entry={entry} />
       ))}
@@ -264,19 +266,20 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
 }
 
 function NotInstalledUpdateCard({ entry }: { entry: ProviderEntry }) {
+  const { t } = useLocale();
   return (
     <Card
       className={installedCardClass(false)}
       title={<ToolNameCell entry={entry} />}
       trailing={<InstallStatusBadge available={false} />}
     >
-      <p className="text-[13px] text-text-tertiary">未安裝，已略過更新檢查</p>
+      <p className="text-[13px] text-text-tertiary">{t("inventory.skipUpdate")}</p>
     </Card>
   );
 }
 
 function ToolUpdateCard({
-  tool: t,
+  tool: toolInfo,
   isChecking,
   isUpdating,
   result,
@@ -288,67 +291,68 @@ function ToolUpdateCard({
   result?: { success: boolean; message: string };
   onUpdate: () => void;
 }) {
-  const icon = toolIcon(t.tool === "ai-shelf" ? "" : t.tool);
+  const { t } = useLocale();
+  const icon = toolIcon(toolInfo.tool === "ai-shelf" ? "" : toolInfo.tool);
   const isOutdated =
-    t.latestVersion != null &&
-    t.currentVersion != null &&
-    !versionsEqual(t.currentVersion, t.latestVersion);
+    toolInfo.latestVersion != null &&
+    toolInfo.currentVersion != null &&
+    !versionsEqual(toolInfo.currentVersion, toolInfo.latestVersion);
   const isUpToDate =
-    t.latestVersion != null &&
-    t.currentVersion != null &&
-    versionsEqual(t.currentVersion, t.latestVersion);
+    toolInfo.latestVersion != null &&
+    toolInfo.currentVersion != null &&
+    versionsEqual(toolInfo.currentVersion, toolInfo.latestVersion);
 
   const badge = isChecking
-    ? <Badge text="Checking…" variant="info" />
+    ? <Badge text={t("inventory.update.checking")} variant="info" />
     : isOutdated
-      ? <Badge text="Update Available" variant="warn" />
+      ? <Badge text={t("inventory.update.updateAvailable")} variant="warn" />
       : isUpToDate
-        ? <Badge text="Up to Date" variant="ok" />
-        : <Badge text="Installed" variant="info" />;
+        ? <Badge text={t("inventory.update.upToDate")} variant="ok" />
+        : <Badge text={t("inventory.installedBadge")} variant="info" />;
 
   return (
-    <Card title={<>{icon} {t.label}</>} trailing={badge}>
+    <Card title={<>{icon} {toolInfo.label}</>} trailing={badge}>
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-sm">
           {isOutdated ? (
             <>
               <span className="rounded bg-bg-primary/60 px-2 py-0.5 font-mono font-semibold text-fail">
-                v{t.currentVersion}
+                v{toolInfo.currentVersion}
               </span>
               <span className="text-base text-text-secondary">→</span>
               <span className="rounded bg-bg-primary/60 px-2 py-0.5 font-mono font-semibold text-ok">
-                v{t.latestVersion}
+                v{toolInfo.latestVersion}
               </span>
             </>
           ) : (
             <>
-              <span className="text-text-secondary">Version:</span>
+              <span className="text-text-secondary">{t("inventory.update.version")}</span>
               <span className={`font-mono font-semibold ${isUpToDate ? "text-ok" : "text-text-primary"}`}>
-                {t.currentVersion ?? "—"}
+                {toolInfo.currentVersion ?? "—"}
               </span>
               {isUpToDate && <span className="text-ok">✓</span>}
-              {isChecking && <span className="animate-pulse text-xs text-text-secondary">checking latest…</span>}
+              {isChecking && (
+                <span className="animate-pulse text-xs text-text-secondary">{t("inventory.update.checkingLatest")}</span>
+              )}
             </>
           )}
         </div>
 
-        {t.updateCommand && (
+        {toolInfo.updateCommand && (
           <div className="rounded bg-bg-primary/60 px-3 py-2 font-mono text-xs text-text-secondary">
-            $ {t.updateCommand}
+            $ {toolInfo.updateCommand}
           </div>
         )}
 
-        {t.desktopUpdate && !t.updateCommand && (
-          <p className="text-xs text-text-secondary">
-            Installed desktop app — updates download from GitHub Releases and install on restart.
-          </p>
+        {toolInfo.desktopUpdate && !toolInfo.updateCommand && (
+          <p className="text-xs text-text-secondary">{t("inventory.update.desktopHint")}</p>
         )}
 
-        {(t.updateCommand || t.desktopUpdate) && !isChecking && (
+        {(toolInfo.updateCommand || toolInfo.desktopUpdate) && !isChecking && (
           isUpToDate ? (
             <div className="flex items-center gap-2 text-sm text-ok">
               <span>✅</span>
-              <span>No update needed — already on the latest version</span>
+              <span>{t("inventory.update.noUpdateNeeded")}</span>
             </div>
           ) : (
             <button
@@ -357,10 +361,8 @@ function ToolUpdateCard({
               className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent transition-all hover:bg-accent/25 disabled:opacity-50"
             >
               {isUpdating
-                ? "⏳ Updating…"
-                : t.desktopUpdate
-                  ? "⬆️ Download & upgrade desktop"
-                  : "⬆️ Update"}
+                ? `⏳ ${t("inventory.update.updating")}`
+                : `⬆️ ${t("inventory.update.runUpdate")}`}
             </button>
           )
         )}

@@ -5,6 +5,7 @@ import { Badge, InstallStatusBadge } from "./Badge";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
+import { useLocale } from "../i18n/LocaleProvider";
 
 function DoctorCards({
   entries,
@@ -13,6 +14,7 @@ function DoctorCards({
   entries: ProviderEntry[];
   results: Record<string, DoctorResult>;
 }) {
+  const { t } = useLocale();
   return entries.map((entry) => {
     const { tool, available } = entry;
     const r = results[tool];
@@ -30,18 +32,18 @@ function DoctorCards({
             <InstallStatusBadge available={false} />
           ) : r ? (
             <Badge
-              text={`${passCount}/${total} passed`}
+              text={t("inventory.doctor.passed", { pass: passCount, total })}
               variant={allPass ? "ok" : "warn"}
             />
           ) : undefined
         }
       >
         {!available ? (
-          <p className="text-[13px] text-text-tertiary">未安裝，已略過健康檢查</p>
+          <p className="text-[13px] text-text-tertiary">{t("inventory.skipDoctor")}</p>
         ) : !r ? (
           <div className="flex items-center gap-2 text-[13px] text-text-secondary">
             <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-accent" />
-            Checking…
+            {t("inventory.doctor.checking")}
           </div>
         ) : (
           r.checks.map((c) => {
@@ -60,6 +62,7 @@ function DoctorCards({
 }
 
 export function DoctorTab({ data }: { data: ProviderEntry[] }) {
+  const { t } = useLocale();
   const [results, setResults] = useState<Record<string, DoctorResult>>({});
   const { installed, notInstalled } = partitionByInstalled(data);
 
@@ -88,12 +91,12 @@ export function DoctorTab({ data }: { data: ProviderEntry[] }) {
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">🩺 Doctor</h2>
+      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">🩺 {t("app.tab.doctor")}</h2>
 
-      <InventorySectionHeader title="已安裝" count={installed.length} variant="installed" />
+      <InventorySectionHeader count={installed.length} variant="installed" />
       <DoctorCards entries={installed} results={results} />
 
-      <InventorySectionHeader title="未安裝" count={notInstalled.length} variant="notInstalled" />
+      <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
       <DoctorCards entries={notInstalled} results={results} />
     </>
   );
