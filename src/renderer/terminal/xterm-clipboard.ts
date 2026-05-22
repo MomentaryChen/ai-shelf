@@ -7,62 +7,84 @@ import {
 import { tryConsumePaneShortcut } from "./pane-shortcuts";
 import { getStoredT } from "../i18n/stored-locale.js";
 
-/** Electron clipboard via preload — more reliable than navigator.clipboard in xterm. */
-class ElectronClipboardProvider implements IClipboardProvider {
-  readText(_selection: ClipboardSelectionType): Promise<string> {
-    return window.api.clipboardReadText();
-  }
+/** Serialize clipboard IPC so copy-then-paste across panes does not read mid-write (Windows). */
+let clipboardOp: Promise<void> = Promise.resolve();
 
-  writeText(_selection: ClipboardSelectionType, data: string): Promise<void> {
-    return window.api.clipboardWriteText(data);
-  }
+function runClipboardOp<T>(fn: () => Promise<T>): Promise<T> {
+  const run = clipboardOp.then(fn, fn);
+  clipboardOp = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 async function readClipboardText(): Promise<string> {
-  try {
-    return await window.api.clipboardReadText();
-  } catch {
-    return "";
-  }
+  return runClipboardOp(async () => {
+    try {
+      const text = await window.api.clipboardReadText();
+      if (text) return text;
+    } catch {
+      /* fall through */
+    }
+    try {
+      return await navigator.clipboard.readText();
+    } catch {
+      return "";
+    }
+  });
 }
 
 async function writeClipboardText(text: string): Promise<boolean> {
   if (!text) return false;
-  try {
-    await window.api.clipboardWriteText(text);
-    return true;
-  } catch {
+  return runClipboardOp(async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await window.api.clipboardWriteText(text);
       return true;
     } catch {
-      return false;
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        return false;
+      }
     }
+  });
+}
+
+/** Electron clipboard via preload — more reliable than navigator.clipboard in xterm OSC handler. */
+class ElectronClipboardProvider implements IClipboardProvider {
+  readText(_selection: ClipboardSelectionType): Promise<string> {
+    return readClipboardText();
+  }
+
+  writeText(_selection: ClipboardSelectionType, data: string): Promise<void> {
+    return writeClipboardText(data).then(() => undefined);
   }
 }
 
-let copyGuardUntil = 0;
+const GUARD_MS = 80;
 
-export async function copyTerminalSelection(term: Terminal): Promise<boolean> {
-  const now = Date.now();
-  if (now < copyGuardUntil) return false;
-  const text = term.getSelection();
-  if (!text) return false;
-  copyGuardUntil = now + 120;
-  return writeClipboardText(text);
+interface TerminalClipboardGuards {
+  copyUntil: number;
+  pasteUntil: number;
 }
 
-let pasteGuardUntil = 0;
+function createGuards(): TerminalClipboardGuards {
+  return { copyUntil: 0, pasteUntil: 0 };
+}
 
-export async function pasteIntoTerminal(term: Terminal): Promise<boolean> {
-  const now = Date.now();
-  if (now < pasteGuardUntil) return false;
-  const text = await readClipboardText();
-  if (!text) return false;
-  pasteGuardUntil = now + 120;
-  term.paste(text);
-  term.focus();
-  return true;
+export interface TerminalClipboardOptions {
+  onOpenFind?: () => void;
+  onClear?: () => void;
+  onRestart?: () => void;
+  /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
+  getRightClickPaste?: () => boolean;
+  /**
+   * Paste into this terminal. When omitted, uses term.paste (may fan out via onData broadcast).
+   * Prefer term.paste via a single-pane bypass in EmbeddedTerminal.
+   */
+  onPaste?: (text: string, term: Terminal) => void;
 }
 
 /** Stop Electron Edit-menu accelerators from duplicating our handler. */
@@ -79,14 +101,6 @@ function hasMod(ev: KeyboardEvent): boolean {
   return ev.ctrlKey || ev.metaKey;
 }
 
-export interface TerminalClipboardOptions {
-  onOpenFind?: () => void;
-  onClear?: () => void;
-  onRestart?: () => void;
-  /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
-  getRightClickPaste?: () => boolean;
-}
-
 /**
  * Bind copy/paste/select-all shortcuts and a minimal context menu.
  * Returns a dispose function.
@@ -96,8 +110,34 @@ export function bindTerminalClipboard(
   container: HTMLElement,
   options: TerminalClipboardOptions = {},
 ): () => void {
+  const guards = createGuards();
   const clipboardAddon = new ClipboardAddon(new ElectronClipboardProvider());
   term.loadAddon(clipboardAddon);
+
+  const deliverPaste = (text: string) => {
+    if (options.onPaste) options.onPaste(text, term);
+    else term.paste(text);
+    term.focus();
+  };
+
+  const copyTerminalSelection = async (): Promise<boolean> => {
+    const now = Date.now();
+    if (now < guards.copyUntil) return false;
+    const text = term.getSelection();
+    if (!text) return false;
+    guards.copyUntil = now + GUARD_MS;
+    return writeClipboardText(text);
+  };
+
+  const pasteIntoTerminal = async (): Promise<boolean> => {
+    const now = Date.now();
+    if (now < guards.pasteUntil) return false;
+    const text = await readClipboardText();
+    if (!text) return false;
+    guards.pasteUntil = now + GUARD_MS;
+    deliverPaste(text);
+    return true;
+  };
 
   const onKey = (ev: KeyboardEvent): boolean => {
     if (!isKeyDown(ev)) return true;
@@ -118,19 +158,19 @@ export function bindTerminalClipboard(
       (ev.shiftKey && !hasMod(ev) && key === "insert")
     ) {
       consumeKey(ev);
-      void pasteIntoTerminal(term);
+      void pasteIntoTerminal();
       return false;
     }
 
     // Copy: Ctrl+Shift+C, Ctrl+Insert
     if (hasMod(ev) && ev.shiftKey && key === "c") {
       consumeKey(ev);
-      void copyTerminalSelection(term);
+      void copyTerminalSelection();
       return false;
     }
     if (hasMod(ev) && key === "insert" && !ev.shiftKey) {
       consumeKey(ev);
-      void copyTerminalSelection(term);
+      void copyTerminalSelection();
       return false;
     }
 
@@ -138,7 +178,7 @@ export function bindTerminalClipboard(
     if (hasMod(ev) && !ev.shiftKey && key === "c") {
       if (term.hasSelection()) {
         consumeKey(ev);
-        void copyTerminalSelection(term);
+        void copyTerminalSelection();
         return false;
       }
       return true;
@@ -206,8 +246,8 @@ export function bindTerminalClipboard(
       menuEl!.appendChild(btn);
     };
 
-    addItem(getStoredT("terminal.ctx.copy"), hasSelection, () => void copyTerminalSelection(term));
-    addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal(term));
+    addItem(getStoredT("terminal.ctx.copy"), hasSelection, () => void copyTerminalSelection());
+    addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal());
     addItem(getStoredT("terminal.ctx.find"), true, () => options?.onOpenFind?.());
     addItem(getStoredT("terminal.ctx.selectAll"), true, () => term.selectAll());
     if (options.onClear) addItem(getStoredT("terminal.ctx.clear"), true, options.onClear);
@@ -220,24 +260,54 @@ export function bindTerminalClipboard(
     });
   };
 
+  /**
+   * Run before xterm's internal contextmenu handler (capture phase).
+   * xterm otherwise moves/focuses its hidden textarea and breaks our paste path.
+   */
+  const onPointerPaste = (ev: MouseEvent) => {
+    const rightClickPaste = options.getRightClickPaste?.() ?? true;
+    if (!rightClickPaste || ev.shiftKey) return;
+
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    removeMenu();
+
+    if (term.hasSelection()) {
+      void copyTerminalSelection();
+      return;
+    }
+
+    term.clearSelection();
+    void pasteIntoTerminal();
+  };
+
   const onContextMenu = (ev: MouseEvent) => {
     const rightClickPaste = options.getRightClickPaste?.() ?? true;
     if (rightClickPaste && !ev.shiftKey) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      removeMenu();
-      if (term.hasSelection()) void copyTerminalSelection(term);
-      else void pasteIntoTerminal(term);
+      onPointerPaste(ev);
       return;
     }
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
     showContextMenu(ev);
   };
 
-  container.addEventListener("contextmenu", onContextMenu);
+  container.addEventListener("contextmenu", onContextMenu, { capture: true });
+
+  const onMouseDown = (ev: MouseEvent) => {
+    if (ev.button === 2) onPointerPaste(ev);
+  };
+  const isFirefox = /firefox/i.test(navigator.userAgent);
+  if (isFirefox) {
+    container.addEventListener("mousedown", onMouseDown, { capture: true });
+  }
 
   return () => {
     removeMenu();
-    container.removeEventListener("contextmenu", onContextMenu);
+    container.removeEventListener("contextmenu", onContextMenu, { capture: true });
+    if (isFirefox) {
+      container.removeEventListener("mousedown", onMouseDown, { capture: true });
+    }
     term.attachCustomKeyEventHandler(() => true);
     clipboardAddon.dispose();
   };

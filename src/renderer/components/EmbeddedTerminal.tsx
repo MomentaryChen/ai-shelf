@@ -286,11 +286,17 @@ export function EmbeddedTerminal({
       window.api.ptyWrite(sessionId, "\x0c");
     };
     const unregisterClear = registerTerminalClear(sessionId, doClear);
+    let pasteToThisPaneOnly = false;
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
       onRestart: onRestart,
       getRightClickPaste: () => rightClickPasteRef.current,
+      onPaste: (text) => {
+        pasteToThisPaneOnly = true;
+        term.paste(text);
+        pasteToThisPaneOnly = false;
+      },
     });
     const unbindLinks = bindTerminalLinks(term);
 
@@ -407,6 +413,10 @@ export function EmbeddedTerminal({
     });
 
     term.onData((data) => {
+      if (pasteToThisPaneOnly) {
+        window.api.ptyWrite(sessionId, data);
+        return;
+      }
       const write = onWriteRef.current;
       if (write) write(data, sessionId);
       else window.api.ptyWrite(sessionId, data);
