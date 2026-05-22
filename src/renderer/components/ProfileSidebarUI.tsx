@@ -20,7 +20,7 @@ export function SidebarIconBtn({
       title={title}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[#8b8b92] transition-colors hover:bg-white/[0.06] hover:text-[#e8e8ec] disabled:cursor-not-allowed disabled:opacity-35 ${className}`}
+      className={`flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-chrome-text-muted transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text disabled:cursor-not-allowed disabled:opacity-35 ${className}`}
     >
       {children}
     </button>
@@ -30,7 +30,7 @@ export function SidebarIconBtn({
 export function SearchIcon() {
   return (
     <svg
-      className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#5c5c64]"
+      className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-chrome-text-dim"
       viewBox="0 0 20 20"
       fill="none"
       aria-hidden
@@ -65,7 +65,7 @@ export function ProfileCountBadge({
 export function Chevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
-      className={`h-3 w-3 text-[#6b6b72] transition-transform duration-150 ${expanded ? "rotate-0" : "-rotate-90"}`}
+      className={`h-3 w-3 text-chrome-text-faint transition-transform duration-150 ${expanded ? "rotate-0" : "-rotate-90"}`}
       viewBox="0 0 12 12"
       fill="currentColor"
       aria-hidden
@@ -77,7 +77,7 @@ export function Chevron({ expanded }: { expanded: boolean }) {
 
 export function DragHandle() {
   return (
-    <svg className="h-3 w-3 text-[#45454d]" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
+    <svg className="h-3 w-3 text-chrome-text-dim" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
       <circle cx="2" cy="2" r="1" />
       <circle cx="6" cy="2" r="1" />
       <circle cx="2" cy="6" r="1" />

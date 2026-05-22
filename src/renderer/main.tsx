@@ -1,9 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { applyAppTheme } from "./app-theme";
 import { App } from "./App";
 import { ChatWindowApp } from "./ChatWindowApp";
+import { loadSettings } from "./chat-settings";
 import { SettingsWindowApp } from "./SettingsWindowApp";
 import "./index.css";
+
+applyAppTheme(loadSettings().appTheme);
 
 const route = window.location.hash.replace(/^#\/?/, "");
 

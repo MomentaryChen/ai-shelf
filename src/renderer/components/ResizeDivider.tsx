@@ -102,7 +102,7 @@ export function ResizeDivider(props: Props) {
       }`}
     >
       <div
-        className={`m-auto rounded-full bg-[#333] transition-colors group-hover:bg-[#6a6a6a] group-active:bg-[#8ab4ff] ${
+        className={`m-auto rounded-full bg-chrome-border-strong transition-colors group-hover:bg-chrome-text-subtle group-active:bg-accent ${
           horizontal ? "h-12 w-0.5" : "h-0.5 w-12"
         }`}
       />

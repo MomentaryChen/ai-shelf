@@ -23,6 +23,7 @@ import {
   type SplitDirection,
 } from "../terminal/split-tree";
 import { normalizePaneTitle } from "../utils/pane-label";
+import { applyAppTheme, getChromeCssVar, useAppThemeRevision } from "../app-theme";
 import {
   TERMINAL_OPTIONS,
   getAppBg,
@@ -78,6 +79,7 @@ export function ChatTab({
   const [terminalError, setTerminalError] = useState<string | null>(null);
   const [addingTerminal, setAddingTerminal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
+  useAppThemeRevision();
   const newMenuRef = useRef<HTMLDivElement>(null);
   const initialRestoreDoneRef = useRef(false);
   const restoreInFlightRef = useRef(false);
@@ -178,7 +180,11 @@ export function ChatTab({
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY) setSettings(loadSettings());
+      if (e.key === SETTINGS_KEY) {
+        const next = loadSettings();
+        setSettings(next);
+        applyAppTheme(next.appTheme);
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -609,8 +615,8 @@ export function ChatTab({
   ) : (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-8 py-6">
       {activeProfile ? (
-        <div className="rounded-lg border border-[#252525] bg-[#111111] px-4 py-3 text-[13px] text-[#8a8a8a]">
-          Profile <span className="text-[#8ab4ff]">{profileLabel}</span>
+        <div className="rounded-lg border border-chrome-border-subtle bg-chrome-surface px-4 py-3 text-[13px] text-chrome-text-muted">
+          Profile <span className="text-chrome-accent-text">{profileLabel}</span>
           {restoring || profileBusy ? (
             <span className="ml-2">正在還原 terminal…</span>
           ) : (
@@ -621,34 +627,34 @@ export function ChatTab({
           {terminalError && (
             <p className="mt-2 text-[12px] text-red-400">{terminalError}</p>
           )}
-          <p className="mt-2 text-[11px] text-[#505050]">
-            窗格快捷鍵：<kbd className="rounded border border-[#333] px-1">Ctrl+Tab</kbd> 切換、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+W</kbd> 關閉、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+L</kbd> 清屏、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+R</kbd> 重啟 session、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+\\</kbd> /{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+\\</kbd> 分割、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+1–9</kbd> 跳至第 N 窗格、{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+F</kbd> 搜尋輸出。
+          <p className="mt-2 text-[11px] text-chrome-text-dim">
+            窗格快捷鍵：<kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Tab</kbd> 切換、{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+W</kbd> 關閉、{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+L</kbd> 清屏、{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Shift+R</kbd> 重啟 session、{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+\\</kbd> /{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Shift+\\</kbd> 分割、{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+1–9</kbd> 跳至第 N 窗格、{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+F</kbd> 搜尋輸出。
             右鍵選單亦可清屏／重啟。
           </p>
-          <p className="mt-1 text-[11px] text-[#505050]">
-            除錯：按 <kbd className="rounded border border-[#333] px-1">F12</kbd> 或{" "}
-            <kbd className="rounded border border-[#333] px-1">Ctrl+Shift+I</kbd>
-            開啟開發者工具；也可按 <kbd className="rounded border border-[#333] px-1">Alt</kbd>{" "}
+          <p className="mt-1 text-[11px] text-chrome-text-dim">
+            除錯：按 <kbd className="rounded border border-chrome-border-strong px-1">F12</kbd> 或{" "}
+            <kbd className="rounded border border-chrome-border-strong px-1">Ctrl+Shift+I</kbd>
+            開啟開發者工具；也可按 <kbd className="rounded border border-chrome-border-strong px-1">Alt</kbd>{" "}
             → View → Developer Tools
           </p>
         </div>
       ) : (
-        <p className="text-[13px] text-[#6b6b6b]">
-          從左側選擇或建立 <strong className="text-[#a0a0a0]">Profile</strong>
+        <p className="text-[13px] text-chrome-text-subtle">
+          從左側選擇或建立 <strong className="text-chrome-text-secondary">Profile</strong>
           ，會自動還原上次的 terminal 視窗與預設目錄。
         </p>
       )}
       <div>
         {availableTools.length > 0 && (
           <>
-            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-[#6b6b6b]">
+            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-chrome-text-subtle">
               可用的 Agent
             </p>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -668,7 +674,7 @@ export function ChatTab({
   );
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-[#0a0a0a] text-[#e8e8e8]">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
       {sidebar}
       <div
         className="w-2.5 shrink-0 self-stretch"
@@ -730,9 +736,10 @@ function WarpTopBar({
 }) {
   const accent = profileAccentColor;
   const hasAccent = Boolean(accent);
+  const defaultAccent = getChromeCssVar("--color-chrome-accent-text", "#8ab4ff");
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[#1a1a1e] bg-[#0a0a0b]/95 px-3 backdrop-blur-sm">
+    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
       {profileLabel && (
         <div
           className="flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1"
@@ -743,8 +750,8 @@ function WarpTopBar({
                   borderColor: `${accent}30`,
                 }
               : {
-                  backgroundColor: "rgba(126, 182, 255, 0.08)",
-                  borderColor: "rgba(126, 182, 255, 0.2)",
+                  backgroundColor: `color-mix(in srgb, ${defaultAccent} 8%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${defaultAccent} 20%, transparent)`,
                 }
           }
           title={profileLabel}
@@ -758,19 +765,19 @@ function WarpTopBar({
           )}
           <span
             className="min-w-0 truncate text-[11px] font-medium"
-            style={{ color: hasAccent && accent ? accent : "#8ab4ff" }}
+            style={{ color: hasAccent && accent ? accent : defaultAccent }}
           >
             {profileLabel}
           </span>
           {paneCount > 0 && (
-            <span className="shrink-0 text-[10px] tabular-nums text-[#6b6b72]">
+            <span className="shrink-0 text-[10px] tabular-nums text-chrome-text-faint">
               {paneCount}/{maxPanes}
               {broadcastInput && paneCount > 1 ? " · sync" : ""}
             </span>
           )}
         </div>
       )}
-      {restoring && <span className="text-[11px] text-[#6b6b6b]">Restoring…</span>}
+      {restoring && <span className="text-[11px] text-chrome-text-subtle">Restoring…</span>}
       <div ref={newMenuRef} className="relative ml-auto flex items-center gap-2">
         <button
           type="button"
@@ -781,7 +788,7 @@ function WarpTopBar({
               ? "選擇資料夾並開啟新窗格（獨立工作目錄）"
               : `Maximum ${maxPanes} panes`
           }
-          className="cursor-pointer rounded-md border border-[#2a2a2a] px-2 py-1 text-[12px] text-[#a0a0a0] hover:border-[#404040] disabled:opacity-40"
+          className="cursor-pointer rounded-md border border-chrome-border-strong px-2 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
         >
           📁 Folder
         </button>
@@ -794,12 +801,12 @@ function WarpTopBar({
               ? "Add terminal pane (Ctrl+\\ split right, Ctrl+Shift+\\ split down)"
               : `Maximum ${maxPanes} panes`
           }
-          className="cursor-pointer rounded-md border border-[#2a2a2a] px-2.5 py-1 text-[12px] text-[#a0a0a0] hover:border-[#404040] disabled:opacity-40"
+          className="cursor-pointer rounded-md border border-chrome-border-strong px-2.5 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
         >
           + Pane
         </button>
         {showNewMenu && canAddPane && (
-          <div className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-lg border border-[#2a2a2a] bg-[#141414] py-1 shadow-xl">
+          <div className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
             {available.map((e) => (
               <button
                 key={e.tool}
@@ -808,7 +815,7 @@ function WarpTopBar({
                   onAddPane(e.tool);
                   onToggleNewMenu();
                 }}
-                className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[12px] hover:bg-[#1f1f1f]"
+                className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[12px] hover:bg-chrome-surface-hover-strong"
               >
                 <ToolLogo tool={e.tool} size={14} />
                 {toolLabel(e.tool)}
@@ -857,41 +864,41 @@ function ToolCard({
     <div
       className={`flex flex-col gap-4 rounded-xl border p-6 transition-colors ${
         disabled
-          ? "border-[#252525] bg-[#111111] opacity-50"
-          : "border-[#252525] bg-[#141414] hover:border-[#404040]"
+          ? "border-chrome-border-subtle bg-chrome-surface opacity-50"
+          : "border-chrome-border-subtle bg-chrome-surface-raised hover:border-chrome-border-hover"
       }`}
     >
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#2a2a2a] bg-[#0a0a0a]">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-chrome-border-strong bg-chrome-bg">
           <ToolLogo tool={entry.tool} size={28} />
         </div>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold">{toolLabel(entry.tool)}</span>
-            {entry.version && <span className="text-[11px] text-[#6b6b6b]">v{entry.version}</span>}
+            {entry.version && <span className="text-[11px] text-chrome-text-subtle">v{entry.version}</span>}
           </div>
           <AuthBadge auth={disabled ? "missing" : entry.auth} />
         </div>
       </div>
-      <p className="text-[13px] leading-relaxed text-[#8a8a8a]">
+      <p className="text-[13px] leading-relaxed text-chrome-text-muted">
         {TOOL_DESCRIPTIONS[entry.tool] ?? "AI coding assistant"}
       </p>
       {err && <p className="rounded-md bg-red-500/10 px-3 py-2 text-[12px] text-red-400">{err}</p>}
       {disabled ? (
-        <p className="text-center text-[13px] text-[#6b6b6b]">Not installed</p>
+        <p className="text-center text-[13px] text-chrome-text-subtle">Not installed</p>
       ) : (
         <div className="mt-auto grid grid-cols-2 gap-3">
           <button
             disabled={extBusy}
             onClick={handleExternal}
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#2a2a2a] py-2.5 text-[13px] disabled:opacity-50"
+            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-chrome-border-strong py-2.5 text-[13px] disabled:opacity-50"
           >
             {extBusy ? <span className="animate-spin">⟳</span> : "🖥️"} External
           </button>
           <button
             disabled={inAppBusy}
             onClick={handleInApp}
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#3d5a80] bg-[#1a2a40]/60 py-2.5 text-[13px] font-medium text-[#7eb8ff] disabled:opacity-50"
+            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-accent/50 bg-accent/15 py-2.5 text-[13px] font-medium text-accent disabled:opacity-50"
           >
             {inAppBusy ? <span className="animate-spin">⟳</span> : "⌨️"} In-App
           </button>
@@ -912,7 +919,7 @@ function TerminalSelector({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as ExternalTerminal)}
-      className="cursor-pointer rounded-md border border-[#2a2a2a] bg-[#111111] px-2 py-1 text-[12px] focus:outline-none"
+      className="cursor-pointer rounded-md border border-chrome-border-strong bg-chrome-surface px-2 py-1 text-[12px] focus:outline-none"
     >
       {TERMINAL_OPTIONS.map((o) => (
         <option key={o.value} value={o.value}>

@@ -14,6 +14,12 @@ export type ProfileAccentColor = (typeof PROFILE_ACCENT_COLORS)[number];
 
 const DEFAULT_FOCUS = "#7eb6ff";
 
+function chromeVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
 function tint(hex: string, alpha: string): string {
   return `${hex}${alpha}`;
 }
@@ -30,13 +36,13 @@ export function profileCardStyle(
   if (!accentColor) {
     return isActive
       ? {
-          backgroundColor: "#12161f",
-          borderColor: "#2d3f5c",
+          backgroundColor: chromeVar("--color-chrome-profile-card-active-bg", "#12161f"),
+          borderColor: chromeVar("--color-chrome-profile-card-active-border", "#2d3f5c"),
           boxShadow: "0 0 0 1px rgba(126, 182, 255, 0.12), 0 4px 16px rgba(0,0,0,0.35)",
         }
       : {
-          backgroundColor: "#111113",
-          borderColor: "#232326",
+          backgroundColor: chromeVar("--color-chrome-profile-card-bg", "#111113"),
+          borderColor: chromeVar("--color-chrome-profile-card-border", "#232326"),
         };
   }
   return {
@@ -75,7 +81,7 @@ export function profileSessionsWellStyle(
   const accent = profileAccentOrDefault(accentColor);
   return {
     borderLeftColor: tint(accent, "66"),
-    backgroundColor: "rgba(0,0,0,0.22)",
+    backgroundColor: chromeVar("--color-chrome-sessions-well-bg", "rgba(0,0,0,0.22)"),
   };
 }
 
@@ -94,7 +100,10 @@ export function profileCountBadgeStyle(
   accentColor: string | null | undefined,
 ): import("react").CSSProperties {
   if (!accentColor) {
-    return { backgroundColor: "#1e1e22", color: "#8b8b92" };
+    return {
+      backgroundColor: chromeVar("--color-chrome-badge-bg", "#1e1e22"),
+      color: chromeVar("--color-chrome-text-muted", "#8b8b92"),
+    };
   }
   return {
     backgroundColor: tint(accentColor, "28"),
@@ -122,8 +131,8 @@ export function profilePaneHeaderStyle(
   const accent = profileAccentOrDefault(accentColor);
   return {
     background: focused
-      ? `linear-gradient(90deg, ${tint(accent, "18")} 0%, rgba(0,0,0,0.45) 48%)`
-      : "rgba(0,0,0,0.4)",
+      ? `linear-gradient(90deg, ${tint(accent, "18")} 0%, ${chromeVar("--color-chrome-pane-header-unfocused", "rgba(0,0,0,0.45)")} 48%)`
+      : chromeVar("--color-chrome-pane-header-unfocused", "rgba(0,0,0,0.4)"),
     borderBottomColor: tint(accent, focused ? "40" : "18"),
   };
 }

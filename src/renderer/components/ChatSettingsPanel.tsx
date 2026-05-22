@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { APP_THEME_OPTIONS, applyAppTheme } from "../app-theme";
 import {
   BG_PRESETS,
   DEFAULT_TERMINAL_FONT_FAMILY,
@@ -42,13 +43,18 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
     setSettings((prev) => {
       const next = { ...prev, ...partial };
       saveSettings(next);
+      if (partial.appTheme !== undefined) applyAppTheme(next.appTheme);
       return next;
     });
   }, []);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY) setSettings(loadSettings());
+      if (e.key === SETTINGS_KEY) {
+        const next = loadSettings();
+        setSettings(next);
+        applyAppTheme(next.appTheme);
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -77,6 +83,41 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
 
   return (
     <div className={compact ? "flex flex-col gap-5" : "flex flex-col gap-6"}>
+      {/* App color theme */}
+      <div>
+        <p className={sectionTitle}>App color theme</p>
+        <div className="flex flex-wrap gap-2">
+          {APP_THEME_OPTIONS.map((opt) => {
+            const active = settings.appTheme === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => updateSettings({ appTheme: opt.value })}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
+                  active
+                    ? "border-accent/60 bg-accent/10 font-medium text-accent"
+                    : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
+                }`}
+              >
+                <span
+                  className="inline-flex h-3.5 w-3.5 shrink-0 overflow-hidden rounded-sm border border-border"
+                  aria-hidden
+                >
+                  <span className="h-full w-1/2" style={{ background: opt.preview.bg }} />
+                  <span className="h-full w-1/2" style={{ background: opt.preview.accent }} />
+                </span>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-[11px] text-text-tertiary">
+          Applies to the main window and this settings window. Terminal background preset「App theme」follows the
+          selected theme.
+        </p>
+      </div>
+
       {/* Working directory */}
       <div>
         <p className={sectionTitle}>Working directory</p>

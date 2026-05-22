@@ -224,12 +224,12 @@ function WarpPaneShell({
       ref={shellRef}
       className={`group/pane relative flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
         isDragOver
-          ? "ring-2 ring-[#7eb6ff]/35"
+          ? "ring-2 ring-accent/35"
           : isDragging
             ? "opacity-45 scale-[0.99]"
             : focused && !profileAccentColor
-              ? "border-[#3d3d42] ring-1 ring-white/[0.08]"
-              : "border-[#1a1a1e]"
+              ? "border-chrome-border-focus ring-1 ring-chrome-hover-strong"
+              : "border-chrome-border"
       }`}
       style={{ background: bg, ...chromeStyle }}
       onMouseDown={onFocus}
@@ -276,7 +276,7 @@ function WarpPaneShell({
               e.dataTransfer.effectAllowed = "move";
             }}
             onDragEnd={clearDrag}
-            className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-white/[0.04] active:cursor-grabbing"
+            className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-chrome-hover active:cursor-grabbing"
             title="拖曳到窗格上／下／左／右，中央為交換"
             aria-label="拖曳到窗格上／下／左／右，中央為交換"
           >
@@ -293,11 +293,11 @@ function WarpPaneShell({
           <EditablePaneTitle
             label={paneDisplayLabel(pane)}
             onRename={onRename}
-            className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-[#ececef]"
+            className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text"
             inputClassName="text-[12px] font-medium"
           />
         ) : (
-          <span className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-[#ececef]">
+          <span className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text">
             {paneDisplayLabel(pane)}
           </span>
         )}
@@ -308,13 +308,13 @@ function WarpPaneShell({
               e.stopPropagation();
               onCwdClick();
             }}
-            className="min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-[#6b6b6b] transition-colors hover:bg-white/[0.06] hover:text-[#b4b4ba]"
+            className="min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text-secondary"
             title={pane.cwd ? `${pane.cwd}\n\n點擊變更工作目錄` : "點擊選擇工作目錄"}
           >
             {cwdShort || "~"}
           </button>
         ) : (
-          <span className="min-w-0 flex-1 truncate text-[11px] text-[#6b6b6b]" title={pane.cwd}>
+          <span className="min-w-0 flex-1 truncate text-[11px] text-chrome-text-subtle" title={pane.cwd}>
             {cwdShort || "~"}
           </span>
         )}
@@ -332,7 +332,7 @@ function WarpPaneShell({
             e.stopPropagation();
             onClose();
           }}
-          className="cursor-pointer rounded px-1 text-[11px] text-[#6b6b6b] transition-colors hover:bg-white/10 hover:text-[#f0f0f0]"
+          className="cursor-pointer rounded px-1 text-[11px] text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
           title="Close pane"
         >
           ✕
@@ -363,7 +363,7 @@ function IconBtn({
         e.stopPropagation();
         onClick();
       }}
-      className="cursor-pointer rounded-md px-1.5 py-0.5 text-[10px] text-[#8b8b92] hover:bg-white/[0.08] hover:text-[#ececef]"
+      className="cursor-pointer rounded-md px-1.5 py-0.5 text-[10px] text-chrome-text-muted hover:bg-chrome-hover-strong hover:text-chrome-text"
     >
       {children}
     </button>

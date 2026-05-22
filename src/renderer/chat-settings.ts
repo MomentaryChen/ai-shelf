@@ -1,3 +1,6 @@
+import { DEFAULT_APP_THEME, normalizeAppTheme, type AppColorTheme } from "./app-theme";
+
+export type { AppColorTheme };
 export type ExternalTerminal = "auto" | "wt" | "pwsh" | "powershell" | "cmd";
 
 export const DEFAULT_TERMINAL_FONT_FAMILY =
@@ -12,6 +15,8 @@ const MIN_TERMINAL_SCROLLBACK = 1_000;
 const MAX_TERMINAL_SCROLLBACK = 100_000;
 
 export interface ChatSettings {
+  /** App UI color theme (light / dark / high contrast). */
+  appTheme: AppColorTheme;
   externalTerminal: ExternalTerminal;
   terminalBg: string;
   terminalFontFamily: string;
@@ -66,6 +71,7 @@ function normalizeRightClickPaste(raw: unknown): boolean {
 }
 
 const DEFAULTS: ChatSettings = {
+  appTheme: DEFAULT_APP_THEME,
   externalTerminal: "auto",
   terminalBg: "#0c0c0c",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
@@ -82,6 +88,7 @@ export function loadSettings(): ChatSettings {
     return {
       ...DEFAULTS,
       ...stored,
+      appTheme: normalizeAppTheme(stored.appTheme),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),
       terminalFontSize: clampInt(
         stored.terminalFontSize,
