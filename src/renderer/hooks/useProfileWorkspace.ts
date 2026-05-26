@@ -102,6 +102,8 @@ export function useProfileWorkspace(
   const broadcastRef = useRef(broadcastInput);
   /** Live PTY + layout per profile — survives sidebar profile switches. */
   const profileLiveCacheRef = useRef(new Map<string, ProfileLiveState>());
+  /** True while activateProfile clears layout between profiles (avoids wiping stashed cache). */
+  const profileSwitchInProgressRef = useRef(false);
 
   layoutRef.current = layout;
   focusedPaneIdRef.current = focusedPaneId;
@@ -242,6 +244,8 @@ export function useProfileWorkspace(
 
   const activateProfile = useCallback(
     async (profile: ProfileInfo) => {
+      profileSwitchInProgressRef.current = true;
+      try {
       const prev = activeProfileRef.current;
 
       if (prev?.id === profile.id) {
@@ -342,6 +346,9 @@ export function useProfileWorkspace(
         broadcastInput: profile.broadcastInput,
         paneCount: 0,
       };
+      } finally {
+        profileSwitchInProgressRef.current = false;
+      }
     },
     [
       persistCurrentProfile,
@@ -350,6 +357,7 @@ export function useProfileWorkspace(
       setLayout,
       setFocusedPaneId,
       applyMinimizedPaneIds,
+      spawnPane,
     ],
   );
 
@@ -366,7 +374,7 @@ export function useProfileWorkspace(
   );
 
   useEffect(() => {
-    if (!activeProfile || restoring) return;
+    if (!activeProfile || restoring || profileSwitchInProgressRef.current) return;
     const paneCount = layout ? collectPanes(layout).length : 0;
     if (paneCount > 0) {
       profileLiveCacheRef.current.set(activeProfile.id, {
