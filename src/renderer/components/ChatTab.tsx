@@ -22,7 +22,14 @@ import {
   type PaneInfo,
   type SplitDirection,
 } from "../terminal/split-tree";
-import { normalizePaneTitle } from "../utils/pane-label";
+import { normalizePaneTitle, paneDisplayLabel } from "../utils/pane-label";
+import { hitPaneDropZone } from "../terminal/pane-drop-zone";
+import type { PaneDropZone } from "../terminal/pane-drop-zone";
+import {
+  hasProfilePaneDrag,
+  readProfilePaneDrag,
+  visiblePanes,
+} from "../terminal/profile-pane-display";
 import { applyAppTheme, getChromeCssVar, useAppThemeRevision } from "../app-theme";
 import {
   TERMINAL_OPTIONS,
@@ -90,6 +97,8 @@ export function ChatTab({
   const [terminalError, setTerminalError] = useState<string | null>(null);
   const [addingTerminal, setAddingTerminal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
+  const [displayDropActive, setDisplayDropActive] = useState(false);
+  const [profileSidebarDrag, setProfileSidebarDrag] = useState(false);
   useAppThemeRevision();
   const newMenuRef = useRef<HTMLDivElement>(null);
   const initialRestoreDoneRef = useRef(false);
@@ -139,6 +148,14 @@ export function ChatTab({
     getProfileFocusedPaneId,
     canAddPane,
     maxPanes,
+    minimizedPaneIds,
+    displayLayout,
+    isPaneMinimized,
+    showPaneInDisplay,
+    placePaneInDisplay,
+    minimizePane,
+    unminimizePanes,
+    forgetMinimizedPane,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -210,6 +227,12 @@ export function ChatTab({
   }, [sidebarWidth]);
 
   useEffect(() => {
+    const onDragEnd = () => setProfileSidebarDrag(false);
+    document.addEventListener("dragend", onDragEnd);
+    return () => document.removeEventListener("dragend", onDragEnd);
+  }, []);
+
+  useEffect(() => {
     if (!showNewMenu) return;
     const handler = (e: MouseEvent) => {
       if (!newMenuRef.current?.contains(e.target as Node)) setShowNewMenu(false);
@@ -260,22 +283,23 @@ export function ChatTab({
       cwd?: string,
       splitTargetId?: string,
       direction: SplitDirection = "horizontal",
-    ) => {
+      opts?: { keepOthersVisible?: boolean },
+    ): Promise<PaneInfo | null> => {
       if (restoring) {
         setTerminalError(t("chat.err.restoringWait"));
-        return false;
+        return null;
       }
       if (!canAddPane) {
         setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
-        return false;
+        return null;
       }
       if (!window.api?.ptySpawn) {
         setTerminalError(t("chat.err.apiNotReady"));
-        return false;
+        return null;
       }
 
       const pane = await spawnPaneResilient(tool || "shell", resolveCwd(cwd));
-      if (!pane) return false;
+      if (!pane) return null;
 
       setLayout((prev) => {
         if (!prev) return { kind: "pane", pane };
@@ -284,9 +308,26 @@ export function ChatTab({
         return splitPaneInTree(prev, targetId, direction, pane);
       });
       setFocusedPaneId(pane.id);
-      return true;
+      if (activeProfile) {
+        if (opts?.keepOthersVisible && splitTargetId) {
+          unminimizePanes(activeProfile.id, [pane.id, splitTargetId]);
+        } else {
+          showPaneInDisplay(activeProfile.id, pane.id);
+        }
+      }
+      return pane;
     },
-    [canAddPane, maxPanes, restoring, resolveCwd, spawnPaneResilient, focusedPaneId],
+    [
+      canAddPane,
+      maxPanes,
+      restoring,
+      resolveCwd,
+      spawnPaneResilient,
+      focusedPaneId,
+      activeProfile,
+      showPaneInDisplay,
+      unminimizePanes,
+    ],
   );
 
   const respawnPaneWithCwd = useCallback(
@@ -386,8 +427,8 @@ export function ChatTab({
         activeProfile?.defaultTool ?? availableTools[0],
         availableTools,
       );
-      const ok = await addPane(tool, picked);
-      if (!ok) {
+      const created = await addPane(tool, picked);
+      if (!created) {
         setTerminalError((prev) => prev ?? t("chat.err.cannotOpen"));
       }
     },
@@ -412,16 +453,20 @@ export function ChatTab({
     [layout],
   );
 
-  const closePane = useCallback((paneId: string) => {
-    setLayout((prev) => {
-      if (prev) {
-        const victim = collectPanes(prev).find((p) => p.id === paneId);
-        if (victim) window.api.ptyKill(victim.sessionId);
-      }
-      return removePaneFromTree(prev, paneId);
-    });
-    setFocusedPaneId((prev) => (prev === paneId ? null : prev));
-  }, []);
+  const closePane = useCallback(
+    (paneId: string) => {
+      if (activeProfile) forgetMinimizedPane(activeProfile.id, paneId);
+      setLayout((prev) => {
+        if (prev) {
+          const victim = collectPanes(prev).find((p) => p.id === paneId);
+          if (victim) window.api.ptyKill(victim.sessionId);
+        }
+        return removePaneFromTree(prev, paneId);
+      });
+      setFocusedPaneId((prev) => (prev === paneId ? null : prev));
+    },
+    [activeProfile, forgetMinimizedPane],
+  );
 
   const splitPane = useCallback(
     async (paneId: string, direction: SplitDirection) => {
@@ -431,7 +476,9 @@ export function ChatTab({
         parent?.tool ?? availableTools[0],
         availableTools,
       );
-      await addPane(tool, parent?.cwd || resolveCwd(), paneId, direction);
+      await addPane(tool, parent?.cwd || resolveCwd(), paneId, direction, {
+        keepOthersVisible: true,
+      });
     },
     [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
@@ -464,6 +511,79 @@ export function ChatTab({
     }
   }
 
+  async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
+    if (activeProfile?.id !== profile.id) {
+      await handleActivateProfile(profile);
+    }
+    showPaneInDisplay(profile.id, paneId);
+  }
+
+  async function restorePaneToDisplayById(
+    profileId: string,
+    paneId: string,
+    opts?: { targetPaneId?: string; zone?: PaneDropZone },
+  ) {
+    if (activeProfile?.id !== profileId) {
+      const r = await window.api.profileGetTree();
+      const profile = r.tree?.profiles.find((p) => p.id === profileId);
+      if (!profile) return;
+      await handleActivateProfile(profile);
+    }
+    if (opts?.targetPaneId && opts.zone) {
+      placePaneInDisplay(profileId, paneId, opts.targetPaneId, opts.zone);
+      return;
+    }
+    showPaneInDisplay(profileId, paneId);
+  }
+
+  async function placePaneBeside(
+    profile: ProfileInfo,
+    dragPaneId: string,
+    targetPaneId: string,
+    zone: PaneDropZone,
+  ) {
+    if (activeProfile?.id !== profile.id) {
+      await handleActivateProfile(profile);
+    }
+    placePaneInDisplay(profile.id, dragPaneId, targetPaneId, zone);
+  }
+
+  function handleDisplayDragOver(e: React.DragEvent) {
+    if (!hasProfilePaneDrag(e.dataTransfer)) return;
+    // Do not stopPropagation — pane shells must receive dragover for zone targeting.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (e.target === e.currentTarget) setDisplayDropActive(true);
+  }
+
+  function handleDisplayDrop(e: React.DragEvent) {
+    if (!hasProfilePaneDrag(e.dataTransfer)) return;
+    if (e.target !== e.currentTarget) return;
+    const payload = readProfilePaneDrag(e.dataTransfer);
+    if (!payload) return;
+    e.preventDefault();
+    setDisplayDropActive(false);
+
+    const visible =
+      layout && activeProfile?.id === payload.profileId
+        ? visiblePanes(layout, minimizedPaneIds)
+        : [];
+    const anchor = visible.find((p) => p.id !== payload.paneId);
+
+    if (anchor && visible.length >= 1) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      let zone = hitPaneDropZone(e.clientX, e.clientY, rect);
+      if (zone === "swap") zone = "right";
+      void restorePaneToDisplayById(payload.profileId, payload.paneId, {
+        targetPaneId: anchor.id,
+        zone,
+      });
+      return;
+    }
+
+    void restorePaneToDisplayById(payload.profileId, payload.paneId);
+  }
+
   async function handleNewTerminal(profile: ProfileInfo) {
     if (addingTerminal || profileBusy || restoring) return;
     setAddingTerminal(true);
@@ -476,11 +596,11 @@ export function ChatTab({
         profile.id === activeProfile?.id
           ? getProfileDefaultCwd() || profile.defaultCwd?.trim()
           : profile.defaultCwd?.trim();
-      const ok = await addPane(
+      const created = await addPane(
         resolveLaunchTool(profile.defaultTool, availableTools),
         cwd || undefined,
       );
-      if (!ok) {
+      if (!created) {
         setTerminalError((prev) => prev ?? t("chat.err.cannotOpen"));
       }
     } catch (err) {
@@ -526,12 +646,16 @@ export function ChatTab({
       busy={profileBusy || restoring}
       onActivateProfile={(p) => void handleActivateProfile(p)}
       onSelectPane={(profile, paneId) => {
-        if (activeProfile?.id !== profile.id) {
-          void handleActivateProfile(profile).then(() => setFocusedPaneId(paneId));
-        } else {
-          setFocusedPaneId(paneId);
-        }
+        void restorePaneToDisplay(profile, paneId);
       }}
+      onRestorePane={(profile, paneId) => {
+        void restorePaneToDisplay(profile, paneId);
+      }}
+      onPlacePaneBeside={(profile, dragPaneId, targetPaneId, zone) => {
+        void placePaneBeside(profile, dragPaneId, targetPaneId, zone);
+      }}
+      onMinimizePane={(profileId, paneId) => minimizePane(profileId, paneId)}
+      isPaneMinimized={isPaneMinimized}
       onClosePane={(_profileId, paneId) => closePane(paneId)}
       onRenamePane={(_profileId, paneId, title) => renamePane(paneId, title)}
       onMovePane={(_profileId, dragPaneId, targetPaneId, zone) => {
@@ -561,6 +685,7 @@ export function ChatTab({
       }}
       onProfileDeleted={handleProfileDeleted}
       activeLivePaneCount={panes.length}
+      onProfilePaneDragChange={setProfileSidebarDrag}
     />
   );
 
@@ -585,15 +710,31 @@ export function ChatTab({
   );
 
   const terminalArea = layout ? (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-1.5">
+    <div
+      className={`relative flex min-h-0 flex-1 flex-col overflow-hidden p-1.5 ${
+        displayDropActive ? "ring-2 ring-inset ring-accent/40" : ""
+      }`}
+      onDragOver={handleDisplayDragOver}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDisplayDropActive(false);
+        }
+      }}
+      onDrop={handleDisplayDrop}
+    >
       <div className="flex min-h-0 flex-1 flex-col">
+      {displayLayout ? (
       <SplitPaneLayout
-        node={layout}
+        node={displayLayout}
         focusedPaneId={focusedPaneId}
         bg={bg}
+        sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
         onFocusPane={setFocusedPaneId}
         onClosePane={closePane}
+        onMinimizePane={(paneId) => {
+          if (activeProfile) minimizePane(activeProfile.id, paneId);
+        }}
         onRenamePane={renamePane}
         onSplitPane={(id, dir) => void splitPane(id, dir)}
         onPaneCwdClick={(paneId) => void changePaneCwd(paneId)}
@@ -602,6 +743,10 @@ export function ChatTab({
         }
         onMovePane={(dragPaneId, targetPaneId, zone) => {
           setLayout((prev) => (prev ? movePaneInTree(prev, dragPaneId, targetPaneId, zone) : prev));
+        }}
+        onProfilePaneDrop={(dragPaneId, targetPaneId, zone) => {
+          if (!activeProfile) return;
+          placePaneInDisplay(activeProfile.id, dragPaneId, targetPaneId, zone);
         }}
         renderTerminal={(pane, paneFocused) => (
           <EmbeddedTerminal
@@ -621,6 +766,32 @@ export function ChatTab({
           />
         )}
       />
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-chrome-border-subtle px-4 py-6 text-center text-[12px] text-chrome-text-dim">
+          <p>{t("chat.allTerminalsMinimized")}</p>
+          <p className="text-[11px]">{t("chat.selectTerminalFromSidebar")}</p>
+          {activeProfile && panes.some((p) => minimizedPaneIds.has(p.id)) && (
+            <div className="flex max-w-md flex-col gap-1.5">
+              {panes
+                .filter((p) => minimizedPaneIds.has(p.id))
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => void restorePaneToDisplay(activeProfile, p.id)}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-chrome-border-subtle bg-chrome-surface px-3 py-2 text-left text-[12px] text-chrome-text-secondary transition-colors hover:border-chrome-border-hover hover:bg-chrome-surface-menu hover:text-chrome-text"
+                  >
+                    <ToolLogo tool={p.tool} size={14} />
+                    <span className="min-w-0 truncate">{paneDisplayLabel(p)}</span>
+                    <span className="ml-auto shrink-0 text-[11px] text-chrome-accent-text">
+                      {t("profile.restoreToDisplay")}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
       </div>
     </div>
   ) : (
