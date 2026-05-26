@@ -511,6 +511,20 @@ export function ChatTab({
     }
   }
 
+  const handleActivateProfileRef = useRef(handleActivateProfile);
+  handleActivateProfileRef.current = handleActivateProfile;
+
+  useEffect(() => {
+    const unsub = window.api.onTrayActivateProfile((profileId) => {
+      void (async () => {
+        const r = await window.api.profileGetTree();
+        const profile = r.tree?.profiles.find((p) => p.id === profileId);
+        if (profile) await handleActivateProfileRef.current(profile);
+      })();
+    });
+    return unsub;
+  }, []);
+
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
     if (activeProfile?.id !== profile.id) {
       await handleActivateProfile(profile);
