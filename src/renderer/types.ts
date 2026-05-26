@@ -179,6 +179,14 @@ export interface ProfileTree {
   lastActiveProfileId: string | null;
 }
 
+export interface ProfileCreateInput {
+  defaultCwd?: string;
+  defaultTool?: string;
+  accentColor?: string | null;
+  broadcastInput?: boolean;
+  copyFromProfileId?: string;
+}
+
 export interface WorkspaceTree {
   workspaces: WorkspaceInfo[];
   groups: Record<string, GroupInfo[]>;
@@ -294,9 +302,7 @@ export interface ElectronAPI {
   profileGetTree: () => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
   profileCreate: (
     name: string,
-    defaultCwd?: string,
-    defaultTool?: string,
-    accentColor?: string | null,
+    input?: ProfileCreateInput,
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileUpdate: (
     profileId: string,

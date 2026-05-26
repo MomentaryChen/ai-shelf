@@ -1,4 +1,4 @@
-import { bootstrap, type AppContext, type GroupLayoutSnapshot } from "ai-shelf";
+import { bootstrap, type AppContext, type CreateProfileInput, type GroupLayoutSnapshot } from "ai-shelf";
 
 let ctx: AppContext | null = null;
 
@@ -65,13 +65,8 @@ export function getProfileTree() {
   return getWorkspaceContext().profileService.getTree();
 }
 
-export function createProfile(
-  name: string,
-  defaultCwd?: string,
-  defaultTool?: string,
-  accentColor?: string | null,
-) {
-  return getWorkspaceContext().profileService.create(name, defaultCwd, defaultTool, accentColor);
+export function createProfile(name: string, input?: CreateProfileInput) {
+  return getWorkspaceContext().profileService.create(name, input);
 }
 
 export function updateProfile(
