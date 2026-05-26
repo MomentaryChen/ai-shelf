@@ -148,7 +148,9 @@ export function App() {
                 <>
                   {activeTab === "overview" && <OverviewTab data={data} modelOverrides={modelOverrides} />}
                   {activeTab === "models" && <ModelsTab data={data} />}
-                  {activeTab === "skills" && <SkillsTab data={data} />}
+                  {activeTab === "skills" && (
+                    <SkillsTab data={data} onOpenMcpSync={() => setActiveTab("mcp")} />
+                  )}
                   {activeTab === "mcp" && <McpTab data={data} />}
                   {activeTab === "config" && <ConfigTab data={data} />}
                   {activeTab === "doctor" && <DoctorTab data={data} />}
