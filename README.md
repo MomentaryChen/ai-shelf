@@ -83,7 +83,7 @@ Switch between **Terminal** and **Inventory** in the header. Inventory mode has 
 ### Windows (desktop app)
 
 1. Download **`AI-Shelf-Setup-<version>.exe`** from [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) (installer only — not portable builds).
-2. Run the installer. If SmartScreen warns about an unknown publisher, choose **More info** → **Run anyway** (unsigned build).
+2. Run the installer. Windows may show SmartScreen (**unknown publisher**) — self-signed builds are not CA-trusted. Choose **More info** → **Run anyway**. See [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md).
 3. Launch **AI Shelf** from the Start menu or desktop shortcut.
 
 See [docs/RELEASE.md](docs/RELEASE.md) for maintainer release steps and uninstall notes.

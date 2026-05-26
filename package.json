@@ -23,6 +23,7 @@
     "electron:dev": "electron .",
     "package:win": "pnpm build && pkg . --targets node22-win-x64 --output dist/ai-shelf.exe",
     "dist:win": "pnpm build && electron-builder --win",
+    "dist:win:signed": "pwsh -NoProfile -File scripts/dist-win-signed.ps1",
     "dist:win:portable": "pnpm build && electron-builder --win portable",
     "test:e2e": "pnpm build && playwright test",
     "gen-icon": "node scripts/gen-icon.mjs",
@@ -57,7 +58,10 @@
           ]
         }
       ],
-      "icon": "src/assets/icon.ico"
+      "icon": "src/assets/icon.ico",
+      "signtoolOptions": {
+        "timeStampServer": "http://timestamp.digicert.com"
+      }
     },
     "nsis": {
       "guid": "com.ai-shelf",

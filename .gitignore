@@ -24,6 +24,10 @@ Desktop.ini
 .env
 .env.*
 
+# Code signing / certificates
+.codesign/
+*.pfx
+
 # Logs
 *.log
 npm-debug.log*

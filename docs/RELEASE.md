@@ -20,6 +20,7 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 4. [ ] Local smoke test: `pnpm dist:win` → install `release/AI-Shelf-Setup-<version>.exe`
 5. [ ] [CHANGELOG.md](../CHANGELOG.md) updated for user-facing changes
 6. [ ] README / GitHub Release notes updated if needed
+7. [ ] Release workflow reports **Authenticode signature present** (self-signed; SmartScreen may still warn — see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md))
 
 ### Publish via GitHub Actions (recommended)
 
@@ -66,9 +67,9 @@ Upload `release/AI-Shelf-Setup-<version>.exe`, `release/latest.yml`, and `releas
 
 ### Code signing
 
-Installers are **not** code-signed in this repo. Windows SmartScreen may warn on first run. To sign later, configure `win.certificateFile` / `CSC_*` secrets in electron-builder and CI.
+Every release tag build is **self-signed** in CI (no secrets required). The installer has an Authenticode signature, but Windows **does not trust** self-signed publishers — SmartScreen may still warn.
 
-The **Release** GitHub Action sets `CSC_IDENTITY_AUTO_DISCOVERY=false` so `signtool` does not try to auto-pick a certificate on the runner (which can hang on helpers like `elevate.exe`).
+Details and optional local signed builds: **[docs/WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md)**.
 
 ---
 
@@ -88,7 +89,7 @@ If Windows shows **“Windows protected your PC”**:
 1. Click **More info**
 2. Click **Run anyway**
 
-This is expected until the project adds an Authenticode certificate.
+This is expected for **self-signed** builds (and fully unsigned builds). Choose **More info** → **Run anyway**. A CA-trusted certificate would show a verified publisher; see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md).
 
 ### Requirements
 
@@ -101,7 +102,7 @@ This is expected until the project adds an Authenticode certificate.
 Installed **NSIS** builds check [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) on startup (after a short delay). When a newer version exists, a dialog asks to download; progress shows 0–100%, then you confirm **Restart** to finish installing.
 
 - **First time** this feature ships: install that release manually once; later upgrades can stay in-app.
-- **Unsigned builds**: SmartScreen may appear again when the updater runs the new installer.
+- **Self-signed builds**: SmartScreen may appear when running the installer or in-app updates (same workaround: **More info** → **Run anyway**).
 - **Dev / `electron .`**: no update checks (not packaged).
 
 Maintainers: `package.json` → `build.publish` must point at this repo; CI must upload `latest.yml` (see workflow above).

@@ -11,10 +11,6 @@ permissions:
 jobs:
   release-windows:
     runs-on: windows-latest
-    env:
-      # Unsigned Windows builds (docs/RELEASE.md). Without this, signtool may try to
-      # auto-discover a cert on the runner and hang indefinitely on elevate.exe helpers.
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,8 +32,25 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Self-signed Authenticode — no secrets or CA purchase required.
+      # SmartScreen still warns (cert is not publicly trusted). See docs/WINDOWS_CODE_SIGNING.md.
+      - name: Prepare self-signed code signing certificate
+        shell: pwsh
+        run: ./scripts/new-selfsigned-codesign.ps1 -ForCi
+
       - name: Package Windows installer
         run: pnpm exec electron-builder --win --publish never
+
+      - name: Verify Authenticode signature
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path release -Filter 'AI-Shelf-Setup-*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Installer not found in release/' }
+          ./scripts/verify-windows-signature.ps1 -Path $installer.FullName -RequireSigned
+
+      - name: Self-signed build notice
+        run: |
+          echo "::notice::Installer is self-signed (not CA-trusted). SmartScreen may still warn users. See docs/WINDOWS_CODE_SIGNING.md"
 
       # Release body matches CHANGELOG.md for this tag (single source of truth).
       - name: Build release notes from CHANGELOG

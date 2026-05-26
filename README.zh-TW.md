@@ -83,7 +83,7 @@
 ### Windows（桌面應用）
 
 1. 至 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) 下載 **`AI-Shelf-Setup-<version>.exe`**（僅安裝程式，請勿下載 portable 版）。
-2. 執行安裝精靈。若 SmartScreen 提示未知發行者，請點 **詳細資訊** → **仍要執行**（目前未簽章）。
+2. 執行安裝精靈。Windows 可能顯示 SmartScreen（**未知發行者**）— 自簽憑證不受系統信任。請點 **詳細資訊** → **仍要執行**。詳見 [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md)。
 3. 從開始選單或桌面捷徑啟動 **AI Shelf**。
 
 維護者發佈流程與解除安裝說明見 [docs/RELEASE.md](docs/RELEASE.md)。
