@@ -256,6 +256,13 @@ export interface ElectronAPI {
   ptySpawn:  (tool: string, cwd?: string)                           => Promise<{ success: boolean; sessionId?: string; error?: string }>;
   ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
   ptyGetOutputBuffer: (sessionId: string)                            => Promise<{ buffer: string }>;
+  ptyExportOutput: (
+    sessionId: string,
+    defaultName?: string,
+  ) => Promise<
+    | { success: true; path: string }
+    | { success: false; canceled?: true; error?: string }
+  >;
   ptySearchOutput: (
     sessionId: string,
     query: string,

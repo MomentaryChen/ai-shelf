@@ -14,6 +14,10 @@ import {
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
+import {
+  copyTerminalOutputForIssue,
+  exportTerminalOutput,
+} from "../terminal/terminal-output-export";
 import { getXtermTheme } from "../app-theme";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -285,12 +289,20 @@ export function EmbeddedTerminal({
       term.clear();
       window.api.ptyWrite(sessionId, "\x0c");
     };
+    const doExportOutput = () => {
+      void exportTerminalOutput(sessionId, sessionId);
+    };
+    const doCopyOutputForIssue = () => {
+      void copyTerminalOutputForIssue(sessionId);
+    };
     const unregisterClear = registerTerminalClear(sessionId, doClear);
     let pasteToThisPaneOnly = false;
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
       onRestart: onRestart,
+      onExportOutput: doExportOutput,
+      onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
       onPaste: (text) => {
         pasteToThisPaneOnly = true;

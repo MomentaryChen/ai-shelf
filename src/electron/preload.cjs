@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld("api", {
   ptySpawn:  (tool, cwd)                    => ipcRenderer.invoke("pty-spawn", tool, cwd),
   ptyAttach: (sessionId)                    => ipcRenderer.invoke("pty-attach", sessionId),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
+  ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),
   ptySearchOutput: (sessionId, query, opts)  => ipcRenderer.invoke("pty-search-output", sessionId, query, opts),
   ptyGetLogPath: (sessionId)                => ipcRenderer.invoke("pty-get-log-path", sessionId),
   pickFolder: (defaultPath)                 => ipcRenderer.invoke("pick-folder", defaultPath),
