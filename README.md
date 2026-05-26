@@ -6,7 +6,7 @@
 
 [中文說明](README.zh-TW.md) · [Changelog](CHANGELOG.md)
 
-**v1.4.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-shelf`).
+**v1.4.1** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-shelf`).
 
 ---
 

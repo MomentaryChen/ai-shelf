@@ -9,6 +9,15 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-05-26
+
+Profile dialog visibility and terminal preservation when switching profiles.
+
+### Fixed
+
+- **Profile create/settings** — name and path fields visible in dialogs
+- **Profile switch** — terminal sessions preserved when switching profiles
+
 ## [1.4.0] - 2026-05-26
 
 Profile terminal minimize, sidebar drag placement, themes, and i18n.
@@ -142,6 +151,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[1.4.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.1
 [1.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.0
 [1.3.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.3.0
 [1.2.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.2.0
