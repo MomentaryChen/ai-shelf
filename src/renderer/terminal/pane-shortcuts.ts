@@ -1,4 +1,6 @@
+import { loadSettings } from "../chat-settings";
 import type { PaneInfo } from "./split-tree";
+import { matchPaneFocusSplitShortcut } from "./pane-key-bindings";
 
 export type PaneShortcutAction =
   | { type: "focus-next" }
@@ -95,14 +97,11 @@ export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null 
   if (ev.type !== "keydown" || !hasMod(ev) || ev.altKey) return null;
   if (shouldIgnoreShortcutTarget(ev.target)) return null;
 
-  const key = ev.key.toLowerCase();
+  const bindings = loadSettings().paneShortcuts;
+  const focusSplit = matchPaneFocusSplitShortcut(ev, bindings);
+  if (focusSplit) return focusSplit;
 
-  if (!ev.shiftKey && key === "tab") {
-    return { type: "focus-next" };
-  }
-  if (ev.shiftKey && key === "tab") {
-    return { type: "focus-prev" };
-  }
+  const key = ev.key.toLowerCase();
 
   if (!ev.shiftKey && key === "w") {
     return { type: "close" };
@@ -113,17 +112,6 @@ export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null 
   }
   if (ev.shiftKey && key === "r") {
     return { type: "restart-session" };
-  }
-
-  if (!ev.shiftKey && (key === "\\" || key === "|")) {
-    return { type: "split", direction: "horizontal" };
-  }
-  if (ev.shiftKey && (key === "\\" || key === "|")) {
-    return { type: "split", direction: "vertical" };
-  }
-
-  if (!ev.shiftKey && key >= "1" && key <= "9") {
-    return { type: "focus-index", index: Number(key) - 1 };
   }
 
   return null;
