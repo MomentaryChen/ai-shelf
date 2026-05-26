@@ -4,6 +4,7 @@ import { Command } from "commander";
 declare const __CLI_VERSION__: string;
 import { bootstrap, type AppContext } from "../infra/bootstrap.js";
 import { APP_NAME, APP_TITLE } from "../config/config.js";
+import { registerProfileCommands } from "./commands/profile.js";
 import { registerWorkspaceCommands } from "./commands/workspace.js";
 import { registerGroupCommands } from "./commands/group.js";
 import { registerSessionCommands } from "./commands/session.js";
@@ -27,6 +28,7 @@ program
     ctx = null;
   });
 
+registerProfileCommands(program, getCtx);
 registerWorkspaceCommands(program, getCtx);
 registerGroupCommands(program, getCtx);
 registerSessionCommands(program, getCtx);

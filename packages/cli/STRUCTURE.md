@@ -1,19 +1,25 @@
-# AI Shelf CLI — Terminal Workspace Manager
+# AI Shelf CLI — Terminal Profile Manager
 
-Phase 1: MVP foundation (SQLite + CLI + TUI skeleton + runtime layer).
+Phase 1 foundation (SQLite + CLI + TUI + runtime layer). **2.0 uses Profile as the primary user-facing model** — see [docs/data-model.md](../../docs/data-model.md).
 
 ## Commands
 
 ```bash
-ai-shelf workspace create <name> [--root <path>]
-ai-shelf workspace list
-ai-shelf group create <workspace> <group>
-ai-shelf group list <workspace>
-ai-shelf session create <workspace> <group> <session> [--cwd <path>] [--shell <shell>]
-ai-shelf session list <workspace> [--group <name>]
-ai-shelf session exec <workspace> <group> <command> [--session <name>]
-ai-shelf session exec <workspace> <group> <command> --broadcast
+# Profiles (primary — same data as desktop app)
+ai-shelf profile list
+ai-shelf profile create <name> [--cwd <path>] [--tool <tool>] [--color <hex>]
+ai-shelf profile update <profile> [--name] [--cwd] [--tool] [--broadcast|--no-broadcast] [--color]
+ai-shelf profile delete <profile>
+ai-shelf profile reorder <profile...>
+ai-shelf profile exec <profile> <command...> [--broadcast] [--session <name>]
+
+# Full-screen TUI (profile list + CLI sessions per profile)
 ai-shelf tui
+
+# Legacy (deprecated — prints warnings)
+ai-shelf workspace create|list|delete …
+ai-shelf group create|list|delete …
+ai-shelf session create|start|stop|list|exec|delete …
 ```
 
 ## Data paths (Windows)

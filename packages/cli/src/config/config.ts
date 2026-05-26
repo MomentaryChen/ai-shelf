@@ -9,4 +9,4 @@ export const AppConfigSchema = z.object({
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 
 export const APP_NAME = "ai-shelf";
-export const APP_TITLE = "AI Shelf — Terminal Workspace Manager";
+export const APP_TITLE = "AI Shelf — Terminal Profile Manager";

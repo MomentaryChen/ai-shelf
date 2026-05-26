@@ -1,0 +1,59 @@
+# Data model — Profile-first (2.0)
+
+AI Shelf uses **one SQLite database** (`%APPDATA%/ai-shelf/workspaces.db` on Windows). The **desktop app** and **`ai-shelf` CLI/TUI** read and write the same file.
+
+## User-facing model: Profile
+
+A **profile** is the primary unit for organizing terminals:
+
+| Concept | Meaning |
+|--------|---------|
+| **Profile** | Named environment: default directory, default AI tool, accent color, broadcast-input flag |
+| **Pane / terminal** | One embedded terminal (tool + cwd + optional title), up to 8 per profile |
+| **Layout** | Split-pane tree persisted per profile |
+
+Create and manage profiles with:
+
+- Desktop: **Profiles** sidebar
+- CLI: `ai-shelf profile list|create|update|delete|reorder|exec`
+
+## Storage mapping (internal)
+
+Profiles are stored using legacy table names for compatibility:
+
+```
+Profile  →  group row in workspace "Profiles"
+Pane layout  →  group_layouts snapshot (JSON)
+Last active profile  →  app_preferences.last_active_group_key
+```
+
+The hidden **`Profiles`** workspace is created automatically. You normally do not create additional workspaces.
+
+## CLI sessions vs desktop panes
+
+| Surface | Live terminals | Persistence |
+|--------|----------------|-------------|
+| **Desktop app** | Electron `node-pty` in main process | Pane slots + layout in `group_layouts` |
+| **CLI / TUI** | `SessionRuntime` PTY processes | `sessions` table under profile name |
+
+Both share **profile metadata** (name, defaults, layout snapshot). Desktop panes and CLI named sessions are different runtime paths; use **`profile exec`** for headless command injection into CLI sessions.
+
+## Deprecated legacy commands
+
+These remain for backward compatibility but print deprecation warnings:
+
+- `ai-shelf workspace …`
+- `ai-shelf group …`
+- `ai-shelf session …` (except when targeting `Profiles` + profile name for CLI sessions)
+
+Prefer **`ai-shelf profile …`** for all new workflows.
+
+## IPC (Electron)
+
+The renderer uses profile APIs for the main UI:
+
+- `profile-get-tree`, `profile-create`, `profile-update`, `profile-delete`, `profile-reorder`
+
+Layout persistence still uses internal group-layout handlers (`ws-group-layout-*`) keyed by `workspaceId:groupId` — equivalent to profile storage keys.
+
+Legacy workspace tree IPC (`ws-get-tree`, `ws-workspace-create`, …) remains for layout migration helpers but is not used by the desktop UI.

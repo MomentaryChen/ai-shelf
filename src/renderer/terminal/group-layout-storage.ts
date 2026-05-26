@@ -46,11 +46,6 @@ export async function saveLastActiveGroupKey(workspaceId: string, groupId: strin
   await window.api.wsGroupLayoutSetActive(workspaceId, groupId);
 }
 
-export async function loadLastActiveGroupKey(): Promise<string | null> {
-  const tree = await window.api.wsGetTree();
-  return tree.lastActiveGroupKey ?? null;
-}
-
 /** One-time migration from legacy localStorage snapshots into SQLite. */
 export async function migrateLocalStorageToSqlite(): Promise<void> {
   const flag = "ai-inventory-group-layout-migrated";

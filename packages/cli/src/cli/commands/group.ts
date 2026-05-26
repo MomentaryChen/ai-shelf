@@ -2,9 +2,12 @@ import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
 import { AppError } from "../../core/errors/app-error.js";
+import { warnLegacyWorkspaceModel } from "../deprecation.js";
 
 export function registerGroupCommands(program: Command, getCtx: () => AppContext): void {
-  const group = program.command("group").description("Manage groups within a workspace");
+  const group = program
+    .command("group")
+    .description("Manage groups within a workspace (legacy — prefer profile commands)");
 
   group
     .command("create")
@@ -12,6 +15,7 @@ export function registerGroupCommands(program: Command, getCtx: () => AppContext
     .argument("<name>", "Group name")
     .description("Create a group in a workspace")
     .action((workspaceName: string, groupName: string) => {
+      warnLegacyWorkspaceModel("Use `ai-shelf profile create <name>` instead.");
       try {
         const g = getCtx().groupService.create(workspaceName, groupName);
         console.log(chalk.green(`✓ Group created: ${workspaceName}/${g.name}`));
@@ -25,6 +29,7 @@ export function registerGroupCommands(program: Command, getCtx: () => AppContext
     .argument("<workspace>", "Workspace name")
     .description("List groups in a workspace")
     .action((workspaceName: string) => {
+      warnLegacyWorkspaceModel("Use `ai-shelf profile list` instead.");
       try {
         const list = getCtx().groupService.list(workspaceName);
         if (list.length === 0) {
@@ -47,6 +52,7 @@ export function registerGroupCommands(program: Command, getCtx: () => AppContext
     .argument("<name>", "Group name")
     .description("Delete a group and its sessions")
     .action((workspaceName: string, groupName: string) => {
+      warnLegacyWorkspaceModel("Use `ai-shelf profile delete <profile>` instead.");
       try {
         getCtx().groupService.delete(workspaceName, groupName);
         console.log(chalk.green(`✓ Group deleted: ${workspaceName}/${groupName}`));

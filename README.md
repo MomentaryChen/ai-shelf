@@ -6,7 +6,7 @@
 
 [中文說明](README.zh-TW.md) · [Changelog](CHANGELOG.md)
 
-**v1.4.1** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal workspace manager (`ai-shelf`).
+**v1.4.1** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
 
 ---
 
@@ -15,10 +15,10 @@
 | Deliverable | Binary / entry | Role |
 |---|---|---|
 | **Inventory CLI** | `ai` | Scan models, skills, MCP, config; run doctor/update/raw |
-| **Workspace CLI** | `ai-shelf` | Manage workspaces, groups, sessions; broadcast commands; TUI |
+| **Profile CLI** | `ai-shelf` | Manage profiles, CLI sessions, broadcast exec; TUI |
 | **Desktop app** | `pnpm electron` | Terminal launcher + inventory dashboard (Electron + React) |
 
-The desktop app uses both: inventory detection lives in `src/`, while profiles, layouts, and session metadata are backed by SQLite via `packages/cli`.
+The desktop app and `ai-shelf` share one SQLite database. **Profiles** (names, defaults, pane layouts) are the primary user-facing model in both surfaces.
 
 ---
 
@@ -35,13 +35,13 @@ The desktop app uses both: inventory detection lives in `src/`, while profiles, 
 - **Update** — version check and one-click update per tool and self
 - **JSON output** — `--json` on every inventory command
 
-### Terminal workspace (`ai-shelf`)
+### Terminal profiles (`ai-shelf`)
 
-- **Workspaces & groups** — organize projects and terminal groups in SQLite
-- **Sessions** — create/start/stop PTY sessions with optional AI tool launch (`claude`, `copilot`, `cursor`, `codex`, `gemini`, `aider`, `opencode`)
-- **Broadcast exec** — send the same command to all running sessions in a group
-- **TUI** — full-screen terminal UI (`ai-shelf tui`) built with neo-blessed
-- **Profiles API** — exported library used by the desktop app for named terminal profiles
+- **Profiles** — named terminal environments (default cwd, tool, accent color, broadcast input); same records as the desktop sidebar
+- **CLI sessions** — optional headless PTY sessions scoped to a profile (`Profiles` workspace internally)
+- **Broadcast exec** — `profile exec <name> … --broadcast` sends a command to all running CLI sessions in a profile
+- **TUI** — profile list + session management (`ai-shelf tui`)
+- **Legacy** — `workspace` / `group` / `session` commands remain but are deprecated
 
 ### Desktop app (Electron)
 
@@ -103,7 +103,7 @@ cd ai-shelf
 pnpm install          # rebuilds native modules (node-pty, better-sqlite3)
 pnpm build
 pnpm start            # ai inventory / doctor / …
-pnpm exec ai-shelf workspace list
+pnpm exec ai-shelf profile list
 pnpm electron         # desktop app
 ```
 
@@ -184,38 +184,34 @@ ai update self
 
 ---
 
-### Workspace CLI — `ai-shelf`
+### Profile CLI — `ai-shelf`
 
 Persistent data (Windows):
 
 | Path | Purpose |
 |---|---|
 | `%APPDATA%/ai-shelf/config.yaml` | App config |
-| `%APPDATA%/ai-shelf/workspaces.db` | SQLite database |
+| `%APPDATA%/ai-shelf/workspaces.db` | SQLite database (profiles + layouts) |
 | `%APPDATA%/ai-shelf/logs/app.log` | Logs |
 
+See [docs/data-model.md](docs/data-model.md) for how profiles map to storage. [繁體中文版](docs/data-model.zh-TW.md)
+
 ```bash
-# Workspaces
-ai-shelf workspace create <name> [--root <path>]
-ai-shelf workspace list
-ai-shelf workspace delete <name>
-
-# Groups (within a workspace)
-ai-shelf group create <workspace> <group>
-ai-shelf group list <workspace>
-ai-shelf group delete <workspace> <group>
-
-# Sessions
-ai-shelf session create <workspace> <group> <name> [--cwd <path>] [--shell <shell>] [--tool <tool>]
-ai-shelf session start <workspace> <group> <name>
-ai-shelf session stop <workspace> <group> <name>
-ai-shelf session list <workspace> [--group <name>]
-ai-shelf session exec <workspace> <group> <command...> [--session <name>]
-ai-shelf session exec <workspace> <group> <command...> --broadcast
-ai-shelf session delete <workspace> <group> <name>
+# Profiles (primary — shared with desktop app)
+ai-shelf profile list
+ai-shelf profile create <name> [--cwd <path>] [--tool <tool>] [--color <hex>]
+ai-shelf profile update <profile> [--name] [--cwd] [--tool] [--broadcast|--no-broadcast]
+ai-shelf profile delete <profile>
+ai-shelf profile reorder <profile...>
+ai-shelf profile exec <profile> <command...> [--broadcast] [--session <name>]
 
 # Full-screen TUI
 ai-shelf tui
+
+# Legacy (deprecated)
+ai-shelf workspace …
+ai-shelf group …
+ai-shelf session …
 ```
 
 See [`packages/cli/STRUCTURE.md`](packages/cli/STRUCTURE.md) for package internals.
@@ -284,7 +280,7 @@ ai-shelf/                 # root workspace (Electron app + inventory CLI)
 | Layer | Stack |
 |---|---|
 | Inventory CLI | Node.js, native `parseArgs` |
-| Workspace CLI | Commander, better-sqlite3, node-pty, RxJS, Zod, Pino |
+| Profile CLI | Commander, better-sqlite3, node-pty, RxJS, Zod, Pino |
 | Desktop | Electron 41, React 19, Vite 8, Tailwind CSS 4, xterm.js |
 | Tests | Playwright |
 

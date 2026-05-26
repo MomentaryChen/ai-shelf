@@ -2,9 +2,15 @@ import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
 import { AppError } from "../../core/errors/app-error.js";
+import { PROFILES_WORKSPACE_NAME } from "../../services/profile-service.js";
+import { warnLegacyWorkspaceModel } from "../deprecation.js";
+
+const SESSION_DEPRECATION = `Prefer \`ai-shelf profile exec <profile> …\` for profile-scoped CLI sessions. Legacy path: workspace "${PROFILES_WORKSPACE_NAME}", group = profile name.`;
 
 export function registerSessionCommands(program: Command, getCtx: () => AppContext): void {
-  const session = program.command("session").description("Manage terminal sessions");
+  const session = program
+    .command("session")
+    .description("Manage terminal sessions (legacy — prefer profile commands)");
 
   session
     .command("create")
@@ -23,6 +29,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
         sessionName: string,
         opts: { cwd?: string; shell?: string; tool?: string; start?: boolean },
       ) => {
+        warnLegacyWorkspaceModel(SESSION_DEPRECATION);
         try {
           const s = await getCtx().sessionService.create(workspaceName, groupName, sessionName, {
             cwd: opts.cwd,
@@ -45,6 +52,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     .argument("<name>", "Session name")
     .description("Start PTY for an existing session")
     .action(async (workspaceName: string, groupName: string, sessionName: string) => {
+      warnLegacyWorkspaceModel(SESSION_DEPRECATION);
       try {
         const s = await getCtx().sessionService.start(workspaceName, groupName, sessionName);
         console.log(chalk.green(`✓ Session started: ${s.name} (pid ${s.pid ?? "—"})`));
@@ -60,6 +68,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     .argument("<name>", "Session name")
     .description("Stop session PTY")
     .action((workspaceName: string, groupName: string, sessionName: string) => {
+      warnLegacyWorkspaceModel(SESSION_DEPRECATION);
       try {
         const s = getCtx().sessionService.stop(workspaceName, groupName, sessionName);
         console.log(chalk.green(`✓ Session stopped: ${s.name}`));
@@ -74,6 +83,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     .option("--group <name>", "Filter by group")
     .description("List sessions")
     .action((workspaceName: string, opts: { group?: string }) => {
+      warnLegacyWorkspaceModel(SESSION_DEPRECATION);
       try {
         const list = getCtx().sessionService.list(workspaceName, opts.group);
         if (list.length === 0) {
@@ -108,6 +118,9 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
         commandParts: string[],
         opts: { session?: string; broadcast?: boolean },
       ) => {
+        warnLegacyWorkspaceModel(
+          `Use \`ai-shelf profile exec <profile> …\` instead of session exec.`,
+        );
         try {
           const command = commandParts.join(" ");
           const result = getCtx().execService.exec(workspaceName, groupName, command, {
@@ -139,6 +152,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     .argument("<name>", "Session name")
     .description("Delete session metadata (stops PTY if running)")
     .action((workspaceName: string, groupName: string, sessionName: string) => {
+      warnLegacyWorkspaceModel(SESSION_DEPRECATION);
       try {
         getCtx().sessionService.delete(workspaceName, groupName, sessionName);
         console.log(chalk.green(`✓ Session deleted: ${workspaceName}/${groupName}/${sessionName}`));
