@@ -44,7 +44,11 @@ export function ProfileCreateDialog({
     const justOpened = open && !wasOpenRef.current;
     wasOpenRef.current = open;
     if (!open) return;
-    if (justOpened) setAccentColor(null);
+    if (justOpened) {
+      setName("");
+      setCwd("");
+      setAccentColor(null);
+    }
     setTool((prev) => {
       if (prev && tools.includes(prev)) return prev;
       return tools[0] ?? PLAIN_SHELL_TOOL_ID;
@@ -82,7 +86,7 @@ export function ProfileCreateDialog({
       onClick={onClose}
     >
       <form
-        className="w-full max-w-sm rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 shadow-2xl"
+        className="w-full max-w-sm rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 text-chrome-text shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
       >
@@ -96,7 +100,7 @@ export function ProfileCreateDialog({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("profile.dialog.namePlaceholder")}
-            className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] focus:border-chrome-border-hover focus:outline-none"
+            className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
 
           />
         </label>
@@ -109,7 +113,7 @@ export function ProfileCreateDialog({
               value={cwd}
               onChange={(e) => setCwd(e.target.value)}
               placeholder={t("profile.dialog.cwdPlaceholder")}
-              className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] focus:border-chrome-border-hover focus:outline-none"
+              className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
 
             />
             <button
