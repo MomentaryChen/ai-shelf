@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
 import {
@@ -44,6 +44,7 @@ import {
   deleteProfile,
   reorderProfiles,
 } from "./workspace-host.js";
+import { applyBackup, createJsonBackup, createZipBackup } from "./backup-service.js";
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
@@ -256,9 +257,9 @@ function createSettingsWindow() {
   }
   settingsWindow = new BrowserWindow({
     width: 520,
-    height: 680,
+    height: 760,
     minWidth: 440,
-    minHeight: 520,
+    minHeight: 560,
     title: formatWindowTitle("Terminal Settings"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
@@ -1380,6 +1381,60 @@ ipcMain.handle("profile-reorder", (_e, orderedProfileIds: string[]) => {
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
   }
+});
+
+ipcMain.handle("export-backup", async (_event, localStorage: Record<string, string>) => {
+  try {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Export AI Shelf backup",
+      defaultPath: `ai-shelf-backup-${stamp}.aishelf`,
+      filters: [
+        { name: "AI Shelf Backup (ZIP)", extensions: ["aishelf", "zip"] },
+        { name: "JSON Backup", extensions: ["json"] },
+      ],
+    });
+    if (canceled || !filePath) return { success: false, canceled: true as const };
+
+    const appVersion = app.getVersion();
+    if (filePath.toLowerCase().endsWith(".json")) {
+      const payload = createJsonBackup(appVersion, localStorage);
+      writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf-8");
+    } else {
+      const zipBytes = createZipBackup(appVersion, localStorage);
+      writeFileSync(filePath, Buffer.from(zipBytes));
+    }
+    return { success: true, path: filePath };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("import-backup", async () => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: "Import AI Shelf backup",
+      properties: ["openFile"],
+      filters: [{ name: "AI Shelf Backup", extensions: ["aishelf", "zip", "json"] }],
+    });
+    if (canceled || !filePaths[0]) return { success: false, canceled: true as const };
+
+    const manifest = applyBackup(readFileSync(filePaths[0]));
+    return {
+      success: true,
+      localStorage: manifest.localStorage,
+      exportedAt: manifest.exportedAt,
+      appVersion: manifest.appVersion,
+    };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("relaunch-app", () => {
+  app.relaunch();
+  app.exit(0);
+  return { ok: true };
 });
 
 app.whenReady().then(() => {

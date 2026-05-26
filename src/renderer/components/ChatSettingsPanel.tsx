@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { APP_THEME_OPTIONS, applyAppTheme } from "../app-theme";
+import { applyImportedLocalStorage, collectLocalStorageForBackup } from "../backup-storage";
 import {
   BG_PRESETS,
   DEFAULT_TERMINAL_FONT_FAMILY,
@@ -78,6 +79,10 @@ function dirOptionLabel(dir: string): string {
 export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   const { locale, setLocale, t } = useLocale();
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
+  const [backupBusy, setBackupBusy] = useState<"export" | "import" | null>(null);
+  const [backupMessage, setBackupMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(
+    null,
+  );
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -116,6 +121,52 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   }
 
   const dirOptions = buildDirOptions(settings.workingDir, settings.dirHistory);
+
+  async function handleExportBackup() {
+    setBackupMessage(null);
+    setBackupBusy("export");
+    try {
+      const result = await window.api.exportBackup(collectLocalStorageForBackup());
+      if ("canceled" in result && result.canceled) return;
+      if (result.success) {
+        setBackupMessage({ kind: "ok", text: t("settings.exportSuccess", { path: result.path }) });
+      } else {
+        setBackupMessage({
+          kind: "err",
+          text: t("settings.exportFailed", { error: result.error ?? "unknown" }),
+        });
+      }
+    } finally {
+      setBackupBusy(null);
+    }
+  }
+
+  async function handleImportBackup() {
+    if (!window.confirm(t("settings.importConfirm"))) return;
+
+    setBackupMessage(null);
+    setBackupBusy("import");
+    try {
+      const result = await window.api.importBackup();
+      if ("canceled" in result && result.canceled) return;
+      if (!result.success) {
+        setBackupMessage({
+          kind: "err",
+          text: t("settings.importFailed", { error: result.error ?? "unknown" }),
+        });
+        return;
+      }
+
+      applyImportedLocalStorage(result.localStorage);
+      const date = new Date(result.exportedAt).toLocaleString();
+      setBackupMessage({ kind: "ok", text: t("settings.importSuccess", { date }) });
+      window.setTimeout(() => {
+        void window.api.relaunchApp();
+      }, 1200);
+    } finally {
+      setBackupBusy(null);
+    }
+  }
 
   const sectionTitle = compact
     ? "mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary"
@@ -392,6 +443,39 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             </span>
           </label>
         </div>
+      </div>
+
+      {/* Data backup & restore */}
+      <div>
+        <p className={sectionTitle}>{t("settings.backup")}</p>
+        <p className="mb-3 text-[11px] leading-snug text-text-tertiary">{t("settings.backupHint")}</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExportBackup()}
+            disabled={backupBusy !== null}
+            className="cursor-pointer rounded-lg border border-border px-4 py-2 text-[13px] text-text-secondary transition-all duration-150 hover:border-accent/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {backupBusy === "export" ? "…" : t("settings.exportBackup")}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleImportBackup()}
+            disabled={backupBusy !== null}
+            className="cursor-pointer rounded-lg border border-border px-4 py-2 text-[13px] text-text-secondary transition-all duration-150 hover:border-accent/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {backupBusy === "import" ? "…" : t("settings.importBackup")}
+          </button>
+        </div>
+        {backupMessage && (
+          <p
+            className={`mt-2 text-[11px] leading-snug ${
+              backupMessage.kind === "ok" ? "text-ok" : "text-fail"
+            }`}
+          >
+            {backupMessage.text}
+          </p>
+        )}
       </div>
     </div>
   );
