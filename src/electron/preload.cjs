@@ -101,8 +101,7 @@ contextBridge.exposeInMainWorld("api", {
   wsGroupLayoutSetActive: (workspaceId, groupId) =>
     ipcRenderer.invoke("ws-group-layout-set-active", workspaceId, groupId),
   profileGetTree: () => ipcRenderer.invoke("profile-get-tree"),
-  profileCreate: (name, defaultCwd, defaultTool, accentColor) =>
-    ipcRenderer.invoke("profile-create", name, defaultCwd, defaultTool, accentColor),
+  profileCreate: (name, input) => ipcRenderer.invoke("profile-create", name, input),
   profileUpdate: (profileId, patch) => ipcRenderer.invoke("profile-update", profileId, patch),
   profileDelete: (profileId) => ipcRenderer.invoke("profile-delete", profileId),
   profileReorder: (orderedProfileIds) =>

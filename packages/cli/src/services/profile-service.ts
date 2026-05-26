@@ -32,6 +32,14 @@ export interface ProfileTree {
   lastActiveProfileId: string | null;
 }
 
+export interface CreateProfileInput {
+  defaultCwd?: string;
+  defaultTool?: string;
+  accentColor?: string | null;
+  broadcastInput?: boolean;
+  copyFromProfileId?: string;
+}
+
 export class ProfileService {
   constructor(
     private readonly workspaces: WorkspaceRepositoryPort,
@@ -63,22 +71,31 @@ export class ProfileService {
     return { workspaceId: ws.id, profiles, lastActiveProfileId };
   }
 
-  create(
-    name: string,
-    defaultCwd?: string,
-    defaultTool?: string,
-    accentColor?: string | null,
-  ): ProfileInfo {
+  create(name: string, input: CreateProfileInput = {}): ProfileInfo {
     const ws = this.ensureProfilesWorkspace();
     const existing = this.groups.findByName(ws.id, name);
     if (existing) {
       throw new AppError(`Profile "${name}" already exists`, "PROFILE_EXISTS");
     }
+
+    let source: ProfileInfo | null = null;
+    if (input.copyFromProfileId) {
+      const resolved = this.resolve(input.copyFromProfileId);
+      source = this.toProfileInfo(resolved.group, resolved.workspaceId);
+    }
+
     const group = this.groups.create({ workspace_id: ws.id, name });
     this.eventBus.publish({ type: "GroupCreated", payload: group });
 
-    const cwd = defaultCwd ?? ws.root_path ?? homedir();
-    const tool = defaultTool ?? DEFAULT_PROFILE_TOOL;
+    const cwd =
+      input.defaultCwd ?? source?.defaultCwd ?? ws.root_path ?? homedir();
+    const tool =
+      input.defaultTool ?? source?.defaultTool ?? DEFAULT_PROFILE_TOOL;
+    const broadcastInput =
+      input.broadcastInput ?? source?.broadcastInput ?? false;
+    const accentColor =
+      input.accentColor !== undefined ? input.accentColor : source?.accentColor;
+
     const existingProfiles = this.groups.listByWorkspace(ws.id);
     const usedColors = existingProfiles.map(
       (g) => this.layouts.findByGroupId(g.id)?.accentColor ?? null,
@@ -94,7 +111,7 @@ export class ProfileService {
       defaultTool: tool,
       panes: [],
       layout: null,
-      broadcastInput: false,
+      broadcastInput,
       accentColor: resolvedAccent,
       updatedAt: new Date().toISOString(),
     };

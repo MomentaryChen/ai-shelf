@@ -1332,9 +1332,19 @@ ipcMain.handle("profile-get-tree", () => {
 
 ipcMain.handle(
   "profile-create",
-  (_e, name: string, defaultCwd?: string, defaultTool?: string, accentColor?: string | null) => {
+  (
+    _e,
+    name: string,
+    input?: {
+      defaultCwd?: string;
+      defaultTool?: string;
+      accentColor?: string | null;
+      broadcastInput?: boolean;
+      copyFromProfileId?: string;
+    },
+  ) => {
     try {
-      const profile = createProfile(name, defaultCwd, defaultTool, accentColor);
+      const profile = createProfile(name, input);
       return { success: true, profile };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };

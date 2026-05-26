@@ -227,15 +227,18 @@ export function ProfileSidebar({
     defaultCwd: string;
     defaultTool: string;
     accentColor: string | null;
+    broadcastInput: boolean;
+    copyFromProfileId?: string;
   }) {
     setCreateOpen(false);
     setBusy(true);
-    const r = await window.api.profileCreate(
-      opts.name,
-      opts.defaultCwd || undefined,
-      opts.defaultTool,
-      opts.accentColor,
-    );
+    const r = await window.api.profileCreate(opts.name, {
+      defaultCwd: opts.defaultCwd || undefined,
+      defaultTool: opts.defaultTool,
+      accentColor: opts.accentColor,
+      broadcastInput: opts.broadcastInput,
+      copyFromProfileId: opts.copyFromProfileId,
+    });
     setBusy(false);
     if (!r.success) setErr(r.error ?? t("profile.failedCreate"));
     else {
@@ -302,6 +305,7 @@ export function ProfileSidebar({
     <>
       <ProfileCreateDialog
         open={createOpen}
+        profiles={tree?.profiles ?? []}
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         onClose={() => setCreateOpen(false)}
