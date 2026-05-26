@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **Windows self-signed Authenticode (CI)** — Release workflow auto-generates a self-signed cert and signs the NSIS installer; no secrets required. SmartScreen still warns (cert not publicly trusted). See [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md).
+
 ## [1.4.1] - 2026-05-26
 
 Profile dialog visibility and terminal preservation when switching profiles.
