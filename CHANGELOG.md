@@ -9,6 +9,23 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-05-26
+
+Profile terminal minimize, sidebar drag placement, themes, and i18n.
+
+### Added
+
+- **Profile terminal minimize** — hide panes in the profile sidebar while sessions keep running; restore via click, restore button, or drag back to the main display
+- **Sidebar drag onto panes** — drop profile tabs on a specific terminal with edge zones (above/below/left/right/swap); profile-scoped so terminals cannot cross profiles
+- **App color themes** (light, dark, high contrast) with terminal chrome synced to the selected theme
+- **Locale switching** — English and Chinese UI in Settings
+
+### Fixed
+
+- **Multi-pane clipboard** — paste works across split panes and via right-click again
+- **Profile create** — accent color can be chosen when creating a profile
+- **Pane drop overlays** — clickable above xterm for drag placement hints
+
 ## [1.3.0] - 2026-05-21
 
 Terminal layout, display settings, right-click paste, and update-tab polish.
@@ -125,6 +142,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[1.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.0
 [1.3.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.3.0
 [1.2.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.2.0
 [1.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.1.1
