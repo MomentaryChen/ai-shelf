@@ -80,20 +80,21 @@
 
 ## 安裝
 
-### Windows（桌面應用）
+> **一般使用者安裝方式：** 桌面應用**僅**透過 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) 提供 Windows 安裝程式。目前**沒有** npm 套件可安裝 AI Shelf — 請使用下方安裝檔，若需要 CLI 請改從原始碼建置。
+
+### Windows 桌面應用（建議）
 
 1. 至 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) 下載 **`AI-Shelf-Setup-<version>.exe`**（僅安裝程式，請勿下載 portable 版）。
 2. 執行安裝精靈。Windows 可能顯示 SmartScreen（**未知發行者**）— 自簽憑證不受系統信任。請點 **詳細資訊** → **仍要執行**。詳見 [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md)。
 3. 從開始選單或桌面捷徑啟動 **AI Shelf**。
 
+安裝後即包含清單儀表板與內嵌終端機，**不需要**在本機安裝 Node.js。
+
 維護者發佈流程與解除安裝說明見 [docs/RELEASE.md](docs/RELEASE.md)。
 
-### 從 npm（清單 CLI）
+### CLI（`ai`、`ai-shelf`）— 僅能從原始碼建置
 
-```bash
-npm install -g ai-shelf
-pnpm add -g ai-shelf
-```
+清單 CLI（`ai`）與 Profile CLI（`ai-shelf`）**尚未**發佈至 npm。若要使用，請 clone 專案並依下方步驟建置。多數使用者只需 **GitHub 安裝版** 即可。
 
 ### 從原始碼（monorepo）
 

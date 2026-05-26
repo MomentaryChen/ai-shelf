@@ -80,20 +80,21 @@ Switch between **Terminal** and **Inventory** in the header. Inventory mode has 
 
 ## Installation
 
-### Windows (desktop app)
+> **End-user distribution:** The desktop app is **only** shipped as a Windows installer on [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases). There is **no** npm package for installing AI Shelf today — use the installer below, or build from source if you need the CLIs.
+
+### Windows desktop app (recommended)
 
 1. Download **`AI-Shelf-Setup-<version>.exe`** from [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) (installer only — not portable builds).
 2. Run the installer. Windows may show SmartScreen (**unknown publisher**) — self-signed builds are not CA-trusted. Choose **More info** → **Run anyway**. See [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md).
 3. Launch **AI Shelf** from the Start menu or desktop shortcut.
 
+The installed app includes the inventory UI and embedded terminals. You do **not** need Node.js on the machine.
+
 See [docs/RELEASE.md](docs/RELEASE.md) for maintainer release steps and uninstall notes.
 
-### From npm (inventory CLI)
+### CLIs (`ai`, `ai-shelf`) — from source only
 
-```bash
-npm install -g ai-shelf   # exposes `ai` when published from root package
-pnpm add -g ai-shelf
-```
+The inventory CLI (`ai`) and profile CLI (`ai-shelf`) are **not** published to npm yet. To use them, clone the repo and build (see below). For most users, the **GitHub installer** is enough.
 
 ### From source (monorepo)
 
