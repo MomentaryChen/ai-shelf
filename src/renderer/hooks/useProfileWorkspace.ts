@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import type { ProfileInfo, ProfileTree } from "../types";
 import {
   collectPanes,
+  findPane,
   mapPanesInTree,
+  movePaneInTree,
   type LayoutNode,
   type PaneInfo,
 } from "../terminal/split-tree";
+import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   buildHorizontalLayout,
   deserializeLayout,
@@ -20,10 +23,17 @@ import {
   saveLastActiveGroupKey,
   type GroupLayoutSnapshot,
 } from "../terminal/group-layout-storage";
+import {
+  buildDisplayLayout,
+  minimizedForSingleDisplay,
+  minimizedSet,
+  unminimizePaneIds,
+} from "../terminal/profile-pane-display";
 
 interface ProfileLiveState {
   layout: LayoutNode;
   focusedPaneId: string | null;
+  minimizedPaneIds: string[];
 }
 
 function teardownPtys(node: LayoutNode | null) {
@@ -82,6 +92,7 @@ export function useProfileWorkspace(
   broadcastInput: boolean,
 ) {
   const [activeProfile, setActiveProfile] = useState<ProfileInfo | null>(null);
+  const [minimizedPaneIds, setMinimizedPaneIds] = useState<Set<string>>(() => new Set());
   const [restoring, setRestoring] = useState(false);
   const [migrationDone, setMigrationDone] = useState(false);
   const layoutRef = useRef(layout);
@@ -137,12 +148,21 @@ export function useProfileWorkspace(
     });
   }, []);
 
+  const minimizedPaneIdsRef = useRef(minimizedPaneIds);
+  minimizedPaneIdsRef.current = minimizedPaneIds;
+
+  const applyMinimizedPaneIds = useCallback((next: Set<string>) => {
+    minimizedPaneIdsRef.current = next;
+    setMinimizedPaneIds(next);
+  }, []);
+
   const stashLiveProfile = useCallback((profileId: string) => {
     const node = layoutRef.current;
     if (!node || collectPanes(node).length === 0) return;
     profileLiveCacheRef.current.set(profileId, {
       layout: node,
       focusedPaneId: focusedPaneIdRef.current,
+      minimizedPaneIds: [...minimizedPaneIdsRef.current],
     });
   }, []);
 
@@ -200,9 +220,15 @@ export function useProfileWorkspace(
       const reconciled = await reconcileLayoutPtys(next, spawnPane);
       const focusId = collectPanes(reconciled)[0]?.id ?? null;
       applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
+      const minimized =
+        focusId && collectPanes(reconciled).length > 1
+          ? minimizedForSingleDisplay(reconciled, focusId)
+          : [];
+      applyMinimizedPaneIds(minimizedSet(minimized));
       profileLiveCacheRef.current.set(profile.id, {
         layout: reconciled,
         focusedPaneId: focusId,
+        minimizedPaneIds: minimized,
       });
       setRestoring(false);
       return {
@@ -237,9 +263,11 @@ export function useProfileWorkspace(
               ? sameCached.focusedPaneId
               : panes[0]?.id ?? null;
           applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
+          applyMinimizedPaneIds(minimizedSet(sameCached.minimizedPaneIds ?? []));
           profileLiveCacheRef.current.set(profile.id, {
             layout: reconciled,
             focusedPaneId: focusId,
+            minimizedPaneIds: sameCached.minimizedPaneIds ?? [],
           });
           return {
             cwd: profile.defaultCwd || panes[0]?.cwd || workingDirRef.current,
@@ -254,6 +282,7 @@ export function useProfileWorkspace(
           if (restored.paneCount > 0) return restored;
         }
 
+        applyMinimizedPaneIds(new Set());
         applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
         return {
           cwd: profile.defaultCwd || workingDirRef.current || "",
@@ -270,10 +299,12 @@ export function useProfileWorkspace(
         layoutRef.current = null;
         setLayout(null);
         setFocusedPaneId(null);
+        applyMinimizedPaneIds(new Set());
       }
 
       await saveLastActiveGroupKey(profile.workspaceId, profile.id);
       setActiveProfile(profile);
+      activeProfileRef.current = profile;
 
       const cached = targetCached ?? profileLiveCacheRef.current.get(profile.id);
       const cachedPaneCount = cached ? collectPanes(cached.layout).length : 0;
@@ -285,9 +316,11 @@ export function useProfileWorkspace(
             ? cached.focusedPaneId
             : panes[0]?.id ?? null;
         applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
+        applyMinimizedPaneIds(minimizedSet(cached.minimizedPaneIds ?? []));
         profileLiveCacheRef.current.set(profile.id, {
           layout: reconciled,
           focusedPaneId: focusId,
+          minimizedPaneIds: cached.minimizedPaneIds ?? [],
         });
         return {
           cwd: profile.defaultCwd || panes[0]?.cwd || workingDirRef.current,
@@ -302,6 +335,7 @@ export function useProfileWorkspace(
         if (restored.paneCount > 0) return restored;
       }
 
+      applyMinimizedPaneIds(new Set());
       applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
       return {
         cwd: profile.defaultCwd || workingDirRef.current || "",
@@ -315,6 +349,7 @@ export function useProfileWorkspace(
       restoreSnapshot,
       setLayout,
       setFocusedPaneId,
+      applyMinimizedPaneIds,
     ],
   );
 
@@ -337,6 +372,7 @@ export function useProfileWorkspace(
       profileLiveCacheRef.current.set(activeProfile.id, {
         layout: layout!,
         focusedPaneId: focusedPaneIdRef.current,
+        minimizedPaneIds: [...minimizedPaneIdsRef.current],
       });
       const t = window.setTimeout(() => {
         void persistCurrentProfile();
@@ -390,6 +426,116 @@ export function useProfileWorkspace(
 
   const canAddPane = !layout || collectPanes(layout).length < MAX_GROUP_PANES;
 
+  const getProfileMinimizedPaneIds = useCallback(
+    (profileId: string): Set<string> => {
+      if (activeProfile?.id === profileId) return minimizedPaneIdsRef.current;
+      const cached = profileLiveCacheRef.current.get(profileId);
+      return minimizedSet(cached?.minimizedPaneIds ?? []);
+    },
+    [activeProfile],
+  );
+
+  const isPaneMinimized = useCallback(
+    (profileId: string, paneId: string): boolean => {
+      return getProfileMinimizedPaneIds(profileId).has(paneId);
+    },
+    [getProfileMinimizedPaneIds],
+  );
+
+  const syncLiveCacheDisplay = useCallback(
+    (profileId: string, focusId: string | null, minimized: string[]) => {
+      const cached = profileLiveCacheRef.current.get(profileId);
+      if (!cached) return;
+      profileLiveCacheRef.current.set(profileId, {
+        ...cached,
+        focusedPaneId: focusId,
+        minimizedPaneIds: minimized,
+      });
+    },
+    [],
+  );
+
+  const showPaneInDisplay = useCallback(
+    (profileId: string, paneId: string) => {
+      if (activeProfileRef.current?.id !== profileId) return;
+      const node = layoutRef.current;
+      if (!node || !findPane(node, paneId)) return;
+      const minimized = minimizedForSingleDisplay(node, paneId);
+      applyMinimizedPaneIds(minimizedSet(minimized));
+      setFocusedPaneId(paneId);
+      syncLiveCacheDisplay(profileId, paneId, minimized);
+    },
+    [applyMinimizedPaneIds, setFocusedPaneId, syncLiveCacheDisplay],
+  );
+
+  const minimizePane = useCallback(
+    (profileId: string, paneId: string) => {
+      if (activeProfileRef.current?.id !== profileId) return;
+      const node = layoutRef.current;
+      if (!node || !findPane(node, paneId)) return;
+      const next = new Set(minimizedPaneIdsRef.current);
+      next.add(paneId);
+      applyMinimizedPaneIds(next);
+      const visible = collectPanes(node).filter((p) => !next.has(p.id));
+      const nextFocus =
+        visible.length > 0
+          ? next.has(focusedPaneIdRef.current ?? "")
+            ? visible[0]!.id
+            : focusedPaneIdRef.current
+          : null;
+      setFocusedPaneId(nextFocus);
+      syncLiveCacheDisplay(profileId, nextFocus, [...next]);
+    },
+    [applyMinimizedPaneIds, setFocusedPaneId, syncLiveCacheDisplay],
+  );
+
+  const unminimizePanes = useCallback(
+    (profileId: string, paneIds: string[]) => {
+      if (activeProfileRef.current?.id !== profileId) return;
+      const next = unminimizePaneIds(minimizedPaneIdsRef.current, paneIds);
+      applyMinimizedPaneIds(next);
+      syncLiveCacheDisplay(profileId, focusedPaneIdRef.current, [...next]);
+    },
+    [applyMinimizedPaneIds, syncLiveCacheDisplay],
+  );
+
+  /** Show a pane next to a target (edge drop / Shift+click) without hiding other visible panes. */
+  const placePaneInDisplay = useCallback(
+    (profileId: string, dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => {
+      if (activeProfileRef.current?.id !== profileId) return;
+      let node = layoutRef.current;
+      if (!node || !findPane(node, dragPaneId) || !findPane(node, targetPaneId)) return;
+
+      if (dragPaneId !== targetPaneId) {
+        node = movePaneInTree(node, dragPaneId, targetPaneId, zone);
+        layoutRef.current = node;
+        setLayout(node);
+      }
+
+      const nextMinimized = new Set(minimizedPaneIdsRef.current);
+      nextMinimized.delete(dragPaneId);
+      nextMinimized.delete(targetPaneId);
+      applyMinimizedPaneIds(nextMinimized);
+      setFocusedPaneId(dragPaneId);
+      syncLiveCacheDisplay(profileId, dragPaneId, [...nextMinimized]);
+    },
+    [setLayout, applyMinimizedPaneIds, setFocusedPaneId, syncLiveCacheDisplay],
+  );
+
+  const forgetMinimizedPane = useCallback(
+    (profileId: string, paneId: string) => {
+      if (activeProfileRef.current?.id !== profileId) return;
+      const next = new Set(minimizedPaneIdsRef.current);
+      next.delete(paneId);
+      applyMinimizedPaneIds(next);
+    },
+    [applyMinimizedPaneIds],
+  );
+
+  const displayLayout = layout
+    ? buildDisplayLayout(layout, minimizedPaneIds, focusedPaneId)
+    : null;
+
   return {
     activeProfile,
     restoring,
@@ -402,8 +548,17 @@ export function useProfileWorkspace(
     discardProfileSessions,
     getProfilePanes,
     getProfileFocusedPaneId,
+    getProfileMinimizedPaneIds,
     hasLiveSessions,
     canAddPane,
     maxPanes: MAX_GROUP_PANES,
+    minimizedPaneIds,
+    displayLayout,
+    isPaneMinimized,
+    showPaneInDisplay,
+    placePaneInDisplay,
+    minimizePane,
+    unminimizePanes,
+    forgetMinimizedPane,
   };
 }

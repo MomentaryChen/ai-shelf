@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { DragHandle } from "./ProfileSidebarUI";
@@ -6,6 +6,7 @@ import { PaneDropOverlay } from "./PaneDropOverlay";
 import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
 import { hitPaneDropZone, type PaneDropZone } from "../terminal/pane-drop-zone";
+import { hasProfilePaneDrag, readProfilePaneDrag } from "../terminal/profile-pane-display";
 import { collectPanes, type LayoutNode, type PaneInfo, type SplitDirection } from "../terminal/split-tree";
 import { formatPaneCwdShort } from "../utils/pane-cwd";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -27,42 +28,59 @@ interface Props {
   bg: string;
   onFocusPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
+  onMinimizePane?: (paneId: string) => void;
   onSplitPane: (paneId: string, direction: SplitDirection) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
   onRenamePane?: (paneId: string, title: string) => void;
   onPaneCwdClick?: (paneId: string) => void;
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
+  onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
+  /** True while dragging a tab from ProfileSidebar (enables drop overlay over xterm). */
+  sidebarPaneDragActive?: boolean;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
 }
+
+type ProfileDragOver = { targetPaneId: string; zone: PaneDropZone };
 
 type PaneDragState = {
   draggingPaneId: string | null;
   dragOverPaneId: string | null;
   dropZone: PaneDropZone | null;
+  profileDragOver: ProfileDragOver | null;
   canReorder: boolean;
   setDraggingPaneId: (id: string | null) => void;
   setDragOverPaneId: (id: string | null) => void;
   setDropZone: (zone: PaneDropZone | null) => void;
+  setProfileDragOver: (over: ProfileDragOver | null) => void;
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
+  onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
 };
 
 export function SplitPaneLayout(props: Props) {
   const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
   const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
   const [dropZone, setDropZone] = useState<PaneDropZone | null>(null);
+  const [profileDragOver, setProfileDragOver] = useState<ProfileDragOver | null>(null);
   const paneCount = collectPanes(props.node).length;
+
+  useEffect(() => {
+    if (!props.sidebarPaneDragActive) setProfileDragOver(null);
+  }, [props.sidebarPaneDragActive]);
   const canReorder = paneCount > 1 && Boolean(props.onMovePane);
 
   const drag: PaneDragState = {
     draggingPaneId,
     dragOverPaneId,
     dropZone,
+    profileDragOver,
     canReorder,
     setDraggingPaneId,
     setDragOverPaneId,
     setDropZone,
+    setProfileDragOver,
     onMovePane: props.onMovePane,
+    onProfilePaneDrop: props.onProfilePaneDrop,
   };
 
   return <SplitPaneLayoutInner {...props} drag={drag} />;
@@ -74,11 +92,13 @@ function SplitPaneLayoutInner({
   bg,
   onFocusPane,
   onClosePane,
+  onMinimizePane,
   onSplitPane,
   onResizeSplit,
   onRenamePane,
   onPaneCwdClick,
   renderTerminal,
+  sidebarPaneDragActive = false,
   profileAccentColor = null,
   drag,
 }: Props & { drag: PaneDragState }) {
@@ -95,11 +115,13 @@ function SplitPaneLayoutInner({
           drag={drag}
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
+          onMinimize={onMinimizePane ? () => onMinimizePane(node.pane.id) : undefined}
           onSplit={(dir) => onSplitPane(node.pane.id, dir)}
           onRename={
             onRenamePane ? (title) => onRenamePane(node.pane.id, title) : undefined
           }
           onCwdClick={onPaneCwdClick ? () => onPaneCwdClick(node.pane.id) : undefined}
+          sidebarPaneDragActive={sidebarPaneDragActive}
         >
           {renderTerminal(node.pane, focused)}
         </WarpPaneShell>
@@ -127,11 +149,13 @@ function SplitPaneLayoutInner({
           bg={bg}
           onFocusPane={onFocusPane}
           onClosePane={onClosePane}
+          onMinimizePane={onMinimizePane}
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
           onRenamePane={onRenamePane}
           onPaneCwdClick={onPaneCwdClick}
           renderTerminal={renderTerminal}
+          sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
           drag={drag}
         />
@@ -158,11 +182,13 @@ function SplitPaneLayoutInner({
           bg={bg}
           onFocusPane={onFocusPane}
           onClosePane={onClosePane}
+          onMinimizePane={onMinimizePane}
           onSplitPane={onSplitPane}
           onResizeSplit={onResizeSplit}
           onRenamePane={onRenamePane}
           onPaneCwdClick={onPaneCwdClick}
           renderTerminal={renderTerminal}
+          sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
           drag={drag}
         />
@@ -179,18 +205,22 @@ function WarpPaneShell({
   drag,
   onFocus,
   onClose,
+  onMinimize,
   onSplit,
   onRename,
   onCwdClick,
+  sidebarPaneDragActive = false,
   children,
 }: {
   pane: PaneInfo;
   focused: boolean;
   bg: string;
   profileAccentColor?: string | null;
+  sidebarPaneDragActive?: boolean;
   drag: PaneDragState;
   onFocus: () => void;
   onClose: () => void;
+  onMinimize?: () => void;
   onSplit: (dir: SplitDirection) => void;
   onRename?: (title: string) => void;
   onCwdClick?: () => void;
@@ -206,26 +236,32 @@ function WarpPaneShell({
     draggingPaneId,
     dragOverPaneId,
     dropZone,
+    profileDragOver,
     canReorder,
     setDraggingPaneId,
     setDragOverPaneId,
     setDropZone,
+    setProfileDragOver,
     onMovePane,
+    onProfilePaneDrop,
   } = drag;
   const isDragOver = dragOverPaneId === pane.id && draggingPaneId !== pane.id;
+  const isProfileDragOver = profileDragOver?.targetPaneId === pane.id;
+  const activeDropZone = isProfileDragOver ? profileDragOver.zone : dropZone;
   const isDragging = draggingPaneId === pane.id;
 
   function clearDrag() {
     setDraggingPaneId(null);
     setDragOverPaneId(null);
     setDropZone(null);
+    setProfileDragOver(null);
   }
 
   return (
     <div
       ref={shellRef}
       className={`group/pane relative flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
-        isDragOver
+        isDragOver || isProfileDragOver
           ? "ring-2 ring-accent/35"
           : isDragging
             ? "opacity-45 scale-[0.99]"
@@ -235,7 +271,31 @@ function WarpPaneShell({
       }`}
       style={{ background: bg, ...chromeStyle }}
       onMouseDown={onFocus}
-      onDragOver={(e) => {
+      onDragOverCapture={(e) => {
+        if (sidebarPaneDragActive && onProfilePaneDrop && hasProfilePaneDrag(e.dataTransfer)) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          const rect = shellRef.current?.getBoundingClientRect();
+          if (rect) {
+            setProfileDragOver({
+              targetPaneId: pane.id,
+              zone: hitPaneDropZone(e.clientX, e.clientY, rect),
+            });
+          }
+          return;
+        }
+        if (hasProfilePaneDrag(e.dataTransfer) && onProfilePaneDrop) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          const rect = shellRef.current?.getBoundingClientRect();
+          if (rect) {
+            setProfileDragOver({
+              targetPaneId: pane.id,
+              zone: hitPaneDropZone(e.clientX, e.clientY, rect),
+            });
+          }
+          return;
+        }
         if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
         e.preventDefault();
         e.stopPropagation();
@@ -252,9 +312,23 @@ function WarpPaneShell({
             setDragOverPaneId(null);
             setDropZone(null);
           }
+          if (profileDragOver?.targetPaneId === pane.id) {
+            setProfileDragOver(null);
+          }
         }
       }}
-      onDrop={(e) => {
+      onDropCapture={(e) => {
+        if (hasProfilePaneDrag(e.dataTransfer) && onProfilePaneDrop) {
+          const payload = readProfilePaneDrag(e.dataTransfer);
+          if (!payload || payload.paneId === pane.id) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const rect = shellRef.current?.getBoundingClientRect();
+          const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
+          onProfilePaneDrop(payload.paneId, pane.id, zone);
+          clearDrag();
+          return;
+        }
         if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
         e.preventDefault();
         e.stopPropagation();
@@ -264,6 +338,41 @@ function WarpPaneShell({
         clearDrag();
       }}
     >
+      {sidebarPaneDragActive && onProfilePaneDrop && (
+        <div
+          className="absolute inset-0 z-30"
+          aria-hidden
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+            const rect = shellRef.current?.getBoundingClientRect();
+            if (rect) {
+              setProfileDragOver({
+                targetPaneId: pane.id,
+                zone: hitPaneDropZone(e.clientX, e.clientY, rect),
+              });
+            }
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              if (profileDragOver?.targetPaneId === pane.id) {
+                setProfileDragOver(null);
+              }
+            }
+          }}
+          onDrop={(e) => {
+            const payload = readProfilePaneDrag(e.dataTransfer);
+            if (!payload || payload.paneId === pane.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = shellRef.current?.getBoundingClientRect();
+            const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
+            onProfilePaneDrop(payload.paneId, pane.id, zone);
+            clearDrag();
+          }}
+        />
+      )}
       <div
         className="relative z-10 flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
         style={headerStyle}
@@ -329,6 +438,11 @@ function WarpPaneShell({
           <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
             ⫼
           </IconBtn>
+          {onMinimize && (
+            <IconBtn title={t("pane.minimize")} onClick={onMinimize}>
+              −
+            </IconBtn>
+          )}
         </div>
         <button
           type="button"
@@ -344,7 +458,12 @@ function WarpPaneShell({
         </button>
       </div>
       <div className="relative z-0 min-h-0 flex-1 overflow-hidden">
-        {isDragOver && dropZone && <PaneDropOverlay zone={dropZone} />}
+        {(isDragOver || isProfileDragOver) && activeDropZone && (
+          <PaneDropOverlay
+            zone={activeDropZone}
+            targetLabel={isProfileDragOver ? paneDisplayLabel(pane) : undefined}
+          />
+        )}
         {children}
       </div>
     </div>

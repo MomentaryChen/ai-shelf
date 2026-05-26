@@ -22,6 +22,7 @@ import {
   profileSessionsWellStyle,
 } from "../utils/profile-colors";
 import { hitPaneDropZone1D, type PaneDropZone } from "../terminal/pane-drop-zone";
+import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
 import { useLocale } from "../i18n/LocaleProvider";
 import { reorderById } from "../utils/reorder-by-id";
 import {
@@ -44,6 +45,15 @@ interface Props {
   getProfileFocusedPaneId: (profileId: string) => string | null;
   onActivateProfile: (profile: ProfileInfo) => void;
   onSelectPane: (profile: ProfileInfo, paneId: string) => void;
+  onRestorePane?: (profile: ProfileInfo, paneId: string) => void;
+  onPlacePaneBeside?: (
+    profile: ProfileInfo,
+    dragPaneId: string,
+    targetPaneId: string,
+    zone: "above" | "below" | "left" | "right",
+  ) => void;
+  onMinimizePane?: (profileId: string, paneId: string) => void;
+  isPaneMinimized?: (profileId: string, paneId: string) => boolean;
   onClosePane: (profileId: string, paneId: string) => void;
   onRenamePane?: (profileId: string, paneId: string, title: string) => void;
   onMovePane?: (profileId: string, dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
@@ -54,6 +64,7 @@ interface Props {
   onProfileUpdated: (profile: ProfileInfo) => void;
   onProfileDeleted: (profileId: string) => void;
   activeLivePaneCount?: number;
+  onProfilePaneDragChange?: (active: boolean) => void;
 }
 
 export function ProfileSidebar({
@@ -68,6 +79,10 @@ export function ProfileSidebar({
   getProfileFocusedPaneId,
   onActivateProfile,
   onSelectPane,
+  onRestorePane,
+  onPlacePaneBeside,
+  onMinimizePane,
+  isPaneMinimized,
   onClosePane,
   onRenamePane,
   onMovePane,
@@ -78,6 +93,7 @@ export function ProfileSidebar({
   onProfileUpdated,
   onProfileDeleted,
   activeLivePaneCount = 0,
+  onProfilePaneDragChange,
 }: Props) {
   const { t } = useLocale();
   const [tree, setTree] = useState<ProfileTree | null>(null);
@@ -172,6 +188,19 @@ export function ProfileSidebar({
     setDraggingPaneId(null);
     setDragOverPaneId(null);
     setPaneDropZone(null);
+  }
+
+  function beginProfilePaneDrag(
+    e: React.DragEvent,
+    profileId: string,
+    paneId: string,
+  ) {
+    writeProfilePaneDrag(e.dataTransfer, { profileId, paneId });
+    onProfilePaneDragChange?.(true);
+  }
+
+  function endProfilePaneDrag() {
+    onProfilePaneDragChange?.(false);
   }
 
   async function handleReorder(dragId: string, dropId: string) {
@@ -516,8 +545,10 @@ export function ProfileSidebar({
                       const cwdShort = formatPaneCwdShort(paneCwd);
                       const isLive = profilePanes.length > 0;
                       const isPaneInfo = "id" in item;
-                      const selected = isActive && isLive && profileFocusId === paneId;
-                      const showLiveDot = isLive && isActive;
+                      const minimized =
+                        isLive && isPaneMinimized?.(profile.id, paneId) === true;
+                      const selected = isActive && isLive && profileFocusId === paneId && !minimized;
+                      const showLiveDot = isLive && isActive && !minimized;
                       const sessionLabel = isPaneInfo
                         ? paneDisplayLabel(item)
                         : item.title?.trim() || `${toolLabel(tool)} ${i + 1}`;
@@ -573,9 +604,12 @@ export function ProfileSidebar({
                               draggable
                               onDragStart={(e) => {
                                 setDraggingPaneId(paneId);
-                                e.dataTransfer.effectAllowed = "move";
+                                beginProfilePaneDrag(e, profile.id, paneId);
                               }}
-                              onDragEnd={clearPaneDrag}
+                              onDragEnd={() => {
+                                clearPaneDrag();
+                                endProfilePaneDrag();
+                              }}
                               className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-chrome-hover active:cursor-grabbing"
                               title={t("profile.dragReorder")}
                               aria-label={t("profile.dragReorder")}
@@ -584,18 +618,53 @@ export function ProfileSidebar({
                               <DragHandle />
                             </span>
                           )}
+                        <div
+                          draggable={isLive && isPaneInfo}
+                          onDragStart={(e) => {
+                            if (!isLive || !isPaneInfo) return;
+                            beginProfilePaneDrag(e, profile.id, paneId);
+                          }}
+                          onDragEnd={endProfilePaneDrag}
+                          className={`group/session flex min-h-[32px] min-w-0 flex-1 ${
+                            isLive && isPaneInfo ? "cursor-grab active:cursor-grabbing" : ""
+                          }`}
+                        >
                         <button
                           type="button"
-                          onClick={() => {
-                            if (isLive) onSelectPane(profile, paneId);
-                            else void onActivateProfile(profile);
+                          onClick={(e) => {
+                            if (!isLive) {
+                              void onActivateProfile(profile);
+                              return;
+                            }
+                            if (
+                              e.shiftKey &&
+                              isActive &&
+                              profileFocusId &&
+                              profileFocusId !== paneId &&
+                              onPlacePaneBeside
+                            ) {
+                              onPlacePaneBeside(profile, paneId, profileFocusId, "right");
+                              return;
+                            }
+                            onSelectPane(profile, paneId);
                           }}
                           style={profileSessionRowStyle(accent, selected)}
-                          className={`group/session flex min-h-[32px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left text-[11px] transition-colors ${
+                          className={`flex min-h-[32px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left text-[11px] transition-colors ${
                             selected
                               ? "font-medium text-chrome-text"
-                              : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text-secondary"
-                          } ${!isLive ? "opacity-65" : ""}`}
+                              : minimized
+                                ? "text-chrome-text-dim hover:bg-chrome-hover hover:text-chrome-text-secondary"
+                                : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text-secondary"
+                          } ${!isLive ? "opacity-65" : minimized ? "opacity-70" : ""}`}
+                          title={
+                            isLive
+                              ? minimized
+                                ? t("profile.showInDisplay")
+                                : isActive && profileFocusId && profileFocusId !== paneId
+                                  ? t("profile.dragOrShiftAlongside")
+                                  : t("profile.dragToDisplay")
+                              : undefined
+                          }
                         >
                           {showLiveDot ? (
                             <span
@@ -640,25 +709,68 @@ export function ProfileSidebar({
                             ) : null}
                           </div>
                           {isActive && isLive && (
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onClosePane(profile.id, paneId);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
+                            <>
+                              {minimized && onRestorePane && (
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRestorePane(profile, paneId);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.stopPropagation();
+                                      onRestorePane(profile, paneId);
+                                    }
+                                  }}
+                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] text-chrome-accent-text opacity-100 hover:bg-chrome-hover-strong"
+                                  title={t("profile.restoreToDisplay")}
+                                >
+                                  ↗
+                                </span>
+                              )}
+                              {onMinimizePane && !minimized && (
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onMinimizePane(profile.id, paneId);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.stopPropagation();
+                                      onMinimizePane(profile.id, paneId);
+                                    }
+                                  }}
+                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] text-chrome-text-faint opacity-0 transition-opacity hover:bg-chrome-hover-strong hover:text-chrome-text group-hover/session:opacity-100"
+                                  title={t("profile.minimizeTerminal")}
+                                >
+                                  −
+                                </span>
+                              )}
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
                                   e.stopPropagation();
                                   onClosePane(profile.id, paneId);
-                                }
-                              }}
-                              className="mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] text-chrome-text-faint opacity-0 transition-opacity hover:bg-chrome-hover-strong hover:text-chrome-text group-hover/session:opacity-100"
-                            >
-                              ✕
-                            </span>
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.stopPropagation();
+                                    onClosePane(profile.id, paneId);
+                                  }
+                                }}
+                                className="mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] text-chrome-text-faint opacity-0 transition-opacity hover:bg-chrome-hover-strong hover:text-chrome-text group-hover/session:opacity-100"
+                              >
+                                ✕
+                              </span>
+                            </>
                           )}
                         </button>
+                        </div>
                         </div>
                       );
                     })}

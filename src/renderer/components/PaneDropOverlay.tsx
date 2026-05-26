@@ -12,10 +12,17 @@ const ZONE_KEYS: Record<PaneDropZone, MessageKey> = {
   swap: "pane.dropSwap",
 };
 
-export function PaneDropOverlay({ zone }: { zone: PaneDropZone }) {
+export function PaneDropOverlay({
+  zone,
+  targetLabel,
+}: {
+  zone: PaneDropZone;
+  /** Shown when dropping a sidebar tab onto this pane. */
+  targetLabel?: string;
+}) {
   const { t } = useLocale();
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 flex flex-col">
+    <div className="pointer-events-none absolute inset-0 z-40 flex flex-col">
       <div className={`h-[22%] shrink-0 transition-colors ${zone === "above" ? ACTIVE : ""}`} />
       <div className="flex min-h-0 flex-1">
         <div className={`w-[22%] shrink-0 transition-colors ${zone === "left" ? ACTIVE : ""}`} />
@@ -24,9 +31,13 @@ export function PaneDropOverlay({ zone }: { zone: PaneDropZone }) {
             zone === "swap" ? "bg-accent/18 ring-2 ring-inset ring-accent/55" : ""
           }`}
         >
-          <span className="rounded-md bg-chrome-bg/90 px-2 py-1 text-[10px] font-medium text-chrome-accent-text shadow-lg">
-            {t(ZONE_KEYS[zone])}
-
+          <span className="flex max-w-[90%] flex-col items-center gap-0.5 rounded-md bg-chrome-bg/90 px-2 py-1 text-center text-[10px] font-medium text-chrome-accent-text shadow-lg">
+            {targetLabel ? (
+              <span className="truncate text-[9px] font-normal text-chrome-text-muted">
+                {targetLabel}
+              </span>
+            ) : null}
+            <span>{t(ZONE_KEYS[zone])}</span>
           </span>
         </div>
         <div className={`w-[22%] shrink-0 transition-colors ${zone === "right" ? ACTIVE : ""}`} />
