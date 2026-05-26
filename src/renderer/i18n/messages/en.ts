@@ -15,7 +15,7 @@ export const en = {
   "app.tab.doctor": "Doctor",
   "app.tab.update": "Update",
   "settings.title": "Terminal Settings",
-  "settings.subtitle": "Language, app theme, working directory, external terminal, display, and background",
+  "settings.subtitle": "Language, app theme, working directory, external terminal, display, background, and data backup",
   "settings.language": "Language",
   "settings.theme": "App color theme",
   "settings.theme.light": "Light",
@@ -41,6 +41,17 @@ export const en = {
   "settings.rightClickPasteHint":
     "When enabled, right-click pastes from the clipboard; with a selection, it copies first. Hold Shift and right-click for the context menu (Copy, Paste, Find…).",
   "settings.custom": "Custom",
+  "settings.backup": "Data backup & restore",
+  "settings.backupHint":
+    "Export profiles, layouts, workspaces, and app settings to a file. Use when migrating devices, reinstalling, or upgrading.",
+  "settings.exportBackup": "Export backup…",
+  "settings.importBackup": "Import backup…",
+  "settings.exportSuccess": "Backup saved to {path}",
+  "settings.exportFailed": "Export failed: {error}",
+  "settings.importConfirm":
+    "Import will replace your current profiles, layouts, workspaces, and settings. Your current data will be backed up as .bak files first. Continue?",
+  "settings.importSuccess": "Backup imported (from {date}). The app will restart to apply changes.",
+  "settings.importFailed": "Import failed: {error}",
   "terminal.auto": "Auto detect",
   "terminal.wt": "Windows Terminal",
   "terminal.pwsh": "PowerShell 7+ (pwsh)",

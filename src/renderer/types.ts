@@ -312,6 +312,22 @@ export interface ElectronAPI {
   profileReorder: (
     orderedProfileIds: string[],
   ) => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
+  exportBackup: (
+    localStorage: Record<string, string>,
+  ) => Promise<
+    | { success: true; path: string }
+    | { success: false; canceled?: true; error?: string }
+  >;
+  importBackup: () => Promise<
+    | {
+        success: true;
+        localStorage: Record<string, string>;
+        exportedAt: string;
+        appVersion: string;
+      }
+    | { success: false; canceled?: true; error?: string }
+  >;
+  relaunchApp: () => Promise<{ ok: boolean }>;
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
   toggleDevTools: () => Promise<void>;

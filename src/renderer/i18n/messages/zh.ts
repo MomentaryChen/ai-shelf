@@ -17,7 +17,7 @@ export const zh: Record<MessageKey, string> = {
   "app.tab.doctor": "診斷",
   "app.tab.update": "更新",
   "settings.title": "終端機設定",
-  "settings.subtitle": "語言、主題顏色、工作目錄、外部終端機、顯示與背景",
+  "settings.subtitle": "語言、主題顏色、工作目錄、外部終端機、顯示、背景與資料備份",
   "settings.language": "語言",
   "settings.theme": "主題顏色",
   "settings.theme.light": "淺色",
@@ -42,6 +42,17 @@ export const zh: Record<MessageKey, string> = {
   "settings.rightClickPasteHint":
     "啟用後，右鍵會從剪貼簿貼上；若有選取文字則先複製。按住 Shift 再右鍵可開啟內容選單（複製、貼上、尋找…）。",
   "settings.custom": "自訂",
+  "settings.backup": "資料備份與還原",
+  "settings.backupHint":
+    "將 Profile、版面、工作區與 App 設定匯出成檔案。換機、重裝或升級時可還原資料。",
+  "settings.exportBackup": "匯出備份…",
+  "settings.importBackup": "匯入備份…",
+  "settings.exportSuccess": "備份已儲存至 {path}",
+  "settings.exportFailed": "匯出失敗：{error}",
+  "settings.importConfirm":
+    "匯入將取代目前的 Profile、版面、工作區與設定。現有資料會先備份為 .bak 檔。是否繼續？",
+  "settings.importSuccess": "備份已匯入（來源 {date}）。App 將重新啟動以套用變更。",
+  "settings.importFailed": "匯入失敗：{error}",
   "terminal.auto": "自動偵測",
   "terminal.wt": "Windows Terminal",
   "terminal.pwsh": "PowerShell 7+ (pwsh)",

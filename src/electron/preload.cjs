@@ -107,6 +107,9 @@ contextBridge.exposeInMainWorld("api", {
   profileDelete: (profileId) => ipcRenderer.invoke("profile-delete", profileId),
   profileReorder: (orderedProfileIds) =>
     ipcRenderer.invoke("profile-reorder", orderedProfileIds),
+  exportBackup: (localStorage) => ipcRenderer.invoke("export-backup", localStorage),
+  importBackup: () => ipcRenderer.invoke("import-backup"),
+  relaunchApp: () => ipcRenderer.invoke("relaunch-app"),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),
