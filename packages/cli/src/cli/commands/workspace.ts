@@ -2,9 +2,12 @@ import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
 import { AppError } from "../../core/errors/app-error.js";
+import { warnLegacyWorkspaceModel } from "../deprecation.js";
 
 export function registerWorkspaceCommands(program: Command, getCtx: () => AppContext): void {
-  const workspace = program.command("workspace").description("Manage workspaces");
+  const workspace = program
+    .command("workspace")
+    .description("Manage workspaces (legacy — prefer profile commands)");
 
   workspace
     .command("create")
@@ -12,6 +15,7 @@ export function registerWorkspaceCommands(program: Command, getCtx: () => AppCon
     .option("--root <path>", "Project root path")
     .description("Create a new workspace")
     .action((name: string, opts: { root?: string }) => {
+      warnLegacyWorkspaceModel("Use `ai-shelf profile create <name> [--cwd <path>]` instead.");
       try {
         const ws = getCtx().workspaceService.create(name, opts.root);
         console.log(chalk.green(`✓ Workspace created: ${ws.name}`));
@@ -25,6 +29,7 @@ export function registerWorkspaceCommands(program: Command, getCtx: () => AppCon
     .command("list")
     .description("List all workspaces")
     .action(() => {
+      warnLegacyWorkspaceModel("Use `ai-shelf profile list` instead.");
       try {
         const list = getCtx().workspaceService.list();
         if (list.length === 0) {
@@ -46,6 +51,7 @@ export function registerWorkspaceCommands(program: Command, getCtx: () => AppCon
     .argument("<name>", "Workspace name")
     .description("Delete workspace and all groups/sessions")
     .action((name: string) => {
+      warnLegacyWorkspaceModel("Use `ai-shelf profile delete <profile>` instead.");
       try {
         const ctx = getCtx();
         ctx.sessionService.stopAllInWorkspace(name);

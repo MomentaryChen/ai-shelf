@@ -6,7 +6,7 @@
 
 [English](README.md) · [Changelog](CHANGELOG.md)
 
-**v1.4.1** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機工作區管理 CLI（`ai-shelf`）。
+**v1.4.1** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
 
 ---
 
@@ -15,10 +15,10 @@
 | 元件 | 指令 / 進入點 | 用途 |
 |---|---|---|
 | **清單 CLI** | `ai` | 掃描模型、技能、MCP、設定；執行 doctor / update / raw |
-| **工作區 CLI** | `ai-shelf` | 管理 workspace、group、session；廣播指令；TUI |
+| **Profile CLI** | `ai-shelf` | 管理 Profile、CLI session、廣播執行；TUI |
 | **桌面應用** | `pnpm electron` | 內嵌終端機啟動器 + 清單儀表板（Electron + React） |
 
-桌面應用整合兩者：偵測邏輯在 `src/`，Profile 與版面配置則透過 `packages/cli` 的 SQLite 持久化。
+桌面應用與 `ai-shelf` 共用同一 SQLite 資料庫。**Profile**（名稱、預設值、窗格版面）是兩邊一致的主要使用者模型。
 
 ---
 
@@ -35,13 +35,13 @@
 - **Update（更新）** — 檢查版本並一鍵更新各工具與本身
 - **JSON 輸出** — 所有清單指令支援 `--json`
 
-### 終端機工作區（`ai-shelf`）
+### 終端機 Profile（`ai-shelf`）
 
-- **Workspace 與 Group** — 以 SQLite 組織專案與終端機群組
-- **Session** — 建立 / 啟動 / 停止 PTY，可選擇啟動 AI 工具（`claude`、`copilot`、`cursor`、`codex`、`gemini`、`aider`、`opencode`）
-- **廣播執行** — 對群組內所有執行中的 session 送出相同指令
-- **TUI** — 全螢幕終端機介面（`ai-shelf tui`，neo-blessed）
-- **Profile API** — 供桌面應用使用的具名終端機 Profile 函式庫
+- **Profile** — 具名終端機環境（預設目錄、工具、強調色、廣播輸入）；與桌面側欄同一筆資料
+- **CLI session** — 可選的無頭 PTY session，隸屬於某 Profile（內部對應 `Profiles` workspace）
+- **廣播執行** — `profile exec <名稱> … --broadcast` 對 Profile 內所有執行中的 CLI session 送指令
+- **TUI** — Profile 列表 + session 管理（`ai-shelf tui`）
+- **舊指令** — `workspace` / `group` / `session` 仍可用但已標示 deprecated
 
 ### 桌面應用（Electron）
 
@@ -103,7 +103,7 @@ cd ai-shelf
 pnpm install          # 會重建原生模組（node-pty、better-sqlite3）
 pnpm build
 pnpm start            # ai inventory / doctor / …
-pnpm exec ai-shelf workspace list
+pnpm exec ai-shelf profile list
 pnpm electron         # 桌面應用
 ```
 
@@ -184,38 +184,34 @@ ai update self
 
 ---
 
-### 工作區 CLI — `ai-shelf`
+### Profile CLI — `ai-shelf`
 
 持久化路徑（Windows）：
 
 | 路徑 | 用途 |
 |---|---|
 | `%APPDATA%/ai-shelf/config.yaml` | 應用設定 |
-| `%APPDATA%/ai-shelf/workspaces.db` | SQLite 資料庫 |
+| `%APPDATA%/ai-shelf/workspaces.db` | SQLite 資料庫（Profile + 版面） |
 | `%APPDATA%/ai-shelf/logs/app.log` | 日誌 |
 
+儲存對應說明見 [docs/data-model.zh-TW.md](docs/data-model.zh-TW.md)（[English](docs/data-model.md)）。
+
 ```bash
-# Workspace
-ai-shelf workspace create <名稱> [--root <路徑>]
-ai-shelf workspace list
-ai-shelf workspace delete <名稱>
-
-# Group（隸屬於 workspace）
-ai-shelf group create <workspace> <group>
-ai-shelf group list <workspace>
-ai-shelf group delete <workspace> <group>
-
-# Session
-ai-shelf session create <workspace> <group> <名稱> [--cwd <路徑>] [--shell <shell>] [--tool <工具>]
-ai-shelf session start <workspace> <group> <名稱>
-ai-shelf session stop <workspace> <group> <名稱>
-ai-shelf session list <workspace> [--group <名稱>]
-ai-shelf session exec <workspace> <group> <指令...> [--session <名稱>]
-ai-shelf session exec <workspace> <group> <指令...> --broadcast
-ai-shelf session delete <workspace> <group> <名稱>
+# Profile（主流程 — 與桌面共用）
+ai-shelf profile list
+ai-shelf profile create <名稱> [--cwd <路徑>] [--tool <工具>] [--color <hex>]
+ai-shelf profile update <profile> [--name] [--cwd] [--tool] [--broadcast|--no-broadcast]
+ai-shelf profile delete <profile>
+ai-shelf profile reorder <profile...>
+ai-shelf profile exec <profile> <指令...> [--broadcast] [--session <名稱>]
 
 # 全螢幕 TUI
 ai-shelf tui
+
+# 舊版（deprecated）
+ai-shelf workspace …
+ai-shelf group …
+ai-shelf session …
 ```
 
 套件內部說明見 [`packages/cli/STRUCTURE.md`](packages/cli/STRUCTURE.md)。
@@ -284,7 +280,7 @@ ai-shelf/                 # 根 workspace（Electron + 清單 CLI）
 | 層級 | 技術 |
 |---|---|
 | 清單 CLI | Node.js、原生 `parseArgs` |
-| 工作區 CLI | Commander、better-sqlite3、node-pty、RxJS、Zod、Pino |
+| Profile CLI | Commander、better-sqlite3、node-pty、RxJS、Zod、Pino |
 | 桌面應用 | Electron 41、React 19、Vite 8、Tailwind CSS 4、xterm.js |
 | 測試 | Playwright |
 

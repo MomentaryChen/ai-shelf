@@ -1,19 +1,20 @@
 import blessed from "neo-blessed";
 import type { Widgets } from "blessed";
 import type { AppContext } from "../infra/bootstrap.js";
-import { createWorkspaceTree, updateWorkspaceTree } from "./components/workspace-tree.js";
+import { createProfileTree, updateProfileTree } from "./components/profile-tree.js";
 import { createSessionList, updateSessionList } from "./components/session-list.js";
 import { createSessionDetail, updateSessionDetail } from "./components/session-detail.js";
 import { createOutputPreview, updateOutputPreview } from "./components/output-preview.js";
 import { createStatusBar, setStatusMessage } from "./components/status-bar.js";
 import { RefreshCoordinator } from "./workers/refresh-coordinator.js";
 import type { SessionModel } from "../models/session.js";
+import type { ProfileInfo } from "../services/profile-service.js";
+import { PROFILES_WORKSPACE_NAME } from "../services/profile-service.js";
 import { APP_TITLE } from "../config/config.js";
 import { AppError } from "../core/errors/app-error.js";
 
 interface TuiState {
-  workspaceName: string | null;
-  groupName: string | null;
+  profile: ProfileInfo | null;
   sessions: SessionModel[];
   selectedSession: SessionModel | null;
 }
@@ -40,30 +41,21 @@ export function startTui(ctx: AppContext): void {
   const refreshCoordinator = new RefreshCoordinator();
 
   const state: TuiState = {
-    workspaceName: null,
-    groupName: null,
+    profile: null,
     sessions: [],
     selectedSession: null,
   };
 
-  function loadTreeData() {
-    const workspaces = ctx.workspaceService.list();
-    const groupsByWorkspace = new Map<string, import("../models/group.js").GroupModel[]>();
-    for (const ws of workspaces) {
-      groupsByWorkspace.set(ws.id, ctx.groupService.list(ws.name));
-    }
-    return { workspaces, groupsByWorkspace };
+  function loadProfileTreeData() {
+    const tree = ctx.profileService.getTree();
+    return { profiles: tree.profiles, lastActiveProfileId: tree.lastActiveProfileId };
   }
 
-  let treeData = loadTreeData();
-  const workspaceTree = createWorkspaceTree(left, treeData, (workspaceName, groupName) => {
-    state.workspaceName = workspaceName;
-    state.groupName = groupName ?? null;
+  let treeData = loadProfileTreeData();
+  const profileTree = createProfileTree(left, treeData, (profile) => {
+    state.profile = profile;
     refreshSessions();
-    setStatusMessage(
-      statusBar,
-      groupName ? `${workspaceName} / ${groupName}` : workspaceName,
-    );
+    setStatusMessage(statusBar, profile.name);
   });
 
   const sessionList = createSessionList(center);
@@ -71,11 +63,11 @@ export function startTui(ctx: AppContext): void {
   const outputPreview = createOutputPreview(right, 14);
 
   function reloadSelectedSession(): SessionModel | null {
-    if (!state.selectedSession || !state.workspaceName || !state.groupName) return null;
+    if (!state.selectedSession || !state.profile) return null;
     try {
       const fresh = ctx.sessionService.resolveSession(
-        state.workspaceName,
-        state.groupName,
+        PROFILES_WORKSPACE_NAME,
+        state.profile.name,
         state.selectedSession.name,
       );
       state.selectedSession = fresh;
@@ -111,22 +103,23 @@ export function startTui(ctx: AppContext): void {
   });
 
   function refreshTree() {
-    treeData = loadTreeData();
-    updateWorkspaceTree(workspaceTree, treeData);
+    treeData = loadProfileTreeData();
+    updateProfileTree(profileTree, treeData);
+    if (state.profile) {
+      const match = treeData.profiles.find((p) => p.id === state.profile?.id);
+      state.profile = match ?? null;
+    }
   }
 
   function refreshSessions() {
-    if (!state.workspaceName) {
+    if (!state.profile) {
       updateSessionList(sessionList, []);
       updateSessionDetail(sessionDetail, null);
       updateOutputPreview(outputPreview, "", false);
       return;
     }
     try {
-      state.sessions = ctx.sessionService.list(
-        state.workspaceName,
-        state.groupName ?? undefined,
-      );
+      state.sessions = ctx.sessionService.list(PROFILES_WORKSPACE_NAME, state.profile.name);
       updateSessionList(sessionList, state.sessions);
       if (state.selectedSession) {
         const match = state.sessions.find((s) => s.id === state.selectedSession?.id);
@@ -147,15 +140,15 @@ export function startTui(ctx: AppContext): void {
   }
 
   async function startSelectedSession() {
-    if (!state.workspaceName || !state.groupName || !state.selectedSession) {
-      setStatusMessage(statusBar, "Select a session first");
+    if (!state.profile || !state.selectedSession) {
+      setStatusMessage(statusBar, "Select a profile session first");
       screen.render();
       return;
     }
     try {
       await ctx.sessionService.start(
-        state.workspaceName,
-        state.groupName,
+        PROFILES_WORKSPACE_NAME,
+        state.profile.name,
         state.selectedSession.name,
       );
       refreshSessions();
@@ -168,11 +161,11 @@ export function startTui(ctx: AppContext): void {
   }
 
   function stopSelectedSession() {
-    if (!state.workspaceName || !state.groupName || !state.selectedSession) return;
+    if (!state.profile || !state.selectedSession) return;
     try {
       ctx.sessionService.stop(
-        state.workspaceName,
-        state.groupName,
+        PROFILES_WORKSPACE_NAME,
+        state.profile.name,
         state.selectedSession.name,
       );
       refreshSessions();
@@ -185,49 +178,52 @@ export function startTui(ctx: AppContext): void {
   }
 
   function promptExec(screenRef: Widgets.Screen, broadcast: boolean) {
-    if (!state.workspaceName || !state.groupName) return;
-    blessed.prompt({
-      parent: screenRef,
-      border: "line",
-      height: 3,
-      width: "70%",
-      top: "center",
-      left: "center",
-      label: broadcast ? " Broadcast Exec " : " Exec ",
-      tags: true,
-      keys: true,
-      vi: true,
-      style: { fg: "white", bg: "blue", border: { fg: "cyan" } },
-    }, (err, value) => {
-      if (err || !value?.trim()) {
-        screenRef.render();
-        return;
-      }
-      try {
-        const result = ctx.execService.exec(
-          state.workspaceName!,
-          state.groupName!,
-          value.trim(),
-          broadcast
-            ? { broadcast: true }
-            : state.selectedSession
-              ? { session: state.selectedSession.name }
-              : undefined,
-        );
-        if ("sent" in result) {
-          setStatusMessage(
-            statusBar,
-            `Broadcast → ${result.sent.join(", ")}${result.skipped.length ? ` (${result.skipped.length} skipped)` : ""}`,
-          );
-        } else {
-          setStatusMessage(statusBar, `Exec → ${result.sessionName}`);
+    if (!state.profile) return;
+    blessed.prompt(
+      {
+        parent: screenRef,
+        border: "line",
+        height: 3,
+        width: "70%",
+        top: "center",
+        left: "center",
+        label: broadcast ? " Broadcast Exec " : " Exec ",
+        tags: true,
+        keys: true,
+        vi: true,
+        style: { fg: "white", bg: "blue", border: { fg: "cyan" } },
+      },
+      (err, value) => {
+        if (err || !value?.trim()) {
+          screenRef.render();
+          return;
         }
-      } catch (ex) {
-        const msg = ex instanceof AppError ? ex.message : String(ex);
-        setStatusMessage(statusBar, msg);
-      }
-      screenRef.render();
-    });
+        try {
+          const result = ctx.execService.exec(
+            PROFILES_WORKSPACE_NAME,
+            state.profile!.name,
+            value.trim(),
+            broadcast
+              ? { broadcast: true }
+              : state.selectedSession
+                ? { session: state.selectedSession.name }
+                : undefined,
+          );
+          if ("sent" in result) {
+            setStatusMessage(
+              statusBar,
+              `Broadcast → ${result.sent.join(", ")}${result.skipped.length ? ` (${result.skipped.length} skipped)` : ""}`,
+            );
+          } else {
+            setStatusMessage(statusBar, `Exec → ${result.sessionName}`);
+          }
+        } catch (ex) {
+          const msg = ex instanceof AppError ? ex.message : String(ex);
+          setStatusMessage(statusBar, msg);
+        }
+        screenRef.render();
+      },
+    );
   }
 
   screen.key(["q", "C-c"], () => {
@@ -237,7 +233,9 @@ export function startTui(ctx: AppContext): void {
   });
 
   screen.key(["r"], () => fullRefresh());
-  screen.key(["s"], () => { void startSelectedSession(); });
+  screen.key(["s"], () => {
+    void startSelectedSession();
+  });
   screen.key(["x"], () => stopSelectedSession());
   screen.key(["e"], () => promptExec(screen, false));
   screen.key(["B"], () => promptExec(screen, true));
@@ -254,6 +252,6 @@ export function startTui(ctx: AppContext): void {
   });
 
   refreshTree();
-  workspaceTree.focus();
+  profileTree.focus();
   screen.render();
 }
