@@ -84,7 +84,7 @@ export function ProfileSettingsDialog({
       onClick={onClose}
     >
       <form
-        className="w-full max-w-sm rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 shadow-2xl"
+        className="w-full max-w-sm rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 text-chrome-text shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
       >
@@ -98,7 +98,7 @@ export function ProfileSettingsDialog({
             onChange={(e) => setName(e.target.value)}
             required
             placeholder={t("profile.dialog.namePlaceholder")}
-            className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] focus:border-chrome-border-hover focus:outline-none"
+            className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
 
           />
         </label>
@@ -112,7 +112,7 @@ export function ProfileSettingsDialog({
               value={cwd}
               onChange={(e) => setCwd(e.target.value)}
               placeholder={t("profile.dialog.cwdPlaceholder")}
-              className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] focus:border-chrome-border-hover focus:outline-none"
+              className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
 
             />
             <button
