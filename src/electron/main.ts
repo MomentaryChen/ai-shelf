@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
@@ -968,7 +968,8 @@ function broadcastPtyExit(sessionId: string, exitCode: number) {
 function resolvePtyWorkDir(cwd?: string): { ok: true; dir: string } | { ok: false; error: string } {
   const trimmed = cwd?.trim();
   if (!trimmed) return { ok: true, dir: homedir() };
-  if (existsSync(trimmed)) return { ok: true, dir: trimmed };
+  const dir = normalize(trimmed);
+  if (existsSync(dir)) return { ok: true, dir };
   return { ok: false, error: `Directory not found: ${trimmed}` };
 }
 
@@ -978,11 +979,15 @@ ipcMain.handle("clipboard-write-text", (_event, text: string) => {
   clipboard.writeText(text ?? "");
 });
 
-ipcMain.handle("pick-folder", async (_event, defaultPath?: string) => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
+ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
+  const options: Electron.OpenDialogOptions = {
     properties: ["openDirectory"],
     ...(defaultPath ? { defaultPath } : {}),
-  });
+  };
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const { canceled, filePaths } = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options);
   return canceled ? null : filePaths[0];
 });
 

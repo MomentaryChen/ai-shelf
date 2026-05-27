@@ -338,43 +338,8 @@ function WarpPaneShell({
         clearDrag();
       }}
     >
-      {sidebarPaneDragActive && onProfilePaneDrop && (
-        <div
-          className="absolute inset-0 z-30"
-          aria-hidden
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            const rect = shellRef.current?.getBoundingClientRect();
-            if (rect) {
-              setProfileDragOver({
-                targetPaneId: pane.id,
-                zone: hitPaneDropZone(e.clientX, e.clientY, rect),
-              });
-            }
-          }}
-          onDragLeave={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-              if (profileDragOver?.targetPaneId === pane.id) {
-                setProfileDragOver(null);
-              }
-            }
-          }}
-          onDrop={(e) => {
-            const payload = readProfilePaneDrag(e.dataTransfer);
-            if (!payload || payload.paneId === pane.id) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = shellRef.current?.getBoundingClientRect();
-            const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
-            onProfilePaneDrop(payload.paneId, pane.id, zone);
-            clearDrag();
-          }}
-        />
-      )}
       <div
-        className="relative z-10 flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
+        className="relative z-20 flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
         style={headerStyle}
       >
         {canReorder && (
@@ -416,11 +381,12 @@ function WarpPaneShell({
         {onCwdClick ? (
           <button
             type="button"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               onCwdClick();
             }}
-            className="min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text-secondary"
+            className="relative z-10 min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text-secondary"
             title={pane.cwd ? `${pane.cwd}\n\n${t("pane.clickChangeCwd")}` : t("pane.clickPickCwd")}
 
           >
@@ -457,7 +423,42 @@ function WarpPaneShell({
           ✕
         </button>
       </div>
-      <div className="relative z-0 min-h-0 flex-1 overflow-hidden">
+      <div className="warp-pane-body relative z-0 min-h-0 flex-1 overflow-hidden">
+        {sidebarPaneDragActive && onProfilePaneDrop && (
+          <div
+            className="absolute inset-0 z-30"
+            aria-hidden
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = "move";
+              const rect = shellRef.current?.getBoundingClientRect();
+              if (rect) {
+                setProfileDragOver({
+                  targetPaneId: pane.id,
+                  zone: hitPaneDropZone(e.clientX, e.clientY, rect),
+                });
+              }
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                if (profileDragOver?.targetPaneId === pane.id) {
+                  setProfileDragOver(null);
+                }
+              }
+            }}
+            onDrop={(e) => {
+              const payload = readProfilePaneDrag(e.dataTransfer);
+              if (!payload || payload.paneId === pane.id) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const rect = shellRef.current?.getBoundingClientRect();
+              const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
+              onProfilePaneDrop(payload.paneId, pane.id, zone);
+              clearDrag();
+            }}
+          />
+        )}
         {(isDragOver || isProfileDragOver) && activeDropZone && (
           <PaneDropOverlay
             zone={activeDropZone}
