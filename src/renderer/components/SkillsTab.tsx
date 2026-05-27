@@ -3,6 +3,7 @@ import { Card } from "./Card";
 import { DataTable, Td } from "./DataTable";
 import { Badge, InstallStatusBadge } from "./Badge";
 import { Tag } from "./Tag";
+import { SkillsMcpDiffPanel } from "./SkillsMcpDiffPanel";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { toolIcon, toolLabel } from "../utils";
@@ -35,7 +36,13 @@ function SkillsCards({ entries }: { entries: ProviderEntry[] }) {
   ));
 }
 
-export function SkillsTab({ data }: { data: ProviderEntry[] }) {
+export function SkillsTab({
+  data,
+  onOpenMcpSync,
+}: {
+  data: ProviderEntry[];
+  onOpenMcpSync: () => void;
+}) {
   const { t } = useLocale();
   const { installed, notInstalled } = partitionByInstalled(data);
   const allSkills = [...new Set(installed.flatMap((e) => e.skills))].sort();
@@ -43,6 +50,8 @@ export function SkillsTab({ data }: { data: ProviderEntry[] }) {
   return (
     <>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">⚡ {t("app.tab.skills")}</h2>
+
+      <SkillsMcpDiffPanel data={data} onOpenMcpSync={onOpenMcpSync} />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
       <SkillsCards entries={installed} />
