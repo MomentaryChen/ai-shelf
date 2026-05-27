@@ -75,6 +75,23 @@ export function Chevron({ expanded }: { expanded: boolean }) {
   );
 }
 
+export function SidebarPanelChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      className={`h-3.5 w-3.5 text-chrome-text-faint transition-transform duration-150 ${expanded ? "rotate-0" : "rotate-180"}`}
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M7.5 2.5 4 6l3.5 3.5" />
+    </svg>
+  );
+}
+
 export function DragHandle() {
   return (
     <svg className="h-3 w-3 text-chrome-text-dim" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
