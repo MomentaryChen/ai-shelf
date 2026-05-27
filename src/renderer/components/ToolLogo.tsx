@@ -98,6 +98,25 @@ function ShellLogo({ size }: { size: number }) {
   );
 }
 
+function CrushLogo({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Crush" className="text-[#ff6b9d]">
+      <path d="M12 3c-3.5 0-6 2.2-6 5.5 0 2.1 1.2 3.9 3 4.8V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-6.7c1.8-.9 3-2.7 3-4.8C18 5.2 15.5 3 12 3Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function GooseLogo({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Goose" className="text-[#fbbf24]">
+      <path d="M4 14c0-3.3 2.7-6 6-6h4c3.3 0 6 2.7 6 6v2H4v-2Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 18h8M10 20h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="9" cy="13" r="1" fill="currentColor" />
+      <circle cx="15" cy="13" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 const LOGOS: Record<string, (size: number) => React.ReactElement> = {
   shell: (s) => <ShellLogo size={s} />,
   claude: (s) => <ClaudeLogo size={s} />,
@@ -109,6 +128,8 @@ const LOGOS: Record<string, (size: number) => React.ReactElement> = {
   gemini: (s) => <GoogleLogo size={s} />,
   aider: (s) => <AiderLogo size={s} />,
   opencode: (s) => <OpenCodeLogo size={s} />,
+  crush: (s) => <CrushLogo size={s} />,
+  goose: (s) => <GooseLogo size={s} />,
 };
 
 export function ToolLogo({ tool, size = 18 }: { tool: string; size?: number }) {

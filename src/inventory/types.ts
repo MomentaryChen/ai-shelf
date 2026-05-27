@@ -23,6 +23,16 @@ export interface ConfigInfo {
   instructionFiles: string[];
 }
 
+export type SkillScope = "global" | "project" | "config";
+
+/** A discovered agent skill from a SKILL.md file on disk. */
+export interface SkillEntry {
+  name: string;
+  description?: string;
+  path: string;
+  scope: SkillScope;
+}
+
 export interface ProviderEntry {
   tool: string;
   provider: string;
@@ -31,7 +41,10 @@ export interface ProviderEntry {
   model?: string;
   models?: string[];
   auth: AuthStatus;
+  /** Skill names from scanned SKILL.md files (empty when none found). */
   skills: string[];
+  /** Full scan metadata; omitted when identical to `skills` only. */
+  skillDetails?: SkillEntry[];
   mcp: MCPInfo;
   capabilities: Capabilities;
   config: ConfigInfo;

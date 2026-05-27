@@ -20,6 +20,15 @@ export interface ConfigInfo {
   instructionFiles: string[];
 }
 
+export type SkillScope = "global" | "project" | "config";
+
+export interface SkillEntry {
+  name: string;
+  description?: string;
+  path: string;
+  scope: SkillScope;
+}
+
 export interface ProviderEntry {
   tool: string;
   provider: string;
@@ -29,6 +38,7 @@ export interface ProviderEntry {
   models?: string[];
   auth: AuthStatus;
   skills: string[];
+  skillDetails?: SkillEntry[];
   mcp: MCPInfo;
   capabilities: Capabilities;
   config: ConfigInfo;

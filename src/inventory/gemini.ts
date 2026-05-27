@@ -1,4 +1,5 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
+import { geminiSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, envPresent, tryReadJson } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
@@ -50,6 +51,8 @@ export async function detectGemini(_opts: DetectOptions = {}): Promise<ProviderE
     ? (modelFromConfig ?? "gemini-2.5-pro")
     : modelFromConfig;
 
+  const scanned = withScannedSkills(geminiSkillRoots());
+
   return {
     tool: "gemini",
     provider: "Google Gemini",
@@ -58,7 +61,7 @@ export async function detectGemini(_opts: DetectOptions = {}): Promise<ProviderE
     auth,
     model,
     models: available ? GEMINI_MODELS : [],
-    skills: ["coding", "bash", "file-edit", "mcp", "research"],
+    ...scanned,
     mcp: {
       supported: true,
       servers: mcpServers,

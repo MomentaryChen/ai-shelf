@@ -2,8 +2,8 @@ import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { DataTable, Td } from "./DataTable";
 import { Badge, InstallStatusBadge } from "./Badge";
-import { Tag } from "./Tag";
 import { SkillsMcpDiffPanel } from "./SkillsMcpDiffPanel";
+import { SkillTags, resolveSkillDetails } from "./SkillTags";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { toolIcon, toolLabel } from "../utils";
@@ -26,9 +26,7 @@ function SkillsCards({ entries }: { entries: ProviderEntry[] }) {
       }
     >
       {e.available ? (
-        <div className="flex flex-wrap gap-1.5">
-          {e.skills.map((s) => <Tag key={s}>{s}</Tag>)}
-        </div>
+        <SkillTags skills={resolveSkillDetails(e)} />
       ) : (
         <p className="text-[13px] text-text-tertiary">{t("inventory.skipSkills")}</p>
       )}
@@ -60,20 +58,22 @@ export function SkillsTab({
       <SkillsCards entries={notInstalled} />
 
       {/* Skill matrix */}
-      <Card title={t("inventory.skillMatrix")}>
-        <DataTable headers={["Skill", ...installed.map((e) => (
-          <span key={e.tool} className="flex items-center gap-1.5">{toolIcon(e.tool)} {toolLabel(e.tool)}</span>
-        ))]}>
-          {allSkills.map((skill) => (
-            <tr key={skill}>
-              <Td>{skill}</Td>
-              {installed.map((e) => (
-                <Td key={e.tool}>{e.skills.includes(skill) ? "✅" : "—"}</Td>
-              ))}
-            </tr>
-          ))}
-        </DataTable>
-      </Card>
+      {allSkills.length > 0 && (
+        <Card title={t("inventory.skillMatrix")}>
+          <DataTable headers={["Skill", ...installed.map((e) => (
+            <span key={e.tool} className="flex items-center gap-1.5">{toolIcon(e.tool)} {toolLabel(e.tool)}</span>
+          ))]}>
+            {allSkills.map((skill) => (
+              <tr key={skill}>
+                <Td>{skill}</Td>
+                {installed.map((e) => (
+                  <Td key={e.tool}>{e.skills.includes(skill) ? "✅" : "—"}</Td>
+                ))}
+              </tr>
+            ))}
+          </DataTable>
+        </Card>
+      )}
     </>
   );
 }

@@ -6,6 +6,8 @@ import { detectCodex } from "./codex.js";
 import { detectGemini } from "./gemini.js";
 import { detectAider } from "./aider.js";
 import { detectOpenCode } from "./opencode.js";
+import { detectCrush } from "./crush.js";
+import { detectGoose } from "./goose.js";
 import { sortProviderEntries } from "../tool-sort.js";
 
 const DETECTORS = [
@@ -16,6 +18,8 @@ const DETECTORS = [
   detectGemini,
   detectAider,
   detectOpenCode,
+  detectCrush,
+  detectGoose,
 ] as const;
 
 const DETECT_BY_TOOL: Record<string, (opts?: DetectOptions) => Promise<ProviderEntry>> = {
@@ -27,6 +31,8 @@ const DETECT_BY_TOOL: Record<string, (opts?: DetectOptions) => Promise<ProviderE
   gemini: detectGemini,
   aider: detectAider,
   opencode: detectOpenCode,
+  crush: detectCrush,
+  goose: detectGoose,
 };
 
 /** Detect a single tool by id (for per-tool IPC without running detectAll). */

@@ -124,7 +124,8 @@ export async function detectCopilot(opts: DetectOptions = {}): Promise<ProviderE
     auth,
     model,
     models,
-    skills: ["coding", "shell", "repo-edit", "mcp"],
+    skills: [],
+    skillDetails: [],
     mcp: {
       supported: true,
       servers: [...new Set(mcpServers)],

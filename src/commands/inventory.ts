@@ -7,6 +7,8 @@ import { detectCodex } from "../inventory/codex.js";
 import { detectGemini } from "../inventory/gemini.js";
 import { detectAider } from "../inventory/aider.js";
 import { detectOpenCode } from "../inventory/opencode.js";
+import { detectCrush } from "../inventory/crush.js";
+import { detectGoose } from "../inventory/goose.js";
 
 type Options = { json: boolean };
 
@@ -197,6 +199,8 @@ async function showToolDetail(tool: string, opts: Options) {
     gemini: detectGemini,
     aider: detectAider,
     opencode: detectOpenCode,
+    crush: detectCrush,
+    goose: detectGoose,
   };
   const detect = detectors[tool];
   if (!detect) {

@@ -11,6 +11,8 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   gemini: "Gemini",
   aider: "Aider",
   opencode: "OpenCode",
+  crush: "Crush",
+  goose: "Goose",
 };
 
 /** Display name used for sorting and UI labels. */
