@@ -78,6 +78,8 @@ export interface TerminalClipboardOptions {
   onOpenFind?: () => void;
   onClear?: () => void;
   onRestart?: () => void;
+  onExportOutput?: () => void;
+  onCopyOutputForIssue?: () => void;
   /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
   getRightClickPaste?: () => boolean;
   /**
@@ -250,6 +252,12 @@ export function bindTerminalClipboard(
     addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal());
     addItem(getStoredT("terminal.ctx.find"), true, () => options?.onOpenFind?.());
     addItem(getStoredT("terminal.ctx.selectAll"), true, () => term.selectAll());
+    if (options.onExportOutput) {
+      addItem(getStoredT("terminal.ctx.exportOutput"), true, options.onExportOutput);
+    }
+    if (options.onCopyOutputForIssue) {
+      addItem(getStoredT("terminal.ctx.copyOutputForIssue"), true, options.onCopyOutputForIssue);
+    }
     if (options.onClear) addItem(getStoredT("terminal.ctx.clear"), true, options.onClear);
     if (options.onRestart) addItem(getStoredT("terminal.ctx.restart"), true, options.onRestart);
 

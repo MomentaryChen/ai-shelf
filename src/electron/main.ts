@@ -1086,6 +1086,35 @@ ipcMain.handle("pty-get-output-buffer", (_event, sessionId: string) => ({
   buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
 }));
 
+function sanitizeExportBasename(raw: string): string {
+  const trimmed = raw.trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "");
+  return (trimmed || "terminal").slice(0, 80);
+}
+
+ipcMain.handle(
+  "pty-export-output",
+  async (_event, sessionId: string, defaultName?: string) => {
+    try {
+      const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const base = sanitizeExportBasename(defaultName ?? sessionId);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export terminal output",
+        defaultPath: `${base}-${stamp}.log`,
+        filters: [
+          { name: "Log file", extensions: ["log"] },
+          { name: "Text file", extensions: ["txt"] },
+        ],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true as const };
+      writeFileSync(filePath, buffer, "utf8");
+      return { success: true, path: filePath };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
+
 ipcMain.handle(
   "pty-search-output",
   (

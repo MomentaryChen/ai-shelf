@@ -269,6 +269,8 @@ export const en = {
   "terminal.ctx.selectAll": "Select all",
   "terminal.ctx.clear": "Clear screen",
   "terminal.ctx.restart": "Restart session",
+  "terminal.ctx.exportOutput": "Export output…",
+  "terminal.ctx.copyOutputForIssue": "Copy output for issue",
   "chat.restoring": "Restoring terminals…",
   "chat.restorePaneHint": "— click \"+ Pane\" above to open a terminal (up to {max}, layout is saved)",
   "chat.shortcutHint":

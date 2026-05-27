@@ -259,6 +259,8 @@ export const zh: Record<MessageKey, string> = {
   "terminal.ctx.selectAll": "全選",
   "terminal.ctx.clear": "清屏",
   "terminal.ctx.restart": "重啟 session",
+  "terminal.ctx.exportOutput": "匯出輸出…",
+  "terminal.ctx.copyOutputForIssue": "複製輸出（貼 issue）",
   "chat.restoring": "正在還原 terminal…",
   "chat.restorePaneHint": "— 點上方「+ Pane」開啟 terminal（最多 {max} 個，會自動記住）",
   "chat.shortcutHint":
