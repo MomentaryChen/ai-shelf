@@ -344,6 +344,7 @@ export interface ElectronAPI {
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
   toggleDevTools: () => Promise<void>;
+  onTrayActivateProfile: (cb: (profileId: string) => void) => () => void;
 }
 
 declare global {

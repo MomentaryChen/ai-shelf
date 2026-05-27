@@ -45,6 +45,7 @@ import {
   reorderProfiles,
 } from "./workspace-host.js";
 import { applyBackup, createJsonBackup, createZipBackup } from "./backup-service.js";
+import { bindMinimizeToTray, initTray, refreshTrayMenu, setAppQuitting } from "./tray.js";
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
@@ -221,6 +222,7 @@ function createWindow() {
 
   mainWindow.loadFile(RENDERER_HTML);
   attachWindow(mainWindow, "AI Shelf");
+  bindMinimizeToTray(mainWindow);
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -245,6 +247,7 @@ function createChatWindow() {
   });
   chatWindow.loadFile(RENDERER_HTML, { hash: "chat" });
   attachWindow(chatWindow, "AI Terminal");
+  bindMinimizeToTray(chatWindow);
   chatWindow.on("closed", () => {
     chatWindow = null;
   });
@@ -1346,6 +1349,7 @@ ipcMain.handle(
 ipcMain.handle("ws-group-layout-set-active", (_e, workspaceId: string, groupId: string) => {
   try {
     setLastActiveGroup(workspaceId, groupId);
+    refreshTrayMenu();
     return { success: true };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
@@ -1375,6 +1379,7 @@ ipcMain.handle(
   ) => {
     try {
       const profile = createProfile(name, input);
+      refreshTrayMenu();
       return { success: true, profile };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -1397,6 +1402,7 @@ ipcMain.handle(
   ) => {
     try {
       const profile = updateProfile(profileId, patch);
+      refreshTrayMenu();
       return { success: true, profile };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -1407,6 +1413,7 @@ ipcMain.handle(
 ipcMain.handle("profile-delete", (_e, profileId: string) => {
   try {
     deleteProfile(profileId);
+    refreshTrayMenu();
     return { success: true };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
@@ -1416,6 +1423,7 @@ ipcMain.handle("profile-delete", (_e, profileId: string) => {
 ipcMain.handle("profile-reorder", (_e, orderedProfileIds: string[]) => {
   try {
     const tree = reorderProfiles(orderedProfileIds);
+    refreshTrayMenu();
     return { success: true, tree };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
@@ -1479,12 +1487,19 @@ ipcMain.handle("relaunch-app", () => {
 app.whenReady().then(() => {
   setupAppMenu();
   createWindow();
+  initTray({
+    iconPath: APP_ICON,
+    getMainWindow: () => mainWindow,
+    getChatWindow: () => chatWindow,
+    createChatWindow,
+  });
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
 });
 
 // Kill all active PTY sessions before the app exits
 app.on("before-quit", () => {
+  setAppQuitting(true);
   for (const [, proc] of PTY_SESSIONS) {
     try { proc.kill(); } catch { /* already dead */ }
   }
@@ -1493,7 +1508,7 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  app.quit();
+  // Keep running in the tray so PTY sessions stay alive when windows are hidden.
 });
 
 app.on("activate", () => {

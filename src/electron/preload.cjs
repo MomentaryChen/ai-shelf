@@ -113,4 +113,9 @@ contextBridge.exposeInMainWorld("api", {
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),
+  onTrayActivateProfile: (cb) => {
+    const handler = (_e, profileId) => cb(profileId);
+    ipcRenderer.on("tray-activate-profile", handler);
+    return () => ipcRenderer.off("tray-activate-profile", handler);
+  },
 });
