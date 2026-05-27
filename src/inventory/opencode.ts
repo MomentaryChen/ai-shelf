@@ -55,7 +55,8 @@ export async function detectOpenCode(_opts: DetectOptions = {}): Promise<Provide
     auth,
     model,
     models: available ? OPENCODE_MODELS : [],
-    skills: ["coding", "bash", "file-edit", "mcp", "multi-provider"],
+    skills: [],
+    skillDetails: [],
     mcp: {
       supported: true,
       servers: mcpServers,

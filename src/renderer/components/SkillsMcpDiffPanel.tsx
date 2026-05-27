@@ -6,7 +6,7 @@ import { Tag } from "./Tag";
 import {
   findProviderEntry,
   mcpServersMissingInCursor,
-  skillTagsMissingInCursor,
+  skillsMissingInCursor,
 } from "../utils/claude-cursor-diff";
 import { useLocale } from "../i18n/LocaleProvider";
 
@@ -43,7 +43,7 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
   if (!claude?.available || !cursor?.available || !rawData) return null;
 
   const missingMcp = mcpServersMissingInCursor(rawData);
-  const missingSkills = skillTagsMissingInCursor(claude, cursor);
+  const missingSkills = skillsMissingInCursor(claude, cursor);
   const hasMcpGap = missingMcp.length > 0;
 
   if (!hasMcpGap && missingSkills.length === 0) {
@@ -88,14 +88,14 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
       {missingSkills.length > 0 && (
         <div className="mb-4 rounded-lg border border-border/60 bg-bg-primary px-3 py-2.5">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">
-            {t("inventory.diffFix.skillTags")}
+            {t("inventory.diffFix.skillsMissing")}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {missingSkills.map((skill) => (
               <Tag key={skill}>{skill}</Tag>
             ))}
           </div>
-          <p className="mt-2 text-xs text-text-tertiary">{t("inventory.diffFix.skillTagsHint")}</p>
+          <p className="mt-2 text-xs text-text-tertiary">{t("inventory.diffFix.skillsMissingHint")}</p>
         </div>
       )}
 

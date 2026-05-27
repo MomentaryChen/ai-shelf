@@ -22,8 +22,8 @@ export function mcpServersMissingInCursor(rawData: McpRawData): string[] {
   return claudeServers.filter((name) => !cursorServers.has(name)).sort();
 }
 
-/** Capability skill tags in Claude inventory but not Cursor (informational). */
-export function skillTagsMissingInCursor(
+/** SKILL.md skills present in Claude inventory but missing from Cursor. */
+export function skillsMissingInCursor(
   claude?: ProviderEntry,
   cursor?: ProviderEntry,
 ): string[] {
@@ -31,3 +31,6 @@ export function skillTagsMissingInCursor(
   const cursorSkills = new Set(cursor.skills);
   return claude.skills.filter((s) => !cursorSkills.has(s)).sort();
 }
+
+/** @deprecated Use skillsMissingInCursor — kept for callers during transition. */
+export const skillTagsMissingInCursor = skillsMissingInCursor;

@@ -1,4 +1,5 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
+import { claudeSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
@@ -108,6 +109,8 @@ export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEn
   const models = cliModels.length > 0 ? cliModels : CLAUDE_MODELS;
   if (model) model = resolveClaudeModelAlias(model, models);
 
+  const scanned = withScannedSkills(claudeSkillRoots());
+
   return {
     tool: "claude",
     provider: "Anthropic Claude",
@@ -116,7 +119,7 @@ export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEn
     auth,
     models,
     model,
-    skills: ["coding", "bash", "file-edit", "mcp"],
+    ...scanned,
     mcp: {
       supported: true,
       servers: [...new Set(mcpServers)],

@@ -1,4 +1,5 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
+import { cursorSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
@@ -116,6 +117,8 @@ export async function detectCursor(opts: DetectOptions = {}): Promise<ProviderEn
     ? CURSOR_MODELS
     : withDefaultModel(await fetchCursorModelIds(toolCmd, available), model);
 
+  const scanned = withScannedSkills(cursorSkillRoots());
+
   return {
     tool: toolCmd,
     provider: "Cursor",
@@ -124,7 +127,7 @@ export async function detectCursor(opts: DetectOptions = {}): Promise<ProviderEn
     auth: available ? "ok" : "unknown",
     models,
     model,
-    skills: ["coding", "file-edit", "mcp"],
+    ...scanned,
     mcp: {
       supported: true,
       servers: [...new Set(mcpServers)],

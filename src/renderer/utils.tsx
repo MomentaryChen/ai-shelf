@@ -42,6 +42,14 @@ const TOOL_INSTALL: Record<string, InstallInfo> = {
     cmd: "opencode upgrade",
     url: "https://opencode.ai/docs/cli/",
   },
+  crush: {
+    cmd: "go install github.com/charmbracelet/crush@latest",
+    url: "https://github.com/charmbracelet/crush",
+  },
+  goose: {
+    cmd: "goose update",
+    url: "https://block.github.io/goose/",
+  },
 };
 
 export function toolInstall(tool: string): InstallInfo | null {

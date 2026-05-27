@@ -51,7 +51,8 @@ export async function detectCodex(_opts: DetectOptions = {}): Promise<ProviderEn
     auth,
     model,
     models: available ? CODEX_MODELS : [],
-    skills: ["coding", "bash", "file-edit", "mcp", "sandbox"],
+    skills: [],
+    skillDetails: [],
     mcp: {
       supported: true,
       servers: [...new Set(mcpServers)],

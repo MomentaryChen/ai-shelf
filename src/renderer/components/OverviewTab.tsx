@@ -78,9 +78,13 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
               <Td>{e.available ? <YesNo value={e.capabilities.toolCalls} /> : <span className="text-text-tertiary">—</span>}</Td>
               <Td>
                 {e.available ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {e.skills.map((s) => <Tag key={s}>{s}</Tag>)}
-                  </div>
+                  e.skills.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {e.skills.map((s) => <Tag key={s}>{s}</Tag>)}
+                    </div>
+                  ) : (
+                    <span className="text-text-tertiary">—</span>
+                  )
                 ) : (
                   <span className="text-text-tertiary">—</span>
                 )}

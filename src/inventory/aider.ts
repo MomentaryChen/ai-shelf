@@ -62,7 +62,8 @@ export async function detectAider(_opts: DetectOptions = {}): Promise<ProviderEn
     auth,
     model,
     models: available ? AIDER_MODELS : [],
-    skills: ["coding", "git", "diff-edit", "multi-file"],
+    skills: [],
+    skillDetails: [],
     mcp: {
       supported: false,
       servers: [],

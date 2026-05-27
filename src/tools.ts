@@ -8,6 +8,8 @@ export const INVENTORY_TOOL_IDS = [
   "gemini",
   "aider",
   "opencode",
+  "crush",
+  "goose",
 ] as const;
 
 export type InventoryToolId = (typeof INVENTORY_TOOL_IDS)[number];
@@ -31,6 +33,8 @@ export const TOOL_LAUNCH_CMD: Record<string, string> = {
   gemini: "gemini",
   aider: "aider",
   opencode: "opencode",
+  crush: "crush",
+  goose: "goose",
 };
 
 export const TOOL_UPDATE: Record<string, { cmd: string; args: string[]; label: string }> = {
@@ -43,6 +47,8 @@ export const TOOL_UPDATE: Record<string, { cmd: string; args: string[]; label: s
   gemini: { cmd: "gemini", args: ["update"], label: "Google Gemini CLI" },
   aider: { cmd: "pip", args: ["install", "-U", "aider-chat"], label: "Aider" },
   opencode: { cmd: "opencode", args: ["upgrade"], label: "OpenCode" },
+  crush: { cmd: "crush", args: ["upgrade"], label: "Crush" },
+  goose: { cmd: "goose", args: ["update"], label: "Goose" },
 };
 
 export const TOOL_NPM_PACKAGE: Record<string, string> = {
