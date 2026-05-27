@@ -104,6 +104,7 @@ export const en = {
   "profile.opening": "Opening…",
   "profile.newTerminal": "New Terminal",
   "profile.minimizeTerminal": "Minimize to sidebar (keeps session running)",
+  "profile.middleClickClose": "Middle-click to close",
   "profile.showInDisplay": "Click to show in main display",
   "profile.dragToDisplay": "Click or drag to main display",
   "profile.dragOrShiftAlongside":

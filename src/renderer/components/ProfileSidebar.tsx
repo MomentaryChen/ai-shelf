@@ -565,6 +565,13 @@ export function ProfileSidebar({
                         ? paneDisplayLabel(item)
                         : item.title?.trim() || `${toolLabel(tool)} ${i + 1}`;
                       const canRename = Boolean(isActive && isLive && isPaneInfo && onRenamePane);
+                      const sessionRowTitle = isLive
+                        ? minimized
+                          ? t("profile.showInDisplay")
+                          : isActive && profileFocusId && profileFocusId !== paneId
+                            ? t("profile.dragOrShiftAlongside")
+                            : t("profile.dragToDisplay")
+                        : undefined;
 
                       return (
                         <div
@@ -643,6 +650,12 @@ export function ProfileSidebar({
                         >
                         <button
                           type="button"
+                          onMouseDown={(e) => {
+                            if (e.button !== 1 || !isActive || !isLive || !isPaneInfo) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onClosePane(profile.id, paneId);
+                          }}
                           onClick={(e) => {
                             if (!isLive) {
                               void onActivateProfile(profile);
@@ -669,13 +682,9 @@ export function ProfileSidebar({
                                 : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text-secondary"
                           } ${!isLive ? "opacity-65" : minimized ? "opacity-70" : ""}`}
                           title={
-                            isLive
-                              ? minimized
-                                ? t("profile.showInDisplay")
-                                : isActive && profileFocusId && profileFocusId !== paneId
-                                  ? t("profile.dragOrShiftAlongside")
-                                  : t("profile.dragToDisplay")
-                              : undefined
+                            sessionRowTitle && isActive && isPaneInfo
+                              ? `${sessionRowTitle} · ${t("profile.middleClickClose")}`
+                              : sessionRowTitle
                           }
                         >
                           {showLiveDot ? (
@@ -776,6 +785,7 @@ export function ProfileSidebar({
                                   }
                                 }}
                                 className="mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] text-chrome-text-faint opacity-0 transition-opacity hover:bg-chrome-hover-strong hover:text-chrome-text group-hover/session:opacity-100"
+                                title={t("pane.close")}
                               >
                                 ✕
                               </span>

@@ -104,6 +104,7 @@ export const zh: Record<MessageKey, string> = {
   "profile.opening": "開啟中…",
   "profile.newTerminal": "新增 Terminal",
   "profile.minimizeTerminal": "縮到側欄（工作階段仍會執行）",
+  "profile.middleClickClose": "滑鼠中鍵關閉",
   "profile.showInDisplay": "點擊在右側顯示",
   "profile.dragToDisplay": "點擊或拖曳到右側顯示區",
   "profile.dragOrShiftAlongside":
