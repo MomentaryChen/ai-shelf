@@ -85,14 +85,20 @@ git tag -a vX.Y.Z -m "AI Shelf X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Pushing **`v*`** triggers [.github/workflows/release.yml](../../../.github/workflows/release.yml) (Windows NSIS + Release body from CHANGELOG). CI attaches **`AI-Shelf-Setup-*.exe`**, **`latest.yml`**, and **`*.blockmap`** — the latter two are required for packaged desktop **in-app auto-update** (`electron-updater`; see [docs/RELEASE.md](../../../docs/RELEASE.md)).
+Pushing **`v*`** triggers [.github/workflows/release.yml](../../../.github/workflows/release.yml):
+
+- **release-windows** — NSIS installer + Release body from CHANGELOG; attaches **`AI-Shelf-Setup-*.exe`**, **`latest.yml`**, **`*.blockmap`** (required for in-app auto-update via `electron-updater`).
+- **publish-npm** — publishes **`ai-shelf`** from `packages/cli` to npm (needs repo secret **`NPM_TOKEN`**; version synced from tag via [scripts/sync-version-from-tag.mjs](../../../scripts/sync-version-from-tag.mjs)).
+
+See [docs/RELEASE.md](../../../docs/RELEASE.md).
 
 ## 6. After push
 
-Tell the user to open **Actions → Release** and then **Releases**. Confirm on that release:
+Tell the user to open **Actions → Release** and then **Releases**. Confirm:
 
-- **`AI-Shelf-Setup-X.Y.Z.exe`**
-- **`latest.yml`** and **`*.blockmap`** (if missing, installed apps cannot auto-update in-app)
+- Both workflow jobs succeeded (**publish-npm**, **release-windows**)
+- **`AI-Shelf-Setup-X.Y.Z.exe`**, **`latest.yml`**, **`*.blockmap`** on the GitHub Release (if missing, installed apps cannot auto-update in-app)
+- **`npm view ai-shelf version`** shows `X.Y.Z` (if publish-npm failed, check **`NPM_TOKEN`** secret)
 - Release description matches CHANGELOG
 
 If this is the **first release** that ships in-app auto-update, mention in CHANGELOG (or release notes) that users on older installers must install that build **once manually**; later versions can upgrade inside the app.

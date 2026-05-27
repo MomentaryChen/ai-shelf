@@ -1,7 +1,7 @@
 {
   "name": "ai-shelf",
-  "version": "1.4.1",
-  "description": "AI Shelf — terminal workspace orchestration CLI and TUI",
+  "version": "2.0.0",
+  "description": "AI Shelf — terminal profile CLI and TUI (shared data model with the desktop app)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,11 +14,38 @@
   "bin": {
     "ai-shelf": "./dist/cli.js"
   },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MomentaryChen/ai-shelf.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/MomentaryChen/ai-shelf#readme",
+  "bugs": "https://github.com/MomentaryChen/ai-shelf/issues",
+  "keywords": [
+    "ai",
+    "ai-shelf",
+    "cli",
+    "claude",
+    "copilot",
+    "cursor",
+    "mcp",
+    "terminal",
+    "profile"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "pnpm run build",
     "dev": "tsx watch src/cli/main.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"

@@ -10,7 +10,8 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 
 - Node.js ≥ 22, pnpm ≥ 10.12.1
 - Windows machine (or rely on CI) for `pnpm dist:win`
-- Git tag `vX.Y.Z` must match root [package.json](../package.json) `version` (e.g. tag `v1.0.0` ↔ version `1.0.0`)
+- Git tag `vX.Y.Z` must match the release version (e.g. tag `v2.0.0` ↔ `2.0.0`). CI runs [scripts/sync-version-from-tag.mjs](../scripts/sync-version-from-tag.mjs) so root and `packages/cli` `version` fields align with the tag before build/publish.
+- **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; the Windows installer job still runs.
 
 ### Pre-release checklist
 
@@ -31,11 +32,20 @@ git tag -a v1.0.0 -m "AI Shelf 1.0.0"
 git push origin v1.0.0
 ```
 
-1. Open **Actions** → **Release** workflow on the tag commit
-2. When green, open **Releases** on GitHub
+1. Open **Actions** → **Release** workflow on the tag commit (two jobs: **Publish ai-shelf to npm** + **release-windows**)
+2. When both are green, open **Releases** on GitHub
 3. Confirm release assets include **`AI-Shelf-Setup-<version>.exe`**, **`latest.yml`**, and **`*.blockmap`** (required for in-app auto-update via `electron-updater`)
-4. Confirm the **release description** matches **[CHANGELOG.md](../CHANGELOG.md)** for that version (CI builds it via [scripts/release-notes.mjs](../scripts/release-notes.mjs))
-5. Optionally tweak wording on GitHub only for hotfixes — then mirror edits back into `CHANGELOG.md` so they stay aligned
+4. Confirm **`ai-shelf@<version>`** on [npm](https://www.npmjs.com/package/ai-shelf): `npm view ai-shelf version`
+5. Confirm the **release description** matches **[CHANGELOG.md](../CHANGELOG.md)** for that version (CI builds it via [scripts/release-notes.mjs](../scripts/release-notes.mjs))
+6. Optionally tweak wording on GitHub only for hotfixes — then mirror edits back into `CHANGELOG.md` so they stay aligned
+
+#### GitHub secret: `NPM_TOKEN`
+
+1. npm → **Access Tokens** → **Generate Token** → type **Granular** or **Classic** with publish rights for package `ai-shelf`
+2. GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+3. Name: `NPM_TOKEN`, value: the token
+
+First publish: ensure the package name `ai-shelf` is available on npm (or change `packages/cli/package.json` `name` / scope before tagging).
 
 ### Release page vs changelog
 
@@ -49,6 +59,8 @@ Before tagging: ensure `CHANGELOG.md` has a `## [<version>]` section with the bu
 
 ### Publish manually (fallback)
 
+**Desktop (Windows installer):**
+
 ```powershell
 pnpm install
 pnpm build
@@ -56,6 +68,18 @@ pnpm dist:win
 ```
 
 Upload `release/AI-Shelf-Setup-<version>.exe`, `release/latest.yml`, and `release/*.blockmap` to a GitHub Release. Do **not** attach portable builds or `win-unpacked` folders for end users.
+
+**CLI (npm):**
+
+```powershell
+node scripts/sync-version-from-tag.mjs 2.0.0   # or rely on tag in CI
+pnpm install
+pnpm --filter ai-shelf run build
+cd packages/cli
+npm publish --access public
+```
+
+Requires `npm login` locally and publish rights on the `ai-shelf` package.
 
 ### Developer-only targets
 
@@ -121,3 +145,4 @@ Maintainers: `package.json` → `build.publish` must point at this repo; CI must
 | `package.json` version | `1.0.0` |
 | Installer filename | `AI-Shelf-Setup-1.0.0.exe` |
 | Electron `app.getVersion()` | `1.0.0` |
+| npm package `ai-shelf` | `1.0.0` |

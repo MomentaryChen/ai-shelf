@@ -9,9 +9,34 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-27
+
+Major release: Profile-first data model, backup/restore, desktop polish, and automated npm + signed Windows installer on tag.
+
 ### Added
 
-- **Windows self-signed Authenticode (CI)** — Release workflow auto-generates a self-signed cert and signs the NSIS installer; no secrets required. SmartScreen still warns (cert not publicly trusted). See [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md).
+- **Profile-first model (2.0)** — Desktop and `ai-shelf` CLI/TUI share **Profile** as the primary unit; `ai-shelf profile` commands replace day-to-day `workspace` / `group` usage (legacy commands remain with warnings). See [docs/data-model.md](docs/data-model.md).
+- **Data backup & restore** — Export/import profiles, layouts, SQLite DB, and app settings (`.aishelf` / JSON) from Terminal Settings; import backs up existing files and restarts the app.
+- **Profile create templates** — Blank, copy-from-profile, and built-in templates (solo agent, multi-agent with broadcast, shell-only).
+- **Windows self-signed Authenticode (CI)** — Release workflow signs the NSIS installer on every tag (SmartScreen may still warn; not CA-trusted). See [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md).
+- **npm publish on release** — Tag push also publishes the `ai-shelf` CLI package to npm (requires repo secret `NPM_TOKEN`; version synced from tag).
+- **System tray** — Minimize to tray with profile quick-switch (Windows).
+- **Collapsible profile sidebar** — Collapse/expand the profile list for more terminal space.
+- **Customizable pane shortcuts** — Configure split and focus keyboard shortcuts in Settings.
+- **Terminal output export** — Save PTY buffer to `.log` or copy for issue reports.
+- **Skills inventory scan** — Discover real `SKILL.md` files across tool config paths.
+- **Claude→Cursor MCP diff panel** — Inventory UI shows MCP gaps and one-click sync toward Cursor.
+- **Codex MCP (TOML)** — MCP sync matrix includes Codex `config.toml` servers.
+- **Crush & Goose** — Inventory detection for additional AI CLI tools.
+- **Middle-click close** — Close a terminal tab from the profile sidebar with middle mouse button.
+
+### Changed
+
+- **Installation docs** — Desktop app is distributed via **GitHub Releases** installer only; `ai-shelf` CLI is built from source until installed from npm after publish.
+
+### Fixed
+
+- **Pane cwd picker** — Clicking the cwd control again opens the folder picker and respawns the pane in the new directory.
 
 ## [1.4.1] - 2026-05-26
 
@@ -155,6 +180,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.0.0
 [1.4.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.1
 [1.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.0
 [1.3.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.3.0
