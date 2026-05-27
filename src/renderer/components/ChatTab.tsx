@@ -12,6 +12,10 @@ import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
+  formatFocusPaneBinding,
+  formatPaneKeyChord,
+} from "../terminal/pane-key-bindings";
+import {
   collectPanes,
   findPane,
   mapPanesInTree,
@@ -116,6 +120,16 @@ export function ChatTab({
   const restoreInFlightRef = useRef(false);
 
   const panes = layout ? collectPanes(layout) : [];
+  const paneShortcutLabels = useMemo(() => {
+    const b = settings.paneShortcuts;
+    return {
+      focusNext: formatPaneKeyChord(b.focusNext),
+      focusPrev: formatPaneKeyChord(b.focusPrev),
+      splitRight: formatPaneKeyChord(b.splitHorizontal),
+      splitDown: formatPaneKeyChord(b.splitVertical),
+      focusPane: formatFocusPaneBinding(b.focusPane),
+    };
+  }, [settings.paneShortcuts]);
   const bg = settings.terminalBg || getAppBg();
   const terminalFontFamily = settings.terminalFontFamily;
   const terminalFontSize = settings.terminalFontSize;
@@ -726,6 +740,10 @@ export function ChatTab({
       onAddPane={(tool) => void addPane(tool)}
       onOpenFolder={() => void openFolderPane()}
       available={data.filter((e) => e.available)}
+      splitShortcutLabels={{
+        splitRight: paneShortcutLabels.splitRight,
+        splitDown: paneShortcutLabels.splitDown,
+      }}
     />
   );
 
@@ -827,7 +845,7 @@ export function ChatTab({
           {terminalError && (
             <p className="mt-2 text-[12px] text-red-400">{terminalError}</p>
           )}
-          <p className="mt-2 text-[11px] text-chrome-text-dim">{t("chat.shortcutHint")}</p>
+          <p className="mt-2 text-[11px] text-chrome-text-dim">{t("chat.shortcutHint", paneShortcutLabels)}</p>
           <p className="mt-1 text-[11px] text-chrome-text-dim">{t("chat.debugHint")}</p>
         </div>
       ) : (
@@ -916,6 +934,7 @@ function WarpTopBar({
   onAddPane,
   onOpenFolder,
   available,
+  splitShortcutLabels,
 }: {
   profileLabel: string | null;
   profileAccentColor?: string | null;
@@ -932,6 +951,7 @@ function WarpTopBar({
   onAddPane: (tool: string) => void;
   onOpenFolder: () => void;
   available: ProviderEntry[];
+  splitShortcutLabels: { splitRight: string; splitDown: string };
 }) {
   const { t } = useLocale();
   const accent = profileAccentColor;
@@ -994,7 +1014,11 @@ function WarpTopBar({
           type="button"
           disabled={!canAddPane}
           onClick={onToggleNewMenu}
-          title={canAddPane ? t("chat.addPaneTitle") : t("chat.maxPanesTitle", { max: maxPanes })}
+          title={
+            canAddPane
+              ? t("chat.addPaneTitle", splitShortcutLabels)
+              : t("chat.maxPanesTitle", { max: maxPanes })
+          }
           className="cursor-pointer rounded-md border border-chrome-border-strong px-2.5 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
 
         >

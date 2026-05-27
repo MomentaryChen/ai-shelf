@@ -1,5 +1,10 @@
 import { DEFAULT_APP_THEME, normalizeAppTheme, type AppColorTheme } from "./app-theme";
 import { detectSystemLocale, resolveLocale, type AppLocale } from "./i18n/index.js";
+import {
+  DEFAULT_PANE_SHORTCUT_BINDINGS,
+  normalizePaneShortcutBindings,
+  type PaneShortcutBindings,
+} from "./terminal/pane-key-bindings";
 
 export type { AppColorTheme, AppLocale };
 
@@ -29,7 +34,11 @@ export interface ChatSettings {
   terminalRightClickPaste: boolean;
   workingDir: string;
   dirHistory: string[];
+  /** Pane split / focus shortcuts (Ctrl/Cmd combinations). */
+  paneShortcuts: PaneShortcutBindings;
 }
+
+export type { PaneShortcutBindings };
 
 export const SETTINGS_KEY = "ai-inventory-chat-settings";
 
@@ -84,6 +93,7 @@ const DEFAULTS: ChatSettings = {
   terminalRightClickPaste: true,
   workingDir: "",
   dirHistory: [],
+  paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
 };
 
 export function loadSettings(): ChatSettings {
@@ -108,6 +118,7 @@ export function loadSettings(): ChatSettings {
         DEFAULT_TERMINAL_SCROLLBACK,
       ),
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
+      paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
     };
   } catch {
     return { ...DEFAULTS };

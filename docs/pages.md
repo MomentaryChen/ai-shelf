@@ -122,12 +122,12 @@ Ignored while typing in inputs (e.g. profile rename).
 
 | Shortcut | Action |
 |---|---|
-| **Ctrl+Tab** | Next pane |
-| **Ctrl+Shift+Tab** | Previous pane |
-| **Ctrl+1 … Ctrl+9** | Focus pane N (tree order) |
+| **Ctrl+Tab** (default) | Next pane — customizable in **Settings → Pane shortcuts** |
+| **Ctrl+Shift+Tab** (default) | Previous pane — customizable in Settings |
+| **Ctrl+1 … Ctrl+9** (default) | Focus pane N (tree order) — modifier customizable in Settings |
 | **Ctrl+W** | Close focused pane |
-| **Ctrl+\\** | Split right (horizontal) |
-| **Ctrl+Shift+\\** | Split down (vertical) |
+| **Ctrl+\\** (default) | Split right (horizontal) — customizable in Settings |
+| **Ctrl+Shift+\\** (default) | Split down (vertical) — customizable in Settings |
 
 ---
 

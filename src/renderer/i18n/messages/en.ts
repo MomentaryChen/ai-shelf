@@ -15,7 +15,18 @@ export const en = {
   "app.tab.doctor": "Doctor",
   "app.tab.update": "Update",
   "settings.title": "Terminal Settings",
-  "settings.subtitle": "Language, app theme, working directory, external terminal, display, background, and data backup",
+  "settings.subtitle":
+    "Language, app theme, working directory, external terminal, pane shortcuts, display, background, and data backup",
+  "settings.paneShortcut.title": "Pane shortcuts",
+  "settings.paneShortcut.subtitle":
+    "Split and focus shortcuts while a terminal pane is focused. Requires Ctrl (or Cmd on Mac). Close, clear, and restart shortcuts stay fixed.",
+  "settings.paneShortcut.focusNext": "Focus next pane",
+  "settings.paneShortcut.focusPrev": "Focus previous pane",
+  "settings.paneShortcut.splitRight": "Split right",
+  "settings.paneShortcut.splitDown": "Split down",
+  "settings.paneShortcut.focusPane": "Focus pane 1–9",
+  "settings.paneShortcut.hint": "Click a shortcut, press the new key combination, or Esc to cancel.",
+  "settings.paneShortcut.pressKeys": "Press keys…",
   "settings.language": "Language",
   "settings.theme": "App color theme",
   "settings.theme.light": "Light",
@@ -261,7 +272,7 @@ export const en = {
   "chat.restoring": "Restoring terminals…",
   "chat.restorePaneHint": "— click \"+ Pane\" above to open a terminal (up to {max}, layout is saved)",
   "chat.shortcutHint":
-    "Pane shortcuts: Ctrl+Tab switch, Ctrl+W close, Ctrl+L clear, Ctrl+Shift+R restart session, Ctrl+\\ / Ctrl+Shift+\\ split, Ctrl+1–9 jump to pane N, Ctrl+F search output. Right-click menu can also clear or restart.",
+    "Pane shortcuts: {focusNext} next, {focusPrev} previous, {splitRight} split right, {splitDown} split down, {focusPane} pane 1–9; Ctrl+W close, Ctrl+L clear, Ctrl+Shift+R restart, Ctrl+F search. Right-click menu can also clear or restart.",
   "chat.debugHint":
     "Debug: press F12 or Ctrl+Shift+I for DevTools, or Alt → View → Developer Tools",
   "chat.pickProfile":
@@ -281,7 +292,7 @@ export const en = {
   "chat.maxPanesTitle": "Maximum {max} panes",
   "chat.folderBtn": "Folder",
   "chat.addPane": "+ Pane",
-  "chat.addPaneTitle": "Add terminal pane (Ctrl+\\ split right, Ctrl+Shift+\\ split down)",
+  "chat.addPaneTitle": "Add terminal pane ({splitRight} split right, {splitDown} split down)",
   "chat.syncLabel": "sync",
   "chat.allTerminalsMinimized": "All terminals are minimized",
   "chat.selectTerminalFromSidebar": "Select or drag a terminal from the profile sidebar to show it here",

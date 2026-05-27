@@ -16,6 +16,7 @@ import {
   type ExternalTerminal,
 } from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
+import { PaneShortcutBindingsEditor } from "./PaneShortcutBindingsEditor";
 import type { AppColorTheme } from "../app-theme";
 import type { AppLocale } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
@@ -333,6 +334,19 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             {t("settings.custom")}
           </label>
         </div>
+      </div>
+
+      {/* Pane shortcuts */}
+      <div>
+        <p className={sectionTitle}>{t("settings.paneShortcut.title")}</p>
+        <p className="mb-3 text-[11px] leading-snug text-text-tertiary">
+          {t("settings.paneShortcut.subtitle")}
+        </p>
+        <PaneShortcutBindingsEditor
+          compact={compact}
+          bindings={settings.paneShortcuts}
+          onChange={(paneShortcuts) => updateSettings({ paneShortcuts })}
+        />
       </div>
 
       {/* Terminal display */}
