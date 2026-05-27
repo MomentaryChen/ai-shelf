@@ -1,6 +1,6 @@
 import { detectAll } from "../inventory/index.js";
 import { tryReadJson } from "../utils/config.js";
-import { run } from "../utils/exec.js";
+import { validateMcpConfigPath } from "../utils/mcp-sync.js";
 
 type Options = { json: boolean };
 
@@ -42,8 +42,13 @@ export async function runDoctor(opts: Options) {
 
     // MCP config parseable
     for (const p of entry.mcp.configPaths) {
-      const ok = tryReadJson(p) !== null;
-      checks.push({ name: "mcp-config", status: ok ? "pass" : "fail", detail: `${ok ? "valid" : "invalid"} MCP config: ${p}` });
+      const ok = validateMcpConfigPath(entry.tool, p);
+      const kind = p.endsWith(".toml") ? "TOML" : "JSON";
+      checks.push({
+        name: "mcp-config",
+        status: ok ? "pass" : "fail",
+        detail: `${ok ? "valid" : "invalid"} MCP config (${kind}): ${p}`,
+      });
     }
 
     results.push({ tool: entry.tool, checks });

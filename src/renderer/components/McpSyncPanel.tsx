@@ -11,6 +11,7 @@ const TOOL_ICONS: Record<string, string> = {
   claude: "🟣",
   copilot: "🐙",
   cursor: "📐",
+  codex: "🤖",
   gemini: "✨",
   opencode: "◇",
 };

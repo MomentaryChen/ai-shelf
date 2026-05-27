@@ -203,7 +203,8 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 在同一矩陣卡內可操作 JSON MCP 項目複製／補齊：
 
-- **Sync to:** 勾選寫入目標（程式內對應 `claude`、`copilot`、`cursor`、`gemini`、`opencode`）
+- **Sync to:** 勾選寫入目標（程式內對應 `claude`、`copilot`、`cursor`、`codex`、`gemini`、`opencode`）
+- Codex 寫入 `~/.codex/config.toml` 的 `[mcp_servers.*]`；Aider 不支援 MCP。新工具建議優先使用 JSON MCP 設定以降低同步成本。
 - **Sync Selected (`n`)** — 僅對第一欄勾選的伺服器套用
 - **Sync All Missing (`n`)** — 對所有仍需補齊的列一次套用
 - 執行中按鈕顯示 **Syncing…**，完成後可依工具列出 `added`、`skipped` 或錯誤訊息
