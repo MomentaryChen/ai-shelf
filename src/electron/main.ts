@@ -13,10 +13,18 @@ import {
 } from "../inventory/index.js";
 import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
-import { MCP_SYNC_TOOL_IDS, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
+import { TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
+import {
+  collectAllMcpServers,
+  readMcpServers,
+  SYNC_TOOLS,
+  validateMcpConfigPath,
+  writeMcpServers,
+} from "../utils/mcp-sync.js";
+import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
 import {
@@ -367,8 +375,13 @@ async function runChecksForEntry(entry: Awaited<ReturnType<typeof detectAll>>[nu
   }
 
   for (const p of entry.mcp.configPaths) {
-    const ok = tryReadJson(p) !== null;
-    checks.push({ name: "mcp-config", status: ok ? "pass" : "fail", detail: `${ok ? "valid" : "invalid"} MCP config: ${p}` });
+    const ok = validateMcpConfigPath(entry.tool, p);
+    const kind = p.endsWith(".toml") ? "TOML" : "JSON";
+    checks.push({
+      name: "mcp-config",
+      status: ok ? "pass" : "fail",
+      detail: `${ok ? "valid" : "invalid"} MCP config (${kind}): ${p}`,
+    });
   }
 
   return { tool: entry.tool, checks };
@@ -766,24 +779,6 @@ ipcMain.handle("quit-and-install-app-update", () => {
 
 // --- MCP Sync ---
 
-type McpServerEntry = Record<string, unknown>;
-type McpServersMap = Record<string, McpServerEntry>;
-
-const SYNC_TOOLS = MCP_SYNC_TOOL_IDS;
-
-/** Read MCP servers from a tool's config file */
-function readMcpServers(tool: string): McpServersMap {
-  const configPath = getMcpConfigPath(tool);
-  if (!configPath || !existsSync(configPath)) return {};
-  const data = tryReadJson<Record<string, unknown>>(configPath);
-  if (!data) return {};
-  const servers = data["mcpServers"];
-  if (servers && typeof servers === "object") {
-    return servers as McpServersMap;
-  }
-  return {};
-}
-
 ipcMain.handle("get-mcp-raw", async () => {
   const rows = await Promise.all(
     SYNC_TOOLS.map(async (tool) => ({
@@ -800,68 +795,12 @@ ipcMain.handle("sync-mcp", async (_event, opts: {
   targetTools: string[];
 }) => {
   const { serverNames, targetTools } = opts;
-
-  // Collect all servers from all tools as source pool
-  const allServers: McpServersMap = {};
-  for (const tool of SYNC_TOOLS) {
-    const servers = readMcpServers(tool);
-    for (const [name, config] of Object.entries(servers)) {
-      if (!allServers[name]) {
-        allServers[name] = config;
-      }
-    }
-  }
+  const allServers = collectAllMcpServers();
 
   const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
   for (const tool of targetTools) {
-    const configPath = getMcpConfigPath(tool);
-    if (!configPath) {
-      results.push({ tool, added: [], skipped: [], error: "Unknown tool" });
-      continue;
-    }
-
-    try {
-      // Read existing config (or create empty)
-      let data: Record<string, unknown> = {};
-      if (existsSync(configPath)) {
-        data = tryReadJson<Record<string, unknown>>(configPath) ?? {};
-      }
-      const existing = (data["mcpServers"] as McpServersMap) ?? {};
-
-      const added: string[] = [];
-      const skipped: string[] = [];
-
-      for (const name of serverNames) {
-        if (existing[name]) {
-          skipped.push(name);
-          continue;
-        }
-        const source = allServers[name];
-        if (!source) continue;
-
-        // Adapt format: strip `type` for Claude/Copilot, add for Cursor
-        const adapted = { ...source };
-        if (tool === "cursor" && !adapted["type"]) {
-          adapted["type"] = "command";
-        } else if (tool !== "cursor") {
-          delete adapted["type"];
-        }
-
-        existing[name] = adapted;
-        added.push(name);
-      }
-
-      if (added.length > 0) {
-        backupFile(configPath);
-        data["mcpServers"] = existing;
-        writeJson(configPath, data);
-      }
-
-      results.push({ tool, added, skipped });
-    } catch (err: any) {
-      results.push({ tool, added: [], skipped: [], error: err.message });
-    }
+    results.push({ tool, ...writeMcpServers(tool, serverNames, allServers) });
   }
 
   return results;
@@ -1241,6 +1180,9 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
       settingsPath = join(homedir(), ".gemini", "settings.json");
       mkdirSync(join(homedir(), ".gemini"), { recursive: true });
       key = "model";
+    } else if (tool === "codex") {
+      settingsPath = join(homedir(), ".codex", "config.toml");
+      key = "model";
     } else if (tool === "opencode") {
       settingsPath = join(homedir(), ".config", "opencode", "opencode.json");
       mkdirSync(join(homedir(), ".config", "opencode"), { recursive: true });
@@ -1251,8 +1193,21 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
 
     console.log(`[set-default-model] tool=${tool} key=${key} model=${model} path=${settingsPath}`);
 
-    // Read existing settings; abort if file exists but can't be parsed (avoid data loss)
     const { readFileSync, existsSync } = await import("node:fs");
+
+    if (tool === "codex") {
+      if (existsSync(settingsPath)) backupFile(settingsPath);
+      setCodexModel(settingsPath, model);
+      const verifyText = existsSync(settingsPath) ? readFileSync(settingsPath, "utf-8") : "";
+      const match = verifyText.match(/^model\s*=\s*["']?([^"'\n]+)["']?/m);
+      if (match?.[1]?.trim() !== model) {
+        return { success: false, error: `Write verification failed: expected "${model}", got "${match?.[1] ?? ""}"` };
+      }
+      console.log(`[set-default-model] success: model=${model}`);
+      return { success: true };
+    }
+
+    // Read existing settings; abort if file exists but can't be parsed (avoid data loss)
     let data: Record<string, unknown> = {};
     if (existsSync(settingsPath)) {
       const raw = readFileSync(settingsPath, "utf-8");

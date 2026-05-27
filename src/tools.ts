@@ -12,11 +12,16 @@ export const INVENTORY_TOOL_IDS = [
 
 export type InventoryToolId = (typeof INVENTORY_TOOL_IDS)[number];
 
-/** Tools whose MCP config is JSON and supported by MCP sync. */
+/**
+ * Tools whose MCP config supports cross-tool MCP sync.
+ * Excludes aider (no MCP). New tools (e.g. Goose, Crush) should prefer JSON MCP
+ * configs to keep sync adaptation cost low; Codex uses TOML via mcp-codex-toml.
+ */
 export const MCP_SYNC_TOOL_IDS = [
   "claude",
   "copilot",
   "cursor",
+  "codex",
   "gemini",
   "opencode",
 ] as const;
