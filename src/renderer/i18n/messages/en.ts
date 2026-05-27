@@ -67,6 +67,8 @@ export const en = {
   "scrollback.20k": "20K lines",
   "scrollback.50k": "50K lines",
   "sidebar.settings": "Settings",
+  "sidebar.collapse": "Collapse sidebar",
+  "sidebar.expand": "Expand sidebar",
   "sidebar.searchTabs": "Search tabs…",
   "sidebar.noSessions": "No sessions",
   "sidebar.noMatchingTabs": "No matching tabs",

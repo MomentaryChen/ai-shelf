@@ -7,6 +7,7 @@ import { EmbeddedTerminal } from "./EmbeddedTerminal";
 import { ProfileSidebar } from "./ProfileSidebar";
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
+import { SidebarIconBtn, SidebarPanelChevron } from "./ProfileSidebarUI";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
@@ -54,6 +55,7 @@ const TERMINAL_LABEL_KEYS: Record<ExternalTerminal, MessageKey> = {
 };
 
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
+const SIDEBAR_COLLAPSED_KEY = "ai-inventory-sidebar-collapsed";
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 440;
 
@@ -65,6 +67,14 @@ function loadSidebarWidth(): number {
     return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n));
   } catch {
     return 268;
+  }
+}
+
+function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -97,6 +107,7 @@ export function ChatTab({
   const [terminalError, setTerminalError] = useState<string | null>(null);
   const [addingTerminal, setAddingTerminal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [displayDropActive, setDisplayDropActive] = useState(false);
   const [profileSidebarDrag, setProfileSidebarDrag] = useState(false);
   useAppThemeRevision();
@@ -225,6 +236,14 @@ export function ChatTab({
       /* ignore */
     }
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     const onDragEnd = () => setProfileSidebarDrag(false);
@@ -686,6 +705,7 @@ export function ChatTab({
       onProfileDeleted={handleProfileDeleted}
       activeLivePaneCount={panes.length}
       onProfilePaneDragChange={setProfileSidebarDrag}
+      onCollapse={() => setSidebarCollapsed(true)}
     />
   );
 
@@ -839,19 +859,34 @@ export function ChatTab({
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
-      {sidebar}
-      <div
-        className="w-2.5 shrink-0 self-stretch"
-        style={{ width: 10 }}
-      >
-        <ResizeDivider
-          mode="delta"
-          orientation="horizontal"
-          onResize={(delta) =>
-            setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
-          }
-        />
-      </div>
+      {sidebarCollapsed ? (
+        <aside className="flex w-9 shrink-0 flex-col border-r border-chrome-border bg-gradient-to-b from-chrome-bg-top to-chrome-bg-bottom">
+          <div className="flex h-9 shrink-0 items-center justify-center border-b border-chrome-border/80">
+            <SidebarIconBtn
+              title={t("sidebar.expand")}
+              onClick={() => setSidebarCollapsed(false)}
+            >
+              <SidebarPanelChevron expanded={false} />
+            </SidebarIconBtn>
+          </div>
+        </aside>
+      ) : (
+        <>
+          {sidebar}
+          <div
+            className="w-2.5 shrink-0 self-stretch"
+            style={{ width: 10 }}
+          >
+            <ResizeDivider
+              mode="delta"
+              orientation="horizontal"
+              onResize={(delta) =>
+                setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
+              }
+            />
+          </div>
+        </>
+      )}
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {topBar}
         {terminalError && (

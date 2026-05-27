@@ -31,6 +31,7 @@ import {
   ProfileCountBadge,
   SearchIcon,
   SidebarIconBtn,
+  SidebarPanelChevron,
 } from "./ProfileSidebarUI";
 
 interface Props {
@@ -65,6 +66,7 @@ interface Props {
   onProfileDeleted: (profileId: string) => void;
   activeLivePaneCount?: number;
   onProfilePaneDragChange?: (active: boolean) => void;
+  onCollapse?: () => void;
 }
 
 export function ProfileSidebar({
@@ -94,6 +96,7 @@ export function ProfileSidebar({
   onProfileDeleted,
   activeLivePaneCount = 0,
   onProfilePaneDragChange,
+  onCollapse,
 }: Props) {
   const { t } = useLocale();
   const [tree, setTree] = useState<ProfileTree | null>(null);
@@ -366,6 +369,11 @@ export function ProfileSidebar({
             >
               +
             </SidebarIconBtn>
+            {onCollapse && (
+              <SidebarIconBtn title={t("sidebar.collapse")} onClick={onCollapse}>
+                <SidebarPanelChevron expanded />
+              </SidebarIconBtn>
+            )}
           </div>
         </div>
 

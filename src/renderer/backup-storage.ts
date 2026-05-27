@@ -1,6 +1,7 @@
 import { BACKUP_LOCAL_STORAGE_KEYS } from "../shared/backup-keys.js";
 
 export const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
+export const SIDEBAR_COLLAPSED_KEY = "ai-inventory-sidebar-collapsed";
 
 export { BACKUP_LOCAL_STORAGE_KEYS };
 

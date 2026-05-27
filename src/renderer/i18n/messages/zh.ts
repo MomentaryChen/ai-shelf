@@ -68,6 +68,8 @@ export const zh: Record<MessageKey, string> = {
   "scrollback.20k": "20K 行",
   "scrollback.50k": "50K 行",
   "sidebar.settings": "設定",
+  "sidebar.collapse": "收合側欄",
+  "sidebar.expand": "展開側欄",
   "sidebar.searchTabs": "搜尋分頁…",
   "sidebar.noSessions": "尚無 session",
   "sidebar.noMatchingTabs": "沒有符合的分頁",
