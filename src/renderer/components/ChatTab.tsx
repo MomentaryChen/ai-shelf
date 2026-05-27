@@ -103,6 +103,9 @@ export function ChatTab({
 }) {
   const { t } = useLocale();
   const [layout, setLayout] = useState<LayoutNode | null>(null);
+  const layoutRef = useRef<LayoutNode | null>(null);
+  layoutRef.current = layout;
+  const respawningPaneIdsRef = useRef(new Set<string>());
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
   const [broadcastInput, setBroadcastInput] = useState(false);
@@ -155,7 +158,7 @@ export function ChatTab({
         const pane = await spawnPane(t, cwd);
         if (pane) return pane;
       }
-      return spawnPane("shell", "");
+      return spawnPane("shell", cwd);
     },
     [spawnPane],
   );
@@ -364,60 +367,79 @@ export function ChatTab({
   );
 
   const respawnPaneWithCwd = useCallback(
-    async (paneId: string, cwdOverride?: string) => {
-      const victim = layout ? findPane(layout, paneId) : null;
-      if (!victim) return;
+    async (paneId: string, cwdOverride?: string): Promise<boolean> => {
+      const layoutNow = layoutRef.current;
+      const victim = layoutNow ? findPane(layoutNow, paneId) : null;
+      if (!victim) return false;
       const cwd = cwdOverride?.trim() || victim.cwd || resolveCwd();
-      window.api.ptyKill(victim.sessionId);
-      const next = await spawnPaneResilient(victim.tool, cwd);
-      if (!next) {
-        setTerminalError(
-          (prev) =>
-            prev ??
-            t("chat.err.sessionDead", { tool: victim.tool }),
+      if (respawningPaneIdsRef.current.has(paneId)) return false;
+      respawningPaneIdsRef.current.add(paneId);
+      const title = victim.title;
+      const tool = victim.tool;
+      try {
+        window.api.ptyKill(victim.sessionId);
+        const next = await spawnPaneResilient(tool, cwd);
+        if (!next) {
+          setTerminalError(
+            (prev) =>
+              prev ?? t("chat.err.sessionDead", { tool }),
+          );
+          return false;
+        }
+        setTerminalError(null);
+        setLayout((prev) =>
+          prev
+            ? mapPanesInTree(prev, (p) =>
+                p.id === paneId
+                  ? { ...next, id: paneId, cwd, title }
+                  : p,
+              )
+            : prev,
         );
-        return;
+        setFocusedPaneId(paneId);
+        return true;
+      } finally {
+        respawningPaneIdsRef.current.delete(paneId);
       }
-      setTerminalError(null);
-      setLayout((prev) =>
-        prev
-          ? mapPanesInTree(prev, (p) =>
-              p.id === paneId
-                ? { ...next, id: paneId, cwd, title: victim.title }
-                : p,
-            )
-          : prev,
-      );
     },
-    [layout, spawnPaneResilient, resolveCwd],
+    [spawnPaneResilient, resolveCwd, t],
   );
 
   const respawnPane = useCallback(
     async (paneId: string) => {
-      const victim = layout ? findPane(layout, paneId) : null;
+      if (respawningPaneIdsRef.current.has(paneId)) return;
+      const layoutNow = layoutRef.current;
+      const victim = layoutNow ? findPane(layoutNow, paneId) : null;
       if (!victim) return;
-      window.api.ptyKill(victim.sessionId);
-      const next = await spawnPaneResilient(victim.tool, victim.cwd || resolveCwd());
-      if (!next) {
-        setTerminalError(
-          (prev) =>
-            prev ??
-            t("chat.err.sessionDead", { tool: victim.tool }),
+      respawningPaneIdsRef.current.add(paneId);
+      const title = victim.title;
+      const cwd = victim.cwd || resolveCwd();
+      const tool = victim.tool;
+      try {
+        window.api.ptyKill(victim.sessionId);
+        const next = await spawnPaneResilient(tool, cwd);
+        if (!next) {
+          setTerminalError(
+            (prev) =>
+              prev ?? t("chat.err.sessionDead", { tool }),
+          );
+          return;
+        }
+        setTerminalError(null);
+        setLayout((prev) =>
+          prev
+            ? mapPanesInTree(prev, (p) =>
+                p.id === paneId
+                  ? { ...next, id: paneId, cwd: cwd || next.cwd, title }
+                  : p,
+              )
+            : prev,
         );
-        return;
+      } finally {
+        respawningPaneIdsRef.current.delete(paneId);
       }
-      setTerminalError(null);
-      setLayout((prev) =>
-        prev
-          ? mapPanesInTree(prev, (p) =>
-              p.id === paneId
-                ? { ...next, id: paneId, cwd: victim.cwd || next.cwd, title: victim.title }
-                : p,
-            )
-          : prev,
-      );
     },
-    [layout, spawnPaneResilient, resolveCwd],
+    [spawnPaneResilient, resolveCwd, t],
   );
 
   const renamePane = useCallback((paneId: string, title: string) => {
@@ -433,14 +455,15 @@ export function ChatTab({
 
   const changePaneCwd = useCallback(
     async (paneId: string) => {
-      const pane = layout ? findPane(layout, paneId) : null;
+      const layoutNow = layoutRef.current;
+      const pane = layoutNow ? findPane(layoutNow, paneId) : null;
       if (!pane) return;
       const picked = await window.api.pickFolder(pane.cwd || resolveCwd() || undefined);
       if (!picked) return;
-      recordDirHistory(picked);
-      await respawnPaneWithCwd(paneId, picked);
+      const ok = await respawnPaneWithCwd(paneId, picked);
+      if (ok) recordDirHistory(picked);
     },
-    [layout, resolveCwd, recordDirHistory, respawnPaneWithCwd],
+    [resolveCwd, recordDirHistory, respawnPaneWithCwd],
   );
 
   const openFolderPane = useCallback(
@@ -812,7 +835,10 @@ export function ChatTab({
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}
-            onSessionLost={() => void respawnPane(pane.id)}
+            onSessionLost={() => {
+              if (respawningPaneIdsRef.current.has(pane.id)) return;
+              void respawnPane(pane.id);
+            }}
             onRestart={() => void respawnPane(pane.id)}
             onExit={() => closePane(pane.id)}
           />

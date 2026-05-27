@@ -7,7 +7,11 @@ body,
   margin: 0;
 }
 
-/* xterm must fill its pane */
+/* xterm must fill its pane; clip helper layers inside the terminal body only */
+.warp-pane-body {
+  isolation: isolate;
+}
+
 .xterm {
   height: 100%;
   width: 100%;
