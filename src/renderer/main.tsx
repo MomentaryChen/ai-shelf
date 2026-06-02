@@ -4,11 +4,13 @@ import { applyAppTheme } from "./app-theme";
 import { App } from "./App";
 import { ChatWindowApp } from "./ChatWindowApp";
 import { loadSettings } from "./chat-settings";
+import { syncSystemTrayFromSettings } from "./system-tray-sync";
 import { SettingsWindowApp } from "./SettingsWindowApp";
 import { LocaleProvider } from "./i18n/LocaleProvider";
 import "./index.css";
 
 applyAppTheme(loadSettings().appTheme);
+syncSystemTrayFromSettings();
 
 const route = window.location.hash.replace(/^#\/?/, "");
 

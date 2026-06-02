@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const MIGRATION_V2 = `
 ALTER TABLE sessions ADD COLUMN tool TEXT;
@@ -51,6 +51,10 @@ const MIGRATION_V8 = `
 ALTER TABLE groups ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
 `;
 
+const MIGRATION_V9 = `
+ALTER TABLE workspaces ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+`;
+
 const INITIAL_SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY
@@ -60,6 +64,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   root_path TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 
@@ -166,6 +171,24 @@ export function runMigrations(db: Database.Database): void {
     backfillGroupSortOrder(db);
     db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(8);
   }
+
+  if (current < 9) {
+    try {
+      db.exec(MIGRATION_V9);
+    } catch {
+      /* column may exist */
+    }
+    backfillWorkspaceSortOrder(db);
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(9);
+  }
+}
+
+function backfillWorkspaceSortOrder(db: Database.Database): void {
+  const rows = db
+    .prepare(`SELECT id FROM workspaces ORDER BY name COLLATE NOCASE`)
+    .all() as { id: string }[];
+  const updateStmt = db.prepare(`UPDATE workspaces SET sort_order = ? WHERE id = ?`);
+  rows.forEach((row, index) => updateStmt.run(index, row.id));
 }
 
 function backfillGroupSortOrder(db: Database.Database): void {

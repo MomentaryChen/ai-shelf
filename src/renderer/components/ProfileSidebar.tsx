@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppThemeRevision } from "../app-theme";
-import type { ProfileInfo, ProfileTree } from "../types";
+import type { ProfileForest, ProfileGroupNode, ProfileInfo } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { paneDisplayLabel } from "../utils/pane-label";
@@ -9,6 +9,7 @@ import { profileToolLabel } from "../utils/available-tools";
 import type { PaneInfo } from "../terminal/split-tree";
 import { formatPaneCwdShort } from "../utils/pane-cwd";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
+import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import {
   ProfileSettingsDialog,
   type ProfileSettingsPatch,
@@ -99,13 +100,17 @@ export function ProfileSidebar({
   onCollapse,
 }: Props) {
   const { t } = useLocale();
-  const [tree, setTree] = useState<ProfileTree | null>(null);
+  const [forest, setForest] = useState<ProfileForest | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [renameGroupOpen, setRenameGroupOpen] = useState(false);
   const [settingsProfileId, setSettingsProfileId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
@@ -113,21 +118,43 @@ export function ProfileSidebar({
   const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
   const [paneDropZone, setPaneDropZone] = useState<"above" | "below" | null>(null);
 
+  const allProfiles = useMemo(
+    () => forest?.groups.flatMap((g) => g.profiles) ?? [],
+    [forest],
+  );
   const settingsProfile = useMemo(
-    () => tree?.profiles.find((p) => p.id === settingsProfileId) ?? null,
-    [tree, settingsProfileId],
+    () => allProfiles.find((p) => p.id === settingsProfileId) ?? null,
+    [allProfiles, settingsProfileId],
+  );
+  const activeGroup = useMemo(
+    () =>
+      forest?.groups.find((g) => g.id === activeGroupId) ??
+      forest?.groups.find((g) => g.id === forest.lastActiveGroupId) ??
+      forest?.groups[0] ??
+      null,
+    [forest, activeGroupId],
   );
 
   const refresh = useCallback(async () => {
     setErr("");
-    const r = await window.api.profileGetTree();
-    if (!r.success || !r.tree) {
-      setTree({ workspaceId: "", profiles: [], lastActiveProfileId: null });
+    const r = await window.api.profileGroupGetForest();
+    if (!r.success || !r.forest) {
+      setForest({ groups: [], lastActiveGroupId: null, lastActiveProfileId: null });
       setErr(r.error ?? t("profile.failedLoad"));
       return;
     }
-    setTree(r.tree);
-  }, []);
+    setForest(r.forest);
+    if (r.forest.groups.length === 0) {
+      setActiveGroupId(null);
+      return;
+    }
+    const known = activeGroupId
+      ? r.forest.groups.some((g) => g.id === activeGroupId)
+      : false;
+    if (!known) {
+      setActiveGroupId(r.forest.lastActiveGroupId ?? r.forest.groups[0].id);
+    }
+  }, [activeGroupId, t]);
 
   useEffect(() => {
     void refresh();
@@ -138,7 +165,7 @@ export function ProfileSidebar({
     setExpandedIds((prev) => new Set(prev).add(activeProfileId));
   }, [activeProfileId]);
 
-  const profileIds = useMemo(() => (tree?.profiles ?? []).map((p) => p.id), [tree]);
+  const profileIds = useMemo(() => allProfiles.map((p) => p.id), [allProfiles]);
 
   const allProfilesExpanded =
     profileIds.length > 0 && profileIds.every((id) => expandedIds.has(id));
@@ -151,6 +178,15 @@ export function ProfileSidebar({
     setExpandedIds(new Set());
   }
 
+  function toggleGroupExpanded(groupId: string) {
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
   function toggleExpanded(profileId: string) {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -161,19 +197,46 @@ export function ProfileSidebar({
   }
 
   const canReorder = !query.trim();
+  const q = query.trim().toLowerCase();
+  const filteredGroups = useMemo(
+    () =>
+      (forest?.groups ?? []).map((group) => ({
+        group,
+        profiles: group.profiles.filter((p) =>
+          q ? p.name.toLowerCase().includes(q) : true,
+        ),
+      })),
+    [forest, q],
+  );
+  const visibleGroups = filteredGroups.filter((entry) => entry.profiles.length > 0);
 
-  const filtered = (tree?.profiles ?? []).filter((p) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return p.name.toLowerCase().includes(q);
-  });
+  useEffect(() => {
+    const groupIds = (forest?.groups ?? []).map((g) => g.id);
+    if (groupIds.length === 0) {
+      setExpandedGroupIds(new Set());
+      return;
+    }
+    setExpandedGroupIds((prev) => {
+      const next = new Set<string>();
+      groupIds.forEach((id) => {
+        if (prev.has(id)) next.add(id);
+      });
+      if (next.size === 0) groupIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [forest]);
 
-  function reorderLocalProfiles(orderedIds: string[]) {
-    setTree((prev) => {
+  function reorderLocalProfiles(groupId: string, orderedIds: string[]) {
+    setForest((prev) => {
       if (!prev) return prev;
-      const byId = new Map(prev.profiles.map((p) => [p.id, p]));
+      const group = prev.groups.find((g) => g.id === groupId);
+      if (!group) return prev;
+      const byId = new Map(group.profiles.map((p) => [p.id, p]));
       const profiles = orderedIds.map((id) => byId.get(id)).filter(Boolean) as ProfileInfo[];
-      return { ...prev, profiles };
+      return {
+        ...prev,
+        groups: prev.groups.map((g) => (g.id === groupId ? { ...g, profiles } : g)),
+      };
     });
   }
 
@@ -206,26 +269,26 @@ export function ProfileSidebar({
     onProfilePaneDragChange?.(false);
   }
 
-  async function handleReorder(dragId: string, dropId: string) {
-    if (!tree) return;
-    const reordered = reorderById(tree.profiles, dragId, dropId, (p) => p.id);
+  async function handleReorder(group: ProfileGroupNode, dragId: string, dropId: string) {
+    const reordered = reorderById(group.profiles, dragId, dropId, (p) => p.id);
     if (!reordered) return;
 
     const nextIds = reordered.map((p) => p.id);
-    const prevTree = tree;
-    reorderLocalProfiles(nextIds);
+    const prevForest = forest;
+    reorderLocalProfiles(group.id, nextIds);
     setBusy(true);
-    const r = await window.api.profileReorder(nextIds);
+    const r = await window.api.profileReorder(group.id, nextIds);
     setBusy(false);
     if (!r.success) {
-      setTree(prevTree);
+      setForest(prevForest ?? null);
       setErr(r.error ?? t("profile.failedReorder"));
       return;
     }
-    if (r.tree) setTree(r.tree);
+    if (r.forest) setForest(r.forest);
   }
 
   async function handleCreate(opts: {
+    groupId: string;
     name: string;
     defaultCwd: string;
     defaultTool: string;
@@ -235,7 +298,10 @@ export function ProfileSidebar({
   }) {
     setCreateOpen(false);
     setBusy(true);
+    setErr("");
+    setActiveGroupId(opts.groupId);
     const r = await window.api.profileCreate(opts.name, {
+      groupId: opts.groupId,
       defaultCwd: opts.defaultCwd || undefined,
       defaultTool: opts.defaultTool,
       accentColor: opts.accentColor,
@@ -245,6 +311,26 @@ export function ProfileSidebar({
     setBusy(false);
     if (!r.success) setErr(r.error ?? t("profile.failedCreate"));
     else {
+      if (r.profile) {
+        setForest((prev) =>
+          prev
+            ? {
+                ...prev,
+                groups: prev.groups.map((g) =>
+                  g.id === r.profile!.workspaceId
+                    ? {
+                        ...g,
+                        profileCount: g.profileCount + 1,
+                        profiles: [...g.profiles, r.profile!],
+                      }
+                    : g,
+                ),
+                lastActiveGroupId: r.profile.workspaceId,
+                lastActiveProfileId: r.profile.id,
+              }
+            : prev,
+        );
+      }
       void refresh();
       if (r.profile) onActivateProfile(r.profile);
     }
@@ -260,11 +346,14 @@ export function ProfileSidebar({
     }
     if (r.profile) {
       onProfileUpdated(r.profile);
-      setTree((prev) =>
+      setForest((prev) =>
         prev
           ? {
               ...prev,
-              profiles: prev.profiles.map((p) => (p.id === profileId ? r.profile! : p)),
+              groups: prev.groups.map((g) => ({
+                ...g,
+                profiles: g.profiles.map((p) => (p.id === profileId ? r.profile! : p)),
+              })),
             }
           : prev,
       );
@@ -308,11 +397,97 @@ export function ProfileSidebar({
     <>
       <ProfileCreateDialog
         open={createOpen}
-        profiles={tree?.profiles ?? []}
+        profiles={allProfiles}
+        profileGroups={(forest?.groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
+        defaultGroupId={activeGroup?.id ?? forest?.groups[0]?.id ?? ""}
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         onClose={() => setCreateOpen(false)}
         onCreate={handleCreate}
+        onQuickCreateGroup={async (name) => {
+          setBusy(true);
+          const r = await window.api.profileGroupCreate(name);
+          setBusy(false);
+          if (!r.success || !r.group) {
+            return { ok: false, error: r.error ?? t("profileGroup.failedCreate") };
+          }
+          setForest((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  groups: [...prev.groups.filter((g) => g.id !== r.group!.id), { ...r.group!, profiles: [] }],
+                }
+              : {
+                  groups: [{ ...r.group, profiles: [] }],
+                  lastActiveGroupId: r.group.id,
+                  lastActiveProfileId: null,
+                },
+          );
+          setActiveGroupId(r.group.id);
+          setErr("");
+          return { ok: true, groupId: r.group.id };
+        }}
+      />
+      <ProfileGroupNameDialog
+        open={createGroupOpen}
+        title={t("profileGroup.createTitle")}
+        submitLabel={t("profileGroup.create")}
+        busy={busy}
+        onClose={() => setCreateGroupOpen(false)}
+        onSubmit={async (name) => {
+          setBusy(true);
+          const r = await window.api.profileGroupCreate(name);
+          setBusy(false);
+          if (!r.success) setErr(r.error ?? t("profileGroup.failedCreate"));
+          else if (r.group) {
+            setForest((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    groups: [...prev.groups.filter((g) => g.id !== r.group!.id), { ...r.group!, profiles: [] }],
+                  }
+                : {
+                    groups: [{ ...r.group, profiles: [] }],
+                    lastActiveGroupId: r.group.id,
+                    lastActiveProfileId: null,
+                  },
+            );
+            setActiveGroupId(r.group.id);
+            setQuery("");
+            setErr("");
+          }
+          setCreateGroupOpen(false);
+          void refresh();
+        }}
+      />
+      <ProfileGroupNameDialog
+        open={renameGroupOpen}
+        title={t("profileGroup.renameTitle")}
+        initialName={activeGroup?.name ?? ""}
+        submitLabel={t("profileGroup.rename")}
+        busy={busy}
+        onClose={() => setRenameGroupOpen(false)}
+        onSubmit={async (name) => {
+          if (!activeGroup) return;
+          setBusy(true);
+          const r = await window.api.profileGroupUpdate(activeGroup.id, name);
+          setBusy(false);
+          if (!r.success) setErr(r.error ?? t("profileGroup.failedRename"));
+          else if (r.group) {
+            setForest((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    groups: prev.groups.map((g) =>
+                      g.id === r.group!.id ? { ...g, name: r.group!.name } : g,
+                    ),
+                  }
+                : prev,
+            );
+          }
+          setRenameGroupOpen(false);
+          void refresh();
+        }}
       />
 
       <ProfileSettingsDialog
@@ -346,8 +521,7 @@ export function ProfileSidebar({
 
         <div className="flex h-9 shrink-0 items-center justify-between px-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-dim">
-            {t("profile.title")}
-
+            {t("profile.hierarchyTitle")}
           </span>
           <div className="flex items-center gap-0.5">
             <SidebarIconBtn
@@ -363,11 +537,19 @@ export function ProfileSidebar({
             </SidebarIconBtn>
             <SidebarIconBtn
               title={t("profile.new")}
-              disabled={busy}
+              disabled={busy || (forest?.groups.length ?? 0) === 0}
               onClick={() => setCreateOpen(true)}
-              className="text-[15px] font-light"
+              className="px-2 text-[11px] font-medium"
             >
-              +
+              + {t("profile.newShort")}
+            </SidebarIconBtn>
+            <SidebarIconBtn
+              title={t("profileGroup.new")}
+              disabled={busy}
+              onClick={() => setCreateGroupOpen(true)}
+              className="px-2 text-[11px] font-medium"
+            >
+              + {t("profileGroup.newShort")}
             </SidebarIconBtn>
             {onCollapse && (
               <SidebarIconBtn title={t("sidebar.collapse")} onClick={onCollapse}>
@@ -378,18 +560,104 @@ export function ProfileSidebar({
         </div>
 
         {err && <p className="px-2.5 pb-1 text-[11px] text-red-400">{err}</p>}
+        <div className="px-2.5 pb-2">
+          <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-chrome-text-dim">
+            1. {t("profileGroup.title")}
+          </div>
+          <div className="space-y-1">
+            {(forest?.groups ?? []).map((g) => {
+              const selected = g.id === activeGroup?.id;
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setActiveGroupId(g.id)}
+                  className={`flex h-8 w-full cursor-pointer items-center justify-between rounded-lg border px-2 text-left text-[12px] transition-colors ${
+                    selected
+                      ? "border-chrome-border-focus bg-chrome-surface text-chrome-text"
+                      : "border-chrome-border-input bg-transparent text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text-secondary"
+                  }`}
+                >
+                  <span className="truncate">{g.name}</span>
+                  <span className="shrink-0 text-[10px] text-chrome-text-dim">{g.profiles.length}</span>
+                </button>
+              );
+            })}
+          </div>
+          {activeGroup && (
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              <div className="text-[10px] text-chrome-text-dim">
+                {t("profileGroup.summary", { count: activeGroup.profiles.length })}
+              </div>
+              <div className="flex gap-1">
+                <SidebarIconBtn
+                  title={t("profileGroup.rename")}
+                  disabled={busy}
+                  onClick={() => setRenameGroupOpen(true)}
+                >
+                  ✎
+                </SidebarIconBtn>
+                <SidebarIconBtn
+                  title={t("profileGroup.delete")}
+                  disabled={busy || (forest?.groups.length ?? 0) <= 1}
+                  onClick={async () => {
+                    const ok = confirm(t("profileGroup.deleteConfirm", { name: activeGroup.name }));
+                    if (!ok) return;
+                    setBusy(true);
+                    const r = await window.api.profileGroupDelete(activeGroup.id);
+                    setBusy(false);
+                    if (!r.success) setErr(r.error ?? t("profileGroup.failedDelete"));
+                    else {
+                      setActiveGroupId(null);
+                      void refresh();
+                    }
+                  }}
+                >
+                  ✕
+                </SidebarIconBtn>
+              </div>
+            </div>
+          )}
+          {!activeGroup && (
+            <div className="mt-1.5 text-[10px] text-chrome-text-dim">{t("profileGroup.emptyHint")}</div>
+          )}
+        </div>
 
         <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2.5">
-          {!tree && (
+          <div className="px-2 text-[10px] uppercase tracking-[0.12em] text-chrome-text-dim">
+            2. {t("profile.title")}
+          </div>
+          {activeGroup && (
+            <div className="px-2 text-[10px] text-chrome-text-dim">
+              {t("profile.hierarchyPath", { group: activeGroup.name })}
+            </div>
+          )}
+          {!forest && (
             <p className="px-2 py-6 text-center text-[11px] text-chrome-text-dim">{t("profile.loading")}</p>
           )}
-          {tree && filtered.length === 0 && (
+          {forest && visibleGroups.length === 0 && (
             <p className="px-2 py-6 text-center text-[11px] text-chrome-text-dim">
               {query.trim() ? t("profile.noMatch") : t("profile.empty")}
 
             </p>
           )}
-          {filtered.map((profile) => {
+          {visibleGroups.map(({ group, profiles }) => {
+            const groupExpanded = expandedGroupIds.has(group.id);
+            return (
+              <div key={group.id} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => toggleGroupExpanded(group.id)}
+                  className="flex w-full cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-chrome-text-secondary hover:bg-chrome-hover"
+                >
+                  <span className="truncate">{group.name}</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-chrome-text-dim">
+                    {profiles.length}
+                    <Chevron expanded={groupExpanded} />
+                  </span>
+                </button>
+                {groupExpanded &&
+                  profiles.map((profile) => {
             const isActive = activeProfileId === profile.id;
             const defaultTool = profile.defaultTool || "shell";
             const expanded = expandedIds.has(profile.id);
@@ -404,6 +672,7 @@ export function ProfileSidebar({
             const sessionCount = listedSessions.length;
             const canReorderPanes =
               canReorder && isActive && profilePanes.length > 1 && Boolean(onMovePane);
+            const canReorderProfiles = canReorder && group.id === activeGroup?.id;
             const accent = profile.accentColor;
             const hasAccent = Boolean(accent);
             const accentDefault = profileAccentOrDefault(accent);
@@ -415,15 +684,15 @@ export function ProfileSidebar({
               <div
                 key={profile.id}
                 className={`overflow-hidden rounded-xl border transition-all duration-150 ${
-                  dragOverId === profile.id && draggingId !== profile.id
+                  canReorderProfiles && dragOverId === profile.id && draggingId !== profile.id
                     ? "ring-2 ring-accent/35"
-                    : draggingId === profile.id
+                    : canReorderProfiles && draggingId === profile.id
                       ? "opacity-45 scale-[0.99]"
                       : ""
                 } ${isActive && !hasAccent ? "border-chrome-profile-card-active-border" : "border-transparent"}`}
                 style={cardStyle}
                 onDragOver={(e) => {
-                  if (!canReorder || !draggingId) return;
+                  if (!canReorderProfiles || !draggingId) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   setDragOverId(profile.id);
@@ -432,9 +701,9 @@ export function ProfileSidebar({
                   if (dragOverId === profile.id) setDragOverId(null);
                 }}
                 onDrop={(e) => {
-                  if (!canReorder || !draggingId) return;
+                  if (!canReorderProfiles || !draggingId) return;
                   e.preventDefault();
-                  void handleReorder(draggingId, profile.id);
+                  void handleReorder(group, draggingId, profile.id);
                   setDraggingId(null);
                   setDragOverId(null);
                 }}
@@ -442,7 +711,7 @@ export function ProfileSidebar({
                 {topStripe && <div className="w-full shrink-0" style={topStripe} />}
 
                 <div className="flex min-h-[36px] items-center gap-0.5 px-1 py-1">
-                  {canReorder && (
+                  {canReorderProfiles && (
                     <span
                       draggable
                       onDragStart={(e) => {
@@ -550,6 +819,9 @@ export function ProfileSidebar({
                     className="mx-2 mb-2 space-y-0.5 rounded-lg border-l-2 py-1 pl-2 pr-1"
                     style={profileSessionsWellStyle(accent)}
                   >
+                    <div className="px-2 pt-0.5 text-[10px] uppercase tracking-[0.1em] text-chrome-text-dim">
+                      3. {t("terminal.title")}
+                    </div>
                     {listedSessions.map((item, i) => {
                       const tool = item.tool;
                       const paneId = "id" in item ? item.id : `saved-${i}`;
@@ -798,7 +1070,7 @@ export function ProfileSidebar({
                     })}
 
                     {listedSessions.length === 0 && (
-                      <p className="px-2 py-2.5 text-[10px] text-chrome-text-dim">{t("profile.noSessions")}</p>
+                      <p className="px-2 py-2.5 text-[10px] text-chrome-text-dim">{t("terminal.empty")}</p>
 
                     )}
 
@@ -821,12 +1093,15 @@ export function ProfileSidebar({
                             : undefined
                         }
                       >
-                        +
+                        <ToolLogo tool={defaultTool} size={12} />
                       </span>
-                      {addingTerminal && isActive ? t("profile.opening") : t("profile.newTerminal")}
+                      {addingTerminal && isActive ? t("profile.opening") : t("terminal.new")}
                     </button>
                   </div>
                 )}
+              </div>
+            );
+          })}
               </div>
             );
           })}

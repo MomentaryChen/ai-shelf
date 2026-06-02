@@ -2,10 +2,10 @@ import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
 import { AppError } from "../../core/errors/app-error.js";
-import { PROFILES_WORKSPACE_NAME } from "../../services/profile-service.js";
+import { DEFAULT_PROFILE_GROUP_NAME } from "../../services/profile-group-service.js";
 import { warnLegacyWorkspaceModel } from "../deprecation.js";
 
-const SESSION_DEPRECATION = `Prefer \`ai-shelf profile exec <profile> …\` for profile-scoped CLI sessions. Legacy path: workspace "${PROFILES_WORKSPACE_NAME}", group = profile name.`;
+const SESSION_DEPRECATION = `Prefer \`ai-shelf profile exec <profile> …\` for profile-scoped CLI sessions. Legacy path: profile group "${DEFAULT_PROFILE_GROUP_NAME}", profile name = session group.`;
 
 export function registerSessionCommands(program: Command, getCtx: () => AppContext): void {
   const session = program

@@ -102,14 +102,23 @@ contextBridge.exposeInMainWorld("api", {
   wsGroupLayoutSetActive: (workspaceId, groupId) =>
     ipcRenderer.invoke("ws-group-layout-set-active", workspaceId, groupId),
   profileGetTree: () => ipcRenderer.invoke("profile-get-tree"),
+  profileGroupGetForest: () => ipcRenderer.invoke("profile-group-get-forest"),
+  profileGroupCreate: (name) => ipcRenderer.invoke("profile-group-create", name),
+  profileGroupUpdate: (idOrName, newName) =>
+    ipcRenderer.invoke("profile-group-update", idOrName, newName),
+  profileGroupDelete: (idOrName) => ipcRenderer.invoke("profile-group-delete", idOrName),
+  profileGroupReorder: (orderedGroupIds) =>
+    ipcRenderer.invoke("profile-group-reorder", orderedGroupIds),
   profileCreate: (name, input) => ipcRenderer.invoke("profile-create", name, input),
   profileUpdate: (profileId, patch) => ipcRenderer.invoke("profile-update", profileId, patch),
   profileDelete: (profileId) => ipcRenderer.invoke("profile-delete", profileId),
-  profileReorder: (orderedProfileIds) =>
-    ipcRenderer.invoke("profile-reorder", orderedProfileIds),
+  profileReorder: (groupIdOrName, orderedProfileIds) =>
+    ipcRenderer.invoke("profile-reorder", groupIdOrName, orderedProfileIds),
   exportBackup: (localStorage) => ipcRenderer.invoke("export-backup", localStorage),
   importBackup: () => ipcRenderer.invoke("import-backup"),
   relaunchApp: () => ipcRenderer.invoke("relaunch-app"),
+  setSystemTrayEnabled: (enabled) => ipcRenderer.invoke("set-system-tray-enabled", enabled),
+  getSystemTrayEnabled: () => ipcRenderer.invoke("get-system-tray-enabled"),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),

@@ -5,8 +5,12 @@ import type { SessionModel, CreateSessionInput } from "../../models/session.js";
 export interface WorkspaceRepositoryPort {
   create(input: CreateWorkspaceInput): WorkspaceModel;
   list(): WorkspaceModel[];
+  findById(id: string): WorkspaceModel | null;
   findByName(name: string): WorkspaceModel | null;
+  rename(id: string, name: string): WorkspaceModel;
+  reorder(orderedWorkspaceIds: string[]): void;
   deleteByName(name: string): boolean;
+  deleteById(id: string): boolean;
 }
 
 export interface GroupRepositoryPort {

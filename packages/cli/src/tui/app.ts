@@ -1,6 +1,7 @@
 import blessed from "neo-blessed";
 import type { Widgets } from "blessed";
 import type { AppContext } from "../infra/bootstrap.js";
+import { createProfileGroupTree, updateProfileGroupTree } from "./components/profile-group-tree.js";
 import { createProfileTree, updateProfileTree } from "./components/profile-tree.js";
 import { createSessionList, updateSessionList } from "./components/session-list.js";
 import { createSessionDetail, updateSessionDetail } from "./components/session-detail.js";
@@ -8,12 +9,12 @@ import { createOutputPreview, updateOutputPreview } from "./components/output-pr
 import { createStatusBar, setStatusMessage } from "./components/status-bar.js";
 import { RefreshCoordinator } from "./workers/refresh-coordinator.js";
 import type { SessionModel } from "../models/session.js";
-import type { ProfileInfo } from "../services/profile-service.js";
-import { PROFILES_WORKSPACE_NAME } from "../services/profile-service.js";
+import type { ProfileGroupNode, ProfileInfo } from "../services/profile-service.js";
 import { APP_TITLE } from "../config/config.js";
 import { AppError } from "../core/errors/app-error.js";
 
 interface TuiState {
+  group: ProfileGroupNode | null;
   profile: ProfileInfo | null;
   sessions: SessionModel[];
   selectedSession: SessionModel | null;
@@ -41,32 +42,67 @@ export function startTui(ctx: AppContext): void {
   const refreshCoordinator = new RefreshCoordinator();
 
   const state: TuiState = {
+    group: null,
     profile: null,
     sessions: [],
     selectedSession: null,
   };
 
-  function loadProfileTreeData() {
-    const tree = ctx.profileService.getTree();
-    return { profiles: tree.profiles, lastActiveProfileId: tree.lastActiveProfileId };
+  function loadForest() {
+    return ctx.profileService.getForest();
   }
 
-  let treeData = loadProfileTreeData();
-  const profileTree = createProfileTree(left, treeData, (profile) => {
+  let forest = loadForest();
+  let selectedGroupId =
+    forest.lastActiveGroupId ?? forest.groups[0]?.id ?? null;
+
+  const profileGroupTree = createProfileGroupTree(
+    left,
+    { forest, selectedGroupId },
+    (group) => {
+      state.group = group;
+      selectedGroupId = group.id;
+      refreshProfileList();
+      setStatusMessage(statusBar, group.name);
+      screen.render();
+    },
+  );
+
+  const profileListBox = blessed.box({
+    parent: left,
+    top: "40%",
+    left: 0,
+    width: "100%",
+    height: "60%",
+    tags: true,
+  });
+
+  let profileTreeData = {
+    profiles: [] as ProfileInfo[],
+    lastActiveProfileId: forest.lastActiveProfileId,
+  };
+
+  const profileTree = createProfileTree(profileListBox, profileTreeData, (profile) => {
     state.profile = profile;
     refreshSessions();
-    setStatusMessage(statusBar, profile.name);
+    const label = state.group ? `${state.group.name} / ${profile.name}` : profile.name;
+    setStatusMessage(statusBar, label);
   });
 
   const sessionList = createSessionList(center);
   const sessionDetail = createSessionDetail(right, 14);
   const outputPreview = createOutputPreview(right, 14);
 
+  function currentGroupName(): string {
+    if (!state.group) throw new AppError("No profile group selected", "PROFILE_GROUP_NOT_FOUND");
+    return state.group.name;
+  }
+
   function reloadSelectedSession(): SessionModel | null {
     if (!state.selectedSession || !state.profile) return null;
     try {
       const fresh = ctx.sessionService.resolveSession(
-        PROFILES_WORKSPACE_NAME,
+        currentGroupName(),
         state.profile.name,
         state.selectedSession.name,
       );
@@ -102,24 +138,38 @@ export function startTui(ctx: AppContext): void {
     }
   });
 
-  function refreshTree() {
-    treeData = loadProfileTreeData();
-    updateProfileTree(profileTree, treeData);
+  function refreshProfileList() {
+    forest = loadForest();
+    const group =
+      forest.groups.find((g) => g.id === selectedGroupId) ?? forest.groups[0] ?? null;
+    state.group = group;
+    selectedGroupId = group?.id ?? null;
+    profileTreeData = {
+      profiles: group?.profiles ?? [],
+      lastActiveProfileId:
+        group?.id === forest.lastActiveGroupId ? forest.lastActiveProfileId : null,
+    };
+    updateProfileGroupTree(profileGroupTree, { forest, selectedGroupId });
+    updateProfileTree(profileTree, profileTreeData);
     if (state.profile) {
-      const match = treeData.profiles.find((p) => p.id === state.profile?.id);
+      const match = profileTreeData.profiles.find((p) => p.id === state.profile?.id);
       state.profile = match ?? null;
     }
   }
 
+  function refreshTree() {
+    refreshProfileList();
+  }
+
   function refreshSessions() {
-    if (!state.profile) {
+    if (!state.profile || !state.group) {
       updateSessionList(sessionList, []);
       updateSessionDetail(sessionDetail, null);
       updateOutputPreview(outputPreview, "", false);
       return;
     }
     try {
-      state.sessions = ctx.sessionService.list(PROFILES_WORKSPACE_NAME, state.profile.name);
+      state.sessions = ctx.sessionService.list(state.group.name, state.profile.name);
       updateSessionList(sessionList, state.sessions);
       if (state.selectedSession) {
         const match = state.sessions.find((s) => s.id === state.selectedSession?.id);
@@ -147,7 +197,7 @@ export function startTui(ctx: AppContext): void {
     }
     try {
       await ctx.sessionService.start(
-        PROFILES_WORKSPACE_NAME,
+        currentGroupName(),
         state.profile.name,
         state.selectedSession.name,
       );
@@ -164,7 +214,7 @@ export function startTui(ctx: AppContext): void {
     if (!state.profile || !state.selectedSession) return;
     try {
       ctx.sessionService.stop(
-        PROFILES_WORKSPACE_NAME,
+        currentGroupName(),
         state.profile.name,
         state.selectedSession.name,
       );
@@ -200,7 +250,7 @@ export function startTui(ctx: AppContext): void {
         }
         try {
           const result = ctx.execService.exec(
-            PROFILES_WORKSPACE_NAME,
+            currentGroupName(),
             state.profile!.name,
             value.trim(),
             broadcast
@@ -239,7 +289,7 @@ export function startTui(ctx: AppContext): void {
   screen.key(["x"], () => stopSelectedSession());
   screen.key(["e"], () => promptExec(screen, false));
   screen.key(["B"], () => promptExec(screen, true));
-  screen.key(["tab"], () => sessionList.focus());
+  screen.key(["tab"], () => profileTree.focus());
 
   refreshCoordinator.start(ctx, {
     onTick: () => {
@@ -252,6 +302,12 @@ export function startTui(ctx: AppContext): void {
   });
 
   refreshTree();
-  profileTree.focus();
+  if (forest.groups.length > 0) {
+    const idx = forest.groups.findIndex((g) => g.id === selectedGroupId);
+    profileGroupTree.select(idx >= 0 ? idx : 0);
+    state.group = forest.groups[idx >= 0 ? idx : 0] ?? null;
+    refreshProfileList();
+  }
+  profileGroupTree.focus();
   screen.render();
 }
