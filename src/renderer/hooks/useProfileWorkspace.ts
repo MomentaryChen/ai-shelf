@@ -94,6 +94,12 @@ export function useProfileWorkspace(
   const [activeProfile, setActiveProfile] = useState<ProfileInfo | null>(null);
   const [minimizedPaneIds, setMinimizedPaneIds] = useState<Set<string>>(() => new Set());
   const [restoring, setRestoring] = useState(false);
+  /** Synced with setRestoringFlag — avoids stale `restoring` after await activateProfile. */
+  const restoringRef = useRef(false);
+  const setRestoringFlag = useCallback((value: boolean) => {
+    restoringRef.current = value;
+    setRestoring(value);
+  }, []);
   const [migrationDone, setMigrationDone] = useState(false);
   const layoutRef = useRef(layout);
   const focusedPaneIdRef = useRef(focusedPaneId);
@@ -181,7 +187,7 @@ export function useProfileWorkspace(
 
   const restoreSnapshot = useCallback(
     async (snapshot: GroupLayoutSnapshot, profile: ProfileInfo) => {
-      setRestoring(true);
+      setRestoringFlag(true);
       // Only replace this profile's previous PTYs — never kill another profile's stashed sessions.
       const staleCached = profileLiveCacheRef.current.get(profile.id);
       if (staleCached) teardownPtys(staleCached.layout);
@@ -205,7 +211,7 @@ export function useProfileWorkspace(
 
       if (spawned.length === 0) {
         applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
-        setRestoring(false);
+        setRestoringFlag(false);
         return {
           cwd: cwdDefault,
           broadcastInput: snapshot.broadcastInput ?? false,
@@ -232,14 +238,14 @@ export function useProfileWorkspace(
         focusedPaneId: focusId,
         minimizedPaneIds: minimized,
       });
-      setRestoring(false);
+      setRestoringFlag(false);
       return {
         cwd: profile.defaultCwd || cwdDefault,
         broadcastInput: snapshot.broadcastInput ?? false,
         paneCount: spawned.length,
       };
     },
-    [setLayout, setFocusedPaneId, spawnPane],
+    [setLayout, setFocusedPaneId, spawnPane, setRestoringFlag],
   );
 
   const activateProfile = useCallback(
@@ -373,7 +379,7 @@ export function useProfileWorkspace(
   );
 
   useEffect(() => {
-    if (!activeProfile || restoring || profileSwitchInProgressRef.current) return;
+    if (!activeProfile || restoringRef.current || profileSwitchInProgressRef.current) return;
     const paneCount = layout ? collectPanes(layout).length : 0;
     if (paneCount > 0) {
       profileLiveCacheRef.current.set(activeProfile.id, {
@@ -546,6 +552,7 @@ export function useProfileWorkspace(
   return {
     activeProfile,
     restoring,
+    isRestoring: () => restoringRef.current,
     migrationDone,
     activateProfile,
     restoreLastProfile,
