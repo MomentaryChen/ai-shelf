@@ -950,14 +950,14 @@ export function ChatTab({
           </div>
         </>
       )}
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         {topBar}
         {terminalError && (
           <div className="shrink-0 border-b border-red-500/30 bg-red-900/20 px-3 py-2 text-[12px] text-red-300">
             {terminalError}
           </div>
         )}
-        {terminalArea}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
       </div>
     </div>
   );
@@ -1004,7 +1004,7 @@ function WarpTopBar({
   const defaultAccent = getChromeCssVar("--color-chrome-accent-text", "#8ab4ff");
 
   return (
-    <div className="relative z-20 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
+    <div className="relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
       {profileLabel && (
         <div
           className="flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1"
@@ -1069,8 +1069,9 @@ function WarpTopBar({
         >
           {t("chat.addPane")}
         </button>
+        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
         {showNewMenu && canAddPane && (
-          <div className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
+          <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
             <button
               type="button"
               title={t("chat.plainShellTitle")}
@@ -1102,7 +1103,6 @@ function WarpTopBar({
             ))}
           </div>
         )}
-        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
       </div>
     </div>
   );
