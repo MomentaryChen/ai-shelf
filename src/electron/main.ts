@@ -119,6 +119,22 @@ function formatWindowTitle(base: string): string {
   return title;
 }
 
+/** Only one app process; a second launch focuses the existing instance instead of opening another window. */
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createWindow();
+    }
+  });
+}
+
 const INVENTORY_CACHE_TTL_MS = 30_000;
 let inventoryCache: { at: number; entries: ProviderEntry[] } | null = null;
 
@@ -1538,6 +1554,7 @@ ipcMain.handle("get-system-tray-enabled", () => ({
 }));
 
 app.whenReady().then(() => {
+  if (!gotSingleInstanceLock) return;
   const trayEnabled = readSystemTrayEnabledFromDisk();
   applySystemTrayEnabled(trayEnabled, getTrayDeps());
 
@@ -1566,5 +1583,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("activate", () => {
+  if (!gotSingleInstanceLock) return;
   if (mainWindow === null) createWindow();
 });
