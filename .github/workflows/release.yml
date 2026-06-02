@@ -45,6 +45,9 @@ jobs:
 
   release-windows:
     runs-on: windows-latest
+    env:
+      WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+      WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,11 +72,23 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Self-signed Authenticode — no secrets or CA purchase required.
-      # SmartScreen still warns (cert is not publicly trusted). See docs/WINDOWS_CODE_SIGNING.md.
-      - name: Prepare self-signed code signing certificate
+      - name: Prepare fallback self-signed certificate
+        if: env.WIN_CSC_LINK == '' || env.WIN_CSC_KEY_PASSWORD == ''
         shell: pwsh
         run: ./scripts/new-selfsigned-codesign.ps1 -ForCi
+
+      - name: Select code signing certificate
+        shell: pwsh
+        run: |
+          if ("${env:WIN_CSC_LINK}" -and "${env:WIN_CSC_KEY_PASSWORD}") {
+            "CSC_LINK=${env:WIN_CSC_LINK}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "CSC_KEY_PASSWORD=${env:WIN_CSC_KEY_PASSWORD}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "Using repository signing certificate secrets."
+          } else {
+            "CSC_LINK=$pwd/.codesign/ai-shelf-selfsign.pfx" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "CSC_KEY_PASSWORD=ai-shelf-selfsign" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "Using fallback self-signed certificate."
+          }
 
       - name: Package Windows installer
         run: pnpm exec electron-builder --win --publish never
@@ -86,8 +101,14 @@ jobs:
           ./scripts/verify-windows-signature.ps1 -Path $installer.FullName -RequireSigned
 
       - name: Self-signed build notice
+        if: env.WIN_CSC_LINK == '' || env.WIN_CSC_KEY_PASSWORD == ''
         run: |
           echo "::notice::Installer is self-signed (not CA-trusted). SmartScreen may still warn users. See docs/WINDOWS_CODE_SIGNING.md"
+
+      - name: Trusted-signing notice
+        if: env.WIN_CSC_LINK != '' && env.WIN_CSC_KEY_PASSWORD != ''
+        run: |
+          echo "::notice::Installer was signed using repository certificate secrets (WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD)."
 
       # Release body matches CHANGELOG.md for this tag (single source of truth).
       - name: Build release notes from CHANGELOG

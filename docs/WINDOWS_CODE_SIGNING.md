@@ -1,19 +1,19 @@
-# Windows code signing (self-signed)
+# Windows code signing
 
-Release CI **automatically signs** Windows installers with a **self-signed** Authenticode certificate. No GitHub secrets, no CA purchase, no manual setup.
+Release CI signs Windows installers with **repository certificate secrets first** and falls back to a **self-signed** Authenticode certificate when secrets are missing.
 
 ---
 
 ## What you get
 
-| | Self-signed (current) | CA certificate (future) |
+| | Self-signed fallback | Trusted certificate (recommended) |
 |--|----------------------|-------------------------|
-| **CI setup** | Automatic on every tag | Requires secrets + purchase / SignPath |
+| **CI setup** | Automatic on every tag | Requires `WIN_CSC_LINK` + `WIN_CSC_KEY_PASSWORD` secrets |
 | **File has signature** | Yes | Yes |
-| **SmartScreen** | Still warns (unknown publisher) | Shows verified publisher; reputation builds over time |
+| **SmartScreen / updater trust** | Still warns; updater trust can fail | Verified publisher; updater trust works as expected |
 | **User action** | **More info** → **Run anyway** | Usually smoother after reputation |
 
-Self-signed signing is a **low-friction placeholder**: the pipeline exercises Authenticode signing end-to-end, but **does not remove SmartScreen friction** for end users.
+Self-signed signing is only a **fallback**: it proves the signing pipeline works, but does **not** provide public trust for SmartScreen or in-app update signature validation.
 
 ---
 
@@ -21,11 +21,14 @@ Self-signed signing is a **low-friction placeholder**: the pipeline exercises Au
 
 On tag push, [`.github/workflows/release.yml`](../.github/workflows/release.yml):
 
-1. Generates a fresh self-signed `.pfx` on the runner (`scripts/new-selfsigned-codesign.ps1`)
-2. Signs the NSIS installer via electron-builder (`CSC_LINK` / `CSC_KEY_PASSWORD`)
-3. Verifies the file is signed (`scripts/verify-windows-signature.ps1 -RequireSigned`)
+1. Uses `WIN_CSC_LINK` + `WIN_CSC_KEY_PASSWORD` if present (recommended path)
+2. Otherwise generates a fallback self-signed `.pfx` on the runner (`scripts/new-selfsigned-codesign.ps1`)
+3. Signs the NSIS installer via electron-builder (`CSC_LINK` / `CSC_KEY_PASSWORD`)
+4. Verifies the file is signed (`scripts/verify-windows-signature.ps1 -RequireSigned`)
 
-Publisher name in file properties: **AI Shelf (Self-Signed)**.
+Fallback publisher name in file properties: **AI Shelf (Self-Signed)**.
+
+> For in-app auto-update reliability, use a trusted certificate via repository secrets. Fresh self-signed certs are not trusted on user machines by default.
 
 ---
 
@@ -51,7 +54,10 @@ The `.codesign/` folder is gitignored. Do not commit `.pfx` files.
 
 ## Upgrade path (when you want real SmartScreen trust)
 
-When ready for trusted signing, replace the self-signed step with a CA or [SignPath Foundation](https://signpath.org/) (free for qualifying OSS). That requires workflow changes and secrets — not needed for the current self-signed setup.
+Use a CA certificate or [SignPath Foundation](https://signpath.org/) (free for qualifying OSS), then store the signing material in:
+
+- `WIN_CSC_LINK` (base64 PFX or secure URL)
+- `WIN_CSC_KEY_PASSWORD`
 
 ---
 
