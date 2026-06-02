@@ -284,6 +284,35 @@ export function ChatTab({
   }, [showNewMenu]);
 
   useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      const hasMod = ev.ctrlKey || ev.metaKey;
+      if (!hasMod || ev.shiftKey || ev.altKey) return;
+      if (ev.key.toLowerCase() !== "s") return;
+
+      const target = ev.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable ||
+          target.closest("[contenteditable='true']")
+        ) {
+          return;
+        }
+      }
+
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      setSidebarCollapsed((prev) => !prev);
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+
+  useEffect(() => {
     if (!migrationDone || initialRestoreDoneRef.current || restoreInFlightRef.current) return;
 
     let cancelled = false;
