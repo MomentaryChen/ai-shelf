@@ -171,6 +171,7 @@ export function ChatTab({
   const {
     activeProfile,
     restoring,
+    isRestoring,
     migrationDone,
     activateProfile,
     restoreLastProfile,
@@ -326,7 +327,7 @@ export function ChatTab({
       direction: SplitDirection = "horizontal",
       opts?: { keepOthersVisible?: boolean },
     ): Promise<PaneInfo | null> => {
-      if (restoring) {
+      if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
         return null;
       }
@@ -361,7 +362,7 @@ export function ChatTab({
     [
       canAddPane,
       maxPanes,
-      restoring,
+      isRestoring,
       resolveCwd,
       spawnPaneResilient,
       focusedPaneId,
@@ -473,7 +474,7 @@ export function ChatTab({
 
   const openFolderPane = useCallback(
     async (cwdHint?: string) => {
-      if (restoring) {
+      if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
         return;
       }
@@ -494,7 +495,7 @@ export function ChatTab({
       }
     },
     [
-      restoring,
+      isRestoring,
       canAddPane,
       maxPanes,
       resolveCwd,
@@ -660,17 +661,14 @@ export function ChatTab({
   }
 
   async function handleNewTerminal(profile: ProfileInfo) {
-    if (addingTerminal || profileBusy || restoring) return;
+    if (addingTerminal || profileBusy || isRestoring()) return;
     setAddingTerminal(true);
     setTerminalError(null);
     try {
       if (activeProfile?.id !== profile.id) {
         await handleActivateProfile(profile);
       }
-      const cwd =
-        profile.id === activeProfile?.id
-          ? getProfileDefaultCwd() || profile.defaultCwd?.trim()
-          : profile.defaultCwd?.trim();
+      const cwd = profile.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(
         resolveLaunchTool(profile.defaultTool, availableTools),
         cwd || undefined,

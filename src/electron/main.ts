@@ -919,11 +919,18 @@ ipcMain.handle("clipboard-write-text", (_event, text: string) => {
 });
 
 ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
+  const trimmed = defaultPath?.trim();
+  const resolvedDefault =
+    trimmed && existsSync(normalize(trimmed)) ? normalize(trimmed) : undefined;
   const options: Electron.OpenDialogOptions = {
     properties: ["openDirectory"],
-    ...(defaultPath ? { defaultPath } : {}),
+    ...(resolvedDefault ? { defaultPath: resolvedDefault } : {}),
   };
   const parent = BrowserWindow.fromWebContents(event.sender);
+  if (parent && !parent.isDestroyed()) {
+    if (parent.isMinimized()) parent.restore();
+    parent.focus();
+  }
   const { canceled, filePaths } = parent
     ? await dialog.showOpenDialog(parent, options)
     : await dialog.showOpenDialog(options);
