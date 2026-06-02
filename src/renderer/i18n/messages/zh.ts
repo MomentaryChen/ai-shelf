@@ -17,7 +17,7 @@ export const zh: Record<MessageKey, string> = {
   "app.tab.doctor": "診斷",
   "app.tab.update": "更新",
   "settings.title": "終端機設定",
-  "settings.subtitle": "語言、主題顏色、工作目錄、外部終端機、窗格快捷鍵、顯示、背景與資料備份",
+  "settings.subtitle": "語言、主題顏色、工作目錄、外部終端機、窗格快捷鍵、顯示、系統匣、背景與資料備份",
   "settings.paneShortcut.title": "窗格快捷鍵",
   "settings.paneShortcut.subtitle":
     "終端機窗格聚焦時的分割與切換快捷鍵，需搭配 Ctrl（Mac 為 Cmd）。關閉、清屏與重啟快捷鍵維持固定。",
@@ -51,7 +51,10 @@ export const zh: Record<MessageKey, string> = {
   "settings.rightClickPaste": "右鍵貼上",
   "settings.rightClickPasteHint":
     "啟用後，右鍵會從剪貼簿貼上；若有選取文字則先複製。按住 Shift 再右鍵可開啟內容選單（複製、貼上、尋找…）。",
-  "settings.custom": "自訂",
+  "settings.systemTray": "系統匣",
+  "settings.systemTrayEnable": "最小化到系統匣",
+  "settings.systemTrayHint":
+    "啟用後，關閉視窗會隱藏到系統匣，程式繼續在背景執行。停用後，關閉最後一個視窗會結束程式。",
   "settings.backup": "資料備份與還原",
   "settings.backupHint":
     "將 Profile、版面、工作區與 App 設定匯出成檔案。換機、重裝或升級時可還原資料。",

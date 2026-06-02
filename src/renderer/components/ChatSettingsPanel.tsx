@@ -20,6 +20,7 @@ import { PaneShortcutBindingsEditor } from "./PaneShortcutBindingsEditor";
 import type { AppColorTheme } from "../app-theme";
 import type { AppLocale } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
+import { syncSystemTrayFromSettings } from "../system-tray-sync";
 
 interface ChatSettingsPanelProps {
   compact?: boolean;
@@ -90,8 +91,15 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
       const next = { ...prev, ...partial };
       saveSettings(next);
       if (partial.appTheme !== undefined) applyAppTheme(next.appTheme);
+      if (partial.systemTrayEnabled !== undefined) {
+        void window.api.setSystemTrayEnabled(next.systemTrayEnabled);
+      }
       return next;
     });
+  }, []);
+
+  useEffect(() => {
+    syncSystemTrayFromSettings();
   }, []);
 
   useEffect(() => {
@@ -100,6 +108,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         const next = loadSettings();
         setSettings(next);
         applyAppTheme(next.appTheme);
+        syncSystemTrayFromSettings();
       }
     };
     window.addEventListener("storage", onStorage);
@@ -457,6 +466,25 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             </span>
           </label>
         </div>
+      </div>
+
+      {/* System tray */}
+      <div>
+        <p className={sectionTitle}>{t("settings.systemTray")}</p>
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors hover:border-accent/40">
+          <input
+            type="checkbox"
+            checked={settings.systemTrayEnabled}
+            onChange={(e) => updateSettings({ systemTrayEnabled: e.target.checked })}
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded accent-accent"
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[13px] text-text-primary">{t("settings.systemTrayEnable")}</span>
+            <span className="text-[11px] leading-snug text-text-tertiary">
+              {t("settings.systemTrayHint")}
+            </span>
+          </span>
+        </label>
       </div>
 
       {/* Data backup & restore */}

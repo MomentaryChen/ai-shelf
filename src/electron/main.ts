@@ -53,7 +53,15 @@ import {
   reorderProfiles,
 } from "./workspace-host.js";
 import { applyBackup, createJsonBackup, createZipBackup } from "./backup-service.js";
-import { bindMinimizeToTray, initTray, refreshTrayMenu, setAppQuitting } from "./tray.js";
+import {
+  applySystemTrayEnabled,
+  bindMinimizeToTray,
+  isSystemTrayEnabled,
+  refreshTrayMenu,
+  setAppQuitting,
+  type TrayDeps,
+} from "./tray.js";
+import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
@@ -71,6 +79,15 @@ const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; 
 let mainWindow: BrowserWindow | null = null;
 let chatWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+
+function getTrayDeps(): TrayDeps {
+  return {
+    iconPath: APP_ICON,
+    getMainWindow: () => mainWindow,
+    getChatWindow: () => chatWindow,
+    createChatWindow,
+  };
+}
 
 const RENDERER_HTML = join(import.meta.dirname, "..", "renderer", "index.html");
 const APP_ICON = join(import.meta.dirname, "..", "assets", "icon.ico");
@@ -1451,15 +1468,23 @@ ipcMain.handle("relaunch-app", () => {
   return { ok: true };
 });
 
+ipcMain.handle("set-system-tray-enabled", (_event, enabled: unknown) => {
+  const on = enabled === true;
+  writeSystemTrayEnabledToDisk(on);
+  applySystemTrayEnabled(on, getTrayDeps());
+  return { ok: true, systemTrayEnabled: on };
+});
+
+ipcMain.handle("get-system-tray-enabled", () => ({
+  systemTrayEnabled: isSystemTrayEnabled(),
+}));
+
 app.whenReady().then(() => {
+  const trayEnabled = readSystemTrayEnabledFromDisk();
+  applySystemTrayEnabled(trayEnabled, getTrayDeps());
+
   setupAppMenu();
   createWindow();
-  initTray({
-    iconPath: APP_ICON,
-    getMainWindow: () => mainWindow,
-    getChatWindow: () => chatWindow,
-    createChatWindow,
-  });
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
 });
@@ -1475,7 +1500,11 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  // Keep running in the tray so PTY sessions stay alive when windows are hidden.
+  if (isSystemTrayEnabled()) {
+    // Keep running in the tray so PTY sessions stay alive when windows are hidden.
+    return;
+  }
+  if (process.platform !== "darwin") app.quit();
 });
 
 app.on("activate", () => {
