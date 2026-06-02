@@ -9,6 +9,19 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-06-02
+
+Release signing pipeline now prefers trusted certificates to avoid desktop in-app update signature trust failures.
+
+### Changed
+
+- **Windows release workflow** — `release.yml` now uses `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` secrets first, and only falls back to generated self-signed certs when secrets are not configured.
+- **CI release notices** — Added explicit workflow notices to show whether trusted signing or fallback self-signed signing was used for each release build.
+
+### Fixed
+
+- **Desktop updater trust path** — Avoided repeated updater signature failures caused by fresh per-run self-signed certificates by enabling stable trusted signing in CI.
+
 ## [2.1.0] - 2026-06-02
 
 Profile group workflow, terminal/sidebar UX improvements, and single-instance desktop behavior.
@@ -204,6 +217,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - macOS and Linux desktop installers are not included in this release.
 
 [2.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.0
+[2.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.1
 [2.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.0.0
 [1.4.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.1
 [1.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.0
