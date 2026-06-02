@@ -298,7 +298,6 @@ export const en = {
   "chat.err.enableProfile": "Could not activate profile: {msg}",
   "chat.maxPanesTitle": "Maximum {max} panes",
   "chat.folderBtn": "Folder",
-  "chat.plainShellBtn": "Terminal",
   "chat.plainShellTitle": "Open a plain shell (no AI CLI)",
   "chat.addPane": "+ Pane",
   "chat.addPaneTitle": "Add terminal pane ({splitRight} split right, {splitDown} split down)",

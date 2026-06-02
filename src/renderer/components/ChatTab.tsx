@@ -780,7 +780,6 @@ export function ChatTab({
       showNewMenu={showNewMenu}
       onToggleNewMenu={() => setShowNewMenu((o) => !o)}
       onAddPane={(tool) => void addPane(tool)}
-      onAddPlainShell={() => void addPane(PLAIN_SHELL_TOOL_ID)}
       onOpenFolder={() => void openFolderPane()}
       available={data.filter((e) => e.available)}
       splitShortcutLabels={{
@@ -978,7 +977,6 @@ function WarpTopBar({
   showNewMenu,
   onToggleNewMenu,
   onAddPane,
-  onAddPlainShell,
   onOpenFolder,
   available,
   splitShortcutLabels,
@@ -996,7 +994,6 @@ function WarpTopBar({
   showNewMenu: boolean;
   onToggleNewMenu: () => void;
   onAddPane: (tool: string) => void;
-  onAddPlainShell: () => void;
   onOpenFolder: () => void;
   available: ProviderEntry[];
   splitShortcutLabels: { splitRight: string; splitDown: string };
@@ -1060,16 +1057,6 @@ function WarpTopBar({
         </button>
         <button
           type="button"
-          disabled={!canAddPane || restoring}
-          onClick={onAddPlainShell}
-          title={canAddPane ? t("chat.plainShellTitle") : t("chat.maxPanesTitle", { max: maxPanes })}
-          className="flex cursor-pointer items-center gap-1.5 rounded-md border border-chrome-border-strong px-2 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
-        >
-          <ToolLogo tool={PLAIN_SHELL_TOOL_ID} size={14} />
-          {t("chat.plainShellBtn")}
-        </button>
-        <button
-          type="button"
           disabled={!canAddPane}
           onClick={onToggleNewMenu}
           title={
@@ -1086,8 +1073,9 @@ function WarpTopBar({
           <div className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
             <button
               type="button"
+              title={t("chat.plainShellTitle")}
               onClick={() => {
-                onAddPlainShell();
+                onAddPane(PLAIN_SHELL_TOOL_ID);
                 onToggleNewMenu();
               }}
               className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[12px] hover:bg-chrome-surface-hover-strong"
