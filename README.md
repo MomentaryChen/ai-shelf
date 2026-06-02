@@ -18,7 +18,7 @@
 | **Profile CLI** | `ai-shelf` | Manage profiles, CLI sessions, broadcast exec; TUI |
 | **Desktop app** | `pnpm electron` | Terminal launcher + inventory dashboard (Electron + React) |
 
-The desktop app and `ai-shelf` share one SQLite database. **Profiles** (names, defaults, pane layouts) are the primary user-facing model in both surfaces.
+The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** split and organize **Profiles** (names, defaults, pane layouts) across both surfaces.
 
 ---
 
@@ -37,7 +37,8 @@ The desktop app and `ai-shelf` share one SQLite database. **Profiles** (names, d
 
 ### Terminal profiles (`ai-shelf`)
 
-- **Profiles** — named terminal environments (default cwd, tool, accent color, broadcast input); same records as the desktop sidebar
+- **Profile Groups** — top-level categories used to split profiles
+- **Profiles** — named terminal environments (default cwd, tool, accent color, broadcast input) under each profile group; same records as the desktop sidebar
 - **CLI sessions** — optional headless PTY sessions scoped to a profile (`Profiles` workspace internally)
 - **Broadcast exec** — `profile exec <name> … --broadcast` sends a command to all running CLI sessions in a profile
 - **TUI** — profile list + session management (`ai-shelf tui`)

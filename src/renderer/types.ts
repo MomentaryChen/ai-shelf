@@ -189,7 +189,26 @@ export interface ProfileTree {
   lastActiveProfileId: string | null;
 }
 
+export interface ProfileGroupInfo {
+  id: string;
+  name: string;
+  profileCount: number;
+  updatedAt: string | null;
+}
+
+export interface ProfileGroupNode extends ProfileGroupInfo {
+  profiles: ProfileInfo[];
+}
+
+export interface ProfileForest {
+  groups: ProfileGroupNode[];
+  lastActiveGroupId: string | null;
+  lastActiveProfileId: string | null;
+}
+
 export interface ProfileCreateInput {
+  groupId?: string;
+  groupName?: string;
   defaultCwd?: string;
   defaultTool?: string;
   accentColor?: string | null;
@@ -317,6 +336,18 @@ export interface ElectronAPI {
     groupId: string,
   ) => Promise<{ success: boolean; error?: string }>;
   profileGetTree: () => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
+  profileGroupGetForest: () => Promise<{ success: boolean; forest?: ProfileForest; error?: string }>;
+  profileGroupCreate: (
+    name: string,
+  ) => Promise<{ success: boolean; group?: ProfileGroupInfo; error?: string }>;
+  profileGroupUpdate: (
+    idOrName: string,
+    newName: string,
+  ) => Promise<{ success: boolean; group?: ProfileGroupInfo; error?: string }>;
+  profileGroupDelete: (idOrName: string) => Promise<{ success: boolean; error?: string }>;
+  profileGroupReorder: (
+    orderedGroupIds: string[],
+  ) => Promise<{ success: boolean; groups?: ProfileGroupInfo[]; error?: string }>;
   profileCreate: (
     name: string,
     input?: ProfileCreateInput,
@@ -333,8 +364,9 @@ export interface ElectronAPI {
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileDelete: (profileId: string) => Promise<{ success: boolean; error?: string }>;
   profileReorder: (
+    groupIdOrName: string,
     orderedProfileIds: string[],
-  ) => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
+  ) => Promise<{ success: boolean; forest?: ProfileForest; error?: string }>;
   exportBackup: (
     localStorage: Record<string, string>,
   ) => Promise<

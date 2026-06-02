@@ -131,7 +131,7 @@ export function ProfileSettingsDialog({
           <ProfileColorPicker value={accentColor} onChange={setAccentColor} disabled={busy} />
         </fieldset>
 
-        <fieldset className="mb-4">
+        <fieldset className="mb-4 rounded-lg border border-chrome-border-subtle bg-chrome-surface/40 p-3">
           <legend className="mb-2 flex items-center gap-2 text-[11px] text-chrome-text-subtle">
             {t("profile.dialog.defaultTool")}
             {inventoryScanning && (
@@ -144,7 +144,7 @@ export function ProfileSettingsDialog({
               <label
                 key={toolId}
                 className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors ${
-                  effectiveTool === t
+                  effectiveTool === toolId
                     ? "border-accent/50 bg-accent/15 text-chrome-accent-text"
                     : "border-chrome-border-subtle text-chrome-text-secondary hover:border-chrome-border-hover"
 

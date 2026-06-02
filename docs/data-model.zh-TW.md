@@ -2,19 +2,20 @@
 
 AI Shelf 使用**同一個 SQLite 資料庫**（Windows：`%APPDATA%/ai-shelf/workspaces.db`）。**桌面應用**與 **`ai-shelf` CLI/TUI** 讀寫同一檔案。
 
-## 使用者模型：Profile
+## 使用者模型：Profile Group + Profile
 
-**Profile** 是組織終端機的主要單位：
+**Profile Group** 是最上層分類，底下再放 **Profile**：
 
 | 概念 | 說明 |
 |------|------|
+| **Profile Group** | 用來分割 Profile 的上層分類（工作/個人/客戶…） |
 | **Profile** | 具名環境：預設目錄、預設 AI 工具、強調色、是否廣播輸入 |
 | **Pane / 終端機** | 一個內嵌終端機（工具 + cwd + 可選標題），每 Profile 最多 8 個 |
 | **Layout** | 每 Profile 持久化的分割窗格樹 |
 
 建立與管理：
 
-- 桌面：**Profile** 側欄
+- 桌面：**Profile Group + Profile** 側欄
 - CLI：`ai-shelf profile list|create|update|delete|reorder|exec`
 
 ## 儲存對應（內部）
@@ -22,7 +23,8 @@ AI Shelf 使用**同一個 SQLite 資料庫**（Windows：`%APPDATA%/ai-shelf/wo
 Profile 沿用舊表名以相容既有資料：
 
 ```
-Profile  →  workspace「Profiles」底下的 group 列
+Profile Group  →  workspaces 列
+Profile  →  該 group 底下的 groups 列
 Pane 版面  →  group_layouts 快照（JSON）
 上次使用中 Profile  →  app_preferences.last_active_group_key
 ```

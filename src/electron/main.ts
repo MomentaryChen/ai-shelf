@@ -46,7 +46,12 @@ import {
   getGroupLayout,
   saveGroupLayout,
   setLastActiveGroup,
+  getProfileForest,
   getProfileTree,
+  createProfileGroup,
+  updateProfileGroup,
+  deleteProfileGroup,
+  reorderProfileGroups,
   createProfile,
   updateProfile,
   deleteProfile,
@@ -1348,12 +1353,62 @@ ipcMain.handle("profile-get-tree", () => {
   }
 });
 
+ipcMain.handle("profile-group-get-forest", () => {
+  try {
+    return { success: true, forest: getProfileForest() };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("profile-group-create", (_e, name: string) => {
+  try {
+    const group = createProfileGroup(name);
+    refreshTrayMenu();
+    return { success: true, group };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("profile-group-update", (_e, idOrName: string, newName: string) => {
+  try {
+    const group = updateProfileGroup(idOrName, newName);
+    refreshTrayMenu();
+    return { success: true, group };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("profile-group-delete", (_e, idOrName: string) => {
+  try {
+    deleteProfileGroup(idOrName);
+    refreshTrayMenu();
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("profile-group-reorder", (_e, orderedGroupIds: string[]) => {
+  try {
+    const groups = reorderProfileGroups(orderedGroupIds);
+    refreshTrayMenu();
+    return { success: true, groups };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
 ipcMain.handle(
   "profile-create",
   (
     _e,
     name: string,
     input?: {
+      groupId?: string;
+      groupName?: string;
       defaultCwd?: string;
       defaultTool?: string;
       accentColor?: string | null;
@@ -1404,15 +1459,18 @@ ipcMain.handle("profile-delete", (_e, profileId: string) => {
   }
 });
 
-ipcMain.handle("profile-reorder", (_e, orderedProfileIds: string[]) => {
-  try {
-    const tree = reorderProfiles(orderedProfileIds);
-    refreshTrayMenu();
-    return { success: true, tree };
-  } catch (err: unknown) {
-    return { success: false, error: (err as Error).message };
-  }
-});
+ipcMain.handle(
+  "profile-reorder",
+  (_e, groupIdOrName: string, orderedProfileIds: string[]) => {
+    try {
+      const forest = reorderProfiles(groupIdOrName, orderedProfileIds);
+      refreshTrayMenu();
+      return { success: true, forest };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
 
 ipcMain.handle("export-backup", async (_event, localStorage: Record<string, string>) => {
   try {
