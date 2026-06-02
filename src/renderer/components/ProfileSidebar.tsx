@@ -1093,7 +1093,7 @@ export function ProfileSidebar({
                             : undefined
                         }
                       >
-                        +
+                        <ToolLogo tool={defaultTool} size={12} />
                       </span>
                       {addingTerminal && isActive ? t("profile.opening") : t("terminal.new")}
                     </button>
