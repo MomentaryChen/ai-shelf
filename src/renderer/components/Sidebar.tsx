@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowUpRight,
   FolderOpen,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Search,
   Circle,
   FolderKanban,
   Monitor,
   Plus,
+  Minus,
   Settings2,
   Trash2,
   UserCircle2,
+  X,
 } from "lucide-react";
+import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
+import { EditablePaneTitle } from "./EditablePaneTitle";
+import { ToolLogo } from "./ToolLogo";
+import { profileToolLabel } from "../utils/available-tools";
 
 export interface SidebarGroup {
   id: string;
@@ -34,6 +42,7 @@ export interface SidebarProfile {
 export interface SidebarProfileItem {
   id: string;
   name: string;
+  defaultTool?: string;
   terminalCount: number;
   broadcastInput?: boolean;
   accentColor?: string | null;
@@ -43,8 +52,11 @@ export interface SidebarProfileItem {
 export interface SidebarTerminalItem {
   id: string;
   profileId: string;
+  tool?: string;
   label: string;
   description?: string;
+  live?: boolean;
+  minimized?: boolean;
 }
 
 interface SidebarProps {
@@ -72,7 +84,22 @@ interface SidebarProps {
   onProfileOpenFolder?: (profileId: string) => void;
   onProfileAddTerminal?: (profileId: string) => void;
   onProfileToggleBroadcast?: (profileId: string, enabled: boolean) => void;
-  onTerminalSelect?: (profileId: string, terminalId: string) => void;
+  onTerminalSelect?: (
+    profileId: string,
+    terminalId: string,
+    opts?: { placeBeside?: boolean },
+  ) => void;
+  onTerminalRename?: (profileId: string, terminalId: string, title: string) => void;
+  onTerminalClose?: (profileId: string, terminalId: string) => void;
+  onTerminalMinimize?: (profileId: string, terminalId: string) => void;
+  onTerminalRestore?: (profileId: string, terminalId: string) => void;
+  onTerminalReorder?: (
+    profileId: string,
+    dragTerminalId: string,
+    dropTerminalId: string,
+    zone: "above" | "below",
+  ) => void;
+  onProfilePaneDragChange?: (active: boolean) => void;
   onNavChange?: (itemId: string) => void;
   onTerminalClick?: () => void;
   onProfileMenuAction?: (action: "account" | "billing" | "logout") => void;
@@ -106,6 +133,12 @@ export function Sidebar({
   onProfileAddTerminal,
   onProfileToggleBroadcast,
   onTerminalSelect,
+  onTerminalRename,
+  onTerminalClose,
+  onTerminalMinimize,
+  onTerminalRestore,
+  onTerminalReorder,
+  onProfilePaneDragChange,
   onNavChange,
   onTerminalClick,
   onProfileMenuAction,
@@ -116,6 +149,9 @@ export function Sidebar({
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [draggingProfileId, setDraggingProfileId] = useState<string | null>(null);
   const [dragOverProfileId, setDragOverProfileId] = useState<string | null>(null);
+  const [draggingTerminal, setDraggingTerminal] = useState<{ profileId: string; terminalId: string } | null>(null);
+  const [dragOverTerminal, setDragOverTerminal] = useState<{ profileId: string; terminalId: string; zone: "above" | "below" } | null>(null);
+  const [query, setQuery] = useState("");
   const groupMenuRef = useRef<HTMLDivElement | null>(null);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -147,11 +183,30 @@ export function Sidebar({
     setExpandedProfiles((prev) => new Set(prev).add(activeProfileId));
   }, [activeProfileId]);
 
+  const filteredProfiles = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return profiles;
+    return profiles.filter((p) => {
+      if (p.name.toLowerCase().includes(q)) return true;
+      return (p.terminals ?? []).some((t) => {
+        const label = t.label?.toLowerCase() ?? "";
+        const desc = t.description?.toLowerCase() ?? "";
+        return label.includes(q) || desc.includes(q);
+      });
+    });
+  }, [profiles, query]);
+
+  const collapsedTerminals = useMemo(() => {
+    if (!collapsed) return [];
+    const active = profiles.find((p) => p.id === activeProfileId);
+    const fromActive = active?.terminals ?? [];
+    if (fromActive.length > 0) return fromActive.slice(0, 24);
+    return profiles.flatMap((p) => p.terminals ?? []).slice(0, 24);
+  }, [collapsed, profiles, activeProfileId]);
+
   return (
     <aside
-      className={`flex h-full flex-col border-r border-chrome-border bg-chrome-bg transition-all duration-200 ${
-        collapsed ? "w-16" : "w-72"
-      }`}
+      className="flex h-full w-full flex-col border-r border-chrome-border bg-chrome-bg transition-all duration-200"
     >
       <div className="flex items-center justify-between border-b border-chrome-border/80 p-2">
         {!collapsed && <span className="px-1 text-xs font-medium text-chrome-text-muted">Workspace</span>}
@@ -205,7 +260,7 @@ export function Sidebar({
           </div>
         )}
         {!collapsed && (
-          <div className="mt-1.5 flex items-center gap-1">
+            <div className="mt-1.5 flex items-center gap-1 rounded-md border border-chrome-border-subtle bg-chrome-surface px-1 py-1">
             <IconAction title="New group" onClick={onCreateGroup}>
               <Plus className="h-3.5 w-3.5" />
             </IconAction>
@@ -231,7 +286,39 @@ export function Sidebar({
         )}
       </div>
 
-      <nav className="flex-1 space-y-1 px-2 py-1">
+      <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto px-2 py-1">
+        {collapsed && (
+          <div className="space-y-1">
+            {collapsedTerminals.map((terminal) => {
+              const terminalActive = terminal.id === activeTerminalId;
+              return (
+                <button
+                  key={terminal.id}
+                  type="button"
+                  draggable={terminal.live === true}
+                  onDragStart={(e) => {
+                    if (terminal.live !== true) return;
+                    writeProfilePaneDrag(e.dataTransfer, {
+                      profileId: terminal.profileId,
+                      paneId: terminal.id,
+                    });
+                    onProfilePaneDragChange?.(true);
+                  }}
+                  onDragEnd={() => onProfilePaneDragChange?.(false)}
+                  title={terminal.description ? `${terminal.label}\n${terminal.description}` : terminal.label}
+                  onClick={() => onTerminalSelect?.(terminal.profileId, terminal.id)}
+                  className={`flex h-8 w-full items-center justify-center rounded-md transition-colors ${
+                    terminalActive
+                      ? "bg-chrome-hover text-chrome-text"
+                      : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
+                  }`}
+                >
+                  <ToolLogo tool={terminal.tool ?? "shell"} size={14} />
+                </button>
+              );
+            })}
+          </div>
+        )}
         {navItems.map((item) => {
           const active = item.id === activeNavId;
           return (
@@ -257,23 +344,63 @@ export function Sidebar({
             <div className="mt-3 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-muted">
               2. Profile
             </div>
+            <div className="mt-1 flex items-center gap-1 px-1">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-chrome-text-dim" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search profiles…"
+                  className="h-7 w-full rounded-md border border-chrome-border-input bg-chrome-surface pl-7 pr-2 text-[11px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-focus focus:outline-none"
+                />
+              </div>
+              <IconAction
+                title={
+                  filteredProfiles.length > 0 &&
+                  filteredProfiles.every((p) => expandedProfiles.has(p.id))
+                    ? "Collapse all"
+                    : "Expand all"
+                }
+                onClick={() => {
+                  const allExpanded =
+                    filteredProfiles.length > 0 &&
+                    filteredProfiles.every((p) => expandedProfiles.has(p.id));
+                  if (allExpanded) {
+                    setExpandedProfiles(new Set());
+                    return;
+                  }
+                  setExpandedProfiles(new Set(filteredProfiles.map((p) => p.id)));
+                }}
+              >
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    filteredProfiles.length > 0 &&
+                    filteredProfiles.every((p) => expandedProfiles.has(p.id))
+                      ? "rotate-180"
+                      : ""
+                  }`}
+                />
+              </IconAction>
+            </div>
             <div className="mt-1 space-y-1">
-              {profiles.length === 0 && (
-                <p className="rounded-lg px-2 py-1.5 text-xs text-chrome-text-muted">No profiles</p>
+              {filteredProfiles.length === 0 && (
+                <p className="rounded-lg px-2 py-1.5 text-xs text-chrome-text-muted">
+                  {query.trim() ? "No matching profiles or terminals" : "No profiles"}
+                </p>
               )}
-              {profiles.map((item) => {
+              {filteredProfiles.map((item) => {
                 const active = item.id === activeProfileId;
                 const expanded = expandedProfiles.has(item.id);
                 const accent = item.accentColor;
                 return (
                   <div
                     key={item.id}
-                    className={`rounded-lg border border-transparent ${
+                    className={`group rounded-lg border bg-chrome-surface/30 transition-colors ${
                       dragOverProfileId === item.id && draggingProfileId !== item.id
                         ? "ring-2 ring-accent/35"
                         : ""
                     }`}
-                    style={accent ? { borderColor: `${accent}44` } : undefined}
+                    style={accent ? { borderColor: `${accent}77` } : { borderColor: "var(--color-chrome-border-subtle)" }}
                     onDragOver={(e) => {
                       if (!draggingProfileId) return;
                       e.preventDefault();
@@ -291,47 +418,86 @@ export function Sidebar({
                       setDragOverProfileId(null);
                     }}
                   >
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(e) => {
-                        setDraggingProfileId(item.id);
-                        e.dataTransfer.effectAllowed = "move";
-                      }}
-                      onDragEnd={() => {
-                        setDraggingProfileId(null);
-                        setDragOverProfileId(null);
-                      }}
-                      onClick={() => onProfileSelect?.(item.id)}
-                      className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm transition-all duration-200 ${
-                        active
-                          ? "bg-chrome-hover text-chrome-text"
-                          : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
-                      }`}
-                      style={active && accent ? { backgroundColor: `${accent}1a` } : undefined}
-                    >
-                      <span className="inline-flex min-w-0 items-center gap-1.5">
-                        {accent && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accent }} />}
-                        <span className="truncate">{item.name}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[11px] text-chrome-text-muted">
-                        {item.terminalCount}
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedProfiles((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(item.id)) next.delete(item.id);
-                              else next.add(item.id);
-                              return next;
-                            });
-                          }}
-                        />
-                      </span>
-                    </button>
+                    <div className="px-1.5 py-1">
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggingProfileId(item.id);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => {
+                          setDraggingProfileId(null);
+                          setDragOverProfileId(null);
+                        }}
+                        onClick={() => onProfileSelect?.(item.id)}
+                        className={`flex w-full items-center justify-between gap-2 rounded-lg px-1.5 py-1 text-left text-sm transition-all duration-200 ${
+                          active
+                            ? "bg-chrome-hover text-chrome-text"
+                            : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
+                        }`}
+                        style={active && accent ? { backgroundColor: `${accent}2b` } : undefined}
+                      >
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          {accent && (
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-[3px] shadow-sm"
+                              style={{
+                                backgroundColor: accent,
+                                boxShadow: `0 0 8px ${accent}66`,
+                              }}
+                            />
+                          )}
+                          <span className="truncate font-medium">{item.name}</span>
+                        </span>
+                        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-chrome-text-muted">
+                          <span className="rounded bg-chrome-badge-bg px-1 py-0.5">{item.terminalCount}</span>
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedProfiles((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(item.id)) next.delete(item.id);
+                                else next.add(item.id);
+                                return next;
+                              });
+                            }}
+                          />
+                        </span>
+                      </button>
+                      <div
+                        className={`mt-1 flex items-center gap-1 pl-1 ${active ? "opacity-100" : "hidden"}`}
+                      >
+                        <IconAction
+                          title={
+                            item.defaultTool
+                              ? `Add terminal (${profileToolLabel(item.defaultTool)})`
+                              : "Add terminal"
+                          }
+                          onClick={() => onProfileAddTerminal?.(item.id)}
+                        >
+                          +
+                        </IconAction>
+                        <IconAction title="Open folder" onClick={() => onProfileOpenFolder?.(item.id)}>
+                          📁
+                        </IconAction>
+                        <IconAction title="Profile settings" onClick={() => onProfileSettings?.(item.id)}>
+                          ⚙
+                        </IconAction>
+                        <label className="ml-1 inline-flex items-center gap-1 text-[10px] text-chrome-text-muted">
+                          <input
+                            type="checkbox"
+                            checked={item.broadcastInput ?? false}
+                            onChange={(e) => onProfileToggleBroadcast?.(item.id, e.target.checked)}
+                            className="h-3 w-3 rounded accent-accent"
+                          />
+                          sync
+                        </label>
+                      </div>
+                    </div>
                     {expanded && (
-                      <div className="mt-0.5 space-y-1 pl-2">
+                      <div className="mt-0.5 space-y-1 border-t border-chrome-border-subtle pl-2 pt-1">
                         {(item.terminals ?? []).length === 0 && (
                           <p className="rounded-lg px-2 py-1.5 text-xs text-chrome-text-muted">No terminals</p>
                         )}
@@ -341,50 +507,132 @@ export function Sidebar({
                             <button
                               key={terminal.id}
                               type="button"
-                              className={`flex w-full items-center rounded-lg px-2 py-1.5 text-left text-xs transition-all duration-200 ${
+                              draggable={terminal.live === true}
+                              onDragStart={(e) => {
+                                if (terminal.live !== true) return;
+                                writeProfilePaneDrag(e.dataTransfer, {
+                                  profileId: terminal.profileId,
+                                  paneId: terminal.id,
+                                });
+                                onProfilePaneDragChange?.(true);
+                                setDraggingTerminal({
+                                  profileId: terminal.profileId,
+                                  terminalId: terminal.id,
+                                });
+                              }}
+                              onDragEnd={() => {
+                                onProfilePaneDragChange?.(false);
+                                setDraggingTerminal(null);
+                                setDragOverTerminal(null);
+                              }}
+                              onDragOver={(e) => {
+                                if (
+                                  !draggingTerminal ||
+                                  draggingTerminal.profileId !== terminal.profileId ||
+                                  draggingTerminal.terminalId === terminal.id
+                                ) {
+                                  return;
+                                }
+                                e.preventDefault();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const zone = e.clientY < rect.top + rect.height / 2 ? "above" : "below";
+                                setDragOverTerminal({
+                                  profileId: terminal.profileId,
+                                  terminalId: terminal.id,
+                                  zone,
+                                });
+                              }}
+                              onDrop={(e) => {
+                                if (
+                                  !draggingTerminal ||
+                                  draggingTerminal.profileId !== terminal.profileId ||
+                                  draggingTerminal.terminalId === terminal.id ||
+                                  !dragOverTerminal
+                                ) {
+                                  return;
+                                }
+                                e.preventDefault();
+                                onTerminalReorder?.(
+                                  terminal.profileId,
+                                  draggingTerminal.terminalId,
+                                  terminal.id,
+                                  dragOverTerminal.zone,
+                                );
+                                setDraggingTerminal(null);
+                                setDragOverTerminal(null);
+                              }}
+                              className={`group relative flex w-full items-center rounded-lg px-2 py-1.5 text-left text-xs transition-all duration-200 ${
                                 terminalActive
                                   ? "bg-chrome-hover text-chrome-text"
                                   : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                               }`}
-                              style={terminalActive && accent ? { backgroundColor: `${accent}14` } : undefined}
-                              onClick={() => onTerminalSelect?.(terminal.profileId, terminal.id)}
+                              style={terminalActive && accent ? { backgroundColor: `${accent}24` } : undefined}
+                              onClick={(e) =>
+                                onTerminalSelect?.(terminal.profileId, terminal.id, {
+                                  placeBeside: e.shiftKey,
+                                })
+                              }
                             >
-                              <span className="truncate">{terminal.label}</span>
+                              {dragOverTerminal?.profileId === terminal.profileId &&
+                                dragOverTerminal.terminalId === terminal.id && (
+                                  <span
+                                    className={`pointer-events-none absolute left-1 right-1 h-0.5 rounded-full bg-accent ${
+                                      dragOverTerminal.zone === "above" ? "top-0" : "bottom-0"
+                                    }`}
+                                  />
+                                )}
+                              <span className="mr-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-chrome-border-subtle bg-chrome-surface">
+                                <ToolLogo tool={terminal.tool ?? "shell"} size={12} />
+                              </span>
+                              {terminal.live && onTerminalRename ? (
+                                <EditablePaneTitle
+                                  label={terminal.label}
+                                  onRename={(title) =>
+                                    onTerminalRename(terminal.profileId, terminal.id, title)
+                                  }
+                                  className="truncate text-[11px]"
+                                  inputClassName="text-[11px]"
+                                />
+                              ) : (
+                                <span className="truncate">{terminal.label}</span>
+                              )}
                               {terminal.description && (
                                 <span className="ml-1 truncate text-[10px] text-chrome-text-muted">
                                   · {terminal.description}
                                 </span>
                               )}
+                              {terminal.live && (
+                                <span className="ml-auto inline-flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                  {terminal.minimized ? (
+                                    <IconAction
+                                      title="Restore pane"
+                                      onClick={() =>
+                                        onTerminalRestore?.(terminal.profileId, terminal.id)
+                                      }
+                                    >
+                                      <ArrowUpRight className="h-3 w-3" />
+                                    </IconAction>
+                                  ) : (
+                                    <IconAction
+                                      title="Minimize pane"
+                                      onClick={() =>
+                                        onTerminalMinimize?.(terminal.profileId, terminal.id)
+                                      }
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </IconAction>
+                                  )}
+                                  <IconAction
+                                    title="Close pane"
+                                    onClick={() => onTerminalClose?.(terminal.profileId, terminal.id)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </IconAction>
+                                </span>
+                              )}
                             </button>
                           );
                         })}
-                        <div className="flex items-center gap-1 px-1 py-0.5">
-                          <IconAction title="Add terminal" onClick={() => onProfileAddTerminal?.(item.id)}>
-                            <Plus className="h-3.5 w-3.5" />
-                          </IconAction>
-                          <IconAction title="Open folder" onClick={() => onProfileOpenFolder?.(item.id)}>
-                            <FolderOpen className="h-3.5 w-3.5" />
-                          </IconAction>
-                          <label className="ml-1 inline-flex items-center gap-1 text-[10px] text-chrome-text-muted">
-                            <input
-                              type="checkbox"
-                              checked={item.broadcastInput ?? false}
-                              onChange={(e) =>
-                                onProfileToggleBroadcast?.(item.id, e.target.checked)
-                              }
-                              className="h-3 w-3 rounded accent-accent"
-                            />
-                            broadcast
-                          </label>
-                          <div className="ml-auto">
-                            <IconAction
-                              title="Profile settings"
-                              onClick={() => onProfileSettings?.(item.id)}
-                            >
-                              <Settings2 className="h-3.5 w-3.5" />
-                            </IconAction>
-                          </div>
-                        </div>
                       </div>
                     )}
                   </div>

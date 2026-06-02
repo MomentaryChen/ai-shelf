@@ -144,19 +144,6 @@ export function useProfileWorkspace(
     await saveGroupSnapshot(profile.workspaceId, profile.id, snapshot);
   }, []);
 
-  const clearProfileSnapshot = useCallback(async (profile: ProfileInfo) => {
-    const existing = await loadGroupSnapshot(profile.workspaceId, profile.id);
-    await saveGroupSnapshot(profile.workspaceId, profile.id, {
-      defaultCwd: existing?.defaultCwd ?? profile.defaultCwd ?? "",
-      defaultTool: existing?.defaultTool ?? profile.defaultTool ?? "claude",
-      panes: [],
-      layout: null,
-      broadcastInput: broadcastRef.current,
-      accentColor: existing?.accentColor ?? profile.accentColor ?? null,
-      updatedAt: new Date().toISOString(),
-    });
-  }, []);
-
   const minimizedPaneIdsRef = useRef(minimizedPaneIds);
   minimizedPaneIdsRef.current = minimizedPaneIds;
 
@@ -236,10 +223,8 @@ export function useProfileWorkspace(
       const reconciled = await reconcileLayoutPtys(next, spawnPane);
       const focusId = collectPanes(reconciled)[0]?.id ?? null;
       applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
-      const minimized =
-        focusId && collectPanes(reconciled).length > 1
-          ? minimizedForSingleDisplay(reconciled, focusId)
-          : [];
+      // Restore full layout visibility from snapshot; do not auto-minimize sibling panes.
+      const minimized: string[] = [];
       applyMinimizedPaneIds(minimizedSet(minimized));
       profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
         layout: reconciled,
@@ -407,15 +392,17 @@ export function useProfileWorkspace(
       return () => window.clearTimeout(t);
     }
     profileLiveCacheRef.current.delete(cacheKey(activeProfile.workspaceId, activeProfile.id));
-    void clearProfileSnapshot(activeProfile);
-  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, persistCurrentProfile, clearProfileSnapshot]);
+  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, persistCurrentProfile, cacheKey]);
 
   const getProfilePanes = useCallback(
     (profileId: string): PaneInfo[] => {
       if (activeProfile?.id === profileId) {
         return layout ? collectPanes(layout) : [];
       }
-      const cached = profileLiveCacheRef.current.get(profileId);
+      const cached =
+        Array.from(profileLiveCacheRef.current.entries()).find(([key]) =>
+          key.endsWith(`:${profileId}`),
+        )?.[1] ?? null;
       return cached ? collectPanes(cached.layout) : [];
     },
     [activeProfile, layout],
@@ -424,7 +411,11 @@ export function useProfileWorkspace(
   const getProfileFocusedPaneId = useCallback(
     (profileId: string): string | null => {
       if (activeProfile?.id === profileId) return focusedPaneId;
-      return profileLiveCacheRef.current.get(profileId)?.focusedPaneId ?? null;
+      const cached =
+        Array.from(profileLiveCacheRef.current.entries()).find(([key]) =>
+          key.endsWith(`:${profileId}`),
+        )?.[1] ?? null;
+      return cached?.focusedPaneId ?? null;
     },
     [activeProfile, focusedPaneId],
   );

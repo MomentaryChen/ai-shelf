@@ -40,10 +40,26 @@ export async function saveGroupSnapshot(
   snapshot: GroupLayoutSnapshot,
 ): Promise<void> {
   await window.api.wsGroupLayoutSave(workspaceId, groupId, snapshot);
+  // Backward-compatibility: keep writing legacy localStorage snapshot map for older builds.
+  try {
+    const key = groupKey(workspaceId, groupId);
+    const raw = localStorage.getItem(GROUP_LAYOUTS_KEY);
+    const all = raw ? (JSON.parse(raw) as Record<string, GroupLayoutSnapshot>) : {};
+    all[key] = snapshot;
+    localStorage.setItem(GROUP_LAYOUTS_KEY, JSON.stringify(all));
+  } catch {
+    /* best-effort legacy mirror */
+  }
 }
 
 export async function saveLastActiveGroupKey(workspaceId: string, groupId: string): Promise<void> {
   await window.api.wsGroupLayoutSetActive(workspaceId, groupId);
+  // Backward-compatibility: keep legacy last-active key in sync for older builds.
+  try {
+    localStorage.setItem(LAST_ACTIVE_GROUP_KEY, groupKey(workspaceId, groupId));
+  } catch {
+    /* best-effort legacy mirror */
+  }
 }
 
 /** One-time migration from legacy localStorage snapshots into SQLite. */

@@ -200,6 +200,7 @@ export function ChatTab({
     minimizePane,
     unminimizePanes,
     forgetMinimizedPane,
+    persistCurrentProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -805,29 +806,35 @@ export function ChatTab({
             ? live.map((pane, idx) => ({
                 id: pane.id,
                 profileId: p.id,
+                tool: pane.tool,
                 label: paneDisplayLabel(pane),
                 description: pane.cwd || `${toolLabel(pane.tool)} ${idx + 1}`,
+                live: true,
+                minimized: p.id === activeProfile?.id ? isPaneMinimized(p.id, pane.id) : false,
               }))
             : p.terminals.map((terminal, idx) => ({
                 id: `saved-${p.id}-${idx}`,
                 profileId: p.id,
+                tool: terminal.tool,
                 label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
                 description: terminal.cwd,
+                live: false,
               }));
         return {
           id: p.id,
           name: p.name,
+          defaultTool: p.defaultTool,
           accentColor: p.accentColor,
           terminalCount: terminals.length,
           broadcastInput: p.broadcastInput,
           terminals,
         };
       }),
-    [currentGroup?.profiles, getProfilePanes],
+    [currentGroup?.profiles, getProfilePanes, activeProfile?.id, isPaneMinimized],
   );
 
   const sidebar = (
-    <div style={{ width: sidebarWidth }}>
+    <div style={{ width: sidebarCollapsed ? 64 : sidebarWidth }}>
       <Sidebar
         groups={sidebarGroups}
         currentGroupId={currentGroupId}
@@ -922,13 +929,49 @@ export function ChatTab({
             await refreshSidebarForest();
           })();
         }}
-        onTerminalSelect={(profileId, terminalId) => {
+        onProfilePaneDragChange={setProfileSidebarDrag}
+        onTerminalRename={(profileId, terminalId, title) => {
+          if (activeProfile?.id !== profileId) return;
+          renamePane(terminalId, title);
+        }}
+        onTerminalClose={(profileId, terminalId) => {
+          if (activeProfile?.id !== profileId) return;
+          closePane(terminalId);
+        }}
+        onTerminalMinimize={(profileId, terminalId) => {
+          if (activeProfile?.id !== profileId) return;
+          minimizePane(profileId, terminalId);
+        }}
+        onTerminalRestore={(profileId, terminalId) => {
+          const profile = sidebarForest?.groups
+            .flatMap((g) => g.profiles)
+            .find((p) => p.id === profileId);
+          if (!profile) return;
+          void restorePaneToDisplay(profile, terminalId);
+        }}
+        onTerminalReorder={(profileId, dragTerminalId, dropTerminalId, zone) => {
+          if (activeProfile?.id !== profileId) return;
+          setLayout((prev) =>
+            prev ? movePaneInTree(prev, dragTerminalId, dropTerminalId, zone) : prev,
+          );
+          void persistCurrentProfile();
+        }}
+        onTerminalSelect={(profileId, terminalId, opts) => {
           const profile = sidebarForest?.groups
             .flatMap((g) => g.profiles)
             .find((p) => p.id === profileId);
           if (!profile) return;
           const pane = getProfilePanes(profile.id).find((p) => p.id === terminalId);
           if (pane) {
+            if (
+              opts?.placeBeside &&
+              activeProfile?.id === profile.id &&
+              focusedPaneId &&
+              focusedPaneId !== pane.id
+            ) {
+              void placePaneBeside(profile, pane.id, focusedPaneId, "right");
+              return;
+            }
             void restorePaneToDisplay(profile, pane.id);
             return;
           }

@@ -79,6 +79,46 @@ export class ProfileService {
     return list[0]!;
   }
 
+  private ensureLegacyWorkspace() {
+    const byName = this.workspaces.findByName(DEFAULT_PROFILE_GROUP_NAME);
+    if (byName) return byName;
+    return this.workspaces.create({
+      name: DEFAULT_PROFILE_GROUP_NAME,
+      root_path: homedir(),
+    });
+  }
+
+  private legacyMirrorName(sourceWorkspaceName: string, profileName: string): string {
+    return `${sourceWorkspaceName} / ${profileName}`;
+  }
+
+  private upsertLegacyMirror(
+    sourceWorkspaceName: string,
+    profileName: string,
+    snapshot: GroupLayoutSnapshot,
+  ): void {
+    if (sourceWorkspaceName === DEFAULT_PROFILE_GROUP_NAME) return;
+    const legacyWs = this.ensureLegacyWorkspace();
+    const mirrorName = this.legacyMirrorName(sourceWorkspaceName, profileName);
+    const existing = this.groups.findByName(legacyWs.id, mirrorName);
+    const mirror =
+      existing ?? this.groups.create({ workspace_id: legacyWs.id, name: mirrorName });
+    this.layouts.upsert(mirror.id, legacyWs.id, {
+      ...snapshot,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  private deleteLegacyMirror(sourceWorkspaceName: string, profileName: string): void {
+    if (sourceWorkspaceName === DEFAULT_PROFILE_GROUP_NAME) return;
+    const legacyWs = this.workspaces.findByName(DEFAULT_PROFILE_GROUP_NAME);
+    if (!legacyWs) return;
+    const mirrorName = this.legacyMirrorName(sourceWorkspaceName, profileName);
+    const existing = this.groups.findByName(legacyWs.id, mirrorName);
+    if (!existing) return;
+    this.groups.deleteByName(legacyWs.id, mirrorName);
+  }
+
   getForest(): ProfileForest {
     const workspaceList = this.workspaces.list();
     if (workspaceList.length === 0) {
@@ -180,6 +220,7 @@ export class ProfileService {
       updatedAt: new Date().toISOString(),
     };
     this.layouts.upsert(group.id, ws.id, snapshot);
+    this.upsertLegacyMirror(ws.name, name, snapshot);
 
     return this.toProfileInfo(group, ws.id);
   }
@@ -195,6 +236,8 @@ export class ProfileService {
     },
   ): ProfileInfo {
     const { workspaceId, group } = this.resolve(profileId);
+    const ws = this.workspaces.findById(workspaceId)!;
+    const previousName = group.name;
     let updatedGroup = group;
 
     if (patch.name !== undefined) {
@@ -205,7 +248,6 @@ export class ProfileService {
       }
     }
 
-    const ws = this.workspaces.findById(workspaceId)!;
     const snap =
       this.layouts.findByGroupId(profileId) ??
       ({
@@ -252,6 +294,12 @@ export class ProfileService {
       updatedAt: new Date().toISOString(),
     };
     this.layouts.upsert(profileId, workspaceId, next);
+    if (ws.name !== DEFAULT_PROFILE_GROUP_NAME) {
+      if (previousName !== updatedGroup.name) {
+        this.deleteLegacyMirror(ws.name, previousName);
+      }
+      this.upsertLegacyMirror(ws.name, updatedGroup.name, next);
+    }
 
     return this.toProfileInfo(updatedGroup, workspaceId);
   }
@@ -274,6 +322,7 @@ export class ProfileService {
 
   delete(profileId: string): void {
     const { workspaceId, group } = this.resolve(profileId);
+    const ws = this.workspaces.findById(workspaceId)!;
 
     const lastKey = this.layouts.getLastActiveGroupKey();
     if (lastKey === `${workspaceId}:${profileId}`) {
@@ -281,6 +330,7 @@ export class ProfileService {
     }
 
     this.groups.deleteByName(workspaceId, group.name);
+    this.deleteLegacyMirror(ws.name, group.name);
   }
 
   resolve(profileId: string): { workspaceId: string; group: GroupModel } {
