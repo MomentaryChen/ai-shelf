@@ -9,6 +9,29 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-06-02
+
+Profile group workflow, terminal/sidebar UX improvements, and single-instance desktop behavior.
+
+### Added
+
+- **Profile groups** — Added profile group commands and services in `ai-shelf` CLI/TUI, plus grouped profile tree in the desktop sidebar.
+- **Desktop single-instance behavior** — Electron now enforces single-instance launch behavior and routes secondary launches to the existing window.
+- **Top-bar plain shell action** — Added a plain shell quick action in terminal top bar / pane controls.
+- **System tray runtime toggle** — Added settings and runtime sync for enabling/disabling tray behavior without restart.
+
+### Changed
+
+- **Sidebar architecture refresh** — Reworked terminal/profile sidebar composition to restore grouped workflow and improve interaction consistency.
+- **Profile default tool behavior** — New terminals now use profile default tool icon and launch behavior more consistently.
+
+### Fixed
+
+- **Profile folder picker after switching** — Fixed intermittent failures when reopening folder picker after profile switches.
+- **Profile layout persistence** — Preserved split layout reliably when switching profiles.
+- **Sidebar shortcut handling** — Fixed `Ctrl+S` sidebar collapse toggle and related sidebar UX regressions.
+- **Pane action stacking** — Prevented `+ Pane` menu stacking issues under the terminal UI.
+
 ## [2.0.0] - 2026-05-27
 
 Major release: Profile-first data model, backup/restore, desktop polish, and automated npm + signed Windows installer on tag.
@@ -180,6 +203,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.0
 [2.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.0.0
 [1.4.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.1
 [1.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.0
