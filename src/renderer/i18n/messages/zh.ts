@@ -286,6 +286,7 @@ export const zh: Record<MessageKey, string> = {
   "chat.err.enableProfile": "無法啟用 profile：{msg}",
   "chat.maxPanesTitle": "最多 {max} 個窗格",
   "chat.folderBtn": "資料夾",
+  "chat.plainShellTitle": "開啟純終端機（不啟動 AI CLI）",
   "chat.addPane": "+ 窗格",
   "chat.addPaneTitle": "新增 terminal 窗格（{splitRight} 向右分割，{splitDown} 向下分割）",
   "chat.syncLabel": "同步",
