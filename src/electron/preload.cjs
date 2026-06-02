@@ -110,6 +110,8 @@ contextBridge.exposeInMainWorld("api", {
   exportBackup: (localStorage) => ipcRenderer.invoke("export-backup", localStorage),
   importBackup: () => ipcRenderer.invoke("import-backup"),
   relaunchApp: () => ipcRenderer.invoke("relaunch-app"),
+  setSystemTrayEnabled: (enabled) => ipcRenderer.invoke("set-system-tray-enabled", enabled),
+  getSystemTrayEnabled: () => ipcRenderer.invoke("get-system-tray-enabled"),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),

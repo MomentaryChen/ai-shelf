@@ -36,6 +36,8 @@ export interface ChatSettings {
   dirHistory: string[];
   /** Pane split / focus shortcuts (Ctrl/Cmd combinations). */
   paneShortcuts: PaneShortcutBindings;
+  /** Minimize to system tray and keep running when all windows are closed. */
+  systemTrayEnabled: boolean;
 }
 
 export type { PaneShortcutBindings };
@@ -82,6 +84,11 @@ function normalizeRightClickPaste(raw: unknown): boolean {
   return true;
 }
 
+function normalizeSystemTrayEnabled(raw: unknown): boolean {
+  if (typeof raw === "boolean") return raw;
+  return true;
+}
+
 const DEFAULTS: ChatSettings = {
   locale: detectSystemLocale(),
   appTheme: DEFAULT_APP_THEME,
@@ -94,6 +101,7 @@ const DEFAULTS: ChatSettings = {
   workingDir: "",
   dirHistory: [],
   paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
+  systemTrayEnabled: true,
 };
 
 export function loadSettings(): ChatSettings {
@@ -119,6 +127,7 @@ export function loadSettings(): ChatSettings {
       ),
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
       paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
+      systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
     };
   } catch {
     return { ...DEFAULTS };
