@@ -5,6 +5,15 @@ import { getProfileForest, setLastActiveGroup } from "./workspace-host.js";
 let tray: Tray | null = null;
 let isQuitting = false;
 let trayDeps: TrayDeps | null = null;
+let minimizeToTrayEnabled = true;
+
+export function isSystemTrayEnabled(): boolean {
+  return minimizeToTrayEnabled;
+}
+
+export function setMinimizeToTrayEnabled(enabled: boolean): void {
+  minimizeToTrayEnabled = enabled;
+}
 
 export interface TrayDeps {
   iconPath: string;
@@ -155,13 +164,34 @@ export function initTray(deps: TrayDeps): Tray {
 export function destroyTray(): void {
   tray?.destroy();
   tray = null;
-  trayDeps = null;
 }
 
-/** Close hides to tray so PTY sessions keep running. */
+function showHiddenAppWindows(deps: TrayDeps): void {
+  for (const getter of [deps.getMainWindow, deps.getChatWindow]) {
+    const win = getter();
+    if (win && !win.isDestroyed() && !win.isVisible()) win.show();
+  }
+}
+
+/** Apply tray on/off from settings; keeps renderer localStorage and main-process pref in sync. */
+export function applySystemTrayEnabled(enabled: boolean, deps: TrayDeps): void {
+  setMinimizeToTrayEnabled(enabled);
+  trayDeps = deps;
+
+  if (enabled) {
+    if (!tray) initTray(deps);
+    else refreshTrayMenu(deps);
+    return;
+  }
+
+  destroyTray();
+  showHiddenAppWindows(deps);
+}
+
+/** Close hides to tray so PTY sessions keep running (when tray is enabled). */
 export function bindMinimizeToTray(win: BrowserWindow): void {
   win.on("close", (e) => {
-    if (isQuitting) return;
+    if (isQuitting || !minimizeToTrayEnabled) return;
     e.preventDefault();
     win.hide();
   });

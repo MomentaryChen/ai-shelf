@@ -16,7 +16,7 @@ export const en = {
   "app.tab.update": "Update",
   "settings.title": "Terminal Settings",
   "settings.subtitle":
-    "Language, app theme, working directory, external terminal, pane shortcuts, display, background, and data backup",
+    "Language, app theme, working directory, external terminal, pane shortcuts, display, system tray, background, and data backup",
   "settings.paneShortcut.title": "Pane shortcuts",
   "settings.paneShortcut.subtitle":
     "Split and focus shortcuts while a terminal pane is focused. Requires Ctrl (or Cmd on Mac). Close, clear, and restart shortcuts stay fixed.",
@@ -51,6 +51,10 @@ export const en = {
   "settings.rightClickPaste": "Right-click to paste",
   "settings.rightClickPasteHint":
     "When enabled, right-click pastes from the clipboard; with a selection, it copies first. Hold Shift and right-click for the context menu (Copy, Paste, Find…).",
+  "settings.systemTray": "System tray",
+  "settings.systemTrayEnable": "Minimize to system tray",
+  "settings.systemTrayHint":
+    "When enabled, closing a window hides it to the tray and the app keeps running. When disabled, closing the last window quits the app.",
   "settings.custom": "Custom",
   "settings.backup": "Data backup & restore",
   "settings.backupHint":
@@ -325,6 +329,7 @@ export const en = {
   "chat.err.enableProfile": "Could not activate profile: {msg}",
   "chat.maxPanesTitle": "Maximum {max} panes",
   "chat.folderBtn": "Folder",
+  "chat.plainShellTitle": "Open a plain shell (no AI CLI)",
   "chat.addPane": "+ Pane",
   "chat.addPaneTitle": "Add terminal pane ({splitRight} split right, {splitDown} split down)",
   "chat.syncLabel": "sync",

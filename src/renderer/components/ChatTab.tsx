@@ -48,7 +48,12 @@ import {
   type ExternalTerminal,
   SETTINGS_KEY,
 } from "../chat-settings";
-import { resolveLaunchTool, toolIdsFromInventory } from "../utils/available-tools";
+import {
+  PLAIN_SHELL_TOOL_ID,
+  profileToolLabel,
+  resolveLaunchTool,
+  toolIdsFromInventory,
+} from "../utils/available-tools";
 import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
@@ -176,6 +181,7 @@ export function ChatTab({
   const {
     activeProfile,
     restoring,
+    isRestoring,
     migrationDone,
     activateProfile,
     restoreLastProfile,
@@ -309,6 +315,35 @@ export function ChatTab({
   }, [showNewMenu]);
 
   useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      const hasMod = ev.ctrlKey || ev.metaKey;
+      if (!hasMod || ev.shiftKey || ev.altKey) return;
+      if (ev.key.toLowerCase() !== "s") return;
+
+      const target = ev.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable ||
+          target.closest("[contenteditable='true']")
+        ) {
+          return;
+        }
+      }
+
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      setSidebarCollapsed((prev) => !prev);
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+
+  useEffect(() => {
     if (!migrationDone || initialRestoreDoneRef.current || restoreInFlightRef.current) return;
 
     let cancelled = false;
@@ -352,7 +387,7 @@ export function ChatTab({
       direction: SplitDirection = "horizontal",
       opts?: { keepOthersVisible?: boolean },
     ): Promise<PaneInfo | null> => {
-      if (restoring) {
+      if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
         return null;
       }
@@ -387,7 +422,7 @@ export function ChatTab({
     [
       canAddPane,
       maxPanes,
-      restoring,
+      isRestoring,
       resolveCwd,
       spawnPaneResilient,
       focusedPaneId,
@@ -499,7 +534,7 @@ export function ChatTab({
 
   const openFolderPane = useCallback(
     async (cwdHint?: string) => {
-      if (restoring) {
+      if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
         return;
       }
@@ -520,7 +555,7 @@ export function ChatTab({
       }
     },
     [
-      restoring,
+      isRestoring,
       canAddPane,
       maxPanes,
       resolveCwd,
@@ -696,17 +731,14 @@ export function ChatTab({
   }
 
   async function handleNewTerminal(profile: ProfileInfo) {
-    if (addingTerminal || profileBusy || restoring) return;
+    if (addingTerminal || profileBusy || isRestoring()) return;
     setAddingTerminal(true);
     setTerminalError(null);
     try {
       if (activeProfile?.id !== profile.id) {
         await handleActivateProfile(profile);
       }
-      const cwd =
-        profile.id === activeProfile?.id
-          ? getProfileDefaultCwd() || profile.defaultCwd?.trim()
-          : profile.defaultCwd?.trim();
+      const cwd = profile.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(
         resolveLaunchTool(profile.defaultTool, availableTools),
         cwd || undefined,
@@ -1192,14 +1224,14 @@ export function ChatTab({
           />
         </div>
       )}
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         {topBar}
         {terminalError && (
           <div className="shrink-0 border-b border-red-500/30 bg-red-900/20 px-3 py-2 text-[12px] text-red-300">
             {terminalError}
           </div>
         )}
-        {terminalArea}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
       </div>
     </div>
   );
@@ -1246,7 +1278,7 @@ function WarpTopBar({
   const defaultAccent = getChromeCssVar("--color-chrome-accent-text", "#8ab4ff");
 
   return (
-    <div className="relative z-20 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
+    <div className="relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
       {profileLabel && (
         <div
           className="flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1"
@@ -1311,8 +1343,24 @@ function WarpTopBar({
         >
           {t("chat.addPane")}
         </button>
+        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
         {showNewMenu && canAddPane && (
-          <div className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
+          <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
+            <button
+              type="button"
+              title={t("chat.plainShellTitle")}
+              onClick={() => {
+                onAddPane(PLAIN_SHELL_TOOL_ID);
+                onToggleNewMenu();
+              }}
+              className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[12px] hover:bg-chrome-surface-hover-strong"
+            >
+              <ToolLogo tool={PLAIN_SHELL_TOOL_ID} size={14} />
+              {profileToolLabel(PLAIN_SHELL_TOOL_ID)}
+            </button>
+            {available.length > 0 && (
+              <div className="my-1 border-t border-chrome-border-subtle" role="separator" />
+            )}
             {available.map((e) => (
               <button
                 key={e.tool}
@@ -1329,7 +1377,6 @@ function WarpTopBar({
             ))}
           </div>
         )}
-        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
       </div>
     </div>
   );
