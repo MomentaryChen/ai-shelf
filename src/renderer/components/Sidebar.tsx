@@ -477,7 +477,7 @@ export function Sidebar({
                           }
                           onClick={() => onProfileAddTerminal?.(item.id)}
                         >
-                          +
+                          <ToolLogo tool={item.defaultTool ?? "shell"} size={12} />
                         </IconAction>
                         <IconAction title="Open folder" onClick={() => onProfileOpenFolder?.(item.id)}>
                           📁
