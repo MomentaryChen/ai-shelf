@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
-import { getProfileTree, setLastActiveGroup } from "./workspace-host.js";
+import { getProfileForest, setLastActiveGroup } from "./workspace-host.js";
 
 let tray: Tray | null = null;
 let isQuitting = false;
@@ -60,34 +60,43 @@ function sendTrayActivateProfile(win: BrowserWindow, profileId: string): void {
   else send();
 }
 
-function activateProfileFromTray(profileId: string, deps: TrayDeps): void {
+function activateProfileFromTray(workspaceId: string, profileId: string, deps: TrayDeps): void {
   try {
-    const tree = getProfileTree();
-    if (!tree.profiles.some((p) => p.id === profileId)) return;
-    setLastActiveGroup(tree.workspaceId, profileId);
+    const forest = getProfileForest();
+    const found = forest.groups.some((g) =>
+      g.profiles.some((p) => p.id === profileId && g.id === workspaceId),
+    );
+    if (!found) return;
+    setLastActiveGroup(workspaceId, profileId);
     showTerminalWindow(deps);
     const target = getTerminalWindow(deps);
     if (target) sendTrayActivateProfile(target, profileId);
     refreshTrayMenu(deps);
   } catch {
-    /* profile tree unavailable */
+    /* profile forest unavailable */
   }
 }
 
 function buildTrayMenu(deps: TrayDeps): Menu {
-  let tree: ReturnType<typeof getProfileTree>;
+  let forest: ReturnType<typeof getProfileForest>;
   try {
-    tree = getProfileTree();
+    forest = getProfileForest();
   } catch {
-    tree = { workspaceId: "", profiles: [], lastActiveProfileId: null };
+    forest = { groups: [], lastActiveGroupId: null, lastActiveProfileId: null };
   }
 
-  const profileItems: MenuItemConstructorOptions[] = tree.profiles.map((p) => ({
-    label: p.name,
-    type: "checkbox",
-    checked: p.id === tree.lastActiveProfileId,
-    click: () => activateProfileFromTray(p.id, deps),
-  }));
+  const switchProfileSubmenu: MenuItemConstructorOptions[] = forest.groups
+    .filter((g) => g.profiles.length > 0)
+    .map((g) => ({
+      label: g.name,
+      submenu: g.profiles.map((p) => ({
+        label: p.name,
+        type: "checkbox" as const,
+        checked:
+          g.id === forest.lastActiveGroupId && p.id === forest.lastActiveProfileId,
+        click: () => activateProfileFromTray(g.id, p.id, deps),
+      })),
+    }));
 
   const template: MenuItemConstructorOptions[] = [
     {
@@ -105,8 +114,8 @@ function buildTrayMenu(deps: TrayDeps): Menu {
       },
     },
     { type: "separator" },
-    ...(profileItems.length > 0
-      ? [{ label: "Switch Profile", submenu: profileItems }]
+    ...(switchProfileSubmenu.length > 0
+      ? [{ label: "Switch Profile", submenu: switchProfileSubmenu }]
       : []),
     { type: "separator" },
     {

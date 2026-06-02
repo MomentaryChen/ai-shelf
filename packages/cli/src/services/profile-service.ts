@@ -9,8 +9,13 @@ import {
   isProfileAccentColor,
   pickNextProfileAccentColor,
 } from "../models/profile-colors.js";
+import {
+  DEFAULT_PROFILE_GROUP_NAME,
+  type ProfileGroupInfo,
+} from "./profile-group-service.js";
 
-export const PROFILES_WORKSPACE_NAME = "Profiles";
+/** @deprecated Use DEFAULT_PROFILE_GROUP_NAME */
+export const PROFILES_WORKSPACE_NAME = DEFAULT_PROFILE_GROUP_NAME;
 export const DEFAULT_PROFILE_TOOL = "claude";
 
 export interface ProfileInfo {
@@ -26,6 +31,17 @@ export interface ProfileInfo {
   updatedAt: string | null;
 }
 
+export interface ProfileGroupNode extends ProfileGroupInfo {
+  profiles: ProfileInfo[];
+}
+
+export interface ProfileForest {
+  groups: ProfileGroupNode[];
+  lastActiveGroupId: string | null;
+  lastActiveProfileId: string | null;
+}
+
+/** @deprecated Use ProfileForest */
 export interface ProfileTree {
   workspaceId: string;
   profiles: ProfileInfo[];
@@ -40,6 +56,9 @@ export interface CreateProfileInput {
   copyFromProfileId?: string;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export class ProfileService {
   constructor(
     private readonly workspaces: WorkspaceRepositoryPort,
@@ -48,31 +67,76 @@ export class ProfileService {
     private readonly eventBus: EventBus,
   ) {}
 
-  ensureProfilesWorkspace() {
-    let ws = this.workspaces.findByName(PROFILES_WORKSPACE_NAME);
-    if (!ws) {
-      ws = this.workspaces.create({ name: PROFILES_WORKSPACE_NAME, root_path: homedir() });
+  ensureDefaultGroup() {
+    let list = this.workspaces.list();
+    if (list.length === 0) {
+      const ws = this.workspaces.create({
+        name: DEFAULT_PROFILE_GROUP_NAME,
+        root_path: homedir(),
+      });
+      list = [ws];
     }
-    return ws;
+    return list[0]!;
   }
 
-  getTree(): ProfileTree {
-    const ws = this.ensureProfilesWorkspace();
-    const groups = this.groups.listByWorkspace(ws.id);
+  getForest(): ProfileForest {
+    const workspaceList = this.workspaces.list();
+    if (workspaceList.length === 0) {
+      this.ensureDefaultGroup();
+    }
     const metaMap = this.layouts.listMetaByWorkspace();
     const lastKey = this.layouts.getLastActiveGroupKey();
+    let lastActiveGroupId: string | null = null;
     let lastActiveProfileId: string | null = null;
-    if (lastKey?.startsWith(`${ws.id}:`)) {
-      lastActiveProfileId = lastKey.slice(ws.id.length + 1);
+    if (lastKey) {
+      const colon = lastKey.indexOf(":");
+      if (colon > 0) {
+        lastActiveGroupId = lastKey.slice(0, colon);
+        lastActiveProfileId = lastKey.slice(colon + 1);
+      }
     }
 
-    const profiles: ProfileInfo[] = groups.map((g) => this.toProfileInfo(g, ws.id, metaMap));
+    const groups: ProfileGroupNode[] = this.workspaces.list().map((ws) => {
+      const groupRows = this.groups.listByWorkspace(ws.id);
+      const profiles = groupRows.map((g) => this.toProfileInfo(g, ws.id, metaMap));
+      let updatedAt: string | null = null;
+      for (const p of profiles) {
+        if (p.updatedAt && (!updatedAt || p.updatedAt > updatedAt)) updatedAt = p.updatedAt;
+      }
+      return {
+        id: ws.id,
+        name: ws.name,
+        profileCount: profiles.length,
+        updatedAt,
+        profiles,
+      };
+    });
 
-    return { workspaceId: ws.id, profiles, lastActiveProfileId };
+    return { groups, lastActiveGroupId, lastActiveProfileId };
   }
 
-  create(name: string, input: CreateProfileInput = {}): ProfileInfo {
-    const ws = this.ensureProfilesWorkspace();
+  /** @deprecated Use getForest() */
+  getTree(): ProfileTree {
+    const forest = this.getForest();
+    const defaultGroup =
+      forest.groups.find((g) => g.name === DEFAULT_PROFILE_GROUP_NAME) ?? forest.groups[0];
+    if (!defaultGroup) {
+      const ws = this.ensureDefaultGroup();
+      return { workspaceId: ws.id, profiles: [], lastActiveProfileId: null };
+    }
+    const lastActiveProfileId =
+      defaultGroup.id === forest.lastActiveGroupId
+        ? forest.lastActiveProfileId
+        : null;
+    return {
+      workspaceId: defaultGroup.id,
+      profiles: defaultGroup.profiles,
+      lastActiveProfileId,
+    };
+  }
+
+  create(groupIdOrName: string, name: string, input: CreateProfileInput = {}): ProfileInfo {
+    const ws = this.resolveGroup(groupIdOrName);
     const existing = this.groups.findByName(ws.id, name);
     if (existing) {
       throw new AppError(`Profile "${name}" already exists`, "PROFILE_EXISTS");
@@ -130,22 +194,22 @@ export class ProfileService {
       accentColor?: string | null;
     },
   ): ProfileInfo {
-    const ws = this.ensureProfilesWorkspace();
-    let group = this.groups.listByWorkspace(ws.id).find((g) => g.id === profileId);
-    if (!group) throw new AppError("Profile not found", "PROFILE_NOT_FOUND");
+    const { workspaceId, group } = this.resolve(profileId);
+    let updatedGroup = group;
 
     if (patch.name !== undefined) {
       const trimmed = patch.name.trim();
       if (!trimmed) throw new AppError("Profile name is required", "INVALID_PROFILE_NAME");
       if (trimmed !== group.name) {
-        group = this.groups.rename(ws.id, profileId, trimmed);
+        updatedGroup = this.groups.rename(workspaceId, profileId, trimmed);
       }
     }
 
+    const ws = this.workspaces.findById(workspaceId)!;
     const snap =
       this.layouts.findByGroupId(profileId) ??
       ({
-        defaultCwd: patch.defaultCwd ?? ws.root_path ?? homedir(),
+        defaultCwd: patch.defaultCwd ?? ws?.root_path ?? homedir(),
         defaultTool: patch.defaultTool ?? DEFAULT_PROFILE_TOOL,
         panes: [],
         layout: null,
@@ -187,45 +251,96 @@ export class ProfileService {
       panes,
       updatedAt: new Date().toISOString(),
     };
-    this.layouts.upsert(profileId, ws.id, next);
+    this.layouts.upsert(profileId, workspaceId, next);
 
-    return this.toProfileInfo(group, ws.id);
+    return this.toProfileInfo(updatedGroup, workspaceId);
   }
 
-  reorder(orderedProfileIds: string[]): ProfileTree {
-    const ws = this.ensureProfilesWorkspace();
-    const groups = this.groups.listByWorkspace(ws.id);
-    if (orderedProfileIds.length !== groups.length) {
+  reorder(groupIdOrName: string, orderedProfileIds: string[]): ProfileForest {
+    const ws = this.resolveGroup(groupIdOrName);
+    const groupRows = this.groups.listByWorkspace(ws.id);
+    if (orderedProfileIds.length !== groupRows.length) {
       throw new AppError("Reorder list must include every profile", "INVALID_PROFILE_ORDER");
     }
-    const known = new Set(groups.map((g) => g.id));
+    const known = new Set(groupRows.map((g) => g.id));
     for (const id of orderedProfileIds) {
       if (!known.has(id)) {
         throw new AppError("Unknown profile in reorder list", "INVALID_PROFILE_ORDER");
       }
     }
     this.groups.reorder(ws.id, orderedProfileIds);
-    return this.getTree();
+    return this.getForest();
   }
 
   delete(profileId: string): void {
-    const ws = this.ensureProfilesWorkspace();
-    const group = this.groups.listByWorkspace(ws.id).find((g) => g.id === profileId);
-    if (!group) throw new AppError("Profile not found", "PROFILE_NOT_FOUND");
+    const { workspaceId, group } = this.resolve(profileId);
 
     const lastKey = this.layouts.getLastActiveGroupKey();
-    if (lastKey === `${ws.id}:${profileId}`) {
+    if (lastKey === `${workspaceId}:${profileId}`) {
       this.layouts.clearLastActiveGroupKey();
     }
 
-    this.groups.deleteByName(ws.id, group.name);
+    this.groups.deleteByName(workspaceId, group.name);
   }
 
   resolve(profileId: string): { workspaceId: string; group: GroupModel } {
-    const ws = this.ensureProfilesWorkspace();
-    const group = this.groups.listByWorkspace(ws.id).find((g) => g.id === profileId);
-    if (!group) throw new AppError("Profile not found", "PROFILE_NOT_FOUND");
-    return { workspaceId: ws.id, group };
+    for (const ws of this.workspaces.list()) {
+      const group = this.groups.listByWorkspace(ws.id).find((g) => g.id === profileId);
+      if (group) return { workspaceId: ws.id, group };
+    }
+    throw new AppError("Profile not found", "PROFILE_NOT_FOUND");
+  }
+
+  resolveByName(groupIdOrName: string, profileName: string): ProfileInfo {
+    const ws = this.resolveGroup(groupIdOrName);
+    const group = this.groups.findByName(ws.id, profileName);
+    if (!group) {
+      throw new AppError(`Profile "${profileName}" not found`, "PROFILE_NOT_FOUND");
+    }
+    return this.toProfileInfo(group, ws.id);
+  }
+
+  findProfile(idOrName: string, groupIdOrName?: string): ProfileInfo {
+    if (UUID_RE.test(idOrName)) {
+      const { workspaceId, group } = this.resolve(idOrName);
+      return this.toProfileInfo(group, workspaceId);
+    }
+    if (!groupIdOrName) {
+      const matches: ProfileInfo[] = [];
+      for (const ws of this.workspaces.list()) {
+        const g = this.groups.findByName(ws.id, idOrName);
+        if (g) matches.push(this.toProfileInfo(g, ws.id));
+      }
+      if (matches.length === 1) return matches[0]!;
+      if (matches.length > 1) {
+        throw new AppError(
+          `Profile "${idOrName}" exists in multiple groups; use --group`,
+          "PROFILE_AMBIGUOUS",
+        );
+      }
+      throw new AppError(`Profile "${idOrName}" not found`, "PROFILE_NOT_FOUND");
+    }
+    return this.resolveByName(groupIdOrName, idOrName);
+  }
+
+  resolveGroup(idOrName: string) {
+    if (UUID_RE.test(idOrName)) {
+      const ws = this.workspaces.findById(idOrName);
+      if (ws) return ws;
+    }
+    const byName = this.workspaces.findByName(idOrName);
+    if (byName) return byName;
+    throw new AppError(`Profile group "${idOrName}" not found`, "PROFILE_GROUP_NOT_FOUND");
+  }
+
+  defaultGroupIdOrName(): string {
+    const forest = this.getForest();
+    if (forest.lastActiveGroupId) {
+      const active = forest.groups.find((g) => g.id === forest.lastActiveGroupId);
+      if (active) return active.id;
+    }
+    const named = forest.groups.find((g) => g.name === DEFAULT_PROFILE_GROUP_NAME);
+    return named?.id ?? forest.groups[0]?.id ?? DEFAULT_PROFILE_GROUP_NAME;
   }
 
   private toProfileInfo(
@@ -236,7 +351,7 @@ export class ProfileService {
     const key = `${workspaceId}:${group.id}`;
     const meta = metaMap?.get(key) ?? this.layouts.listMetaByWorkspace().get(key);
     const snap = this.layouts.findByGroupId(group.id);
-    const ws = this.workspaces.list().find((w) => w.id === workspaceId);
+    const ws = this.workspaces.findById(workspaceId);
     return {
       id: group.id,
       workspaceId,

@@ -61,12 +61,43 @@ export function setLastActiveGroup(workspaceId: string, groupId: string) {
   getWorkspaceContext().groupLayoutService.setLastActiveGroup(workspaceId, groupId);
 }
 
+export function getProfileForest() {
+  return getWorkspaceContext().profileService.getForest();
+}
+
+/** @deprecated Use getProfileForest() */
 export function getProfileTree() {
   return getWorkspaceContext().profileService.getTree();
 }
 
-export function createProfile(name: string, input?: CreateProfileInput) {
-  return getWorkspaceContext().profileService.create(name, input);
+export function createProfileGroup(name: string) {
+  return getWorkspaceContext().profileGroupService.create(name);
+}
+
+export function updateProfileGroup(idOrName: string, newName: string) {
+  return getWorkspaceContext().profileGroupService.rename(idOrName, newName);
+}
+
+export function deleteProfileGroup(idOrName: string) {
+  const ctx = getWorkspaceContext();
+  const ws = ctx.profileGroupService.resolve(idOrName);
+  ctx.sessionService.stopAllInWorkspace(ws.name);
+  ctx.profileGroupService.delete(idOrName);
+}
+
+export function reorderProfileGroups(orderedGroupIds: string[]) {
+  return getWorkspaceContext().profileGroupService.reorder(orderedGroupIds);
+}
+
+export function createProfile(
+  name: string,
+  input?: CreateProfileInput & { groupId?: string; groupName?: string },
+) {
+  const ctx = getWorkspaceContext();
+  const groupRef =
+    input?.groupId ?? input?.groupName ?? ctx.profileService.defaultGroupIdOrName();
+  const { groupId: _g, groupName: _n, ...profileInput } = input ?? {};
+  return ctx.profileService.create(groupRef, name, profileInput);
 }
 
 export function updateProfile(
@@ -86,6 +117,6 @@ export function deleteProfile(profileId: string) {
   getWorkspaceContext().profileService.delete(profileId);
 }
 
-export function reorderProfiles(orderedProfileIds: string[]) {
-  return getWorkspaceContext().profileService.reorder(orderedProfileIds);
+export function reorderProfiles(groupIdOrName: string, orderedProfileIds: string[]) {
+  return getWorkspaceContext().profileService.reorder(groupIdOrName, orderedProfileIds);
 }

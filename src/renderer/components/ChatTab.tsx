@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { ProviderEntry, ProfileInfo } from "../types";
+import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { toolLabel } from "../utils";
 import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
-import { ProfileSidebar } from "./ProfileSidebar";
+import { Sidebar } from "./Sidebar";
+import { ProfileCreateDialog } from "./ProfileCreateDialog";
+import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
+import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
-import { SidebarIconBtn, SidebarPanelChevron } from "./ProfileSidebarUI";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
@@ -47,6 +49,7 @@ import {
   SETTINGS_KEY,
 } from "../chat-settings";
 import { resolveLaunchTool, toolIdsFromInventory } from "../utils/available-tools";
+import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 
@@ -115,6 +118,13 @@ export function ChatTab({
   const [addingTerminal, setAddingTerminal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
+  const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [createProfileOpen, setCreateProfileOpen] = useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [renameGroupOpen, setRenameGroupOpen] = useState(false);
+  const [settingsProfileId, setSettingsProfileId] = useState<string | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
   const [displayDropActive, setDisplayDropActive] = useState(false);
   const [profileSidebarDrag, setProfileSidebarDrag] = useState(false);
   useAppThemeRevision();
@@ -262,6 +272,27 @@ export function ChatTab({
     }
   }, [sidebarCollapsed]);
 
+  const refreshSidebarForest = useCallback(async (preferredGroupId?: string | null) => {
+    const r = await window.api.profileGroupGetForest();
+    if (!r.success || !r.forest) return;
+    setSidebarForest(r.forest);
+    const preferred =
+      (preferredGroupId &&
+        r.forest.groups.some((g) => g.id === preferredGroupId) &&
+        preferredGroupId) ||
+      (activeProfile?.workspaceId &&
+        r.forest.groups.some((g) => g.id === activeProfile.workspaceId) &&
+        activeProfile.workspaceId) ||
+      r.forest.lastActiveGroupId ||
+      r.forest.groups[0]?.id ||
+      null;
+    setSelectedGroupId(preferred);
+  }, [activeProfile?.workspaceId]);
+
+  useEffect(() => {
+    void refreshSidebarForest();
+  }, [refreshSidebarForest, activeProfile?.id, panes.length]);
+
   useEffect(() => {
     const onDragEnd = () => setProfileSidebarDrag(false);
     document.addEventListener("dragend", onDragEnd);
@@ -284,9 +315,9 @@ export function ChatTab({
     restoreInFlightRef.current = true;
     void (async () => {
       try {
-        const r = await window.api.profileGetTree();
-        if (cancelled || !r.success || !r.tree) return;
-        const result = await restoreLastProfile(r.tree);
+        const r = await window.api.profileGroupGetForest();
+        if (cancelled || !r.success || !r.forest) return;
+        const result = await restoreLastProfile(r.forest);
         if (cancelled) return;
         if (result?.cwd) updateSettings({ workingDir: result.cwd });
         if (result?.broadcastInput !== undefined) setBroadcastInput(result.broadcastInput);
@@ -573,8 +604,13 @@ export function ChatTab({
   useEffect(() => {
     const unsub = window.api.onTrayActivateProfile((profileId) => {
       void (async () => {
-        const r = await window.api.profileGetTree();
-        const profile = r.tree?.profiles.find((p) => p.id === profileId);
+        const r = await window.api.profileGroupGetForest();
+        if (!r.success || !r.forest) return;
+        let profile: import("../types").ProfileInfo | undefined;
+        for (const g of r.forest.groups) {
+          profile = g.profiles.find((p) => p.id === profileId);
+          if (profile) break;
+        }
         if (profile) await handleActivateProfileRef.current(profile);
       })();
     });
@@ -594,8 +630,13 @@ export function ChatTab({
     opts?: { targetPaneId?: string; zone?: PaneDropZone },
   ) {
     if (activeProfile?.id !== profileId) {
-      const r = await window.api.profileGetTree();
-      const profile = r.tree?.profiles.find((p) => p.id === profileId);
+      const r = await window.api.profileGroupGetForest();
+      if (!r.success || !r.forest) return;
+      let profile: import("../types").ProfileInfo | undefined;
+      for (const g of r.forest.groups) {
+        profile = g.profiles.find((p) => p.id === profileId);
+        if (profile) break;
+      }
       if (!profile) return;
       await handleActivateProfile(profile);
     }
@@ -703,61 +744,279 @@ export function ChatTab({
     setBroadcastInput(false);
   }
 
+  const sidebarGroups = useMemo(
+    () => (sidebarForest?.groups ?? []).map((g) => ({ id: g.id, name: g.name })),
+    [sidebarForest],
+  );
+  const currentGroupId =
+    selectedGroupId ??
+    activeProfile?.workspaceId ??
+    sidebarForest?.lastActiveGroupId ??
+    sidebarGroups[0]?.id ??
+    "";
+  const currentGroup =
+    sidebarForest?.groups.find((g) => g.id === currentGroupId) ?? sidebarForest?.groups[0] ?? null;
+  const allProfiles = useMemo(
+    () => sidebarForest?.groups.flatMap((g) => g.profiles) ?? [],
+    [sidebarForest],
+  );
+  const settingsProfile = useMemo(
+    () => allProfiles.find((p) => p.id === settingsProfileId) ?? null,
+    [allProfiles, settingsProfileId],
+  );
+  const sidebarProfiles = useMemo(
+    () =>
+      (currentGroup?.profiles ?? []).map((p) => {
+        const live = getProfilePanes(p.id);
+        const terminals =
+          live.length > 0
+            ? live.map((pane, idx) => ({
+                id: pane.id,
+                profileId: p.id,
+                label: paneDisplayLabel(pane),
+                description: pane.cwd || `${toolLabel(pane.tool)} ${idx + 1}`,
+              }))
+            : p.terminals.map((terminal, idx) => ({
+                id: `saved-${p.id}-${idx}`,
+                profileId: p.id,
+                label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
+                description: terminal.cwd,
+              }));
+        return {
+          id: p.id,
+          name: p.name,
+          accentColor: p.accentColor,
+          terminalCount: terminals.length,
+          broadcastInput: p.broadcastInput,
+          terminals,
+        };
+      }),
+    [currentGroup?.profiles, getProfilePanes],
+  );
+
   const sidebar = (
-    <ProfileSidebar
-      width={sidebarWidth}
-      activeProfileId={activeProfile?.id ?? null}
-      focusedPaneId={focusedPaneId}
-      getProfilePanes={getProfilePanes}
-      getProfileFocusedPaneId={getProfileFocusedPaneId}
-      broadcastInput={broadcastInput}
-      availableTools={availableTools}
-      inventoryScanning={inventoryScanning}
-      busy={profileBusy || restoring}
-      onActivateProfile={(p) => void handleActivateProfile(p)}
-      onSelectPane={(profile, paneId) => {
-        void restorePaneToDisplay(profile, paneId);
-      }}
-      onRestorePane={(profile, paneId) => {
-        void restorePaneToDisplay(profile, paneId);
-      }}
-      onPlacePaneBeside={(profile, dragPaneId, targetPaneId, zone) => {
-        void placePaneBeside(profile, dragPaneId, targetPaneId, zone);
-      }}
-      onMinimizePane={(profileId, paneId) => minimizePane(profileId, paneId)}
-      isPaneMinimized={isPaneMinimized}
-      onClosePane={(_profileId, paneId) => closePane(paneId)}
-      onRenamePane={(_profileId, paneId, title) => renamePane(paneId, title)}
-      onMovePane={(_profileId, dragPaneId, targetPaneId, zone) => {
-        setLayout((prev) => (prev ? movePaneInTree(prev, dragPaneId, targetPaneId, zone) : prev));
-      }}
-      onAddTerminal={(profile) => void handleNewTerminal(profile)}
-      onOpenFolder={(profile) => {
-        void (async () => {
-          if (activeProfile?.id !== profile.id) {
-            await handleActivateProfile(profile);
+    <div style={{ width: sidebarWidth }}>
+      <Sidebar
+        groups={sidebarGroups}
+        currentGroupId={currentGroupId}
+        profiles={sidebarProfiles}
+        activeProfileId={activeProfile?.id ?? null}
+        activeTerminalId={focusedPaneId}
+        profile={{
+          name: activeProfile?.name ?? "AI Shelf User",
+          email: `${activeProfile?.name ?? "profile"}@local`,
+        }}
+        terminalOnline={!profileBusy && !restoring}
+        terminalLabel={t("terminal.label")}
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+        onGroupChange={(groupId) => {
+          setSelectedGroupId(groupId);
+          const group = sidebarForest?.groups.find((g) => g.id === groupId);
+          const first = group?.profiles[0];
+          if (first) void handleActivateProfile(first);
+        }}
+        onCreateGroup={() => {
+          setCreateGroupOpen(true);
+        }}
+        onRenameGroup={(groupId) => {
+          setSelectedGroupId(groupId);
+          setRenameGroupOpen(true);
+        }}
+        onDeleteGroup={(groupId) => {
+          const group = sidebarForest?.groups.find((g) => g.id === groupId);
+          if (!group) return;
+          const ok = confirm(t("profileGroup.deleteConfirm", { name: group.name }));
+          if (!ok) return;
+          void (async () => {
+            await window.api.profileGroupDelete(groupId);
+            await refreshSidebarForest();
+          })();
+        }}
+        onCreateProfile={(groupId) => {
+          setSelectedGroupId(groupId);
+          setCreateProfileOpen(true);
+        }}
+        onProfileSelect={(profileId) => {
+          const profile = currentGroup?.profiles.find((p) => p.id === profileId);
+          if (profile) void handleActivateProfile(profile);
+        }}
+        onProfileReorder={(dragProfileId, dropProfileId) => {
+          if (!currentGroup) return;
+          const reordered = reorderById(currentGroup.profiles, dragProfileId, dropProfileId, (p) => p.id);
+          if (!reordered) return;
+          const orderedIds = reordered.map((p) => p.id);
+          const prevForest = sidebarForest;
+          setSidebarForest((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  groups: prev.groups.map((g) =>
+                    g.id === currentGroup.id ? { ...g, profiles: reordered } : g,
+                  ),
+                }
+              : prev,
+          );
+          void (async () => {
+            const r = await window.api.profileReorder(currentGroup.id, orderedIds);
+            if (!r.success) {
+              setSidebarForest(prevForest);
+              return;
+            }
+            await refreshSidebarForest();
+          })();
+        }}
+        onProfileSettings={(profileId) => setSettingsProfileId(profileId)}
+        onProfileOpenFolder={(profileId) => {
+          const profile = sidebarForest?.groups.flatMap((g) => g.profiles).find((p) => p.id === profileId);
+          if (!profile) return;
+          void (async () => {
+            if (activeProfile?.id !== profile.id) await handleActivateProfile(profile);
+            const hint =
+              profile.defaultCwd?.trim() ||
+              getProfileDefaultCwd() ||
+              settings.workingDir?.trim() ||
+              undefined;
+            await openFolderPane(hint);
+          })();
+        }}
+        onProfileAddTerminal={(profileId) => {
+          const profile = sidebarForest?.groups.flatMap((g) => g.profiles).find((p) => p.id === profileId);
+          if (profile) void handleNewTerminal(profile);
+        }}
+        onProfileToggleBroadcast={(profileId, enabled) => {
+          void (async () => {
+            await handleToggleBroadcast(profileId, enabled);
+            await refreshSidebarForest();
+          })();
+        }}
+        onTerminalSelect={(profileId, terminalId) => {
+          const profile = sidebarForest?.groups
+            .flatMap((g) => g.profiles)
+            .find((p) => p.id === profileId);
+          if (!profile) return;
+          const pane = getProfilePanes(profile.id).find((p) => p.id === terminalId);
+          if (pane) {
+            void restorePaneToDisplay(profile, pane.id);
+            return;
           }
-          const hint =
-            profile.defaultCwd?.trim() ||
-            getProfileDefaultCwd() ||
-            settings.workingDir?.trim() ||
-            undefined;
-          await openFolderPane(hint);
-        })();
-      }}
-      addingTerminal={addingTerminal}
-      onToggleBroadcast={(id, v) => void handleToggleBroadcast(id, v)}
-      onProfileUpdated={(profile) => {
-        syncActiveProfile(profile);
-        if (profile.id === activeProfile?.id) {
-          updateSettings({ workingDir: profile.defaultCwd?.trim() ?? "" });
-        }
-      }}
-      onProfileDeleted={handleProfileDeleted}
-      activeLivePaneCount={panes.length}
-      onProfilePaneDragChange={setProfileSidebarDrag}
-      onCollapse={() => setSidebarCollapsed(true)}
-    />
+          void handleActivateProfile(profile);
+        }}
+        onTerminalClick={() => {
+          if (activeProfile) {
+            void handleNewTerminal(activeProfile);
+          } else {
+            void addPane("shell");
+          }
+        }}
+      />
+    </div>
+  );
+
+  const sidebarDialogs = (
+    <>
+      <ProfileCreateDialog
+        open={createProfileOpen}
+        profiles={allProfiles}
+        profileGroups={(sidebarForest?.groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
+        defaultGroupId={currentGroup?.id ?? sidebarForest?.groups[0]?.id ?? ""}
+        availableTools={availableTools}
+        inventoryScanning={inventoryScanning}
+        onClose={() => setCreateProfileOpen(false)}
+        onCreate={(opts) => {
+          setCreateProfileOpen(false);
+          setSelectedGroupId(opts.groupId);
+          void (async () => {
+            const r = await window.api.profileCreate(opts.name, {
+              groupId: opts.groupId,
+              defaultCwd: opts.defaultCwd || undefined,
+              defaultTool: opts.defaultTool,
+              accentColor: opts.accentColor,
+              broadcastInput: opts.broadcastInput,
+              copyFromProfileId: opts.copyFromProfileId,
+            });
+            if (r.success && r.profile) await handleActivateProfile(r.profile);
+            await refreshSidebarForest(opts.groupId);
+          })();
+        }}
+        onQuickCreateGroup={async (name) => {
+          const r = await window.api.profileGroupCreate(name);
+          if (!r.success || !r.group) {
+            return { ok: false, error: r.error ?? t("profileGroup.failedCreate") };
+          }
+          await refreshSidebarForest();
+          setSelectedGroupId(r.group.id);
+          return { ok: true, groupId: r.group.id };
+        }}
+      />
+      <ProfileGroupNameDialog
+        open={createGroupOpen}
+        title={t("profileGroup.createTitle")}
+        submitLabel={t("profileGroup.create")}
+        busy={profileBusy}
+        onClose={() => setCreateGroupOpen(false)}
+        onSubmit={(name) => {
+          setCreateGroupOpen(false);
+          void (async () => {
+            const r = await window.api.profileGroupCreate(name);
+            if (r.success && r.group) setSelectedGroupId(r.group.id);
+            await refreshSidebarForest();
+          })();
+        }}
+      />
+      <ProfileGroupNameDialog
+        open={renameGroupOpen}
+        title={t("profileGroup.renameTitle")}
+        initialName={currentGroup?.name ?? ""}
+        submitLabel={t("profileGroup.rename")}
+        busy={profileBusy}
+        onClose={() => setRenameGroupOpen(false)}
+        onSubmit={(name) => {
+          if (!currentGroup) {
+            setRenameGroupOpen(false);
+            return;
+          }
+          setRenameGroupOpen(false);
+          void (async () => {
+            await window.api.profileGroupUpdate(currentGroup.id, name);
+            await refreshSidebarForest();
+          })();
+        }}
+      />
+      <ProfileSettingsDialog
+        open={settingsProfileId !== null}
+        profile={settingsProfile}
+        availableTools={availableTools}
+        inventoryScanning={inventoryScanning}
+        busy={settingsBusy}
+        onClose={() => setSettingsProfileId(null)}
+        onSave={async (profileId: string, patch: ProfileSettingsPatch) => {
+          setSettingsBusy(true);
+          const r = await window.api.profileUpdate(profileId, patch);
+          setSettingsBusy(false);
+          if (!r.success) return;
+          if (r.profile) {
+            syncActiveProfile(r.profile);
+            if (r.profile.id === activeProfile?.id) {
+              updateSettings({ workingDir: r.profile.defaultCwd?.trim() ?? "" });
+              setBroadcastInput(r.profile.broadcastInput ?? false);
+            }
+          }
+          setSettingsProfileId(null);
+          await refreshSidebarForest();
+        }}
+        onDelete={async (profile) => {
+          const ok = confirm(t("profile.deleteConfirm", { name: profile.name }));
+          if (!ok) return;
+          setSettingsBusy(true);
+          await window.api.profileDelete(profile.id);
+          setSettingsBusy(false);
+          handleProfileDeleted(profile.id);
+          setSettingsProfileId(null);
+          await refreshSidebarForest();
+        }}
+      />
+    </>
   );
 
   const topBar = (
@@ -917,33 +1176,21 @@ export function ChatTab({
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
-      {sidebarCollapsed ? (
-        <aside className="flex w-9 shrink-0 flex-col border-r border-chrome-border bg-gradient-to-b from-chrome-bg-top to-chrome-bg-bottom">
-          <div className="flex h-9 shrink-0 items-center justify-center border-b border-chrome-border/80">
-            <SidebarIconBtn
-              title={t("sidebar.expand")}
-              onClick={() => setSidebarCollapsed(false)}
-            >
-              <SidebarPanelChevron expanded={false} />
-            </SidebarIconBtn>
-          </div>
-        </aside>
-      ) : (
-        <>
-          {sidebar}
-          <div
-            className="w-2.5 shrink-0 self-stretch"
-            style={{ width: 10 }}
-          >
-            <ResizeDivider
-              mode="delta"
-              orientation="horizontal"
-              onResize={(delta) =>
-                setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
-              }
-            />
-          </div>
-        </>
+      {sidebarDialogs}
+      {sidebar}
+      {!sidebarCollapsed && (
+        <div
+          className="w-2.5 shrink-0 self-stretch"
+          style={{ width: 10 }}
+        >
+          <ResizeDivider
+            mode="delta"
+            orientation="horizontal"
+            onResize={(delta) =>
+              setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
+            }
+          />
+        </div>
       )}
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {topBar}

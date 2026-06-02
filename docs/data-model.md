@@ -2,32 +2,34 @@
 
 AI Shelf uses **one SQLite database** (`%APPDATA%/ai-shelf/workspaces.db` on Windows). The **desktop app** and **`ai-shelf` CLI/TUI** read and write the same file.
 
-## User-facing model: Profile
+## User-facing model: Profile Group + Profile
 
-A **profile** is the primary unit for organizing terminals:
+A **profile group** is the top-level category, and **profiles** are organized under each group:
 
 | Concept | Meaning |
 |--------|---------|
+| **Profile Group** | Category layer to split profiles (work / personal / client, etc.) |
 | **Profile** | Named environment: default directory, default AI tool, accent color, broadcast-input flag |
 | **Pane / terminal** | One embedded terminal (tool + cwd + optional title), up to 8 per profile |
 | **Layout** | Split-pane tree persisted per profile |
 
 Create and manage profiles with:
 
-- Desktop: **Profiles** sidebar
-- CLI: `ai-shelf profile list|create|update|delete|reorder|exec`
+- Desktop: **Profile Groups + Profiles** sidebar
+- CLI: `ai-shelf profile-group ...` and `ai-shelf profile ... --group <name>`
 
 ## Storage mapping (internal)
 
 Profiles are stored using legacy table names for compatibility:
 
 ```
-Profile  →  group row in workspace "Profiles"
+Profile Group  →  workspace row
+Profile  →  group row in that workspace
 Pane layout  →  group_layouts snapshot (JSON)
 Last active profile  →  app_preferences.last_active_group_key
 ```
 
-The hidden **`Profiles`** workspace is created automatically. You normally do not create additional workspaces.
+A default **`Profiles`** group is created automatically for compatibility, and you can create additional profile groups.
 
 ## CLI sessions vs desktop panes
 

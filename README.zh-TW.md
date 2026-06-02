@@ -18,7 +18,7 @@
 | **Profile CLI** | `ai-shelf` | 管理 Profile、CLI session、廣播執行；TUI |
 | **桌面應用** | `pnpm electron` | 內嵌終端機啟動器 + 清單儀表板（Electron + React） |
 
-桌面應用與 `ai-shelf` 共用同一 SQLite 資料庫。**Profile**（名稱、預設值、窗格版面）是兩邊一致的主要使用者模型。
+桌面應用與 `ai-shelf` 共用同一 SQLite 資料庫。**Profile Group** 用來分割與整理 **Profile**（名稱、預設值、窗格版面），兩邊資料一致。
 
 ---
 
@@ -37,7 +37,8 @@
 
 ### 終端機 Profile（`ai-shelf`）
 
-- **Profile** — 具名終端機環境（預設目錄、工具、強調色、廣播輸入）；與桌面側欄同一筆資料
+- **Profile Group** — 分割 Profile 的上層分類
+- **Profile** — 具名終端機環境（預設目錄、工具、強調色、廣播輸入）；隸屬於 Profile Group，與桌面側欄同一筆資料
 - **CLI session** — 可選的無頭 PTY session，隸屬於某 Profile（內部對應 `Profiles` workspace）
 - **廣播執行** — `profile exec <名稱> … --broadcast` 對 Profile 內所有執行中的 CLI session 送指令
 - **TUI** — Profile 列表 + session 管理（`ai-shelf tui`）

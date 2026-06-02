@@ -157,6 +157,10 @@ body,
   --color-chrome-badge-bg: #1e1e22;
   --color-chrome-sessions-well-bg: rgb(0 0 0 / 0.22);
   --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.4);
+  /* Semantic sidebar tokens */
+  --color-sidebar-accent: rgb(255 255 255 / 0.06);
+  --color-foreground: var(--color-chrome-text);
+  --color-muted-foreground: var(--color-chrome-text-muted);
 }
 
 /* App color themes (default: dark — matches @theme above) */
@@ -205,6 +209,9 @@ html[data-app-theme="light"] {
   --color-chrome-badge-bg: #e2e8f0;
   --color-chrome-sessions-well-bg: rgb(15 23 42 / 0.04);
   --color-chrome-pane-header-unfocused: rgb(241 245 249 / 0.9);
+  --color-sidebar-accent: rgb(15 23 42 / 0.08);
+  --color-foreground: var(--color-chrome-text);
+  --color-muted-foreground: var(--color-chrome-text-muted);
 }
 
 html[data-app-theme="contrast"] {
@@ -252,4 +259,7 @@ html[data-app-theme="contrast"] {
   --color-chrome-badge-bg: #000000;
   --color-chrome-sessions-well-bg: rgb(255 255 255 / 0.08);
   --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.85);
+  --color-sidebar-accent: rgb(255 255 0 / 0.16);
+  --color-foreground: var(--color-chrome-text);
+  --color-muted-foreground: var(--color-chrome-text-muted);
 }

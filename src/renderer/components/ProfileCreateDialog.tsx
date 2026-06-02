@@ -16,10 +16,13 @@ import {
 interface Props {
   open: boolean;
   profiles: ProfileInfo[];
+  profileGroups: { id: string; name: string }[];
+  defaultGroupId: string;
   availableTools: string[];
   inventoryScanning?: boolean;
   onClose: () => void;
   onCreate: (opts: {
+    groupId: string;
     name: string;
     defaultCwd: string;
     defaultTool: string;
@@ -27,15 +30,19 @@ interface Props {
     broadcastInput: boolean;
     copyFromProfileId?: string;
   }) => void;
+  onQuickCreateGroup?: (name: string) => Promise<{ ok: boolean; groupId?: string; error?: string }>;
 }
 
 export function ProfileCreateDialog({
   open,
   profiles,
+  profileGroups,
+  defaultGroupId,
   availableTools,
   inventoryScanning = false,
   onClose,
   onCreate,
+  onQuickCreateGroup,
 }: Props) {
   const { t } = useLocale();
   const [name, setName] = useState("");
@@ -45,6 +52,10 @@ export function ProfileCreateDialog({
   const [broadcastInput, setBroadcastInput] = useState(false);
   const [startFrom, setStartFrom] = useState<ProfileStartFrom>("blank");
   const [copyFromProfileId, setCopyFromProfileId] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState(defaultGroupId);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [quickCreatingGroup, setQuickCreatingGroup] = useState(false);
+  const [groupErr, setGroupErr] = useState("");
 
   const tools = useMemo(
     () => profileToolChoices(availableTools),
@@ -59,6 +70,9 @@ export function ProfileCreateDialog({
     if (!open) return;
 
     if (justOpened) {
+      setGroupId(defaultGroupId);
+      setNewGroupName("");
+      setGroupErr("");
       setStartFrom("blank");
       setCopyFromProfileId(null);
       startKeyRef.current = "blank:";
@@ -88,7 +102,7 @@ export function ProfileCreateDialog({
     if (defaults.copyNameSource !== undefined) {
       setName(t("profile.dialog.copyNameDefault", { name: defaults.copyNameSource }));
     }
-  }, [open, startFrom, copyFromProfileId, profiles, tools, t]);
+  }, [open, startFrom, copyFromProfileId, profiles, tools, t, defaultGroupId]);
 
   useEffect(() => {
     if (!open) return;
@@ -122,8 +136,9 @@ export function ProfileCreateDialog({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed || !effectiveTool) return;
+    if (!trimmed || !effectiveTool || !groupId) return;
     onCreate({
+      groupId,
       name: trimmed,
       defaultCwd: cwd.trim(),
       defaultTool: effectiveTool,
@@ -139,6 +154,21 @@ export function ProfileCreateDialog({
     setBroadcastInput(false);
     setStartFrom("blank");
     setCopyFromProfileId(null);
+  }
+
+  async function handleQuickCreateGroup() {
+    const trimmed = newGroupName.trim();
+    if (!trimmed || !onQuickCreateGroup) return;
+    setQuickCreatingGroup(true);
+    setGroupErr("");
+    const r = await onQuickCreateGroup(trimmed);
+    setQuickCreatingGroup(false);
+    if (!r.ok || !r.groupId) {
+      setGroupErr(r.error ?? t("profileGroup.failedCreate"));
+      return;
+    }
+    setGroupId(r.groupId);
+    setNewGroupName("");
   }
 
   return (
@@ -196,6 +226,56 @@ export function ProfileCreateDialog({
             </p>
           )}
         </fieldset>
+
+        <label className="mb-3 block">
+            <span className="mb-1 block text-[11px] text-chrome-text-subtle">
+              {t("profile.dialog.group")}
+            </span>
+            {profileGroups.length > 0 ? (
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text focus:border-chrome-border-hover focus:outline-none"
+            >
+              {profileGroups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            ) : (
+              <p className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+                {t("profileGroup.emptyHint")}
+              </p>
+            )}
+            <div className="mt-2 flex gap-2">
+              <input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder={t("profileGroup.quickCreatePlaceholder")}
+                aria-label={t("profileGroup.quickCreatePlaceholder")}
+                className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleQuickCreateGroup();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void handleQuickCreateGroup()}
+                disabled={quickCreatingGroup || !newGroupName.trim() || !onQuickCreateGroup}
+                aria-label={t("profileGroup.create")}
+                className="shrink-0 rounded-md border border-chrome-border-strong px-3 py-2 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
+              >
+                {quickCreatingGroup ? t("profileGroup.creating") : t("profileGroup.create")}
+              </button>
+            </div>
+            {groupErr && (
+              <p className="mt-1 text-[11px] text-red-400">{groupErr}</p>
+            )}
+          </label>
 
         <label className="mb-3 block">
           <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.name")}</span>
@@ -288,7 +368,7 @@ export function ProfileCreateDialog({
           </button>
           <button
             type="submit"
-            disabled={!name.trim()}
+            disabled={!name.trim() || !groupId}
             className="cursor-pointer rounded-md bg-accent px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-accent-hover disabled:opacity-40"
           >
             {t("profile.dialog.create")}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { ProfileInfo, ProfileTree } from "../types";
+import type { ProfileForest, ProfileInfo } from "../types";
 import {
   collectPanes,
   findPane,
@@ -102,6 +102,7 @@ export function useProfileWorkspace(
   const broadcastRef = useRef(broadcastInput);
   /** Live PTY + layout per profile — survives sidebar profile switches. */
   const profileLiveCacheRef = useRef(new Map<string, ProfileLiveState>());
+  const cacheKey = useCallback((workspaceId: string, profileId: string) => `${workspaceId}:${profileId}`, []);
   /** True while activateProfile clears layout between profiles (avoids wiping stashed cache). */
   const profileSwitchInProgressRef = useRef(false);
 
@@ -158,32 +159,39 @@ export function useProfileWorkspace(
     setMinimizedPaneIds(next);
   }, []);
 
-  const stashLiveProfile = useCallback((profileId: string) => {
+  const stashLiveProfile = useCallback((profile: ProfileInfo) => {
     const node = layoutRef.current;
     if (!node || collectPanes(node).length === 0) return;
-    profileLiveCacheRef.current.set(profileId, {
+    profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
       layout: node,
       focusedPaneId: focusedPaneIdRef.current,
       minimizedPaneIds: [...minimizedPaneIdsRef.current],
     });
-  }, []);
+  }, [cacheKey]);
 
-  const discardProfileSessions = useCallback((profileId: string) => {
-    const cached = profileLiveCacheRef.current.get(profileId);
+  const discardProfileSessions = useCallback((profileId: string, workspaceId?: string) => {
+    const ws =
+      workspaceId ??
+      activeProfileRef.current?.workspaceId ??
+      Array.from(profileLiveCacheRef.current.keys())
+        .map((k) => k.split(":"))
+        .find((parts) => parts[1] === profileId)?.[0] ??
+      "";
+    const cached = profileLiveCacheRef.current.get(cacheKey(ws, profileId));
     if (cached) {
       teardownPtys(cached.layout);
-      profileLiveCacheRef.current.delete(profileId);
+      profileLiveCacheRef.current.delete(cacheKey(ws, profileId));
     }
     if (activeProfileRef.current?.id === profileId) {
       teardownPtys(layoutRef.current);
     }
-  }, []);
+  }, [cacheKey]);
 
   const restoreSnapshot = useCallback(
     async (snapshot: GroupLayoutSnapshot, profile: ProfileInfo) => {
       setRestoring(true);
       // Only replace this profile's previous PTYs — never kill another profile's stashed sessions.
-      const staleCached = profileLiveCacheRef.current.get(profile.id);
+      const staleCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
       if (staleCached) teardownPtys(staleCached.layout);
 
       const cwdDefault =
@@ -227,7 +235,7 @@ export function useProfileWorkspace(
           ? minimizedForSingleDisplay(reconciled, focusId)
           : [];
       applyMinimizedPaneIds(minimizedSet(minimized));
-      profileLiveCacheRef.current.set(profile.id, {
+      profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
         layout: reconciled,
         focusedPaneId: focusId,
         minimizedPaneIds: minimized,
@@ -257,7 +265,7 @@ export function useProfileWorkspace(
           };
         }
 
-        const sameCached = profileLiveCacheRef.current.get(profile.id);
+        const sameCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
         const sameCachedPanes = sameCached ? collectPanes(sameCached.layout).length : 0;
         if (sameCached && sameCachedPanes > 0) {
           const reconciled = await reconcileLayoutPtys(sameCached.layout, spawnPane);
@@ -268,7 +276,7 @@ export function useProfileWorkspace(
               : panes[0]?.id ?? null;
           applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
           applyMinimizedPaneIds(minimizedSet(sameCached.minimizedPaneIds ?? []));
-          profileLiveCacheRef.current.set(profile.id, {
+          profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
             layout: reconciled,
             focusedPaneId: focusId,
             minimizedPaneIds: sameCached.minimizedPaneIds ?? [],
@@ -295,11 +303,11 @@ export function useProfileWorkspace(
         };
       }
 
-      const targetCached = profileLiveCacheRef.current.get(profile.id);
+      const targetCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
 
       if (prev && prev.id !== profile.id) {
         await persistCurrentProfile();
-        stashLiveProfile(prev.id);
+        stashLiveProfile(prev);
         layoutRef.current = null;
         setLayout(null);
         setFocusedPaneId(null);
@@ -310,7 +318,7 @@ export function useProfileWorkspace(
       setActiveProfile(profile);
       activeProfileRef.current = profile;
 
-      const cached = targetCached ?? profileLiveCacheRef.current.get(profile.id);
+      const cached = targetCached ?? profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
       const cachedPaneCount = cached ? collectPanes(cached.layout).length : 0;
       if (cached && cachedPaneCount > 0) {
         const reconciled = await reconcileLayoutPtys(cached.layout, spawnPane);
@@ -321,7 +329,7 @@ export function useProfileWorkspace(
             : panes[0]?.id ?? null;
         applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
         applyMinimizedPaneIds(minimizedSet(cached.minimizedPaneIds ?? []));
-        profileLiveCacheRef.current.set(profile.id, {
+        profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
           layout: reconciled,
           focusedPaneId: focusId,
           minimizedPaneIds: cached.minimizedPaneIds ?? [],
@@ -362,11 +370,13 @@ export function useProfileWorkspace(
   );
 
   const restoreLastProfile = useCallback(
-    async (tree: ProfileTree) => {
+    async (forest: ProfileForest) => {
       if (!migrationDone) return;
-      if (tree.profiles.length === 0) return;
+      const group =
+        forest.groups.find((g) => g.id === forest.lastActiveGroupId) ?? forest.groups[0];
+      if (!group || group.profiles.length === 0) return;
       const profile =
-        tree.profiles.find((p) => p.id === tree.lastActiveProfileId) ?? tree.profiles[0];
+        group.profiles.find((p) => p.id === forest.lastActiveProfileId) ?? group.profiles[0];
       const r = await activateProfile(profile);
       return { profile, ...r };
     },
@@ -377,7 +387,7 @@ export function useProfileWorkspace(
     if (!activeProfile || restoring || profileSwitchInProgressRef.current) return;
     const paneCount = layout ? collectPanes(layout).length : 0;
     if (paneCount > 0) {
-      profileLiveCacheRef.current.set(activeProfile.id, {
+      profileLiveCacheRef.current.set(cacheKey(activeProfile.workspaceId, activeProfile.id), {
         layout: layout!,
         focusedPaneId: focusedPaneIdRef.current,
         minimizedPaneIds: [...minimizedPaneIdsRef.current],
@@ -387,7 +397,7 @@ export function useProfileWorkspace(
       }, 400);
       return () => window.clearTimeout(t);
     }
-    profileLiveCacheRef.current.delete(activeProfile.id);
+    profileLiveCacheRef.current.delete(cacheKey(activeProfile.workspaceId, activeProfile.id));
     void clearProfileSnapshot(activeProfile);
   }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, persistCurrentProfile, clearProfileSnapshot]);
 

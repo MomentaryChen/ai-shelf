@@ -6,12 +6,13 @@ Phase 1 foundation (SQLite + CLI + TUI + runtime layer). **2.0 uses Profile as t
 
 ```bash
 # Profiles (primary — same data as desktop app)
-ai-shelf profile list
-ai-shelf profile create <name> [--cwd <path>] [--tool <tool>] [--color <hex>]
-ai-shelf profile update <profile> [--name] [--cwd] [--tool] [--broadcast|--no-broadcast] [--color]
-ai-shelf profile delete <profile>
-ai-shelf profile reorder <profile...>
-ai-shelf profile exec <profile> <command...> [--broadcast] [--session <name>]
+ai-shelf profile-group list|create|rename|delete|reorder
+ai-shelf profile list [--group <name>]
+ai-shelf profile create <name> [--group <name>] [--cwd <path>] [--tool <tool>] [--color <hex>]
+ai-shelf profile update <profile> [--group <name>] [--name] [--cwd] [--tool] [--broadcast|--no-broadcast] [--color]
+ai-shelf profile delete <profile> [--group <name>]
+ai-shelf profile reorder <profile...> [--group <name>]
+ai-shelf profile exec <profile> <command...> [--group <name>] [--broadcast] [--session <name>]
 
 # Full-screen TUI (profile list + CLI sessions per profile)
 ai-shelf tui

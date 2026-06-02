@@ -4,6 +4,7 @@ export const WorkspaceModelSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(128),
   root_path: z.string().nullable(),
+  sort_order: z.number().int().nonnegative().optional().default(0),
   created_at: z.string(),
 });
 

@@ -16,6 +16,7 @@ import { SessionService } from "../services/session-service.js";
 import { ExecService } from "../services/exec-service.js";
 import { GroupLayoutService } from "../services/group-layout-service.js";
 import { ProfileService } from "../services/profile-service.js";
+import { ProfileGroupService } from "../services/profile-group-service.js";
 import { loadConfig } from "../config/loader.js";
 import { createLogger, type Logger } from "../shared/logger.js";
 
@@ -30,6 +31,7 @@ export interface AppContext {
   sessionService: SessionService;
   groupLayoutService: GroupLayoutService;
   profileService: ProfileService;
+  profileGroupService: ProfileGroupService;
   execService: ExecService;
   close: () => void;
 }
@@ -63,6 +65,7 @@ export function bootstrap(): AppContext {
   );
   const groupLayoutService = new GroupLayoutService(workspaces, groups, groupLayouts);
   const profileService = new ProfileService(workspaces, groups, groupLayouts, eventBus);
+  const profileGroupService = new ProfileGroupService(workspaces, groupLayouts, eventBus);
   const execService = new ExecService(sessionService, sessionRuntime, commandHistory);
 
   eventBus.onAll((event) => {
@@ -82,6 +85,7 @@ export function bootstrap(): AppContext {
     sessionService,
     groupLayoutService,
     profileService,
+    profileGroupService,
     execService,
     close: () => db.close(),
   };
