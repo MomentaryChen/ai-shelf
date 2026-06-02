@@ -300,10 +300,6 @@ export function useProfileWorkspace(
       if (prev && prev.id !== profile.id) {
         await persistCurrentProfile();
         stashLiveProfile(prev.id);
-        layoutRef.current = null;
-        setLayout(null);
-        setFocusedPaneId(null);
-        applyMinimizedPaneIds(new Set());
       }
 
       await saveLastActiveGroupKey(profile.workspaceId, profile.id);
@@ -347,7 +343,10 @@ export function useProfileWorkspace(
         paneCount: 0,
       };
       } finally {
-        profileSwitchInProgressRef.current = false;
+        // Let layout effects run while the switch guard is still set (avoids wiping stashed cache).
+        queueMicrotask(() => {
+          profileSwitchInProgressRef.current = false;
+        });
       }
     },
     [
