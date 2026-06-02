@@ -351,6 +351,8 @@ export interface ElectronAPI {
     | { success: false; canceled?: true; error?: string }
   >;
   relaunchApp: () => Promise<{ ok: boolean }>;
+  setSystemTrayEnabled: (enabled: boolean) => Promise<{ ok: boolean; systemTrayEnabled: boolean }>;
+  getSystemTrayEnabled: () => Promise<{ systemTrayEnabled: boolean }>;
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
   toggleDevTools: () => Promise<void>;
