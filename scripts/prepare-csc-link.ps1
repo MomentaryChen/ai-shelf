@@ -31,6 +31,25 @@ function ConvertFrom-Base64Payload {
     }
 }
 
+function Test-PfxBytesWithPassword {
+    param(
+        [byte[]]$Bytes,
+        [string]$Password
+    )
+
+    $tempPath = [IO.Path]::Combine([IO.Path]::GetTempPath(), "csc-link-test-$([Guid]::NewGuid()).pfx")
+    try {
+        [IO.File]::WriteAllBytes($tempPath, $Bytes)
+        $secure = ConvertTo-SecureString -String $Password.Trim() -AsPlainText -Force
+        $null = Get-PfxData -FilePath $tempPath -Password $secure
+        return $true
+    } catch {
+        return $false, $_.Exception.Message
+    } finally {
+        Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function ConvertTo-SignToolPfxBytes {
     param(
         [byte[]]$Bytes,
@@ -38,11 +57,34 @@ function ConvertTo-SignToolPfxBytes {
     )
 
     $plain = $Password.Trim()
-    $collection = [System.Security.Cryptography.X509Certificates.X509Certificate2Collection]::new()
-    $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable `
-        -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
-    $collection.Import($Bytes, $plain, $flags)
-    return $collection.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, $plain)
+    $flagSets = @(
+        'Exportable, EphemeralKeySet',
+        'Exportable, UserKeySet',
+        'Exportable, DefaultKeySet',
+        'Exportable'
+    )
+    $lastError = $null
+
+    foreach ($flagSet in $flagSets) {
+        try {
+            $collection = [System.Security.Cryptography.X509Certificates.X509Certificate2Collection]::new()
+            $flags = [Enum]::Parse(
+                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags],
+                $flagSet,
+                $false
+            )
+            $collection.Import($Bytes, $plain, $flags)
+            return $collection.Export(
+                [System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12,
+                $plain
+            )
+        } catch {
+            $lastError = $_
+            Write-Host "PKCS#12 normalize ($flagSet) failed: $($_.Exception.Message)"
+        }
+    }
+
+    throw $lastError
 }
 
 function Resolve-CscLinkBytes {
@@ -107,8 +149,26 @@ if ($bytes.Length -lt 100) {
 }
 
 if ($Password) {
-    $bytes = ConvertTo-SignToolPfxBytes -Bytes $bytes -Password $Password
-    Write-Host "Normalized PKCS#12 for SignTool ($($bytes.Length) bytes)."
+    $base64Chars = ($Link.Trim() -replace '\s', '').Length
+    $openResult = Test-PfxBytesWithPassword -Bytes $bytes -Password $Password
+    if ($openResult -is [array]) {
+        $hint = @"
+CSC_LINK decodes to $($bytes.Length) bytes but cannot be opened with CSC_KEY_PASSWORD.
+- If base64 length is not $($base64Chars) chars, the GitHub secret was likely truncated when pasted (use encode-csc-link-secret.ps1 output via a file, not the terminal scrollback).
+- Otherwise verify CSC_KEY_PASSWORD matches the PFX export password.
+Original error: $($openResult[1])
+"@
+        throw $hint
+    }
+
+    try {
+        $normalized = ConvertTo-SignToolPfxBytes -Bytes $bytes -Password $Password
+        Write-Host "Normalized PKCS#12 for SignTool ($($normalized.Length) bytes)."
+        $bytes = $normalized
+    } catch {
+        Write-Host "PKCS#12 normalization skipped; using decoded PFX bytes ($($bytes.Length) bytes)."
+        Write-Host "Reason: $($_.Exception.Message)"
+    }
 }
 
 [IO.File]::WriteAllBytes($OutputPath, $bytes)

@@ -85,6 +85,7 @@ Copy the **entire one-line base64 output** into `CSC_LINK`. Set `CSC_KEY_PASSWOR
 |--------|----------------|-----|
 | `SignTool Error: ... load the signing certificate from: ...\repo-codesign.pfx` | Wrong `CSC_KEY_PASSWORD`, corrupt `CSC_LINK` base64, or CN mismatch with `publisherName` | Re-run `encode-csc-link-secret.ps1`; update both secrets; ensure CN matches `package.json` → `build.win.signtoolOptions.publisherName`. CI now fails in the **Verify signing certificate** step (SignTool preflight) before packaging when this would happen. |
 | Preflight: `not a valid PFX` / `expected DER header 30 82, got 4D 49...` | **Double base64** (encoding the base64 *text* again) or wrong file type | Run `encode-csc-link-secret.ps1` on the `.pfx` binary; paste that one line into `CSC_LINK` (CI auto-fixes double encoding when detected) |
+| `decoded to 2419 bytes` / `Cannot find the requested object` on Import | **Truncated `CSC_LINK` secret** (GitHub value shorter than encoder output) | Write base64 to `.codesign/csc-link-secret.txt` with `encode-csc-link-secret.ps1`, run `verify-csc-link-secret.ps1`, paste the **full** file (e.g. 3552 chars → 2662 bytes) |
 | Preflight: `Failed to open PFX` | Password does not match the exported PFX | Re-export with a known password; update `CSC_KEY_PASSWORD` (trim accidental newlines in the secret) |
 | Preflight: `Decoded CSC_LINK is too small` | Secret is a file path or truncated base64, not raw PFX bytes | Store base64 of the `.pfx` file, not a path string |
 

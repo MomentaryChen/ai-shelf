@@ -21,6 +21,7 @@ if ($bytes[0] -ne 0x30) {
 $base64 = [Convert]::ToBase64String($bytes)
 
 Write-Host "PFX size: $($bytes.Length) bytes (DER header $header)"
+Write-Host "CSC_LINK base64 length: $($base64.Length) characters (must match GitHub secret exactly)"
 Write-Host ''
 Write-Host 'Copy the single line below into the GitHub CSC_LINK secret (no quotes, no line breaks):'
 Write-Host ''

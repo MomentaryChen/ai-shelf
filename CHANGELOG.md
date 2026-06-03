@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Fixed
+
+- **Truncated CSC_LINK in CI** — Validate PFX opens before SignTool normalization; fail with expected base64/PFX sizes when secrets are truncated; skip normalization when re-export is unnecessary.
+
+### Added
+
+- **`verify-csc-link-secret.ps1`** — Local check that a base64 file matches the PFX before pasting into GitHub.
+
 ## [2.1.12] - 2026-06-03
 
 Align CI SignTool preflight with electron-builder on GitHub Actions.
