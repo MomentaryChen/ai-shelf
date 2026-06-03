@@ -16,10 +16,22 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
+import { useLocale } from "../i18n/LocaleProvider";
 import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { ToolLogo } from "./ToolLogo";
 import { profileToolLabel } from "../utils/available-tools";
+
+function tryCloseTerminalOnMiddleClick(
+  e: { button: number; preventDefault(): void; stopPropagation(): void },
+  canClose: boolean,
+  onClose: (() => void) | undefined,
+): void {
+  if (e.button !== 1 || !canClose || !onClose) return;
+  e.preventDefault();
+  e.stopPropagation();
+  onClose();
+}
 
 export interface SidebarGroup {
   id: string;
@@ -143,6 +155,7 @@ export function Sidebar({
   onTerminalClick,
   onProfileMenuAction,
 }: SidebarProps) {
+  const { t } = useLocale();
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -291,6 +304,11 @@ export function Sidebar({
           <div className="space-y-1">
             {collapsedTerminals.map((terminal) => {
               const terminalActive = terminal.id === activeTerminalId;
+              const profileActive = terminal.profileId === activeProfileId;
+              const canMiddleClose = profileActive && terminal.live === true;
+              const collapsedTitle = terminal.description
+                ? `${terminal.label}\n${terminal.description}`
+                : terminal.label;
               return (
                 <button
                   key={terminal.id}
@@ -305,7 +323,16 @@ export function Sidebar({
                     onProfilePaneDragChange?.(true);
                   }}
                   onDragEnd={() => onProfilePaneDragChange?.(false)}
-                  title={terminal.description ? `${terminal.label}\n${terminal.description}` : terminal.label}
+                  title={
+                    canMiddleClose
+                      ? `${collapsedTitle} · ${t("profile.middleClickClose")}`
+                      : collapsedTitle
+                  }
+                  onMouseDown={(e) =>
+                    tryCloseTerminalOnMiddleClick(e, canMiddleClose, () =>
+                      onTerminalClose?.(terminal.profileId, terminal.id),
+                    )
+                  }
                   onClick={() => onTerminalSelect?.(terminal.profileId, terminal.id)}
                   className={`flex h-8 w-full items-center justify-center rounded-md transition-colors ${
                     terminalActive
@@ -503,6 +530,11 @@ export function Sidebar({
                         )}
                         {(item.terminals ?? []).map((terminal) => {
                           const terminalActive = terminal.id === activeTerminalId;
+                          const profileActive = item.id === activeProfileId;
+                          const canMiddleClose = profileActive && terminal.live === true;
+                          const terminalTitle = terminal.description
+                            ? `${terminal.label} · ${terminal.description}`
+                            : terminal.label;
                           return (
                             <button
                               key={terminal.id}
@@ -567,6 +599,16 @@ export function Sidebar({
                                   : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                               }`}
                               style={terminalActive && accent ? { backgroundColor: `${accent}24` } : undefined}
+                              title={
+                                canMiddleClose
+                                  ? `${terminalTitle} · ${t("profile.middleClickClose")}`
+                                  : terminalTitle
+                              }
+                              onMouseDown={(e) =>
+                                tryCloseTerminalOnMiddleClick(e, canMiddleClose, () =>
+                                  onTerminalClose?.(terminal.profileId, terminal.id),
+                                )
+                              }
                               onClick={(e) =>
                                 onTerminalSelect?.(terminal.profileId, terminal.id, {
                                   placeBeside: e.shiftKey,
@@ -623,7 +665,7 @@ export function Sidebar({
                                     </IconAction>
                                   )}
                                   <IconAction
-                                    title="Close pane"
+                                    title={t("pane.close")}
                                     onClick={() => onTerminalClose?.(terminal.profileId, terminal.id)}
                                   >
                                     <X className="h-3 w-3" />
