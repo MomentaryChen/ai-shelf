@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-06-03
+
+Re-release with stable repository code-signing certificate configured for CI.
+
+### Changed
+
+- **Windows release signing** — CI now signs installers with the repository `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` certificate, keeping the same publisher across releases for in-app update signature checks.
+
 ## [2.1.2] - 2026-06-03
 
 Hotfix for Windows release CI producing unsigned installers.
@@ -224,6 +232,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.3]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.3
 [2.1.2]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.2
 [2.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.1
 [2.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.0
