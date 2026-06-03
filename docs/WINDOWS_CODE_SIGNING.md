@@ -22,11 +22,12 @@ Self-signed signing is only a **fallback**: it proves the signing pipeline works
 On tag push, [`.github/workflows/release.yml`](../.github/workflows/release.yml):
 
 1. Uses `CSC_LINK` + `CSC_KEY_PASSWORD` GitHub secrets if present (recommended path)
-2. Otherwise generates a fallback self-signed `.pfx` on the runner (`scripts/new-selfsigned-codesign.ps1`)
-3. Signs the NSIS installer via electron-builder (`CSC_LINK` / `CSC_KEY_PASSWORD`)
-4. Verifies the file is signed (`scripts/verify-windows-signature.ps1 -RequireSigned`)
+2. Decodes base64 `CSC_LINK` to a temp `.pfx` on the runner (`scripts/prepare-csc-link.ps1`)
+3. Otherwise generates a fallback self-signed `.pfx` on the runner (`scripts/new-selfsigned-codesign.ps1`)
+4. Signs the NSIS installer via electron-builder (`CSC_LINK` / `CSC_KEY_PASSWORD`)
+5. Verifies the file is signed (`scripts/verify-windows-signature.ps1 -RequireSigned`)
 
-Fallback publisher name in file properties: **AI Shelf (Self-Signed)**.
+Fallback publisher name in file properties: **AI Shelf (Self-Signed)** (`package.json` → `build.win.publisherName` must match the certificate CN).
 
 > For in-app auto-update reliability, use a trusted certificate via repository secrets. Fresh self-signed certs are not trusted on user machines by default.
 
@@ -49,6 +50,24 @@ pnpm dist:win
 ```
 
 The `.codesign/` folder is gitignored. Do not commit `.pfx` files.
+
+### GitHub Actions secrets
+
+Add repository secrets (Settings → Secrets and variables → Actions):
+
+| Name | Value |
+|---|---|
+| `CSC_LINK` | Base64 of your `.pfx` (single line, no line breaks) |
+| `CSC_KEY_PASSWORD` | PFX export password |
+
+Generate a clean base64 value:
+
+```powershell
+./scripts/new-selfsigned-codesign.ps1 -Password "your-strong-password"
+[Convert]::ToBase64String([IO.File]::ReadAllBytes(".codesign/ai-shelf-selfsign.pfx"))
+```
+
+Copy the **entire one-line output** into the `CSC_LINK` secret. Extra whitespace or line breaks can cause `pkcs12: trailing data found` during CI signing.
 
 ---
 

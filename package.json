@@ -1,7 +1,7 @@
 {
   "name": "ai-shelf-workspace",
   "private": true,
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "AI Shelf monorepo — inventory, workspace orchestration, and desktop app",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -59,6 +59,7 @@
         }
       ],
       "icon": "src/assets/icon.ico",
+      "publisherName": "AI Shelf (Self-Signed)",
       "signtoolOptions": {
         "timeStampServer": "http://timestamp.digicert.com"
       }

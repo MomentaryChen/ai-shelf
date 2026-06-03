@@ -76,7 +76,8 @@ jobs:
           REPO_CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
           if ($env:REPO_CSC_LINK -and $env:REPO_CSC_KEY_PASSWORD) {
-            "CSC_LINK=$env:REPO_CSC_LINK" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            $pfxPath = & ./scripts/prepare-csc-link.ps1 -Link $env:REPO_CSC_LINK
+            "CSC_LINK=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             "CSC_KEY_PASSWORD=$env:REPO_CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             "USE_REPO_SIGNING=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             Write-Host "Using repository CSC_LINK / CSC_KEY_PASSWORD secrets."
@@ -96,11 +97,10 @@ jobs:
           if (-not $env:CSC_LINK -or -not $env:CSC_KEY_PASSWORD) {
             throw 'CSC_LINK / CSC_KEY_PASSWORD were not set. Configure GitHub secrets or use fallback.'
           }
-          if (Test-Path -LiteralPath $env:CSC_LINK) {
-            Write-Host "Signing certificate file ready: $($env:CSC_LINK)"
-          } else {
-            Write-Host "CSC_LINK set (base64 or URL); electron-builder will load the certificate."
+          if (-not (Test-Path -LiteralPath $env:CSC_LINK)) {
+            throw "Signing certificate not found at CSC_LINK: $($env:CSC_LINK)"
           }
+          Write-Host "Signing certificate file ready: $($env:CSC_LINK)"
 
       - name: Package Windows installer
         env:

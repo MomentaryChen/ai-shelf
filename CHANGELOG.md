@@ -9,6 +9,15 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.6] - 2026-06-03
+
+Fix Windows CI code signing for repository PFX secrets and publisher metadata.
+
+### Fixed
+
+- **electron-builder publisherName** — Set `build.win.publisherName` to `AI Shelf (Self-Signed)` so NSIS signing works when the certificate publisher cannot be auto-detected.
+- **CSC_LINK base64 in CI** — Decode repository `CSC_LINK` secrets to a temp `.pfx` before signing to avoid PKCS#12 parse errors (`trailing data found`).
+
 ## [2.1.5] - 2026-06-03
 
 Fix invalid GitHub Actions workflow conditions for release signing notices.
@@ -249,6 +258,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.6]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.6
 [2.1.5]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.5
 [2.1.4]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.4
 [2.1.3]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.3
