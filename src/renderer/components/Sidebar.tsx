@@ -369,7 +369,7 @@ export function Sidebar({
         {!collapsed && (
           <>
             <div className="mt-3 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-muted">
-              2. Profile
+              {t("profile.title")}
             </div>
             <div className="mt-1 flex items-center gap-1 px-1">
               <div className="relative flex-1">

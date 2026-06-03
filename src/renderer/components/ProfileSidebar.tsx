@@ -562,7 +562,7 @@ export function ProfileSidebar({
         {err && <p className="px-2.5 pb-1 text-[11px] text-red-400">{err}</p>}
         <div className="px-2.5 pb-2">
           <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-chrome-text-dim">
-            1. {t("profileGroup.title")}
+            {t("profileGroup.title")}
           </div>
           <div className="space-y-1">
             {(forest?.groups ?? []).map((g) => {
@@ -625,7 +625,7 @@ export function ProfileSidebar({
 
         <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2.5">
           <div className="px-2 text-[10px] uppercase tracking-[0.12em] text-chrome-text-dim">
-            2. {t("profile.title")}
+            {t("profile.title")}
           </div>
           {activeGroup && (
             <div className="px-2 text-[10px] text-chrome-text-dim">
