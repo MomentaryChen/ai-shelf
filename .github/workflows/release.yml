@@ -75,14 +75,17 @@ jobs:
           REPO_CSC_LINK: ${{ secrets.CSC_LINK }}
           REPO_CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
-          if ($env:REPO_CSC_LINK -and $env:REPO_CSC_KEY_PASSWORD) {
-            $pfxPath = & ./scripts/prepare-csc-link.ps1 -Link $env:REPO_CSC_LINK
-            "CSC_LINK=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            "CSC_KEY_PASSWORD=$env:REPO_CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            "USE_REPO_SIGNING=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $repoLink = if ($env:REPO_CSC_LINK) { $env:REPO_CSC_LINK.Trim() } else { '' }
+          $repoPassword = if ($env:REPO_CSC_KEY_PASSWORD) { $env:REPO_CSC_KEY_PASSWORD.Trim() } else { '' }
+          if ($repoLink -and $repoPassword) {
+            $pfxPath = & ./scripts/prepare-csc-link.ps1 -Link $repoLink -Password $repoPassword
+            $password = $repoPassword
+            Add-Content -Path $env:GITHUB_ENV -Value "CSC_LINK=$pfxPath"
+            Add-Content -Path $env:GITHUB_ENV -Value "CSC_KEY_PASSWORD=$password"
+            Add-Content -Path $env:GITHUB_ENV -Value "USE_REPO_SIGNING=true"
             Write-Host "Using repository CSC_LINK / CSC_KEY_PASSWORD secrets."
           } else {
-            "USE_REPO_SIGNING=false" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Add-Content -Path $env:GITHUB_ENV -Value "USE_REPO_SIGNING=false"
             Write-Host "Repository CSC_* secrets not configured; fallback self-signed cert will be generated."
           }
 
@@ -97,10 +100,9 @@ jobs:
           if (-not $env:CSC_LINK -or -not $env:CSC_KEY_PASSWORD) {
             throw 'CSC_LINK / CSC_KEY_PASSWORD were not set. Configure GitHub secrets or use fallback.'
           }
-          if (-not (Test-Path -LiteralPath $env:CSC_LINK)) {
-            throw "Signing certificate not found at CSC_LINK: $($env:CSC_LINK)"
-          }
-          Write-Host "Signing certificate file ready: $($env:CSC_LINK)"
+          $pkg = Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json
+          $publisher = $pkg.build.win.signtoolOptions.publisherName
+          ./scripts/assert-signing-pfx.ps1 -Path $env:CSC_LINK -Password $env:CSC_KEY_PASSWORD -ExpectedPublisherName $publisher
 
       - name: Package Windows installer
         env:

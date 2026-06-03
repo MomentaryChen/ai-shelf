@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.8] - 2026-06-03
+
+Fix Windows release CI SignTool PFX load failures for repository signing secrets.
+
+### Fixed
+
+- **Windows CI SignTool PFX load** — Trim signing secrets, decode/validate repository `CSC_LINK` before packaging, write `GITHUB_ENV` without UTF-8 BOM, and preflight PFX + `publisherName` alignment so SignTool failures surface with actionable errors.
+
 ## [2.1.7] - 2026-06-03
 
 Fix electron-builder 26 Windows signing configuration schema.

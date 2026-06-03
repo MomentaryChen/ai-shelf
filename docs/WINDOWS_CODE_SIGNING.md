@@ -69,6 +69,22 @@ Generate a clean base64 value:
 
 Copy the **entire one-line output** into the `CSC_LINK` secret. Extra whitespace or line breaks can cause `pkcs12: trailing data found` during CI signing.
 
+Or validate and print the secret line in one step:
+
+```powershell
+./scripts/encode-csc-link-secret.ps1 -PfxPath ".codesign/ai-shelf-selfsign.pfx" -Password "your-export-password"
+```
+
+### CI troubleshooting
+
+| Symptom | Likely cause | Fix |
+|--------|----------------|-----|
+| `SignTool Error: ... load the signing certificate from: ...\repo-codesign.pfx` | Wrong `CSC_KEY_PASSWORD`, corrupt `CSC_LINK` base64, or CN mismatch with `publisherName` | Re-run `encode-csc-link-secret.ps1`; update both secrets; ensure CN matches `package.json` → `build.win.signtoolOptions.publisherName` |
+| Preflight: `Failed to open PFX` | Password does not match the exported PFX | Re-export with a known password; update `CSC_KEY_PASSWORD` (trim accidental newlines in the secret) |
+| Preflight: `Decoded CSC_LINK is too small` | Secret is a file path or truncated base64, not raw PFX bytes | Store base64 of the `.pfx` file, not a path string |
+
+Release CI decodes secrets in `prepare-csc-link.ps1`, validates the PFX with `assert-signing-pfx.ps1` **before** electron-builder runs, and writes `GITHUB_ENV` via `Add-Content` (avoids UTF-8 BOM corrupting `CSC_KEY_PASSWORD`).
+
 ---
 
 ## Upgrade path (when you want real SmartScreen trust)
