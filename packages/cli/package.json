@@ -1,6 +1,6 @@
 {
   "name": "ai-shelf",
-  "version": "2.1.14",
+  "version": "2.1.15",
   "description": "AI Shelf — terminal profile CLI and TUI (shared data model with the desktop app)",
   "type": "module",
   "main": "./dist/index.js",

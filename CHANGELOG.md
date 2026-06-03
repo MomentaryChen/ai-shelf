@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.15] - 2026-06-03
+
+Fix desktop auto-update for self-signed releases and improve the update error dialog.
+
 ### Fixed
 
 - **Update error modal layout** — Cap modal height, keep action buttons visible, and show short i18n errors instead of full SignTool JSON dumps.
