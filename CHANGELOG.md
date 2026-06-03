@@ -9,6 +9,19 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.11] - 2026-06-03
+
+SignTool-compatible PFX normalization and password handling for repository signing secrets.
+
+### Added
+
+- **`import-csc-env.ps1`** / **`write-csc-password-file.ps1`** — Load signing password from a runner temp file so `CSC_KEY_PASSWORD` is not corrupted in `GITHUB_ENV`.
+- **SignTool preflight** — CI validates the PFX with the same SignTool path electron-builder uses before packaging.
+
+### Fixed
+
+- **SignTool PFX load failures** — Re-export decoded PKCS#12 in a SignTool-compatible form when PowerShell can open the cert but SignTool cannot.
+
 ## [2.1.10] - 2026-06-03
 
 Harden repository signing secret handling before electron-builder runs.
@@ -20,7 +33,7 @@ Harden repository signing secret handling before electron-builder runs.
 
 ### Fixed
 
-- **CSC_KEY_PASSWORD in CI** — Use heredoc env writes so special characters in the export password are not corrupted before SignTool runs.
+- **SignTool PFX load in CI** — Store `CSC_KEY_PASSWORD` in a runner temp file (not `GITHUB_ENV`), normalize decoded PKCS#12 for SignTool, run Windows SDK SignTool preflight before `electron-builder`, and load signing env via `import-csc-env.ps1` (avoids `${{ env.* }}` re-injection corrupting passwords).
 
 ## [2.1.9] - 2026-06-03
 
@@ -295,6 +308,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.11]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.11
 [2.1.10]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.10
 [2.1.9]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.9
 [2.1.8]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.8

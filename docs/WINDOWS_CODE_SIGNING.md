@@ -83,12 +83,12 @@ Copy the **entire one-line base64 output** into `CSC_LINK`. Set `CSC_KEY_PASSWOR
 
 | Symptom | Likely cause | Fix |
 |--------|----------------|-----|
-| `SignTool Error: ... load the signing certificate from: ...\repo-codesign.pfx` | Wrong `CSC_KEY_PASSWORD`, corrupt `CSC_LINK` base64, or CN mismatch with `publisherName` | Re-run `encode-csc-link-secret.ps1`; update both secrets; ensure CN matches `package.json` → `build.win.signtoolOptions.publisherName` |
+| `SignTool Error: ... load the signing certificate from: ...\repo-codesign.pfx` | Wrong `CSC_KEY_PASSWORD`, corrupt `CSC_LINK` base64, or CN mismatch with `publisherName` | Re-run `encode-csc-link-secret.ps1`; update both secrets; ensure CN matches `package.json` → `build.win.signtoolOptions.publisherName`. CI now fails in the **Verify signing certificate** step (SignTool preflight) before packaging when this would happen. |
 | Preflight: `not a valid PFX` / `expected DER header 30 82, got 4D 49...` | **Double base64** (encoding the base64 *text* again) or wrong file type | Run `encode-csc-link-secret.ps1` on the `.pfx` binary; paste that one line into `CSC_LINK` (CI auto-fixes double encoding when detected) |
 | Preflight: `Failed to open PFX` | Password does not match the exported PFX | Re-export with a known password; update `CSC_KEY_PASSWORD` (trim accidental newlines in the secret) |
 | Preflight: `Decoded CSC_LINK is too small` | Secret is a file path or truncated base64, not raw PFX bytes | Store base64 of the `.pfx` file, not a path string |
 
-Release CI decodes secrets in `prepare-csc-link.ps1`, validates the PFX with `assert-signing-pfx.ps1` **before** electron-builder runs, and writes `GITHUB_ENV` via `write-github-env.ps1` (heredoc; avoids special-character / BOM issues in `CSC_KEY_PASSWORD`).
+Release CI decodes secrets in `prepare-csc-link.ps1`, normalizes PKCS#12 for SignTool, validates with `assert-signing-pfx.ps1` (including optional SignTool preflight), stores the password in a runner temp file (`write-csc-password-file.ps1`), and loads signing env via `import-csc-env.ps1` before electron-builder runs.
 
 ---
 

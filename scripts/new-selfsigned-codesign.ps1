@@ -42,5 +42,5 @@ if ($ForCi) {
         throw "GITHUB_ENV is not set; use -ForCi only in GitHub Actions."
     }
     Add-Content -Path $env:GITHUB_ENV -Value "CSC_LINK=$OutputPath"
-    Add-Content -Path $env:GITHUB_ENV -Value "CSC_KEY_PASSWORD=$Password"
+    & "$PSScriptRoot/write-csc-password-file.ps1" -Password $Password
 }

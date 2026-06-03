@@ -6,10 +6,69 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Password,
 
-    [string]$ExpectedPublisherName
+    [string]$ExpectedPublisherName,
+
+    [switch]$SignToolPreflight
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Get-WindowsSdkSignToolPath {
+    $kits = @(
+        "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe",
+        "${env:ProgramFiles}\Windows Kits\10\bin\*\x64\signtool.exe"
+    )
+    foreach ($pattern in $kits) {
+        $found = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue |
+            Sort-Object { $_.FullName } -Descending |
+            Select-Object -First 1
+        if ($found) {
+            return $found.FullName
+        }
+    }
+    return $null
+}
+
+function Test-SignToolLoadsPfx {
+    param(
+        [string]$PfxPath,
+        [string]$Password
+    )
+
+    $signtool = Get-WindowsSdkSignToolPath
+    if (-not $signtool) {
+        Write-Host 'SignTool preflight skipped: Windows SDK signtool.exe not found on PATH.'
+        return
+    }
+
+    $stamp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+    $testExe = Join-Path $stamp 'ai-shelf-signtool-preflight.exe'
+    Copy-Item -LiteralPath (Get-Command pwsh).Source -Destination $testExe -Force
+
+    $args = @(
+        'sign',
+        '/f', $PfxPath,
+        '/p', $Password,
+        '/fd', 'sha256',
+        '/tr', 'http://timestamp.digicert.com',
+        '/td', 'sha256',
+        '/d', 'AI Shelf SignTool preflight',
+        '/debug',
+        $testExe
+    )
+
+    Write-Host "SignTool preflight: $signtool"
+    & $signtool @args
+    if ($LASTEXITCODE -ne 0) {
+        throw @"
+SignTool could not sign with this PFX/password (same failure electron-builder uses).
+Check CSC_KEY_PASSWORD, re-run encode-csc-link-secret.ps1, and ensure publisherName matches the cert CN.
+"@
+    }
+
+    Remove-Item -LiteralPath $testExe -Force -ErrorAction SilentlyContinue
+    Write-Host 'SignTool preflight OK.'
+}
 
 if (-not (Test-Path -LiteralPath $Path)) {
     throw "Signing certificate not found: $Path"
@@ -66,4 +125,8 @@ Certificate CN '$cn' does not match build.win.signtoolOptions.publisherName '$Ex
 Update package.json publisherName or re-export a cert with matching CN.
 "@
     }
+}
+
+if ($SignToolPreflight) {
+    Test-SignToolLoadsPfx -PfxPath $Path -Password $passwordPlain
 }

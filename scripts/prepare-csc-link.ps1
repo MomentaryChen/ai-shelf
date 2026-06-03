@@ -31,6 +31,20 @@ function ConvertFrom-Base64Payload {
     }
 }
 
+function ConvertTo-SignToolPfxBytes {
+    param(
+        [byte[]]$Bytes,
+        [string]$Password
+    )
+
+    $plain = $Password.Trim()
+    $collection = [System.Security.Cryptography.X509Certificates.X509Certificate2Collection]::new()
+    $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable `
+        -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+    $collection.Import($Bytes, $plain, $flags)
+    return $collection.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12, $plain)
+}
+
 function Resolve-CscLinkBytes {
     param([string]$Link)
 
@@ -92,11 +106,23 @@ if ($bytes.Length -lt 100) {
     throw "Resolved CSC_LINK is too small ($($bytes.Length) bytes) to be a valid PFX."
 }
 
+if ($Password) {
+    $bytes = ConvertTo-SignToolPfxBytes -Bytes $bytes -Password $Password
+    Write-Host "Normalized PKCS#12 for SignTool ($($bytes.Length) bytes)."
+}
+
 [IO.File]::WriteAllBytes($OutputPath, $bytes)
 Write-Host "Wrote signing PFX: $OutputPath ($($bytes.Length) bytes)"
 
 if ($Password) {
-    & "$PSScriptRoot/assert-signing-pfx.ps1" -Path $OutputPath -Password $Password
+    $assertArgs = @{
+        Path     = $OutputPath
+        Password = $Password
+    }
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        $assertArgs.SignToolPreflight = $true
+    }
+    & "$PSScriptRoot/assert-signing-pfx.ps1" @assertArgs
 }
 
 Write-Output $OutputPath

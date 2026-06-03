@@ -80,7 +80,7 @@ jobs:
           if ($repoLink -and $repoPassword) {
             $pfxPath = & ./scripts/prepare-csc-link.ps1 -Link $repoLink -Password $repoPassword
             & ./scripts/write-github-env.ps1 -Name 'CSC_LINK' -Value $pfxPath
-            & ./scripts/write-github-env.ps1 -Name 'CSC_KEY_PASSWORD' -Value $repoPassword
+            & ./scripts/write-csc-password-file.ps1 -Password $repoPassword
             Add-Content -Path $env:GITHUB_ENV -Value 'USE_REPO_SIGNING=true'
             Write-Host "Using repository CSC_LINK / CSC_KEY_PASSWORD secrets."
           } else {
@@ -96,18 +96,22 @@ jobs:
       - name: Verify signing certificate is configured
         shell: pwsh
         run: |
-          if (-not $env:CSC_LINK -or -not $env:CSC_KEY_PASSWORD) {
-            throw 'CSC_LINK / CSC_KEY_PASSWORD were not set. Configure GitHub secrets or use fallback.'
-          }
+          . ./scripts/import-csc-env.ps1
           $pkg = Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json
           $publisher = $pkg.build.win.signtoolOptions.publisherName
-          ./scripts/assert-signing-pfx.ps1 -Path $env:CSC_LINK -Password $env:CSC_KEY_PASSWORD -ExpectedPublisherName $publisher
+          $assertArgs = @{
+            Path                   = $env:CSC_LINK
+            Password               = $env:CSC_KEY_PASSWORD
+            ExpectedPublisherName  = $publisher
+            SignToolPreflight      = $true
+          }
+          ./scripts/assert-signing-pfx.ps1 @assertArgs
 
       - name: Package Windows installer
-        env:
-          CSC_LINK: ${{ env.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ env.CSC_KEY_PASSWORD }}
-        run: pnpm exec electron-builder --win --publish never
+        shell: pwsh
+        run: |
+          . ./scripts/import-csc-env.ps1
+          pnpm exec electron-builder --win --publish never
 
       - name: Verify Authenticode signature
         shell: pwsh
