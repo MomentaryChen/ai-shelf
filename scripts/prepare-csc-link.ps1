@@ -115,14 +115,7 @@ if ($Password) {
 Write-Host "Wrote signing PFX: $OutputPath ($($bytes.Length) bytes)"
 
 if ($Password) {
-    $assertArgs = @{
-        Path     = $OutputPath
-        Password = $Password
-    }
-    if ($env:GITHUB_ACTIONS -eq 'true') {
-        $assertArgs.SignToolPreflight = $true
-    }
-    & "$PSScriptRoot/assert-signing-pfx.ps1" @assertArgs
+    & "$PSScriptRoot/assert-signing-pfx.ps1" -Path $OutputPath -Password $Password
 }
 
 Write-Output $OutputPath

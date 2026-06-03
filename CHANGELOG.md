@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.12] - 2026-06-03
+
+Align CI SignTool preflight with electron-builder on GitHub Actions.
+
+### Fixed
+
+- **SignTool path mismatch** — `import-csc-env.ps1` sets `SIGNTOOL_PATH` to the Windows SDK `signtool.exe` so preflight and packaging use the same binary instead of electron-builder’s bundled winCodeSign copy.
+
 ## [2.1.11] - 2026-06-03
 
 SignTool-compatible PFX normalization and password handling for repository signing secrets.
@@ -16,7 +24,7 @@ SignTool-compatible PFX normalization and password handling for repository signi
 ### Added
 
 - **`import-csc-env.ps1`** / **`write-csc-password-file.ps1`** — Load signing password from a runner temp file so `CSC_KEY_PASSWORD` is not corrupted in `GITHUB_ENV`.
-- **SignTool preflight** — CI validates the PFX with the same SignTool path electron-builder uses before packaging.
+- **SignTool preflight** — CI validates the PFX with SignTool before packaging; `import-csc-env.ps1` sets `SIGNTOOL_PATH` to the Windows SDK tool so electron-builder does not use a different bundled winCodeSign binary.
 
 ### Fixed
 

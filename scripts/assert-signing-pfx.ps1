@@ -13,7 +13,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Get-WindowsSdkSignToolPath {
+function Get-PreflightSignToolPath {
+    if ($env:SIGNTOOL_PATH -and (Test-Path -LiteralPath $env:SIGNTOOL_PATH)) {
+        return $env:SIGNTOOL_PATH
+    }
+
     $kits = @(
         "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe",
         "${env:ProgramFiles}\Windows Kits\10\bin\*\x64\signtool.exe"
@@ -35,9 +39,9 @@ function Test-SignToolLoadsPfx {
         [string]$Password
     )
 
-    $signtool = Get-WindowsSdkSignToolPath
+    $signtool = Get-PreflightSignToolPath
     if (-not $signtool) {
-        Write-Host 'SignTool preflight skipped: Windows SDK signtool.exe not found on PATH.'
+        Write-Host 'SignTool preflight skipped: winCodeSign / Windows SDK signtool.exe not found.'
         return
     }
 

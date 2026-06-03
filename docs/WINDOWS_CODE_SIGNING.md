@@ -88,7 +88,7 @@ Copy the **entire one-line base64 output** into `CSC_LINK`. Set `CSC_KEY_PASSWOR
 | Preflight: `Failed to open PFX` | Password does not match the exported PFX | Re-export with a known password; update `CSC_KEY_PASSWORD` (trim accidental newlines in the secret) |
 | Preflight: `Decoded CSC_LINK is too small` | Secret is a file path or truncated base64, not raw PFX bytes | Store base64 of the `.pfx` file, not a path string |
 
-Release CI decodes secrets in `prepare-csc-link.ps1`, normalizes PKCS#12 for SignTool, validates with `assert-signing-pfx.ps1` (including optional SignTool preflight), stores the password in a runner temp file (`write-csc-password-file.ps1`), and loads signing env via `import-csc-env.ps1` before electron-builder runs.
+Release CI decodes secrets in `prepare-csc-link.ps1`, normalizes PKCS#12 for SignTool, validates with `assert-signing-pfx.ps1` (SignTool preflight), stores the password in a runner temp file (`write-csc-password-file.ps1`), and loads signing env via `import-csc-env.ps1` (sets `SIGNTOOL_PATH` to the Windows SDK `signtool.exe` on GitHub Actions) before electron-builder runs.
 
 ---
 
