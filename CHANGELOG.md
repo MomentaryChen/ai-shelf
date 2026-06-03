@@ -9,13 +9,22 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.4] - 2026-06-03
+
+Fix release workflow to read electron-builder signing secrets by their canonical names.
+
+### Fixed
+
+- **Release CI secret names** — Workflow now reads `CSC_LINK` / `CSC_KEY_PASSWORD` GitHub secrets (matching electron-builder) instead of `WIN_CSC_*`.
+- **Base64 certificate support** — Signing preflight no longer requires `CSC_LINK` to be a local file path when the secret contains base64-encoded PFX data.
+
 ## [2.1.3] - 2026-06-03
 
 Re-release with stable repository code-signing certificate configured for CI.
 
 ### Changed
 
-- **Windows release signing** — CI now signs installers with the repository `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` certificate, keeping the same publisher across releases for in-app update signature checks.
+- **Windows release signing** — CI now signs installers with the repository `CSC_LINK` / `CSC_KEY_PASSWORD` secrets, keeping the same publisher across releases for in-app update signature checks.
 
 ## [2.1.2] - 2026-06-03
 
@@ -31,7 +40,7 @@ Release signing pipeline now prefers trusted certificates to avoid desktop in-ap
 
 ### Changed
 
-- **Windows release workflow** — `release.yml` now uses `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` secrets first, and only falls back to generated self-signed certs when secrets are not configured.
+- **Windows release workflow** — `release.yml` now uses `CSC_LINK` / `CSC_KEY_PASSWORD` secrets first, and only falls back to generated self-signed certs when secrets are not configured.
 - **CI release notices** — Added explicit workflow notices to show whether trusted signing or fallback self-signed signing was used for each release build.
 
 ### Fixed
@@ -232,6 +241,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.4]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.4
 [2.1.3]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.3
 [2.1.2]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.2
 [2.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.1

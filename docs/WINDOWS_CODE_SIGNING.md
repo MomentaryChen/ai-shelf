@@ -8,7 +8,7 @@ Release CI signs Windows installers with **repository certificate secrets first*
 
 | | Self-signed fallback | Trusted certificate (recommended) |
 |--|----------------------|-------------------------|
-| **CI setup** | Automatic on every tag | Requires `WIN_CSC_LINK` + `WIN_CSC_KEY_PASSWORD` secrets |
+| **CI setup** | Automatic on every tag | Requires `CSC_LINK` + `CSC_KEY_PASSWORD` GitHub secrets |
 | **File has signature** | Yes | Yes |
 | **SmartScreen / updater trust** | Still warns; updater trust can fail | Verified publisher; updater trust works as expected |
 | **User action** | **More info** → **Run anyway** | Usually smoother after reputation |
@@ -21,7 +21,7 @@ Self-signed signing is only a **fallback**: it proves the signing pipeline works
 
 On tag push, [`.github/workflows/release.yml`](../.github/workflows/release.yml):
 
-1. Uses `WIN_CSC_LINK` + `WIN_CSC_KEY_PASSWORD` if present (recommended path)
+1. Uses `CSC_LINK` + `CSC_KEY_PASSWORD` GitHub secrets if present (recommended path)
 2. Otherwise generates a fallback self-signed `.pfx` on the runner (`scripts/new-selfsigned-codesign.ps1`)
 3. Signs the NSIS installer via electron-builder (`CSC_LINK` / `CSC_KEY_PASSWORD`)
 4. Verifies the file is signed (`scripts/verify-windows-signature.ps1 -RequireSigned`)
@@ -56,8 +56,8 @@ The `.codesign/` folder is gitignored. Do not commit `.pfx` files.
 
 Use a CA certificate or [SignPath Foundation](https://signpath.org/) (free for qualifying OSS), then store the signing material in:
 
-- `WIN_CSC_LINK` (base64 PFX or secure URL)
-- `WIN_CSC_KEY_PASSWORD`
+- `CSC_LINK` (base64 PFX or secure URL — same env var electron-builder expects)
+- `CSC_KEY_PASSWORD`
 
 ---
 
