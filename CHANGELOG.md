@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.9] - 2026-06-03
+
+Fix repository `CSC_LINK` secrets that accidentally double-base64-encode the PFX.
+
+### Fixed
+
+- **CSC_LINK double base64** — `prepare-csc-link.ps1` detects PKCS#12 by DER header and unwraps nested base64 (common mistaken secret format) before PFX validation.
+
 ## [2.1.8] - 2026-06-03
 
 Fix Windows release CI SignTool PFX load failures for repository signing secrets.

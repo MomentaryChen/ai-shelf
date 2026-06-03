@@ -80,6 +80,7 @@ Or validate and print the secret line in one step:
 | Symptom | Likely cause | Fix |
 |--------|----------------|-----|
 | `SignTool Error: ... load the signing certificate from: ...\repo-codesign.pfx` | Wrong `CSC_KEY_PASSWORD`, corrupt `CSC_LINK` base64, or CN mismatch with `publisherName` | Re-run `encode-csc-link-secret.ps1`; update both secrets; ensure CN matches `package.json` → `build.win.signtoolOptions.publisherName` |
+| Preflight: `not a valid PFX` / `expected DER header 30 82, got 4D 49...` | **Double base64** (encoding the base64 *text* again) or wrong file type | Run `encode-csc-link-secret.ps1` on the `.pfx` binary; paste that one line into `CSC_LINK` (CI auto-fixes double encoding when detected) |
 | Preflight: `Failed to open PFX` | Password does not match the exported PFX | Re-export with a known password; update `CSC_KEY_PASSWORD` (trim accidental newlines in the secret) |
 | Preflight: `Decoded CSC_LINK is too small` | Secret is a file path or truncated base64, not raw PFX bytes | Store base64 of the `.pfx` file, not a path string |
 

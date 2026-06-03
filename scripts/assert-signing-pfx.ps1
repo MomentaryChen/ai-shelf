@@ -20,14 +20,27 @@ if (-not $passwordPlain) {
     throw 'CSC_KEY_PASSWORD is empty after trimming whitespace.'
 }
 
+$bytes = [IO.File]::ReadAllBytes($Path)
+if ($bytes.Length -lt 4 -or $bytes[0] -ne 0x30) {
+    $header = ($bytes[0..([Math]::Min(3, $bytes.Length - 1))] | ForEach-Object { '{0:X2}' -f $_ }) -join ' '
+    throw @"
+File at '$Path' is not PKCS#12 DER (expected header 30 82, got $header).
+CSC_LINK is likely double-base64 or not raw .pfx bytes — re-run encode-csc-link-secret.ps1.
+"@
+}
+
 $securePassword = ConvertTo-SecureString -String $passwordPlain -AsPlainText -Force
 
 try {
     $pfx = Get-PfxData -FilePath $Path -Password $securePassword
 } catch {
+    $hint = if ($_.Exception.Message -match 'not a valid PFX') {
+        'PFX structure looks valid; check CSC_KEY_PASSWORD matches the export password (no extra quotes or newlines).'
+    } else {
+        'Check CSC_KEY_PASSWORD and that the PFX was exported with an exportable private key.'
+    }
     throw @"
-Failed to open PFX at '$Path' with CSC_KEY_PASSWORD.
-Common causes: wrong password, corrupt base64 in CSC_LINK, or PFX exported without a private key.
+Failed to open PFX at '$Path' with CSC_KEY_PASSWORD. $hint
 Original error: $($_.Exception.Message)
 "@
 }
