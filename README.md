@@ -6,7 +6,7 @@
 
 [中文說明](README.zh-TW.md) · [Changelog](CHANGELOG.md)
 
-**v2.1.1** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
+**v2.1.2** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
 
 ---
 

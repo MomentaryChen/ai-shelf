@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-06-03
+
+Hotfix for Windows release CI producing unsigned installers.
+
+### Fixed
+
+- **Release CI signing** — Fixed fallback self-signed workflow overwriting `CSC_LINK` with a non-existent `.codesign/` path, which caused `AI-Shelf-Setup-*.exe` to ship unsigned and fail Authenticode verification.
+
 ## [2.1.1] - 2026-06-02
 
 Release signing pipeline now prefers trusted certificates to avoid desktop in-app update signature trust failures.
@@ -216,8 +224,9 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
-[2.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.0
+[2.1.2]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.2
 [2.1.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.1
+[2.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.0
 [2.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.0.0
 [1.4.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.1
 [1.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v1.4.0
