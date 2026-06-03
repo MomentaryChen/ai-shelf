@@ -27,7 +27,7 @@ On tag push, [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 4. Signs the NSIS installer via electron-builder (`CSC_LINK` / `CSC_KEY_PASSWORD`)
 5. Verifies the file is signed (`scripts/verify-windows-signature.ps1 -RequireSigned`)
 
-Fallback publisher name in file properties: **AI Shelf (Self-Signed)** (`package.json` → `build.win.publisherName` must match the certificate CN).
+Fallback publisher name in file properties: **AI Shelf (Self-Signed)** (`package.json` → `build.win.signtoolOptions.publisherName` must match the certificate CN).
 
 > For in-app auto-update reliability, use a trusted certificate via repository secrets. Fresh self-signed certs are not trusted on user machines by default.
 

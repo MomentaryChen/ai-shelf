@@ -9,13 +9,21 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.7] - 2026-06-03
+
+Fix electron-builder 26 Windows signing configuration schema.
+
+### Fixed
+
+- **electron-builder 26 signtoolOptions** — Moved `publisherName` under `build.win.signtoolOptions` (removed invalid `build.win.publisherName` that broke CI validation).
+
 ## [2.1.6] - 2026-06-03
 
 Fix Windows CI code signing for repository PFX secrets and publisher metadata.
 
 ### Fixed
 
-- **electron-builder publisherName** — Set `build.win.publisherName` to `AI Shelf (Self-Signed)` so NSIS signing works when the certificate publisher cannot be auto-detected.
+- **electron-builder publisherName** — Set `build.win.signtoolOptions.publisherName` to `AI Shelf (Self-Signed)` so NSIS signing works when the certificate publisher cannot be auto-detected.
 - **CSC_LINK base64 in CI** — Decode repository `CSC_LINK` secrets to a temp `.pfx` before signing to avoid PKCS#12 parse errors (`trailing data found`).
 
 ## [2.1.5] - 2026-06-03
@@ -258,6 +266,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.7]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.7
 [2.1.6]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.6
 [2.1.5]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.5
 [2.1.4]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.4
