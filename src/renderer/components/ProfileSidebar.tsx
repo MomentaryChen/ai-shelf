@@ -644,7 +644,7 @@ export function ProfileSidebar({
           {visibleGroups.map(({ group, profiles }) => {
             const groupExpanded = expandedGroupIds.has(group.id);
             return (
-              <div key={group.id} className="space-y-1">
+              <div key={group.id} className="space-y-1.5">
                 <button
                   type="button"
                   onClick={() => toggleGroupExpanded(group.id)}
@@ -683,13 +683,13 @@ export function ProfileSidebar({
             return (
               <div
                 key={profile.id}
-                className={`overflow-hidden rounded-xl border transition-all duration-150 ${
+                className={`overflow-hidden rounded-xl border-2 transition-all duration-150 ${
                   canReorderProfiles && dragOverId === profile.id && draggingId !== profile.id
                     ? "ring-2 ring-accent/35"
                     : canReorderProfiles && draggingId === profile.id
                       ? "opacity-45 scale-[0.99]"
                       : ""
-                } ${isActive && !hasAccent ? "border-chrome-profile-card-active-border" : "border-transparent"}`}
+                } ${isActive && !hasAccent ? "border-chrome-profile-card-active-border" : "border-solid"}`}
                 style={cardStyle}
                 onDragOver={(e) => {
                   if (!canReorderProfiles || !draggingId) return;
@@ -816,7 +816,7 @@ export function ProfileSidebar({
 
                 {expanded && (
                   <div
-                    className="mx-2 mb-2 space-y-0.5 rounded-lg border-l-2 py-1 pl-2 pr-1"
+                    className="mx-2 mb-2 space-y-0.5 rounded-lg border-l-[3px] border-solid py-1 pl-2 pr-1"
                     style={profileSessionsWellStyle(accent)}
                   >
                     <div className="px-2 pt-0.5 text-[10px] uppercase tracking-[0.1em] text-chrome-text-dim">
