@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { sanitizeReleaseNotesHtml } from "../utils/releaseNotesHtml";
+import {
+  resolveAppUpdateErrorKey,
+  shortenAppUpdateErrorDetail,
+} from "../utils/formatAppUpdateError";
 import { useLocale } from "../i18n/LocaleProvider";
 
 type Phase = "hidden" | "confirm" | "downloading" | "ready" | "error";
@@ -17,6 +21,12 @@ export function AppUpdateModal() {
     () => (releaseNotes ? sanitizeReleaseNotesHtml(releaseNotes) : null),
     [releaseNotes],
   );
+
+  const errorSummaryKey = useMemo(
+    () => resolveAppUpdateErrorKey(errorMessage),
+    [errorMessage],
+  );
+  const errorDetail = useMemo(() => shortenAppUpdateErrorDetail(errorMessage), [errorMessage]);
 
   const dismiss = useCallback(() => {
     if (phase === "downloading") return;
@@ -101,6 +111,67 @@ export function AppUpdateModal() {
 
   if (!enabled || phase === "hidden") return null;
 
+  const title =
+    phase === "ready"
+      ? t("appUpdate.ready")
+      : phase === "error"
+        ? t("appUpdate.failed")
+        : t("appUpdate.available");
+
+  const footer =
+    phase === "confirm" ? (
+      <>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
+        >
+          {t("appUpdate.later")}
+        </button>
+        <button
+          type="button"
+          onClick={startDownload}
+          className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
+        >
+          {t("appUpdate.now")}
+        </button>
+      </>
+    ) : phase === "ready" ? (
+      <>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
+        >
+          {t("appUpdate.restartLater")}
+        </button>
+        <button
+          type="button"
+          onClick={restartToInstall}
+          className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
+        >
+          {t("appUpdate.restartNow")}
+        </button>
+      </>
+    ) : phase === "error" ? (
+      <>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
+        >
+          {t("appUpdate.close")}
+        </button>
+        <button
+          type="button"
+          onClick={retryCheck}
+          className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
+        >
+          {t("appUpdate.retry")}
+        </button>
+      </>
+    ) : null;
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
@@ -108,115 +179,86 @@ export function AppUpdateModal() {
       aria-modal="true"
       aria-labelledby="app-update-title"
     >
-      <div className="w-full max-w-md rounded-xl border border-border bg-bg-card p-6 shadow-xl">
-        <h2 id="app-update-title" className="mb-2 text-lg font-semibold text-text-primary">
-          {phase === "ready"
-            ? t("appUpdate.ready")
-            : phase === "error"
-              ? t("appUpdate.failed")
-              : t("appUpdate.available")}
-        </h2>
+      <div className="flex max-h-[min(90vh,28rem)] w-full max-w-md flex-col rounded-xl border border-border bg-bg-card shadow-xl">
+        <div className="shrink-0 border-b border-border px-6 py-4">
+          <h2 id="app-update-title" className="text-lg font-semibold text-text-primary">
+            {title}
+          </h2>
+        </div>
 
-        {phase === "confirm" && (
-          <>
-            <p className="mb-3 text-sm text-text-secondary">
-              {t("appUpdate.newVersion")}
-              {version ? (
-                <>
-                  {" "}
-                  (<span className="font-mono text-accent">v{version}</span>)
-                </>
-              ) : null}
-              {t("appUpdate.downloadPrompt")}
-            </p>
-            {releaseNotesHtml && (
-              <div
-                className="release-notes mb-4 max-h-40 overflow-y-auto rounded-lg bg-bg-primary/60 p-3 text-xs text-text-secondary"
-                onClick={onReleaseNotesClick}
-                dangerouslySetInnerHTML={{ __html: releaseNotesHtml }}
-              />
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={dismiss}
-                className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
-              >
-                {t("appUpdate.later")}
-              </button>
-              <button
-                type="button"
-                onClick={startDownload}
-                className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
-              >
-                {t("appUpdate.now")}
-              </button>
-            </div>
-          </>
-        )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          {phase === "confirm" && (
+            <>
+              <p className="text-sm text-text-secondary">
+                {t("appUpdate.newVersion")}
+                {version ? (
+                  <>
+                    {" "}
+                    (<span className="font-mono text-accent">v{version}</span>)
+                  </>
+                ) : null}
+                {t("appUpdate.downloadPrompt")}
+              </p>
+              {releaseNotesHtml && (
+                <div
+                  className="release-notes mt-3 max-h-36 overflow-y-auto rounded-lg bg-bg-primary/60 p-3 text-xs text-text-secondary"
+                  onClick={onReleaseNotesClick}
+                  dangerouslySetInnerHTML={{ __html: releaseNotesHtml }}
+                />
+              )}
+            </>
+          )}
 
-        {phase === "downloading" && (
-          <>
-            <p className="mb-3 text-sm text-text-secondary">
-              {t("appUpdate.downloading")}
-              {version ? ` v${version}` : ""}…
-            </p>
-            <div className="mb-2 h-2 overflow-hidden rounded-full bg-bg-primary">
-              <div
-                className="h-full rounded-full bg-accent transition-[width] duration-200"
-                style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-              />
-            </div>
-            <p className="text-center font-mono text-sm tabular-nums text-text-primary">{percent}%</p>
-          </>
-        )}
+          {phase === "downloading" && (
+            <>
+              <p className="text-sm text-text-secondary">
+                {t("appUpdate.downloading")}
+                {version ? ` v${version}` : ""}…
+              </p>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg-primary">
+                <div
+                  className="h-full rounded-full bg-accent transition-[width] duration-200"
+                  style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                />
+              </div>
+              <p className="mt-2 text-center font-mono text-sm tabular-nums text-text-primary">
+                {percent}%
+              </p>
+            </>
+          )}
 
-        {phase === "ready" && (
-          <>
-            <p className="mb-4 text-sm text-text-secondary">
+          {phase === "ready" && (
+            <p className="text-sm text-text-secondary">
               {t("appUpdate.downloadComplete")}
               {version ? ` (v${version})` : ""}. {t("appUpdate.restartFinish")}
             </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={dismiss}
-                className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
-              >
-                {t("appUpdate.restartLater")}
-              </button>
-              <button
-                type="button"
-                onClick={restartToInstall}
-                className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
-              >
-                {t("appUpdate.restartNow")}
-              </button>
-            </div>
-          </>
-        )}
+          )}
 
-        {phase === "error" && (
-          <>
-            <p className="mb-4 text-sm text-fail">{errorMessage ?? t("appUpdate.errorDefault")}</p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={dismiss}
-                className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
-              >
-                {t("appUpdate.close")}
-              </button>
-              <button
-                type="button"
-                onClick={retryCheck}
-                className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
-              >
-                {t("appUpdate.retry")}
-              </button>
-            </div>
-          </>
-        )}
+          {phase === "error" && (
+            <>
+              <p className="text-sm text-fail">{t(errorSummaryKey)}</p>
+              {errorDetail && errorSummaryKey === "appUpdate.errorDefault" && (
+                <p className="mt-2 break-words font-mono text-xs text-text-secondary">{errorDetail}</p>
+              )}
+              {errorDetail && errorSummaryKey === "appUpdate.errorSignature" && (
+                <details className="mt-3 text-xs text-text-secondary">
+                  <summary className="cursor-pointer select-none text-text-primary">
+                    {t("appUpdate.errorDetail")}
+                  </summary>
+                  <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-bg-primary/60 p-2 font-mono text-[11px] leading-snug">
+                    {errorDetail}
+                  </pre>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+
+        {footer ? (
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-6 py-4">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>
   );

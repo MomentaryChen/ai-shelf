@@ -11,6 +11,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ### Fixed
 
+- **Update error modal layout** — Cap modal height, keep action buttons visible, and show short i18n errors instead of full SignTool JSON dumps.
 - **Desktop auto-update with self-signed CI** — Custom `verifyUpdateCodeSignature` accepts `HashValid` Authenticode when publisher CN matches, instead of requiring a CA-trusted `Valid` signature only.
 
 ## [2.1.14] - 2026-06-03

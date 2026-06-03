@@ -50,6 +50,20 @@ function sendToRenderer(channel: string, payload: unknown): void {
   win.webContents.send(channel, payload);
 }
 
+function formatUpdateErrorMessage(raw: string): string {
+  const msg = raw.trim();
+  if (!msg) return msg;
+  if (
+    msg.includes("ERR_UPDATER_INVALID_SIGNATURE") ||
+    msg.includes("not signed by the application owner") ||
+    msg.includes("publisherNames:")
+  ) {
+    const short = msg.split("publisherNames:")[0]?.trim() || msg;
+    return short.length > 320 ? `${short.slice(0, 320)}…` : short;
+  }
+  return msg.length > 500 ? `${msg.slice(0, 500)}…` : msg;
+}
+
 function formatReleaseNotes(notes: unknown): string | null {
   if (notes == null) return null;
   if (typeof notes === "string") return notes.trim() || null;
@@ -113,9 +127,9 @@ function bindAutoUpdaterEvents(): void {
 
   autoUpdater.on("error", (err) => {
     state.status = "error";
-    state.error = err.message;
+    state.error = formatUpdateErrorMessage(err.message);
     console.error("[app-updater]", err.message);
-    sendToRenderer("app-update-error", { message: err.message });
+    sendToRenderer("app-update-error", { message: state.error });
   });
 }
 

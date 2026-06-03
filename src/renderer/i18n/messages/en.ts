@@ -352,6 +352,9 @@ export const en = {
   "appUpdate.restartLater": "Restart later",
   "appUpdate.restartNow": "Restart now",
   "appUpdate.errorDefault": "Could not check or download the update.",
+  "appUpdate.errorSignature":
+    "The downloaded installer signature could not be verified (self-signed or publisher mismatch). Install manually from GitHub Releases, or update after a newer app build with matching signing.",
+  "appUpdate.errorDetail": "Technical details",
   "appUpdate.close": "Close",
   "appUpdate.retry": "Retry",
 } as const;

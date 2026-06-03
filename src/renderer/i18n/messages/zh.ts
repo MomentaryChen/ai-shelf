@@ -338,6 +338,9 @@ export const zh: Record<MessageKey, string> = {
   "appUpdate.restartLater": "稍後重啟",
   "appUpdate.restartNow": "立即重啟",
   "appUpdate.errorDefault": "無法檢查或下載更新。",
+  "appUpdate.errorSignature":
+    "下載的安裝程式簽章無法通過驗證（自簽憑證或發行者不符）。請改從 GitHub Releases 手動安裝，或待新版桌面程式發佈後再試自動更新。",
+  "appUpdate.errorDetail": "技術細節",
   "appUpdate.close": "關閉",
   "appUpdate.retry": "重試",
 };
