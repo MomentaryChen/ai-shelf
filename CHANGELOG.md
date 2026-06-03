@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.13] - 2026-06-03
+
+Detect truncated repository `CSC_LINK` secrets before Windows signing fails in CI.
+
 ### Fixed
 
 - **Truncated CSC_LINK in CI** — Validate PFX opens before SignTool normalization; fail with expected base64/PFX sizes when secrets are truncated; skip normalization when re-export is unnecessary.
