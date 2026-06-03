@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Fixed
+
+- **Windows SDK SignTool /fd** — Sign only with SHA256 + RFC3161 timestamp so electron-builder passes `/fd sha256` when `SIGNTOOL_PATH` points at Windows Kits 10.0.26100+ (avoids legacy SHA1 pass without `/fd`).
+
 ## [2.1.13] - 2026-06-03
 
 Detect truncated repository `CSC_LINK` secrets before Windows signing fails in CI.

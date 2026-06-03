@@ -29,6 +29,8 @@ On tag push, [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 
 Fallback publisher name in file properties: **AI Shelf (Self-Signed)** (`package.json` → `build.win.signtoolOptions.publisherName` must match the certificate CN).
 
+`build.win.signtoolOptions.signingHashAlgorithms` is `["sha256"]` so CI uses `/fd sha256` with the Windows SDK `signtool.exe` (required on Kits 10.0.26100+ when `SIGNTOOL_PATH` is set).
+
 > For in-app auto-update reliability, use a trusted certificate via repository secrets. Fresh self-signed certs are not trusted on user machines by default.
 
 ---
