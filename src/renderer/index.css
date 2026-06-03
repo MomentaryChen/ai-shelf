@@ -152,8 +152,8 @@ body,
   --color-chrome-hover-strong: rgb(255 255 255 / 0.06);
   --color-chrome-profile-card-bg: #111113;
   --color-chrome-profile-card-active-bg: #12161f;
-  --color-chrome-profile-card-border: #232326;
-  --color-chrome-profile-card-active-border: #2d3f5c;
+  --color-chrome-profile-card-border: #303035;
+  --color-chrome-profile-card-active-border: #3a5070;
   --color-chrome-badge-bg: #1e1e22;
   --color-chrome-sessions-well-bg: rgb(0 0 0 / 0.22);
   --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.4);
@@ -204,8 +204,8 @@ html[data-app-theme="light"] {
   --color-chrome-hover-strong: rgb(15 23 42 / 0.08);
   --color-chrome-profile-card-bg: #f8fafc;
   --color-chrome-profile-card-active-bg: #e0f2fe;
-  --color-chrome-profile-card-border: #cbd5e1;
-  --color-chrome-profile-card-active-border: #0284c7;
+  --color-chrome-profile-card-border: #94a3b8;
+  --color-chrome-profile-card-active-border: #0369a1;
   --color-chrome-badge-bg: #e2e8f0;
   --color-chrome-sessions-well-bg: rgb(15 23 42 / 0.04);
   --color-chrome-pane-header-unfocused: rgb(241 245 249 / 0.9);

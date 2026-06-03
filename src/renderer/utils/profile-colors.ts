@@ -28,28 +28,34 @@ export function profileAccentOrDefault(accent?: string | null): string {
   return accent ?? DEFAULT_FOCUS;
 }
 
+const PROFILE_CARD_BORDER_WIDTH = 2;
+
 /** Profile card container — border, fill, optional glow when active. */
 export function profileCardStyle(
   accentColor: string | null | undefined,
   isActive: boolean,
 ): import("react").CSSProperties {
+  const borderBase = { borderWidth: PROFILE_CARD_BORDER_WIDTH, borderStyle: "solid" as const };
   if (!accentColor) {
     return isActive
       ? {
+          ...borderBase,
           backgroundColor: chromeVar("--color-chrome-profile-card-active-bg", "#12161f"),
-          borderColor: chromeVar("--color-chrome-profile-card-active-border", "#2d3f5c"),
-          boxShadow: "0 0 0 1px rgba(126, 182, 255, 0.12), 0 4px 16px rgba(0,0,0,0.35)",
+          borderColor: chromeVar("--color-chrome-profile-card-active-border", "#3a5070"),
+          boxShadow: "0 0 0 2px rgba(126, 182, 255, 0.14), 0 4px 16px rgba(0,0,0,0.35)",
         }
       : {
+          ...borderBase,
           backgroundColor: chromeVar("--color-chrome-profile-card-bg", "#111113"),
-          borderColor: chromeVar("--color-chrome-profile-card-border", "#232326"),
+          borderColor: chromeVar("--color-chrome-profile-card-border", "#303035"),
         };
   }
   return {
+    ...borderBase,
     backgroundColor: tint(accentColor, isActive ? "14" : "08"),
-    borderColor: tint(accentColor, isActive ? "50" : "28"),
+    borderColor: tint(accentColor, isActive ? "62" : "40"),
     boxShadow: isActive
-      ? `0 0 0 1px ${tint(accentColor, "22")}, 0 4px 20px ${tint(accentColor, "18")}`
+      ? `0 0 0 2px ${tint(accentColor, "28")}, 0 4px 20px ${tint(accentColor, "18")}`
       : "0 1px 2px rgba(0,0,0,0.2)",
   };
 }
@@ -80,7 +86,8 @@ export function profileSessionsWellStyle(
 ): import("react").CSSProperties {
   const accent = profileAccentOrDefault(accentColor);
   return {
-    borderLeftColor: tint(accent, "66"),
+    borderLeftWidth: 3,
+    borderLeftColor: tint(accent, "77"),
     backgroundColor: chromeVar("--color-chrome-sessions-well-bg", "rgba(0,0,0,0.22)"),
   };
 }
