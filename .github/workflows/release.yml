@@ -78,13 +78,15 @@ jobs:
           if ($env:REPO_CSC_LINK -and $env:REPO_CSC_KEY_PASSWORD) {
             "CSC_LINK=$env:REPO_CSC_LINK" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             "CSC_KEY_PASSWORD=$env:REPO_CSC_KEY_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "USE_REPO_SIGNING=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             Write-Host "Using repository CSC_LINK / CSC_KEY_PASSWORD secrets."
           } else {
+            "USE_REPO_SIGNING=false" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             Write-Host "Repository CSC_* secrets not configured; fallback self-signed cert will be generated."
           }
 
       - name: Prepare fallback self-signed certificate
-        if: env.CSC_LINK == '' || env.CSC_KEY_PASSWORD == ''
+        if: env.USE_REPO_SIGNING != 'true'
         shell: pwsh
         run: ./scripts/new-selfsigned-codesign.ps1 -ForCi
 
@@ -114,12 +116,12 @@ jobs:
           ./scripts/verify-windows-signature.ps1 -Path $installer.FullName -RequireSigned
 
       - name: Self-signed build notice
-        if: secrets.CSC_LINK == '' || secrets.CSC_KEY_PASSWORD == ''
+        if: env.USE_REPO_SIGNING != 'true'
         run: |
           echo "::notice::Installer is self-signed (not CA-trusted). SmartScreen may still warn users. See docs/WINDOWS_CODE_SIGNING.md"
 
       - name: Repository-signing notice
-        if: secrets.CSC_LINK != '' && secrets.CSC_KEY_PASSWORD != ''
+        if: env.USE_REPO_SIGNING == 'true'
         run: |
           echo "::notice::Installer was signed using repository CSC_LINK / CSC_KEY_PASSWORD secrets."
 

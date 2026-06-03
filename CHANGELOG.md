@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.5] - 2026-06-03
+
+Fix invalid GitHub Actions workflow conditions for release signing notices.
+
+### Fixed
+
+- **Release workflow validation** — Replaced disallowed `secrets.*` step `if` expressions with a `USE_REPO_SIGNING` env flag set during certificate configuration.
+
 ## [2.1.4] - 2026-06-03
 
 Fix release workflow to read electron-builder signing secrets by their canonical names.
@@ -241,6 +249,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.5]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.5
 [2.1.4]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.4
 [2.1.3]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.3
 [2.1.2]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.2
