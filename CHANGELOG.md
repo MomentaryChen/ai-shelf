@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Fixed
+
+- **Desktop auto-update with self-signed CI** — Custom `verifyUpdateCodeSignature` accepts `HashValid` Authenticode when publisher CN matches, instead of requiring a CA-trusted `Valid` signature only.
+
 ## [2.1.14] - 2026-06-03
 
 Fix Windows release signing with Windows SDK SignTool 10.0.26100+.

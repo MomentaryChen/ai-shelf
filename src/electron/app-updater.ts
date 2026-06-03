@@ -1,5 +1,6 @@
 import { app, type BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
+import { verifyWindowsUpdateSignature } from "./windows-update-signature.js";
 
 const { autoUpdater } = electronUpdater;
 
@@ -158,6 +159,9 @@ export function initAppUpdater(getWindow: () => BrowserWindow | null): void {
 
   getMainWindow = getWindow;
   refreshCurrentVersion();
+  if (process.platform === "win32") {
+    autoUpdater.verifyUpdateCodeSignature = verifyWindowsUpdateSignature;
+  }
   bindAutoUpdaterEvents();
 }
 

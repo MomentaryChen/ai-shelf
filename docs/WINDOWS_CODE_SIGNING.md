@@ -10,7 +10,7 @@ Release CI signs Windows installers with **repository certificate secrets first*
 |--|----------------------|-------------------------|
 | **CI setup** | Automatic on every tag | Requires `CSC_LINK` + `CSC_KEY_PASSWORD` GitHub secrets |
 | **File has signature** | Yes | Yes |
-| **SmartScreen / updater trust** | Still warns; updater trust can fail | Verified publisher; updater trust works as expected |
+| **SmartScreen / updater trust** | Still warns on first install; in-app updater accepts matching self-signed publisher | Verified publisher; SmartScreen reputation builds faster |
 | **User action** | **More info** → **Run anyway** | Usually smoother after reputation |
 
 Self-signed signing is only a **fallback**: it proves the signing pipeline works, but does **not** provide public trust for SmartScreen or in-app update signature validation.
@@ -31,7 +31,7 @@ Fallback publisher name in file properties: **AI Shelf (Self-Signed)** (`package
 
 `build.win.signtoolOptions.signingHashAlgorithms` is `["sha256"]` so CI uses `/fd sha256` with the Windows SDK `signtool.exe` (required on Kits 10.0.26100+ when `SIGNTOOL_PATH` is set).
 
-> For in-app auto-update reliability, use a trusted certificate via repository secrets. Fresh self-signed certs are not trusted on user machines by default.
+> **In-app auto-update** checks that the downloaded installer is signed by `build.win.signtoolOptions.publisherName` (`AI Shelf (Self-Signed)`). The desktop app accepts **HashValid** self-signed signatures (same cert across releases). Windows still shows SmartScreen warnings for untrusted roots until you use a CA certificate.
 
 ---
 
