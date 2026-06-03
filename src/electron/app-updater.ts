@@ -4,6 +4,14 @@ import { verifyWindowsUpdateSignature } from "./windows-update-signature.js";
 
 const { autoUpdater } = electronUpdater;
 
+/** Windows NSIS updater only; not declared on base AppUpdater in electron-updater types. */
+type WindowsAppUpdater = typeof autoUpdater & {
+  verifyUpdateCodeSignature: (
+    publisherNames: string[],
+    unescapedTempUpdateFile: string,
+  ) => Promise<string | null>;
+};
+
 export type AppUpdateStatus =
   | "idle"
   | "checking"
@@ -174,7 +182,7 @@ export function initAppUpdater(getWindow: () => BrowserWindow | null): void {
   getMainWindow = getWindow;
   refreshCurrentVersion();
   if (process.platform === "win32") {
-    autoUpdater.verifyUpdateCodeSignature = verifyWindowsUpdateSignature;
+    (autoUpdater as WindowsAppUpdater).verifyUpdateCodeSignature = verifyWindowsUpdateSignature;
   }
   bindAutoUpdaterEvents();
 }

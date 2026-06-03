@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.16] - 2026-06-03
+
+Fix TypeScript build for Windows auto-update signature hook.
+
+### Fixed
+
+- **Release CI desktop build** — Cast `autoUpdater` when assigning `verifyUpdateCodeSignature` (property exists on NSIS updater at runtime but not on `AppUpdater` types).
+
 ## [2.1.15] - 2026-06-03
 
 Fix desktop auto-update for self-signed releases and improve the update error dialog.
