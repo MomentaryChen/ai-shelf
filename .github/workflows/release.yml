@@ -79,10 +79,9 @@ jobs:
           $repoPassword = if ($env:REPO_CSC_KEY_PASSWORD) { $env:REPO_CSC_KEY_PASSWORD.Trim() } else { '' }
           if ($repoLink -and $repoPassword) {
             $pfxPath = & ./scripts/prepare-csc-link.ps1 -Link $repoLink -Password $repoPassword
-            $password = $repoPassword
-            Add-Content -Path $env:GITHUB_ENV -Value "CSC_LINK=$pfxPath"
-            Add-Content -Path $env:GITHUB_ENV -Value "CSC_KEY_PASSWORD=$password"
-            Add-Content -Path $env:GITHUB_ENV -Value "USE_REPO_SIGNING=true"
+            & ./scripts/write-github-env.ps1 -Name 'CSC_LINK' -Value $pfxPath
+            & ./scripts/write-github-env.ps1 -Name 'CSC_KEY_PASSWORD' -Value $repoPassword
+            Add-Content -Path $env:GITHUB_ENV -Value 'USE_REPO_SIGNING=true'
             Write-Host "Using repository CSC_LINK / CSC_KEY_PASSWORD secrets."
           } else {
             Add-Content -Path $env:GITHUB_ENV -Value "USE_REPO_SIGNING=false"

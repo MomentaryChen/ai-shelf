@@ -60,19 +60,23 @@ Add repository secrets (Settings → Secrets and variables → Actions):
 | `CSC_LINK` | Base64 of your `.pfx` (single line, no line breaks) |
 | `CSC_KEY_PASSWORD` | PFX export password |
 
-Generate a clean base64 value:
+Generate both secrets in one step (recommended):
+
+```powershell
+./scripts/setup-github-signing-secrets.ps1 -Password "your-strong-password"
+```
+
+Or validate an existing PFX and print the `CSC_LINK` line:
+
+```powershell
+./scripts/encode-csc-link-secret.ps1 -PfxPath ".codesign/ai-shelf-selfsign.pfx" -Password "your-export-password"
+```
+
+Copy the **entire one-line base64 output** into `CSC_LINK`. Set `CSC_KEY_PASSWORD` to the **same export password** (not a hash, not the file path).
 
 ```powershell
 ./scripts/new-selfsigned-codesign.ps1 -Password "your-strong-password"
 [Convert]::ToBase64String([IO.File]::ReadAllBytes(".codesign/ai-shelf-selfsign.pfx"))
-```
-
-Copy the **entire one-line output** into the `CSC_LINK` secret. Extra whitespace or line breaks can cause `pkcs12: trailing data found` during CI signing.
-
-Or validate and print the secret line in one step:
-
-```powershell
-./scripts/encode-csc-link-secret.ps1 -PfxPath ".codesign/ai-shelf-selfsign.pfx" -Password "your-export-password"
 ```
 
 ### CI troubleshooting
@@ -84,7 +88,7 @@ Or validate and print the secret line in one step:
 | Preflight: `Failed to open PFX` | Password does not match the exported PFX | Re-export with a known password; update `CSC_KEY_PASSWORD` (trim accidental newlines in the secret) |
 | Preflight: `Decoded CSC_LINK is too small` | Secret is a file path or truncated base64, not raw PFX bytes | Store base64 of the `.pfx` file, not a path string |
 
-Release CI decodes secrets in `prepare-csc-link.ps1`, validates the PFX with `assert-signing-pfx.ps1` **before** electron-builder runs, and writes `GITHUB_ENV` via `Add-Content` (avoids UTF-8 BOM corrupting `CSC_KEY_PASSWORD`).
+Release CI decodes secrets in `prepare-csc-link.ps1`, validates the PFX with `assert-signing-pfx.ps1` **before** electron-builder runs, and writes `GITHUB_ENV` via `write-github-env.ps1` (heredoc; avoids special-character / BOM issues in `CSC_KEY_PASSWORD`).
 
 ---
 

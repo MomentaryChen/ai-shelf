@@ -9,6 +9,19 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.10] - 2026-06-03
+
+Harden repository signing secret handling before electron-builder runs.
+
+### Added
+
+- **`setup-github-signing-secrets.ps1`** — One command to generate a PFX, validate it, and print both `CSC_LINK` / `CSC_KEY_PASSWORD` values for GitHub Secrets.
+- **`write-github-env.ps1`** — Writes multiline-safe `GITHUB_ENV` entries for signing variables.
+
+### Fixed
+
+- **CSC_KEY_PASSWORD in CI** — Use heredoc env writes so special characters in the export password are not corrupted before SignTool runs.
+
 ## [2.1.9] - 2026-06-03
 
 Fix repository `CSC_LINK` secrets that accidentally double-base64-encode the PFX.
@@ -282,6 +295,9 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.10]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.10
+[2.1.9]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.9
+[2.1.8]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.8
 [2.1.7]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.7
 [2.1.6]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.6
 [2.1.5]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.5
