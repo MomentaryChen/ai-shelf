@@ -103,22 +103,6 @@ export function profileSessionRowStyle(
   };
 }
 
-export function profileCountBadgeStyle(
-  accentColor: string | null | undefined,
-): import("react").CSSProperties {
-  if (!accentColor) {
-    return {
-      backgroundColor: chromeVar("--color-chrome-badge-bg", "#1e1e22"),
-      color: chromeVar("--color-chrome-text-muted", "#8b8b92"),
-    };
-  }
-  return {
-    backgroundColor: tint(accentColor, "28"),
-    color: accentColor,
-    border: `1px solid ${tint(accentColor, "35")}`,
-  };
-}
-
 export function profilePaneChromeStyle(
   accentColor: string | null | undefined,
   focused: boolean,
