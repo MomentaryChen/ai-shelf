@@ -35,7 +35,7 @@ interface Props {
   onPaneCwdClick?: (paneId: string) => void;
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
-  /** True while dragging a tab from ProfileSidebar (enables drop overlay over xterm). */
+  /** True while dragging a tab from the profile sidebar (enables drop overlay over xterm). */
   sidebarPaneDragActive?: boolean;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
