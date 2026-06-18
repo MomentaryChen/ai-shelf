@@ -244,7 +244,7 @@ export function ProfileCreateDialog({
               ))}
             </select>
             ) : (
-              <p className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+              <p className="rounded-md border border-warn/35 bg-warn/10 px-3 py-2 text-[12px] text-warn">
                 {t("profileGroup.emptyHint")}
               </p>
             )}
@@ -273,7 +273,7 @@ export function ProfileCreateDialog({
               </button>
             </div>
             {groupErr && (
-              <p className="mt-1 text-[11px] text-red-400">{groupErr}</p>
+              <p className="mt-1 text-[11px] text-fail">{groupErr}</p>
             )}
           </label>
 

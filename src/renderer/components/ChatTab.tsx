@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
 import { ToolLogo } from "./ToolLogo";
+import { EmptyState } from "./EmptyState";
 import { toolLabel } from "../utils";
 import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
@@ -1224,14 +1225,18 @@ export function ChatTab({
             <span className="ml-2">{t("chat.restorePaneHint", { max: maxPanes })}</span>
           )}
           {terminalError && (
-            <p className="mt-2 text-[12px] text-red-400">{terminalError}</p>
+            <p className="mt-2 text-[12px] text-fail">{terminalError}</p>
           )}
           <p className="mt-2 text-[11px] text-chrome-text-dim">{t("chat.shortcutHint", paneShortcutLabels)}</p>
           <p className="mt-1 text-[11px] text-chrome-text-dim">{t("chat.debugHint")}</p>
         </div>
       ) : (
-        <p className="text-[13px] text-chrome-text-subtle">{t("chat.pickProfile")}</p>
-
+        <EmptyState
+          tone="chrome"
+          icon="👋"
+          title={t("chat.pickProfileTitle")}
+          description={t("chat.pickProfile")}
+        />
       )}
       <div>
         {availableTools.length > 0 && (
@@ -1277,7 +1282,7 @@ export function ChatTab({
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         {topBar}
         {terminalError && (
-          <div className="shrink-0 border-b border-red-500/30 bg-red-900/20 px-3 py-2 text-[12px] text-red-300">
+          <div className="shrink-0 border-b border-fail/30 bg-fail/15 px-3 py-2 text-[12px] text-fail">
             {terminalError}
           </div>
         )}
@@ -1487,7 +1492,7 @@ function ToolCard({
       <p className="text-[13px] leading-relaxed text-chrome-text-muted">
         {TOOL_DESCRIPTIONS[entry.tool] ?? t("chat.aiAssistant")}
       </p>
-      {err && <p className="rounded-md bg-red-500/10 px-3 py-2 text-[12px] text-red-400">{err}</p>}
+      {err && <p className="rounded-md bg-fail/10 px-3 py-2 text-[12px] text-fail">{err}</p>}
       {disabled ? (
         <p className="text-center text-[13px] text-chrome-text-subtle">{t("chat.notInstalled")}</p>
 

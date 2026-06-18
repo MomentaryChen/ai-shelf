@@ -45,7 +45,7 @@ export function ProfileGroupNameDialog({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("profileGroup.namePlaceholder")}
-          className="mb-4 h-9 w-full rounded-lg border border-chrome-border-input bg-[#131316] px-2.5 text-[13px] text-chrome-text focus:border-chrome-border-focus focus:outline-none"
+          className="mb-4 h-9 w-full rounded-lg border border-chrome-border-input bg-chrome-surface-focus px-2.5 text-[13px] text-chrome-text focus:border-chrome-border-focus focus:outline-none"
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter" && name.trim()) onSubmit(name.trim());

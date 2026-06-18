@@ -10,6 +10,7 @@ import type { PaneInfo } from "../terminal/split-tree";
 import { formatPaneCwdShort } from "../utils/pane-cwd";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
+import { EmptyState } from "./EmptyState";
 import {
   ProfileSettingsDialog,
   type ProfileSettingsPatch,
@@ -513,7 +514,7 @@ export function ProfileSidebar({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("profile.search")}
-              className="h-8 w-full rounded-lg border border-chrome-border-input bg-chrome-surface pl-8 pr-2.5 text-[12px] text-chrome-text placeholder:text-chrome-text-dim transition-colors focus:border-chrome-border-focus focus:bg-[#131316] focus:outline-none focus:ring-1 focus:ring-white/[0.06]"
+              className="h-8 w-full rounded-lg border border-chrome-border-input bg-chrome-surface pl-8 pr-2.5 text-[12px] text-chrome-text placeholder:text-chrome-text-dim transition-colors focus:border-chrome-border-focus focus:bg-chrome-surface-focus focus:outline-none focus:ring-1 focus:ring-white/[0.06]"
 
             />
           </div>
@@ -559,7 +560,7 @@ export function ProfileSidebar({
           </div>
         </div>
 
-        {err && <p className="px-2.5 pb-1 text-[11px] text-red-400">{err}</p>}
+        {err && <p className="px-2.5 pb-1 text-[11px] text-fail">{err}</p>}
         <div className="px-2.5 pb-2">
           <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-chrome-text-dim">
             {t("profileGroup.title")}
@@ -636,10 +637,20 @@ export function ProfileSidebar({
             <p className="px-2 py-6 text-center text-[11px] text-chrome-text-dim">{t("profile.loading")}</p>
           )}
           {forest && visibleGroups.length === 0 && (
-            <p className="px-2 py-6 text-center text-[11px] text-chrome-text-dim">
-              {query.trim() ? t("profile.noMatch") : t("profile.empty")}
-
-            </p>
+            query.trim() ? (
+              <p className="px-2 py-6 text-center text-[11px] text-chrome-text-dim">
+                {t("profile.noMatch")}
+              </p>
+            ) : (
+              <EmptyState
+                tone="chrome"
+                compact
+                icon="🗂️"
+                title={t("profile.empty")}
+                description={t("profile.emptyHint")}
+                className="px-2 py-6"
+              />
+            )
           )}
           {visibleGroups.map(({ group, profiles }) => {
             const groupExpanded = expandedGroupIds.has(group.id);

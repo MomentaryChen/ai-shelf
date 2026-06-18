@@ -5,6 +5,7 @@ import {
   shortenAppUpdateErrorDetail,
 } from "../utils/formatAppUpdateError";
 import { useLocale } from "../i18n/LocaleProvider";
+import { Button } from "./Button";
 
 type Phase = "hidden" | "confirm" | "downloading" | "ready" | "error";
 
@@ -121,54 +122,30 @@ export function AppUpdateModal() {
   const footer =
     phase === "confirm" ? (
       <>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
-        >
+        <Button type="button" variant="secondary" onClick={dismiss}>
           {t("appUpdate.later")}
-        </button>
-        <button
-          type="button"
-          onClick={startDownload}
-          className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
-        >
+        </Button>
+        <Button type="button" variant="primary" onClick={startDownload}>
           {t("appUpdate.now")}
-        </button>
+        </Button>
       </>
     ) : phase === "ready" ? (
       <>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
-        >
+        <Button type="button" variant="secondary" onClick={dismiss}>
           {t("appUpdate.restartLater")}
-        </button>
-        <button
-          type="button"
-          onClick={restartToInstall}
-          className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
-        >
+        </Button>
+        <Button type="button" variant="primary" onClick={restartToInstall}>
           {t("appUpdate.restartNow")}
-        </button>
+        </Button>
       </>
     ) : phase === "error" ? (
       <>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent"
-        >
+        <Button type="button" variant="secondary" onClick={dismiss}>
           {t("appUpdate.close")}
-        </button>
-        <button
-          type="button"
-          onClick={retryCheck}
-          className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/25"
-        >
+        </Button>
+        <Button type="button" variant="primary" onClick={retryCheck}>
           {t("appUpdate.retry")}
-        </button>
+        </Button>
       </>
     ) : null;
 
