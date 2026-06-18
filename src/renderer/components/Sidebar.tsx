@@ -685,7 +685,18 @@ export function Sidebar({
         )}
       </nav>
 
-      <div className="border-t border-chrome-border p-2">
+      <div className="border-t border-chrome-border p-2 space-y-1">
+        <button
+          type="button"
+          className={`flex w-full items-center rounded-lg px-2.5 py-2 text-sm text-chrome-text-muted transition-all duration-200 hover:bg-chrome-hover hover:text-chrome-text ${
+            collapsed ? "justify-center px-0" : "gap-2.5"
+          }`}
+          onClick={() => void window.api.openSettingsWindow()}
+          title={collapsed ? t("sidebar.settings") : undefined}
+        >
+          <Settings2 className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="truncate">{t("sidebar.settings")}</span>}
+        </button>
         <button
           type="button"
           className={`flex w-full items-center rounded-lg px-2.5 py-2 text-sm transition-all duration-200 hover:bg-chrome-hover ${

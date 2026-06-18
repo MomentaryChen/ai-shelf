@@ -49,6 +49,7 @@ import {
   type ExternalTerminal,
   SETTINGS_KEY,
 } from "../chat-settings";
+import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 import {
   PLAIN_SHELL_TOOL_ID,
   profileToolLabel,
@@ -156,7 +157,8 @@ export function ChatTab({
   const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
-    const result = await window.api.ptySpawn(tool, cwd || undefined);
+    const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
+    const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs);
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
@@ -165,7 +167,7 @@ export function ChatTab({
     }
     setTerminalError(null);
     return { id: result.sessionId, tool, sessionId: result.sessionId, cwd: cwd || "" };
-  }, []);
+  }, [settings.toolLaunchArgs, t]);
 
   const spawnPaneResilient = useCallback(
     async (tool: string, cwd: string): Promise<PaneInfo | null> => {
@@ -765,10 +767,12 @@ export function ChatTab({
   }
 
   async function openExternal(tool: string): Promise<{ success: boolean; error?: string }> {
+    const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
     return window.api.launchInTerminal(
       tool,
       settings.externalTerminal,
       resolveCwd() || undefined,
+      extraArgs,
     );
   }
 

@@ -1,6 +1,10 @@
 import { DEFAULT_APP_THEME, normalizeAppTheme, type AppColorTheme } from "./app-theme";
 import { detectSystemLocale, resolveLocale, type AppLocale } from "./i18n/index.js";
 import {
+  normalizeToolLaunchArgs,
+  type ToolLaunchArgs,
+} from "../tool-launch.js";
+import {
   DEFAULT_PANE_SHORTCUT_BINDINGS,
   normalizePaneShortcutBindings,
   type PaneShortcutBindings,
@@ -40,9 +44,11 @@ export interface ChatSettings {
   paneShortcuts: PaneShortcutBindings;
   /** Minimize to system tray and keep running when all windows are closed. */
   systemTrayEnabled: boolean;
+  /** Extra CLI flags appended when launching each AI tool (e.g. `--model opus`). */
+  toolLaunchArgs: ToolLaunchArgs;
 }
 
-export type { PaneShortcutBindings };
+export type { PaneShortcutBindings, ToolLaunchArgs };
 
 export const SETTINGS_KEY = "ai-inventory-chat-settings";
 
@@ -110,6 +116,7 @@ const DEFAULTS: ChatSettings = {
   dirHistory: [],
   paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
   systemTrayEnabled: true,
+  toolLaunchArgs: {},
 };
 
 export function loadSettings(): ChatSettings {
@@ -137,6 +144,7 @@ export function loadSettings(): ChatSettings {
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
       systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
+      toolLaunchArgs: normalizeToolLaunchArgs(stored.toolLaunchArgs),
     };
   } catch {
     return { ...DEFAULTS };
