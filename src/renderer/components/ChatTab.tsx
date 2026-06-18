@@ -195,6 +195,7 @@ export function ChatTab({
     minimizedPaneIds,
     displayLayout,
     isPaneMinimized,
+    focusPaneInDisplay,
     showPaneInDisplay,
     placePaneInDisplay,
     minimizePane,
@@ -610,7 +611,10 @@ export function ChatTab({
     panes,
     focusedPaneId,
     enabled: active && layout !== null && !profileBusy && !restoring,
-    onFocusPane: setFocusedPaneId,
+    onFocusPane: (paneId) => {
+      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+      else setFocusedPaneId(paneId);
+    },
     onClosePane: closePane,
     onClearPane: clearPaneScreen,
     onRestartPane: (id) => void respawnPane(id),
@@ -657,7 +661,7 @@ export function ChatTab({
     if (activeProfile?.id !== profile.id) {
       await handleActivateProfile(profile);
     }
-    showPaneInDisplay(profile.id, paneId);
+    focusPaneInDisplay(profile.id, paneId);
   }
 
   async function restorePaneToDisplayById(
@@ -680,7 +684,7 @@ export function ChatTab({
       placePaneInDisplay(profileId, paneId, opts.targetPaneId, opts.zone);
       return;
     }
-    showPaneInDisplay(profileId, paneId);
+    focusPaneInDisplay(profileId, paneId);
   }
 
   async function placePaneBeside(
@@ -1139,7 +1143,10 @@ export function ChatTab({
         bg={bg}
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
-        onFocusPane={setFocusedPaneId}
+        onFocusPane={(paneId) => {
+          if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+          else setFocusedPaneId(paneId);
+        }}
         onClosePane={closePane}
         onMinimizePane={(paneId) => {
           if (activeProfile) minimizePane(activeProfile.id, paneId);
