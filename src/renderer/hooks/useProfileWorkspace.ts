@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProfileForest, ProfileInfo } from "../types";
 import {
   collectPanes,
@@ -148,6 +148,11 @@ export function useProfileWorkspace(
   minimizedPaneIdsRef.current = minimizedPaneIds;
 
   const applyMinimizedPaneIds = useCallback((next: Set<string>) => {
+    // Skip the state update when the set is unchanged — unminimizePaneIds and
+    // friends always return a fresh Set, so without this guard every pane focus
+    // re-renders (rebuilding the layout tree) and refits terminals → flicker.
+    const prev = minimizedPaneIdsRef.current;
+    if (prev.size === next.size && [...prev].every((id) => next.has(id))) return;
     minimizedPaneIdsRef.current = next;
     setMinimizedPaneIds(next);
   }, []);
@@ -479,6 +484,14 @@ export function useProfileWorkspace(
       if (activeProfileRef.current?.id !== profileId) return;
       const node = layoutRef.current;
       if (!node || !findPane(node, paneId)) return;
+      // Already the focused, visible pane → nothing to change. Without this,
+      // every mousedown inside the focused pane churns state and flickers.
+      if (
+        focusedPaneIdRef.current === paneId &&
+        !minimizedPaneIdsRef.current.has(paneId)
+      ) {
+        return;
+      }
       const nextMinimized = unminimizePaneIds(minimizedPaneIdsRef.current, [paneId]);
       applyMinimizedPaneIds(nextMinimized);
       setFocusedPaneId(paneId);
@@ -565,9 +578,12 @@ export function useProfileWorkspace(
     [applyMinimizedPaneIds],
   );
 
-  const displayLayout = layout
-    ? buildDisplayLayout(layout, minimizedPaneIds, focusedPaneId)
-    : null;
+  // Memoized so it only rebuilds when layout / minimized / focus actually change
+  // references — a fresh tree every render would remount-reconcile every pane.
+  const displayLayout = useMemo(
+    () => (layout ? buildDisplayLayout(layout, minimizedPaneIds, focusedPaneId) : null),
+    [layout, minimizedPaneIds, focusedPaneId],
+  );
 
   return {
     activeProfile,

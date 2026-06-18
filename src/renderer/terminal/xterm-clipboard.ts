@@ -52,14 +52,22 @@ async function writeClipboardText(text: string): Promise<boolean> {
   });
 }
 
-/** Electron clipboard via preload — more reliable than navigator.clipboard in xterm OSC handler. */
+/**
+ * Clipboard provider for xterm's OSC 52 handling.
+ *
+ * writeText is intentionally a no-op: terminal programs (e.g. Claude Code's TUI)
+ * emit OSC 52 clipboard-set sequences while rendering, which would otherwise
+ * silently overwrite whatever the user just copied — making copy-then-paste
+ * across panes lose the text. User-initiated copy/paste does not go through this
+ * provider; it uses copyTerminalSelection / pasteIntoTerminal directly.
+ */
 class ElectronClipboardProvider implements IClipboardProvider {
   readText(_selection: ClipboardSelectionType): Promise<string> {
     return readClipboardText();
   }
 
-  writeText(_selection: ClipboardSelectionType, data: string): Promise<void> {
-    return writeClipboardText(data).then(() => undefined);
+  writeText(_selection: ClipboardSelectionType, _data: string): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -82,6 +90,8 @@ export interface TerminalClipboardOptions {
   onCopyOutputForIssue?: () => void;
   /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
   getRightClickPaste?: () => boolean;
+  /** When true, finishing a mouse selection copies it to the clipboard automatically. */
+  getCopyOnSelect?: () => boolean;
   /**
    * Paste into this terminal. When omitted, uses term.paste (may fan out via onData broadcast).
    * Prefer term.paste via a single-pane bypass in EmbeddedTerminal.
@@ -302,6 +312,31 @@ export function bindTerminalClipboard(
 
   container.addEventListener("contextmenu", onContextMenu, { capture: true });
 
+  /**
+   * Copy-on-select via xterm's own selection event (more reliable than a DOM
+   * mouseup, whose listener xterm's document-level drag handling can bypass).
+   * Debounced so a drag copies once when it settles, and written directly so the
+   * per-pane copy guard can't drop the final selection mid-drag.
+   */
+  let lastAutoCopied = "";
+  let selCopyTimer = 0;
+  const onSelectionChange = () => {
+    if (!(options.getCopyOnSelect?.() ?? false)) return;
+    const text = term.getSelection();
+    // Selection cleared (e.g. focus moved to another pane). Leave any pending
+    // copy of the previous selection alone — cancelling it here is what made a
+    // quick copy-then-switch lose the text before it reached the clipboard.
+    if (!text || text === lastAutoCopied) return;
+    // Capture `text` now and write that exact value; re-reading on the timer
+    // could see an already-cleared selection after the pane lost focus.
+    window.clearTimeout(selCopyTimer);
+    selCopyTimer = window.setTimeout(() => {
+      lastAutoCopied = text;
+      void writeClipboardText(text);
+    }, 50);
+  };
+  const selectionDisposable = term.onSelectionChange(onSelectionChange);
+
   const onMouseDown = (ev: MouseEvent) => {
     if (ev.button === 2) onPointerPaste(ev);
   };
@@ -312,6 +347,8 @@ export function bindTerminalClipboard(
 
   return () => {
     removeMenu();
+    window.clearTimeout(selCopyTimer);
+    selectionDisposable.dispose();
     container.removeEventListener("contextmenu", onContextMenu, { capture: true });
     if (isFirefox) {
       container.removeEventListener("mousedown", onMouseDown, { capture: true });

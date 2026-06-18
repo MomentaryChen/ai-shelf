@@ -1174,6 +1174,7 @@ export function ChatTab({
             fontSize={terminalFontSize}
             scrollback={terminalScrollback}
             rightClickPaste={settings.terminalRightClickPaste}
+            copyOnSelect={settings.terminalCopyOnSelect}
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}

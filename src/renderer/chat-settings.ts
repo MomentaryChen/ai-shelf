@@ -32,6 +32,8 @@ export interface ChatSettings {
   terminalScrollback: number;
   /** Right-click pastes clipboard; with selection, copies first. Shift+right-click opens menu. */
   terminalRightClickPaste: boolean;
+  /** Copy the selection to the clipboard as soon as a mouse drag finishes. */
+  terminalCopyOnSelect: boolean;
   workingDir: string;
   dirHistory: string[];
   /** Pane split / focus shortcuts (Ctrl/Cmd combinations). */
@@ -84,6 +86,11 @@ function normalizeRightClickPaste(raw: unknown): boolean {
   return true;
 }
 
+function normalizeCopyOnSelect(raw: unknown): boolean {
+  if (typeof raw === "boolean") return raw;
+  return true;
+}
+
 function normalizeSystemTrayEnabled(raw: unknown): boolean {
   if (typeof raw === "boolean") return raw;
   return true;
@@ -98,6 +105,7 @@ const DEFAULTS: ChatSettings = {
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
   terminalScrollback: DEFAULT_TERMINAL_SCROLLBACK,
   terminalRightClickPaste: true,
+  terminalCopyOnSelect: true,
   workingDir: "",
   dirHistory: [],
   paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
@@ -126,6 +134,7 @@ export function loadSettings(): ChatSettings {
         DEFAULT_TERMINAL_SCROLLBACK,
       ),
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
+      terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
       systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
     };

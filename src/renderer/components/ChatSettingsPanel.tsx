@@ -465,6 +465,19 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
               <span className="text-[11px] leading-snug text-text-tertiary">{t("settings.rightClickPasteHint")}</span>
             </span>
           </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors hover:border-accent/40">
+            <input
+              type="checkbox"
+              checked={settings.terminalCopyOnSelect}
+              onChange={(e) => updateSettings({ terminalCopyOnSelect: e.target.checked })}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded accent-accent"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">{t("settings.copyOnSelect")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">{t("settings.copyOnSelectHint")}</span>
+            </span>
+          </label>
         </div>
       </div>
 
