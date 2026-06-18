@@ -314,14 +314,15 @@ export function bindTerminalClipboard(
   let selCopyTimer = 0;
   const onSelectionChange = () => {
     if (!(options.getCopyOnSelect?.() ?? false)) return;
+    const text = term.getSelection();
+    // Selection cleared (e.g. focus moved to another pane). Leave any pending
+    // copy of the previous selection alone — cancelling it here is what made a
+    // quick copy-then-switch lose the text before it reached the clipboard.
+    if (!text || text === lastAutoCopied) return;
+    // Capture `text` now and write that exact value; re-reading on the timer
+    // could see an already-cleared selection after the pane lost focus.
     window.clearTimeout(selCopyTimer);
     selCopyTimer = window.setTimeout(() => {
-      const text = term.getSelection();
-      if (!text) {
-        lastAutoCopied = "";
-        return;
-      }
-      if (text === lastAutoCopied) return;
       lastAutoCopied = text;
       void writeClipboardText(text);
     }, 50);
