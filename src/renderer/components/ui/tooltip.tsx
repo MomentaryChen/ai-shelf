@@ -17,11 +17,9 @@ function TooltipProvider({
 }
 
 function Tooltip(props: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return (
-    <TooltipProvider>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    </TooltipProvider>
-  );
+  // Bare Root — mount a single <TooltipProvider> high in the tree (see ChatTab)
+  // instead of one provider per tooltip.
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
 function TooltipTrigger(props: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {

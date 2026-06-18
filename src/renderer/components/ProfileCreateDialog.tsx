@@ -71,6 +71,7 @@ export function ProfileCreateDialog({
   );
   const wasOpenRef = useRef(false);
   const startKeyRef = useRef("blank:");
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const justOpened = open && !wasOpenRef.current;
@@ -179,7 +180,15 @@ export function ProfileCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-sm overflow-y-auto">
+      <DialogContent
+        className="max-h-[90vh] max-w-sm overflow-y-auto"
+        onOpenAutoFocus={(e) => {
+          // Radix focuses the first tabbable (the "start from" select) by default;
+          // land the caret in the name field instead, like the pre-shadcn dialog.
+          e.preventDefault();
+          nameInputRef.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-[15px]">{t("profile.dialog.createTitle")}</DialogTitle>
         </DialogHeader>
@@ -282,7 +291,7 @@ export function ProfileCreateDialog({
           <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.name")}</span>
 
           <input
-            autoFocus
+            ref={nameInputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("profile.dialog.namePlaceholder")}

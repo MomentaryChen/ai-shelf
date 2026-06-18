@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { EmptyState } from "./EmptyState";
@@ -1263,33 +1264,32 @@ export function ChatTab({
   );
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
-      {sidebarDialogs}
-      {sidebar}
-      {!sidebarCollapsed && (
-        <div
-          className="w-2.5 shrink-0 self-stretch"
-          style={{ width: 10 }}
-        >
-          <ResizeDivider
-            mode="delta"
-            orientation="horizontal"
-            onResize={(delta) =>
-              setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
-            }
-          />
-        </div>
-      )}
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-        {topBar}
-        {terminalError && (
-          <div className="shrink-0 border-b border-fail/30 bg-fail/15 px-3 py-2 text-[12px] text-fail">
-            {terminalError}
+    <TooltipProvider>
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
+        {sidebarDialogs}
+        {sidebar}
+        {!sidebarCollapsed && (
+          <div className="w-2.5 shrink-0 self-stretch" style={{ width: 10 }}>
+            <ResizeDivider
+              mode="delta"
+              orientation="horizontal"
+              onResize={(delta) =>
+                setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
+              }
+            />
           </div>
         )}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          {topBar}
+          {terminalError && (
+            <div className="shrink-0 border-b border-fail/30 bg-fail/15 px-3 py-2 text-[12px] text-fail">
+              {terminalError}
+            </div>
+          )}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
