@@ -1,4 +1,4 @@
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Spinner } from "./components/Spinner";
 import { OverviewTab } from "./components/OverviewTab";
 import { ModelsTab } from "./components/ModelsTab";
@@ -10,6 +10,8 @@ import { UpdateTab } from "./components/UpdateTab";
 import { AppUpdateModal } from "./components/AppUpdateModal";
 import { ChatTab } from "./components/ChatTab";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
+import { InventoryNav, type NavItem } from "./components/InventoryNav";
+import { CommandPalette, type Command } from "./components/CommandPalette";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
@@ -37,11 +39,20 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
 };
 
 const TAB_IDS = Object.keys(TAB_LABEL_KEYS) as TabId[];
+const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
+  id,
+  icon: TAB_ICONS[id],
+  labelKey: TAB_LABEL_KEYS[id],
+}));
+
+const IS_MAC =
+  typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
 
 export function App() {
   const { t } = useLocale();
   const [appMode, setAppMode] = useState<AppMode>("terminal");
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [, startTransition] = useTransition();
 
   function handleModeChange(mode: AppMode) {
@@ -63,35 +74,66 @@ export function App() {
   const tabsEnabled = ready;
   const showSpinner = scanning && !hasData && !error;
 
+  // Cmd/Ctrl+K toggles the command palette from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const goTo = (tab: TabId) => {
+    handleModeChange("inventory");
+    setActiveTab(tab);
+  };
+
+  const commands = useMemo<Command[]>(() => {
+    const navigate: Command[] = TABS.map((it) => ({
+      id: `go-${it.id}`,
+      title: `${t("cmd.go")} ${t(it.labelKey)}`,
+      group: t("cmd.group.navigate"),
+      icon: it.icon,
+      keywords: it.id,
+      run: () => goTo(it.id),
+    }));
+    const actions: Command[] = [
+      {
+        id: "mode-terminal",
+        title: t("cmd.action.terminal"),
+        group: t("cmd.group.actions"),
+        icon: "🖥️",
+        run: () => handleModeChange("terminal"),
+      },
+      {
+        id: "mode-inventory",
+        title: t("cmd.action.inventory"),
+        group: t("cmd.group.actions"),
+        icon: "📦",
+        run: () => handleModeChange("inventory"),
+      },
+      {
+        id: "refresh",
+        title: t("cmd.action.refresh"),
+        group: t("cmd.group.actions"),
+        icon: "🔄",
+        run: () => reload(),
+      },
+    ];
+    return [...navigate, ...actions];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
       <AppUpdateModal />
-      <header className="flex h-8 shrink-0 items-center border-b border-border bg-bg-primary px-1">
-        <AppModeSwitch mode={appMode} onChange={handleModeChange} disabled={!ready && scanning} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
 
-        {appMode === "inventory" && (
-          <>
-            <div className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden="true" />
-            <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
-              {TAB_IDS.map((tabId) => (
-                <button
-                  key={tabId}
-                  disabled={!tabsEnabled}
-                  onClick={() => setActiveTab(tabId)}
-                  className={`shrink-0 rounded-md px-2 py-1 font-sans text-[11px] transition-colors duration-150 ${
-                    !tabsEnabled
-                      ? "cursor-not-allowed text-text-secondary opacity-40"
-                      : activeTab === tabId
-                        ? "cursor-pointer bg-accent-soft font-medium text-accent"
-                        : "cursor-pointer text-text-secondary hover:bg-bg-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {TAB_ICONS[tabId]} {t(TAB_LABEL_KEYS[tabId])}
-                </button>
-              ))}
-            </nav>
-          </>
-        )}
+      <header className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-bg-primary px-2">
+        <AppModeSwitch mode={appMode} onChange={handleModeChange} disabled={!ready && scanning} />
 
         {appMode === "terminal" && (scanning || enriching) && hasData && (
           <span className="shrink-0 px-3 text-[11px] text-text-secondary">
@@ -101,18 +143,30 @@ export function App() {
           </span>
         )}
 
-        {appMode === "inventory" && (
-          <div className="ml-auto flex shrink-0 items-center px-3">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 pl-2">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            title={t("app.cmdk")}
+            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary transition-colors duration-150 hover:border-border-strong hover:text-text-primary"
+          >
+            <span>{t("app.cmdk")}</span>
+            <kbd className="rounded border border-border-subtle bg-bg-card px-1 text-[10px] text-text-tertiary">
+              {IS_MAC ? "⌘K" : "Ctrl K"}
+            </kbd>
+          </button>
+
+          {appMode === "inventory" && (
             <button
               type="button"
               onClick={reload}
               disabled={scanning && !hasData}
-              className="cursor-pointer rounded-md border border-border bg-bg-secondary px-2.5 py-1 font-sans text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
+              className="cursor-pointer rounded-md border border-border bg-bg-secondary px-2.5 py-1 text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
             >
               🔄 {t("app.refresh")}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -138,25 +192,39 @@ export function App() {
         )}
 
         {appMode === "inventory" && (
-          <div className="absolute inset-0 flex flex-col overflow-hidden">
-            <main className="mx-auto w-full max-w-[1000px] flex-1 overflow-y-auto px-8 pb-6 pt-4">
-              {showSpinner && <Spinner label={t("app.detecting")} />}
-              {error && !hasData && (
-                <p className="py-10 text-center text-text-secondary">{t("app.loadInventoryFailed")}</p>
-              )}
-              {hasData && (
-                <>
-                  {activeTab === "overview" && <OverviewTab data={data} modelOverrides={modelOverrides} />}
-                  {activeTab === "models" && <ModelsTab data={data} />}
-                  {activeTab === "skills" && (
-                    <SkillsTab data={data} onOpenMcpSync={() => setActiveTab("mcp")} />
-                  )}
-                  {activeTab === "mcp" && <McpTab data={data} />}
-                  {activeTab === "config" && <ConfigTab data={data} />}
-                  {activeTab === "doctor" && <DoctorTab data={data} />}
-                  {activeTab === "update" && <UpdateTab data={data} />}
-                </>
-              )}
+          <div className="absolute inset-0 flex overflow-hidden">
+            {hasData && (
+              <InventoryNav
+                items={TABS}
+                active={activeTab}
+                onSelect={setActiveTab}
+                disabled={!tabsEnabled}
+              />
+            )}
+            <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
+              <div className="mx-auto w-full max-w-[1400px]">
+                {showSpinner && <Spinner label={t("app.detecting")} />}
+                {error && !hasData && (
+                  <p className="py-10 text-center text-text-secondary">
+                    {t("app.loadInventoryFailed")}
+                  </p>
+                )}
+                {hasData && (
+                  <>
+                    {activeTab === "overview" && (
+                      <OverviewTab data={data} modelOverrides={modelOverrides} />
+                    )}
+                    {activeTab === "models" && <ModelsTab data={data} />}
+                    {activeTab === "skills" && (
+                      <SkillsTab data={data} onOpenMcpSync={() => setActiveTab("mcp")} />
+                    )}
+                    {activeTab === "mcp" && <McpTab data={data} />}
+                    {activeTab === "config" && <ConfigTab data={data} />}
+                    {activeTab === "doctor" && <DoctorTab data={data} />}
+                    {activeTab === "update" && <UpdateTab data={data} />}
+                  </>
+                )}
+              </div>
             </main>
           </div>
         )}

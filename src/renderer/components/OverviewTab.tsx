@@ -1,15 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { EnvVarGroup, ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { StatCard } from "./StatCard";
 import { DataTable, Td } from "./DataTable";
 import { AuthBadgeForEntry, Badge, YesNo } from "./Badge";
 import { Tag } from "./Tag";
+import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
 import { EmptyInventoryHint } from "./InventorySection";
 import { toolLabel, toolInstall, formatContext } from "../utils";
 import { partitionByInstalled, sortByInstalled, installedRowClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
+
+type ToolFilter = "all" | "installed" | "notInstalled";
+type SortKey = "default" | "tool" | "context";
 
 export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry[]; modelOverrides?: Record<string, string> }) {
   const { t } = useLocale();
@@ -37,6 +41,57 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
 
   const envKey = (provider: string, key: string) => `${provider}:${key}`;
 
+  // --- Table toolbar: search + filter + sort -------------------------------
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<ToolFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("default");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const rows = useMemo(() => {
+    let list = sortByInstalled(data);
+    if (filter === "installed") list = list.filter((e) => e.available);
+    else if (filter === "notInstalled") list = list.filter((e) => !e.available);
+    const q = query.trim().toLowerCase();
+    if (q) list = list.filter((e) => `${toolLabel(e.tool)} ${e.tool}`.toLowerCase().includes(q));
+    if (sortKey === "tool") {
+      list = [...list].sort(
+        (a, b) => toolLabel(a.tool).localeCompare(toolLabel(b.tool)) * (sortAsc ? 1 : -1),
+      );
+    } else if (sortKey === "context") {
+      list = [...list].sort(
+        (a, b) =>
+          ((a.capabilities.contextTokens ?? 0) - (b.capabilities.contextTokens ?? 0)) *
+          (sortAsc ? 1 : -1),
+      );
+    }
+    return list;
+  }, [data, filter, query, sortKey, sortAsc]);
+
+  const toggleSort = (k: SortKey) => {
+    if (sortKey === k) setSortAsc((v) => !v);
+    else {
+      setSortKey(k);
+      setSortAsc(true);
+    }
+  };
+
+  const SortHeader = ({ label, k }: { label: string; k: SortKey }) => (
+    <button
+      type="button"
+      onClick={() => toggleSort(k)}
+      className="inline-flex cursor-pointer items-center gap-1 uppercase transition-colors hover:text-text-secondary"
+    >
+      {label}
+      <span className="text-[8px] opacity-70">{sortKey === k ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+    </button>
+  );
+
+  const FILTERS: { id: ToolFilter; label: string }[] = [
+    { id: "all", label: t("inventory.filter.all") },
+    { id: "installed", label: t("inventory.filter.installed") },
+    { id: "notInstalled", label: t("inventory.filter.notInstalled") },
+  ];
+
   return (
     <>
       {/* Summary grid */}
@@ -53,9 +108,55 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
 
       <EmptyInventoryHint entries={data} />
 
+      {/* Toolbar */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1">
+          <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-tertiary">
+            ⌕
+          </span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("inventory.search.placeholder")}
+            className="w-full rounded-lg border border-border bg-bg-secondary py-1.5 pr-3 pl-8 text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
+          />
+        </div>
+        <div className="flex items-center gap-0.5 rounded-md bg-bg-secondary p-0.5">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFilter(f.id)}
+              className={`cursor-pointer rounded-[5px] px-2.5 py-1 text-[12px] transition-[background,color,box-shadow] duration-150 ${
+                filter === f.id
+                  ? "bg-bg-card font-medium text-text-primary shadow-card"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Card>
-        <DataTable headers={["Tool", "Version", "Auth", "MCP", "Model", "Context", "Stream", "Tools", "Skills"]}>
-          {sorted.map((e) => (
+        {rows.length === 0 ? (
+          <EmptyState icon="🔍" title={t("inventory.search.noMatch")} />
+        ) : (
+          <DataTable
+            headers={[
+              <SortHeader key="tool" label="Tool" k="tool" />,
+              "Version",
+              "Auth",
+              "MCP",
+              "Model",
+              <SortHeader key="ctx" label="Context" k="context" />,
+              "Stream",
+              "Tools",
+              "Skills",
+            ]}
+          >
+            {rows.map((e) => (
             <tr key={e.tool} className={installedRowClass(e.available)}>
               <Td>
                 <ToolNameCell entry={e} />
@@ -92,10 +193,12 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
               </Td>
             </tr>
           ))}
-        </DataTable>
+          </DataTable>
+        )}
       </Card>
 
-      {/* Warnings */}
+      {/* Warnings + Environment — side by side on wide screens */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start [&>*]:mb-0 [&>*]:min-w-0 [&>*]:flex-1">
       {warnings > 0 && (
         <Card title={`⚠️ ${t("inventory.overview.cardWarnings")}`}>
           {data
@@ -170,6 +273,7 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
           ))}
         </Card>
       )}
+      </div>
     </>
   );
 }
