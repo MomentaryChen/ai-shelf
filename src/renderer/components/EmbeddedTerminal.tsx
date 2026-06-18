@@ -574,7 +574,7 @@ export function EmbeddedTerminal({
               e.stopPropagation();
               scrollToBottomRef.current?.();
             }}
-            className="pointer-events-auto absolute bottom-3 right-3 flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#3d3d42] bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-lg backdrop-blur-sm transition-colors hover:border-[#5a5a62] hover:bg-[#28282e]"
+            className="pointer-events-auto absolute bottom-3 right-3 flex cursor-pointer items-center gap-1.5 rounded-lg border border-chrome-border-focus bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-lg backdrop-blur-sm transition-colors hover:border-chrome-border-hover hover:bg-chrome-surface-hover-strong"
             title={t("terminal.scrollToBottom")}
 
           >

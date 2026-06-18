@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { McpRawData, McpSyncResult } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
+import { Button } from "./Button";
 
 import { MCP_SYNC_TOOL_IDS } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -88,11 +89,11 @@ export function McpSyncPanel() {
             <div key={r.tool} className="mb-1 text-sm">
               <strong>{TOOL_ICONS[r.tool] ?? "🔧"} {r.tool}</strong>:{" "}
               {r.error ? (
-                <span className="text-red-400">❌ {r.error}</span>
+                <span className="text-fail">❌ {r.error}</span>
               ) : (
                 <>
                   {r.added.length > 0 && (
-                    <span className="text-green-400">+{r.added.length} added ({r.added.join(", ")})</span>
+                    <span className="text-ok">+{r.added.length} added ({r.added.join(", ")})</span>
                   )}
                   {r.added.length > 0 && r.skipped.length > 0 && " · "}
                   {r.skipped.length > 0 && (
@@ -139,20 +140,22 @@ export function McpSyncPanel() {
             ))}
           </div>
           <div className="ml-auto flex gap-2">
-            <button
+            <Button
+              size="sm"
+              variant="primary"
               onClick={() => doSync([...selected])}
               disabled={syncing || selected.size === 0 || targetTools.size === 0}
-              className="cursor-pointer rounded-md border border-accent bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {syncing ? "Syncing…" : `Sync Selected (${selected.size})`}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => doSync(syncableServers)}
               disabled={syncing || targetTools.size === 0}
-              className="cursor-pointer rounded-md border border-border bg-bg-card px-3 py-1.5 text-xs text-text-primary transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               {syncing ? "Syncing…" : `Sync All Missing (${syncableServers.length})`}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -186,7 +189,7 @@ export function McpSyncPanel() {
           <tbody>
             {/* Syncable rows (has missing) — shown first */}
             {syncableServers.map((server) => (
-              <tr key={server} className="bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
+              <tr key={server} className="bg-warn/5 hover:bg-warn/10 transition-colors">
                 <td className="border-b border-border/40 px-3 py-2">
                   <input
                     type="checkbox"
@@ -229,8 +232,8 @@ export function McpSyncPanel() {
       <div className="mt-3 text-xs text-text-secondary">
         {allServerNames.length} servers total ·{" "}
         {syncableServers.length > 0
-          ? <span className="text-amber-400">{syncableServers.length} need sync</span>
-          : <span className="text-green-400">{t("inventory.mcpSync.allSyncedShort")}</span>}
+          ? <span className="text-warn">{syncableServers.length} need sync</span>
+          : <span className="text-ok">{t("inventory.mcpSync.allSyncedShort")}</span>}
         {syncedCount > 0 && ` · ${syncedCount} fully synced`}
       </div>
     </Card>

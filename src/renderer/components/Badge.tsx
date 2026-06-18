@@ -12,7 +12,7 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 export function Badge({ text, variant }: { text: string; variant: Variant }) {
   return (
     <span
-      className={`inline-block rounded-xl px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${VARIANT_CLASSES[variant]}`}
+      className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${VARIANT_CLASSES[variant]}`}
     >
       {text}
     </span>

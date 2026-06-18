@@ -703,7 +703,7 @@ export function Sidebar({
               </div>
               <Circle
                 className={`h-2.5 w-2.5 fill-current ${
-                  terminalOnline ? "text-green-500" : "text-red-500"
+                  terminalOnline ? "text-ok" : "text-fail"
                 }`}
               />
             </>
@@ -711,7 +711,7 @@ export function Sidebar({
           {collapsed && (
             <Circle
               className={`absolute ml-4 mt-4 h-2.5 w-2.5 fill-current ${
-                terminalOnline ? "text-green-500" : "text-red-500"
+                terminalOnline ? "text-ok" : "text-fail"
               }`}
             />
           )}
@@ -806,7 +806,7 @@ function MenuAction({
     <button
       type="button"
       className={`w-full rounded-md px-2 py-1.5 text-left text-sm transition-all duration-200 hover:bg-chrome-hover ${
-        danger ? "text-red-400" : "text-chrome-text-muted"
+        danger ? "text-fail" : "text-chrome-text-muted"
       }`}
       onClick={onClick}
     >

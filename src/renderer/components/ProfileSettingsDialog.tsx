@@ -181,7 +181,7 @@ export function ProfileSettingsDialog({
             type="button"
             disabled={busy}
             onClick={() => void onDelete(profile)}
-            className="cursor-pointer rounded-md px-3 py-2 text-[12px] text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+            className="cursor-pointer rounded-md px-3 py-2 text-[12px] text-fail hover:bg-fail/10 disabled:opacity-40"
           >
             {t("profile.dialog.delete")}
           </button>

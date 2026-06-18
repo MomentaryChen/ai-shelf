@@ -80,7 +80,7 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
 
   return (
     <Card
-      className={`mb-5 ${hasMcpGap ? "border-amber-500/40 bg-amber-500/5" : "border-border"}`}
+      className={`mb-5 ${hasMcpGap ? "border-warn/40 bg-warn/5" : "border-border"}`}
       title={`🔧 ${t("inventory.diffFix.title")}`}
     >
       <p className="mb-3 text-[13px] text-text-secondary">{t("inventory.diffFix.subtitle")}</p>
@@ -101,8 +101,8 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
 
       {hasMcpGap ? (
         <>
-          <div className="mb-4 rounded-lg border border-amber-500/30 bg-bg-primary px-3 py-2.5">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-400">
+          <div className="mb-4 rounded-lg border border-warn/30 bg-bg-primary px-3 py-2.5">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-warn">
               {t("inventory.diffFix.mcpMissing")}
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -118,9 +118,9 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
                 <div key={r.tool} className="text-sm">
                   <strong>📐 {r.tool}</strong>:{" "}
                   {r.error ? (
-                    <span className="text-red-400">❌ {r.error}</span>
+                    <span className="text-fail">❌ {r.error}</span>
                   ) : r.added.length > 0 ? (
-                    <span className="text-green-400">
+                    <span className="text-ok">
                       {t("inventory.diffFix.syncAdded", { names: r.added.join(", ") })}
                     </span>
                   ) : (

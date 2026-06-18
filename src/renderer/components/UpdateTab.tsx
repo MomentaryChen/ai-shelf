@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetState
 import type { ProviderEntry, ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
 import { Badge, InstallStatusBadge } from "./Badge";
+import { Button } from "./Button";
+import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
@@ -199,17 +201,13 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
       </h2>
 
       <div className="mb-3 flex justify-end">
-        <button
-          onClick={() => void runCheckAll()}
-          disabled={checkingAll}
-          className="cursor-pointer rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-primary transition-all hover:border-accent disabled:opacity-50"
-        >
+        <Button variant="secondary" onClick={() => void runCheckAll()} disabled={checkingAll}>
           🔍 {t("inventory.update.recheckAll")}
-        </button>
+        </Button>
       </div>
 
       {!anyChecking && checkableTools.length === 0 && (
-        <p className="py-10 text-center text-text-secondary">{t("inventory.update.noTools")}</p>
+        <EmptyState icon="📦" title={t("inventory.update.noTools")} />
       )}
 
       {allUpToDate && (
@@ -355,15 +353,11 @@ function ToolUpdateCard({
               <span>{t("inventory.update.noUpdateNeeded")}</span>
             </div>
           ) : (
-            <button
-              onClick={onUpdate}
-              disabled={isUpdating}
-              className="cursor-pointer rounded-lg border border-accent bg-accent/15 px-4 py-2 text-sm font-semibold text-accent transition-all hover:bg-accent/25 disabled:opacity-50"
-            >
+            <Button variant="primary" onClick={onUpdate} disabled={isUpdating}>
               {isUpdating
                 ? `⏳ ${t("inventory.update.updating")}`
                 : `⬆️ ${t("inventory.update.runUpdate")}`}
-            </button>
+            </Button>
           )
         )}
 

@@ -7,6 +7,20 @@ body,
   margin: 0;
 }
 
+/* Keyboard focus affordance — only on :focus-visible (keyboard), never on mouse
+   click. Components that set `focus:outline-none` (with their own ring) win on
+   specificity, so this only adds a ring to otherwise-unstyled interactive
+   elements. The offscreen xterm helper textarea is excluded. */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+textarea:not(.xterm-helper-textarea):focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 /* xterm must fill its pane; clip helper layers inside the terminal body only */
 .warp-pane-body {
   isolation: isolate;
