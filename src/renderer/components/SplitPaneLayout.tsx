@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { SplitSquareHorizontal, SplitSquareVertical, Minus, X } from "lucide-react";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { DragHandle } from "./ProfileSidebarUI";
@@ -399,14 +400,14 @@ function WarpPaneShell({
         )}
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/pane:opacity-100">
           <IconBtn title={t("pane.splitRight")} onClick={() => onSplit("horizontal")}>
-            ⫽
+            <SplitSquareHorizontal className="h-3.5 w-3.5" />
           </IconBtn>
           <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
-            ⫼
+            <SplitSquareVertical className="h-3.5 w-3.5" />
           </IconBtn>
           {onMinimize && (
             <IconBtn title={t("pane.minimize")} onClick={onMinimize}>
-              −
+              <Minus className="h-3.5 w-3.5" />
             </IconBtn>
           )}
         </div>
@@ -416,11 +417,11 @@ function WarpPaneShell({
             e.stopPropagation();
             onClose();
           }}
-          className="cursor-pointer rounded px-1 text-[11px] text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
+          className="flex cursor-pointer items-center justify-center rounded p-1 text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
           title={t("pane.close")}
 
         >
-          ✕
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
       <div className="warp-pane-body relative z-0 min-h-0 flex-1 overflow-hidden">
@@ -488,7 +489,7 @@ function IconBtn({
         e.stopPropagation();
         onClick();
       }}
-      className="cursor-pointer rounded-md px-1.5 py-0.5 text-[10px] text-chrome-text-muted hover:bg-chrome-hover-strong hover:text-chrome-text"
+      className="flex cursor-pointer items-center justify-center rounded-md p-1 text-chrome-text-muted hover:bg-chrome-hover-strong hover:text-chrome-text"
     >
       {children}
     </button>

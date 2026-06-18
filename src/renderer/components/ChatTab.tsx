@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Monitor, Terminal, FolderOpen, Loader2 } from "lucide-react";
 import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { EmptyState } from "./EmptyState";
@@ -1384,10 +1385,11 @@ function WarpTopBar({
           disabled={!canAddPane || restoring}
           onClick={onOpenFolder}
           title={canAddPane ? t("chat.pickFolderPane") : t("chat.maxPanesTitle", { max: maxPanes })}
-          className="cursor-pointer rounded-md border border-chrome-border-strong px-2 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-chrome-border-strong px-2 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
 
         >
-          📁 {t("chat.folderBtn")}
+          <FolderOpen className="h-3.5 w-3.5" />
+          {t("chat.folderBtn")}
         </button>
         <button
           type="button"
@@ -1508,14 +1510,24 @@ function ToolCard({
             onClick={handleExternal}
             className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-chrome-border-strong py-2.5 text-[13px] disabled:opacity-50"
           >
-            {extBusy ? <span className="animate-spin">⟳</span> : "🖥️"} {t("chat.externalBtn")}
+            {extBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Monitor className="h-4 w-4" />
+            )}
+            {t("chat.externalBtn")}
           </button>
           <button
             disabled={inAppBusy}
             onClick={handleInApp}
             className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-accent/50 bg-accent/15 py-2.5 text-[13px] font-medium text-accent disabled:opacity-50"
           >
-            {inAppBusy ? <span className="animate-spin">⟳</span> : "⌨️"} {t("chat.inAppBtn")}
+            {inAppBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Terminal className="h-4 w-4" />
+            )}
+            {t("chat.inAppBtn")}
           </button>
         </div>
       )}

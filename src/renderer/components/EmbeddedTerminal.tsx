@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
+import { ArrowDown } from "lucide-react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -584,7 +585,7 @@ export function EmbeddedTerminal({
             title={t("terminal.scrollToBottom")}
 
           >
-            <span aria-hidden>↓</span>
+            <ArrowDown className="h-3 w-3" aria-hidden />
             <span>{t("terminal.newOutput")}</span>
           </button>
         )}
