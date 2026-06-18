@@ -13,7 +13,9 @@ function ModelChip({ name, active }: { name: string; active?: boolean }) {
   return (
     <span
       className={`inline-block rounded-md px-1.5 py-0.5 font-mono text-[11px] whitespace-nowrap ${
-        active ? "bg-accent/20 font-semibold text-accent ring-2 ring-accent" : "bg-surface-2 text-muted"
+        active
+          ? "bg-accent/15 font-semibold text-accent ring-1 ring-accent/40"
+          : "bg-bg-card text-text-secondary"
       }`}
     >
       {name}

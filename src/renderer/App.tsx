@@ -78,12 +78,12 @@ export function App() {
                   key={tabId}
                   disabled={!tabsEnabled}
                   onClick={() => setActiveTab(tabId)}
-                  className={`shrink-0 rounded px-2 py-1 font-sans text-[11px] transition-colors duration-150 ${
+                  className={`shrink-0 rounded-md px-2 py-1 font-sans text-[11px] transition-colors duration-150 ${
                     !tabsEnabled
                       ? "cursor-not-allowed text-text-secondary opacity-40"
                       : activeTab === tabId
-                        ? "cursor-pointer bg-bg-secondary font-medium text-accent"
-                        : "cursor-pointer text-text-secondary hover:bg-bg-secondary/60 hover:text-text-primary"
+                        ? "cursor-pointer bg-accent-soft font-medium text-accent"
+                        : "cursor-pointer text-text-secondary hover:bg-bg-secondary hover:text-text-primary"
                   }`}
                 >
                   {TAB_ICONS[tabId]} {t(TAB_LABEL_KEYS[tabId])}
@@ -107,7 +107,7 @@ export function App() {
               type="button"
               onClick={reload}
               disabled={scanning && !hasData}
-              className="cursor-pointer rounded border border-border bg-bg-secondary px-2.5 py-1 font-sans text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
+              className="cursor-pointer rounded-md border border-border bg-bg-secondary px-2.5 py-1 font-sans text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
             >
               🔄 {t("app.refresh")}
             </button>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { EnvVarGroup, ProviderEntry } from "../types";
 import { Card } from "./Card";
+import { StatCard } from "./StatCard";
 import { DataTable, Td } from "./DataTable";
 import { AuthBadgeForEntry, Badge, YesNo } from "./Badge";
 import { Tag } from "./Tag";
@@ -40,13 +41,13 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
     <>
       {/* Summary grid */}
       <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        <SummaryBox value={`${available}/${data.length}`} label={t("inventory.overview.available")} />
-        <SummaryBox value={notInstalled.length} label={t("inventory.notInstalled")} className={notInstalled.length > 0 ? "text-text-tertiary" : "text-ok"} />
-        <SummaryBox value={totalMcp} label={t("inventory.overview.mcpServers")} />
-        <SummaryBox
+        <StatCard value={`${available}/${data.length}`} label={t("inventory.overview.available")} />
+        <StatCard value={notInstalled.length} label={t("inventory.notInstalled")} valueClassName={notInstalled.length > 0 ? "text-text-tertiary" : "text-ok"} />
+        <StatCard value={totalMcp} label={t("inventory.overview.mcpServers")} />
+        <StatCard
           value={warnings}
           label={t("inventory.overview.warnings")}
-          className={warnings > 0 ? "text-warn" : "text-ok"}
+          valueClassName={warnings > 0 ? "text-warn" : "text-ok"}
         />
       </div>
 
@@ -170,23 +171,6 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
         </Card>
       )}
     </>
-  );
-}
-
-function SummaryBox({
-  value,
-  label,
-  className = "text-accent",
-}: {
-  value: number | string;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-bg-secondary p-4 text-center">
-      <div className={`text-[28px] font-bold ${className}`}>{value}</div>
-      <div className="mt-1 text-xs text-text-secondary">{label}</div>
-    </div>
   );
 }
 
