@@ -317,8 +317,10 @@ export function bindTerminalClipboard(
   let lastAutoCopied = "";
   let selCopyTimer = 0;
   const onSelectionChange = () => {
-    if (!(options.getCopyOnSelect?.() ?? false)) return;
+    const enabled = options.getCopyOnSelect?.() ?? false;
     const text = term.getSelection();
+    console.warn("[clipdbg] selChange enabled=", enabled, "selLen=", text.length);
+    if (!enabled) return;
     // Selection cleared (e.g. focus moved to another pane). Leave any pending
     // copy of the previous selection alone — cancelling it here is what made a
     // quick copy-then-switch lose the text before it reached the clipboard.
