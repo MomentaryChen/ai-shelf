@@ -52,14 +52,22 @@ async function writeClipboardText(text: string): Promise<boolean> {
   });
 }
 
-/** Electron clipboard via preload — more reliable than navigator.clipboard in xterm OSC handler. */
+/**
+ * Clipboard provider for xterm's OSC 52 handling.
+ *
+ * writeText is intentionally a no-op: terminal programs (e.g. Claude Code's TUI)
+ * emit OSC 52 clipboard-set sequences while rendering, which would otherwise
+ * silently overwrite whatever the user just copied — making copy-then-paste
+ * across panes lose the text. User-initiated copy/paste does not go through this
+ * provider; it uses copyTerminalSelection / pasteIntoTerminal directly.
+ */
 class ElectronClipboardProvider implements IClipboardProvider {
   readText(_selection: ClipboardSelectionType): Promise<string> {
     return readClipboardText();
   }
 
-  writeText(_selection: ClipboardSelectionType, data: string): Promise<void> {
-    return writeClipboardText(data).then(() => undefined);
+  writeText(_selection: ClipboardSelectionType, _data: string): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -135,12 +143,8 @@ export function bindTerminalClipboard(
 
   const pasteIntoTerminal = async (): Promise<boolean> => {
     const now = Date.now();
-    if (now < guards.pasteUntil) {
-      console.warn("[clipdbg] paste blocked by guard");
-      return false;
-    }
+    if (now < guards.pasteUntil) return false;
     const text = await readClipboardText();
-    console.warn("[clipdbg] paste read len=", text.length);
     if (!text) return false;
     guards.pasteUntil = now + GUARD_MS;
     deliverPaste(text);
@@ -317,10 +321,8 @@ export function bindTerminalClipboard(
   let lastAutoCopied = "";
   let selCopyTimer = 0;
   const onSelectionChange = () => {
-    const enabled = options.getCopyOnSelect?.() ?? false;
+    if (!(options.getCopyOnSelect?.() ?? false)) return;
     const text = term.getSelection();
-    console.warn("[clipdbg] selChange enabled=", enabled, "selLen=", text.length);
-    if (!enabled) return;
     // Selection cleared (e.g. focus moved to another pane). Leave any pending
     // copy of the previous selection alone — cancelling it here is what made a
     // quick copy-then-switch lose the text before it reached the clipboard.
@@ -330,7 +332,6 @@ export function bindTerminalClipboard(
     window.clearTimeout(selCopyTimer);
     selCopyTimer = window.setTimeout(() => {
       lastAutoCopied = text;
-      console.warn("[clipdbg] copy-on-select write len=", text.length);
       void writeClipboardText(text);
     }, 50);
   };

@@ -311,7 +311,6 @@ export function EmbeddedTerminal({
       getRightClickPaste: () => rightClickPasteRef.current,
       getCopyOnSelect: () => copyOnSelectRef.current,
       onPaste: (text) => {
-        console.warn("[clipdbg] onPaste session=", sessionId, "len=", text.length);
         pasteToThisPaneOnly = true;
         term.paste(text);
         pasteToThisPaneOnly = false;
