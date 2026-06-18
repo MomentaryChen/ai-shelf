@@ -17,6 +17,7 @@ import {
 } from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
 import { PaneShortcutBindingsEditor } from "./PaneShortcutBindingsEditor";
+import { ToolLaunchArgsEditor } from "./ToolLaunchArgsEditor";
 import type { AppColorTheme } from "../app-theme";
 import type { AppLocale } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
@@ -299,6 +300,19 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Tool launch arguments */}
+      <div>
+        <p className={sectionTitle}>{t("settings.toolLaunchArgs.title")}</p>
+        <p className="mb-3 text-[11px] leading-snug text-text-tertiary">
+          {t("settings.toolLaunchArgs.subtitle")}
+        </p>
+        <ToolLaunchArgsEditor
+          compact={compact}
+          args={settings.toolLaunchArgs}
+          onChange={(toolLaunchArgs) => updateSettings({ toolLaunchArgs })}
+        />
       </div>
 
       {/* Terminal background */}

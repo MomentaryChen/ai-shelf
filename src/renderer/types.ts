@@ -340,8 +340,17 @@ export interface ElectronAPI {
   mcpPingTool: (tool: string) => Promise<McpPingToolResult>;
   openPath: (filePath: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
-  launchInTerminal: (tool: string, terminal?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
-  ptySpawn:  (tool: string, cwd?: string)                           => Promise<{ success: boolean; sessionId?: string; error?: string }>;
+  launchInTerminal: (
+    tool: string,
+    terminal?: string,
+    cwd?: string,
+    extraArgs?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  ptySpawn: (
+    tool: string,
+    cwd?: string,
+    extraArgs?: string,
+  ) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
   ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
   ptyGetOutputBuffer: (sessionId: string)                            => Promise<{ buffer: string }>;
   ptyExportOutput: (

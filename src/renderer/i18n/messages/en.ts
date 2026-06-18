@@ -31,7 +31,7 @@ export const en = {
   "inventory.search.noMatch": "No tools match your filters",
   "settings.title": "Terminal Settings",
   "settings.subtitle":
-    "Language, app theme, working directory, external terminal, pane shortcuts, display, system tray, background, and data backup",
+    "Language, app theme, working directory, external terminal, tool launch arguments, pane shortcuts, display, system tray, background, and data backup",
   "settings.paneShortcut.title": "Pane shortcuts",
   "settings.paneShortcut.subtitle":
     "Split and focus shortcuts while a terminal pane is focused. Requires Ctrl (or Cmd on Mac). Close, clear, and restart shortcuts stay fixed.",
@@ -56,6 +56,10 @@ export const en = {
   "settings.browse": "Browse…",
   "settings.clearHistory": "Clear history",
   "settings.externalTerminal": "External terminal preference",
+  "settings.toolLaunchArgs.title": "Tool launch arguments",
+  "settings.toolLaunchArgs.subtitle":
+    "Extra CLI flags appended when starting a tool in embedded or external terminals. Example: --model opus",
+  "settings.toolLaunchArgs.placeholder": "e.g. --model opus",
   "settings.terminalBg": "Terminal background",
   "settings.terminalDisplay": "Terminal display",
   "settings.fontFamily": "Font family",

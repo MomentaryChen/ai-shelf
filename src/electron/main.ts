@@ -14,6 +14,7 @@ import {
 import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
+import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
@@ -1036,7 +1037,7 @@ ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
   return canceled ? null : filePaths[0];
 });
 
-ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string) => {
+ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string, extraArgs?: string) => {
   let pty: PtyModule;
   try {
     pty = await getPty();
@@ -1044,7 +1045,7 @@ ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string) => {
     return { success: false, error: (err as Error).message };
   }
   const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
-  const cmd = shellOnly ? "" : TOOL_LAUNCH_CMD[tool];
+  const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
   if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
 
   const sessionId = `${tool}-${Date.now()}`;
@@ -1195,11 +1196,12 @@ ipcMain.on("pty-kill",   (_e, sessionId: string)                                
 
 // --- Launch in Terminal ---
 
-ipcMain.handle("launch-in-terminal", (_event, tool: string, terminal: string = "auto", cwd?: string) => {
-  const baseCmd = TOOL_LAUNCH_CMD[tool];
-  if (!baseCmd) return { success: false, error: `Unknown tool: ${tool}` };
+ipcMain.handle(
+  "launch-in-terminal",
+  (_event, tool: string, terminal: string = "auto", cwd?: string, extraArgs?: string) => {
+  const cmd = resolveToolLaunchCommand(tool, extraArgs);
+  if (!cmd) return { success: false, error: `Unknown tool: ${tool}` };
 
-  // Prepend cd to working directory if specified
   const isWin = process.platform === "win32";
   const cdPrefix = cwd
     ? isWin
@@ -1207,7 +1209,6 @@ ipcMain.handle("launch-in-terminal", (_event, tool: string, terminal: string = "
       : `cd "${cwd}" && `
     : "";
   const pwshCdPrefix = cwd ? `Set-Location '${cwd}'; ` : "";
-  const cmd = baseCmd;
 
   try {
     const plat = process.platform;

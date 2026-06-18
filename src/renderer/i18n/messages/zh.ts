@@ -32,7 +32,7 @@ export const zh: Record<MessageKey, string> = {
   "app.tab.doctor": "診斷",
   "app.tab.update": "更新",
   "settings.title": "終端機設定",
-  "settings.subtitle": "語言、主題顏色、工作目錄、外部終端機、窗格快捷鍵、顯示、系統匣、背景與資料備份",
+  "settings.subtitle": "語言、主題顏色、工作目錄、外部終端機、工具啟動參數、窗格快捷鍵、顯示、系統匣、背景與資料備份",
   "settings.paneShortcut.title": "窗格快捷鍵",
   "settings.paneShortcut.subtitle":
     "終端機窗格聚焦時的分割與切換快捷鍵，需搭配 Ctrl（Mac 為 Cmd）。關閉、清屏與重啟快捷鍵維持固定。",
@@ -56,6 +56,10 @@ export const zh: Record<MessageKey, string> = {
   "settings.browse": "瀏覽…",
   "settings.clearHistory": "清除紀錄",
   "settings.externalTerminal": "外部終端機偏好",
+  "settings.toolLaunchArgs.title": "工具啟動參數",
+  "settings.toolLaunchArgs.subtitle":
+    "在內嵌或外部終端機啟動工具時附加的 CLI 參數。例如：--model opus",
+  "settings.toolLaunchArgs.placeholder": "例如 --model opus",
   "settings.terminalBg": "終端機背景",
   "settings.terminalDisplay": "終端機顯示",
   "settings.fontFamily": "字型",

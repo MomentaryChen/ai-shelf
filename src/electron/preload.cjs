@@ -72,8 +72,9 @@ contextBridge.exposeInMainWorld("api", {
   mcpPingTool: (tool) => ipcRenderer.invoke("mcp-ping-tool", tool),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
-  launchInTerminal: (tool, terminal, cwd) => ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd),
-  ptySpawn:  (tool, cwd)                    => ipcRenderer.invoke("pty-spawn", tool, cwd),
+  launchInTerminal: (tool, terminal, cwd, extraArgs) =>
+    ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
+  ptySpawn: (tool, cwd, extraArgs) => ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs),
   ptyAttach: (sessionId)                    => ipcRenderer.invoke("pty-attach", sessionId),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
   ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),
