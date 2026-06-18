@@ -8,6 +8,13 @@ import {
 } from "../utils/available-tools";
 import { ProfileColorPicker } from "./ProfileColorPicker";
 import { useLocale } from "../i18n/LocaleProvider";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export interface ProfileSettingsPatch {
   name: string;
@@ -56,7 +63,7 @@ export function ProfileSettingsDialog({
     setAccentColor(profile.accentColor ?? null);
   }, [open, profile]);
 
-  if (!open || !profile) return null;
+  if (!profile) return null;
 
   const effectiveTool = tools.includes(tool) ? tool : (tools[0] ?? PLAIN_SHELL_TOOL_ID);
 
@@ -79,17 +86,12 @@ export function ProfileSettingsDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-overlay p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <form
-        className="w-full max-w-sm rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 text-chrome-text shadow-float"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
-      >
-        <h2 className="mb-4 text-[15px] font-semibold text-chrome-text">{t("profile.dialog.settingsTitle")}</h2>
-
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-[15px]">{t("profile.dialog.settingsTitle")}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
         <label className="mb-3 block">
           <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.name")}</span>
 
@@ -177,33 +179,27 @@ export function ProfileSettingsDialog({
         </label>
 
         <div className="flex items-center justify-between gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             disabled={busy}
             onClick={() => void onDelete(profile)}
-            className="cursor-pointer rounded-md px-3 py-2 text-[12px] text-fail hover:bg-fail/10 disabled:opacity-40"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
             {t("profile.dialog.delete")}
-          </button>
+          </Button>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={busy}
-              className="cursor-pointer rounded-md px-4 py-2 text-[13px] text-chrome-text-muted hover:text-chrome-text disabled:opacity-40"
-            >
+            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
               {t("profile.dialog.cancel")}
-            </button>
-            <button
-              type="submit"
-              disabled={busy || !name.trim()}
-              className="cursor-pointer rounded-md bg-accent px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-accent-hover disabled:opacity-40"
-            >
+            </Button>
+            <Button type="submit" size="sm" disabled={busy || !name.trim()}>
               {t("profile.dialog.save")}
-            </button>
+            </Button>
           </div>
         </div>
-      </form>
-    </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

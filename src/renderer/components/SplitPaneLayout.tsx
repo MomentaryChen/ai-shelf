@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SplitSquareHorizontal, SplitSquareVertical, Minus, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { DragHandle } from "./ProfileSidebarUI";
@@ -411,18 +412,22 @@ function WarpPaneShell({
             </IconBtn>
           )}
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          className="flex cursor-pointer items-center justify-center rounded p-1 text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
-          title={t("pane.close")}
-
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={t("pane.close")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="flex cursor-pointer items-center justify-center rounded p-1 text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{t("pane.close")}</TooltipContent>
+        </Tooltip>
       </div>
       <div className="warp-pane-body relative z-0 min-h-0 flex-1 overflow-hidden">
         {sidebarPaneDragActive && onProfilePaneDrop && (
@@ -482,16 +487,21 @@ function IconBtn({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className="flex cursor-pointer items-center justify-center rounded-md p-1 text-chrome-text-muted hover:bg-chrome-hover-strong hover:text-chrome-text"
-    >
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={title}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="flex cursor-pointer items-center justify-center rounded-md p-1 text-chrome-text-muted hover:bg-chrome-hover-strong hover:text-chrome-text"
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   );
 }
