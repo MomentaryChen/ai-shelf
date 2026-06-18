@@ -260,7 +260,7 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
                       {canReveal && isOpen && (
                         <div
                           role="tooltip"
-                          className="absolute top-full left-0 z-20 mt-1 w-max max-w-[95vw] overflow-x-auto whitespace-nowrap rounded-md border border-border bg-bg-primary px-3 py-2 font-mono text-[12px] text-accent shadow-lg select-all"
+                          className="absolute top-full left-0 z-20 mt-1 w-max max-w-[95vw] overflow-x-auto whitespace-nowrap rounded-md border border-border bg-bg-primary px-3 py-2 font-mono text-[12px] text-accent shadow-pop select-all"
                         >
                           {v.value}
                         </div>
