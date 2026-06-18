@@ -94,6 +94,8 @@ function DoctorCards({
     return (
       <Card
         key={tool}
+        collapsible
+        defaultCollapsed
         className={installedCardClass(available)}
         title={<ToolNameCell entry={entry} />}
         trailing={

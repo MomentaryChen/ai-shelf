@@ -30,7 +30,13 @@ function ConfigCards({
         ];
 
         return (
-          <Card key={e.tool} className={installedCardClass(e.available)} title={<ToolNameCell entry={e} />}>
+          <Card
+            key={e.tool}
+            collapsible
+            defaultCollapsed
+            className={installedCardClass(e.available)}
+            title={<ToolNameCell entry={e} />}
+          >
             {!e.available ? (
               <p className="text-[13px] text-text-tertiary">
                 {allPaths.length > 0 ? t("inventory.configResidual") : t("inventory.configNone")}

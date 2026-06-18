@@ -19,6 +19,8 @@ function McpCards({ entries }: { entries: ProviderEntry[] }) {
     return (
     <Card
       key={e.tool}
+      collapsible
+      defaultCollapsed
       className={installedCardClass(e.available)}
       title={<ToolNameCell entry={e} />}
       trailing={
