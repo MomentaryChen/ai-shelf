@@ -92,6 +92,87 @@ export function appendCodexMcpServers(
   return added;
 }
 
+/** True when a TOML section header belongs to the given MCP server. */
+function sectionBelongsToServer(section: string, name: string): boolean {
+  const prefix = "mcp_servers.";
+  if (!section.startsWith(prefix)) return false;
+  const rest = section.slice(prefix.length);
+  let serverName: string;
+  if (rest.startsWith('"') || rest.startsWith("'")) {
+    const quote = rest[0]!;
+    const end = rest.indexOf(quote, 1);
+    serverName = end === -1 ? rest.slice(1) : rest.slice(1, end);
+  } else {
+    const dot = rest.indexOf(".");
+    serverName = dot === -1 ? rest : rest.slice(0, dot);
+  }
+  return serverName === name;
+}
+
+/** Remove a `[mcp_servers.NAME]` block (and its `.env` sub-table) from Codex config. */
+export function removeCodexMcpServer(configPath: string, name: string): boolean {
+  if (!existsSync(configPath)) return false;
+
+  let text: string;
+  try {
+    text = readFileSync(configPath, "utf-8");
+  } catch {
+    return false;
+  }
+
+  const headerRe = /^\s*\[([^\]]+)\]\s*$/;
+  const out: string[] = [];
+  let removing = false;
+  let removedAny = false;
+
+  for (const line of text.split(/\r?\n/)) {
+    const header = line.match(headerRe);
+    if (header) {
+      if (sectionBelongsToServer(header[1]!, name)) {
+        removing = true;
+        removedAny = true;
+        continue;
+      }
+      removing = false;
+      out.push(line);
+      continue;
+    }
+    if (removing) continue;
+    out.push(line);
+  }
+
+  if (!removedAny) return false;
+
+  let result = out.join("\n").replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+  if (result.length > 0 && !result.endsWith("\n")) result += "\n";
+  writeFileSync(configPath, result, "utf-8");
+  return true;
+}
+
+/** Add or replace a single MCP server block in Codex config. */
+export function upsertCodexMcpServer(
+  configPath: string,
+  name: string,
+  entry: McpServerEntry,
+): void {
+  removeCodexMcpServer(configPath, name);
+  appendCodexMcpServers(configPath, { [name]: entry });
+}
+
+/** Toggle the `enabled` flag of a Codex MCP server. Returns false if absent. */
+export function setCodexMcpServerEnabled(
+  configPath: string,
+  name: string,
+  enabled: boolean,
+): boolean {
+  const servers = readCodexMcpServers(configPath);
+  const entry = servers[name];
+  if (!entry) return false;
+  entry["enabled"] = enabled;
+  upsertCodexMcpServer(configPath, name, entry);
+  return true;
+}
+
 /** Normalize a JSON MCP entry for Codex TOML output. */
 export function adaptMcpForCodex(entry: McpServerEntry): McpServerEntry {
   const out: McpServerEntry = {};

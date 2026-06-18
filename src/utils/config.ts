@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { canonicalToolId } from "../tools.js";
 
 export function home(...segments: string[]): string {
   return join(homedir(), ...segments);
@@ -70,13 +71,21 @@ export function tryReadJson<T = unknown>(filePath: string): T | null {
   }
 }
 
+/**
+ * Parse JSON leniently (comments and trailing commas allowed). Throws on
+ * genuinely malformed input. Used to validate editor content before writing.
+ */
+export function parseJsonLoose(text: string): unknown {
+  return JSON.parse(stripJsonComments(text));
+}
+
 export function envPresent(name: string): boolean {
   return !!process.env[name];
 }
 
 /** Config file paths for each tool's MCP settings */
 export function getMcpConfigPath(tool: string): string {
-  switch (tool) {
+  switch (canonicalToolId(tool)) {
     case "claude":
       return home(".claude.json");
     case "copilot":

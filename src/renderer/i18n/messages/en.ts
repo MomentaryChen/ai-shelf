@@ -374,6 +374,48 @@ export const en = {
   "appUpdate.errorDetail": "Technical details",
   "appUpdate.close": "Close",
   "appUpdate.retry": "Retry",
+
+  // Config file editor
+  "configEditor.title": "Edit config file",
+  "configEditor.edit": "Edit",
+  "configEditor.loading": "Loading…",
+  "configEditor.saving": "Saving…",
+  "configEditor.save": "Save",
+  "configEditor.cancel": "Cancel",
+  "configEditor.invalidJson": "Invalid JSON",
+  "configEditor.backupNote": "A .bak backup is written before saving",
+  "configEditor.noChanges": "No changes",
+
+  // MCP server management
+  "mcpManage.title": "Manage servers",
+  "mcpManage.add": "Add server",
+  "mcpManage.edit": "Edit",
+  "mcpManage.delete": "Delete",
+  "mcpManage.enabled": "Enabled",
+  "mcpManage.disabled": "Disabled",
+  "mcpManage.none": "No MCP servers configured",
+  "mcpManage.editRaw": "Edit raw file",
+  "mcpManage.confirm": "Confirm",
+  "mcpManage.cancel": "Cancel",
+  "mcpManage.confirmDelete": 'Delete "{name}"?',
+  "mcpServerEditor.addTitle": "Add MCP server",
+  "mcpServerEditor.editTitle": "Edit MCP server",
+  "mcpServerEditor.name": "Server name",
+  "mcpServerEditor.config": "Server config (JSON)",
+  "mcpServerEditor.enabled": "Enabled",
+  "mcpServerEditor.save": "Save",
+  "mcpServerEditor.cancel": "Cancel",
+  "mcpServerEditor.saving": "Saving…",
+  "mcpServerEditor.invalidJson": "Config must be a valid JSON object",
+  "mcpServerEditor.hint": "stdio: command + args + env · http: url",
+
+  // Doctor — MCP connectivity
+  "doctor.mcpTest": "Test MCP connectivity",
+  "doctor.mcpTesting": "Testing…",
+  "doctor.mcpRetest": "Re-test",
+  "doctor.mcpReachable": "reachable",
+  "doctor.mcpNoServers": "No enabled MCP servers to test",
+  "doctor.mcpEnabledOnly": "Only enabled servers are tested",
 } as const;
 
 export type MessageKey = keyof typeof en;
