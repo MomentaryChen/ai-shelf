@@ -4,7 +4,7 @@ export type TerminalOutputExportResult =
   | { success: true; path: string }
   | { success: false; canceled?: true; error?: string };
 
-/** Save the PTY output buffer (~256KB tail) to a user-chosen .log file. */
+/** Save the PTY output buffer tail to a user-chosen .log file. */
 export async function exportTerminalOutput(
   sessionId: string,
   defaultName?: string,

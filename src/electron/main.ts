@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import { join, normalize, dirname } from "node:path";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
 import {
@@ -127,20 +127,28 @@ function formatWindowTitle(base: string): string {
   return title;
 }
 
-/** Only one app process; a second launch focuses the existing instance instead of opening another window. */
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-if (!gotSingleInstanceLock) {
-  app.quit();
-} else {
-  app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      if (!mainWindow.isVisible()) mainWindow.show();
-      mainWindow.focus();
-    } else {
-      createWindow();
-    }
-  });
+/**
+ * Packaged builds run as a single process: a second launch focuses the existing
+ * instance instead of opening another window. In dev (`electron:dev`, i.e.
+ * `!app.isPackaged`) we skip the lock so multiple independent instances can run
+ * side by side — `gotSingleInstanceLock` stays true there so the whenReady/activate
+ * guards below don't bail out. Note: dev instances share the same userData dir / SQLite DB.
+ */
+const gotSingleInstanceLock = app.isPackaged ? app.requestSingleInstanceLock() : true;
+if (app.isPackaged) {
+  if (!gotSingleInstanceLock) {
+    app.quit();
+  } else {
+    app.on("second-instance", () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+      } else {
+        createWindow();
+      }
+    });
+  }
 }
 
 const INVENTORY_CACHE_TTL_MS = 30_000;
@@ -950,13 +958,34 @@ const PLAIN_SHELL_TOOL_ID = "shell";
 
 const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
 const PTY_OUTPUT_BUFFERS = new Map<string, string>();
-const PTY_BUFFER_MAX_CHARS = 256 * 1024;
+const DEFAULT_PTY_BUFFER_MAX_CHARS = 4 * 1024 * 1024;
+const MIN_PTY_BUFFER_MAX_CHARS = 256 * 1024;
+const MAX_PTY_BUFFER_MAX_CHARS = 64 * 1024 * 1024;
+
+let ptyBufferMaxChars = DEFAULT_PTY_BUFFER_MAX_CHARS;
+
+function clampPtyBufferMaxChars(n: unknown): number {
+  const v = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(v)) return DEFAULT_PTY_BUFFER_MAX_CHARS;
+  return Math.min(MAX_PTY_BUFFER_MAX_CHARS, Math.max(MIN_PTY_BUFFER_MAX_CHARS, Math.round(v)));
+}
+
+function setPtyBufferMaxChars(chars: number) {
+  ptyBufferMaxChars = clampPtyBufferMaxChars(chars);
+  for (const [sessionId, buf] of PTY_OUTPUT_BUFFERS) {
+    if (buf.length > ptyBufferMaxChars) {
+      const trimmed = buf.slice(-ptyBufferMaxChars);
+      PTY_OUTPUT_BUFFERS.set(sessionId, trimmed);
+      mirrorPtyLog(sessionId, trimmed);
+    }
+  }
+}
 
 function ptyLogDir(): string {
   return join(app.getPath("userData"), "pty-logs");
 }
 
-/** Mirror PTY transcript for external tools / agents (grep, read). */
+/** Rewrite the mirrored log to match the in-memory PTY tail. */
 function mirrorPtyLog(sessionId: string, text: string) {
   try {
     const dir = ptyLogDir();
@@ -967,14 +996,28 @@ function mirrorPtyLog(sessionId: string, text: string) {
   }
 }
 
+function mirrorPtyLogAppend(sessionId: string, chunk: string) {
+  if (!chunk) return;
+  try {
+    const dir = ptyLogDir();
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(join(dir, `${sessionId}.log`), chunk, "utf8");
+  } catch {
+    /* best-effort */
+  }
+}
+
 function appendPtyBuffer(sessionId: string, data: string) {
   const prev = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
   let next = prev + data;
-  if (next.length > PTY_BUFFER_MAX_CHARS) {
-    next = next.slice(-PTY_BUFFER_MAX_CHARS);
+  if (next.length > ptyBufferMaxChars) {
+    next = next.slice(-ptyBufferMaxChars);
+    PTY_OUTPUT_BUFFERS.set(sessionId, next);
+    mirrorPtyLog(sessionId, next);
+    return;
   }
   PTY_OUTPUT_BUFFERS.set(sessionId, next);
-  mirrorPtyLog(sessionId, next);
+  mirrorPtyLogAppend(sessionId, data);
 }
 
 function clearPtyBuffer(sessionId: string) {
@@ -1613,6 +1656,15 @@ ipcMain.handle("set-system-tray-enabled", (_event, enabled: unknown) => {
 
 ipcMain.handle("get-system-tray-enabled", () => ({
   systemTrayEnabled: isSystemTrayEnabled(),
+}));
+
+ipcMain.handle("set-pty-buffer-max-chars", (_event, chars: unknown) => {
+  setPtyBufferMaxChars(clampPtyBufferMaxChars(chars));
+  return { ok: true, terminalPtyBufferChars: ptyBufferMaxChars };
+});
+
+ipcMain.handle("get-pty-buffer-max-chars", () => ({
+  terminalPtyBufferChars: ptyBufferMaxChars,
 }));
 
 app.whenReady().then(() => {

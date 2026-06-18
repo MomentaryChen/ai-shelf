@@ -5,6 +5,7 @@ import {
   BG_PRESETS,
   DEFAULT_TERMINAL_FONT_FAMILY,
   DEFAULT_TERMINAL_FONT_SIZE,
+  PTY_BUFFER_PRESETS,
   SCROLLBACK_PRESETS,
   TERMINAL_OPTIONS,
   getAppBg,
@@ -21,7 +22,7 @@ import { ToolLaunchArgsEditor } from "./ToolLaunchArgsEditor";
 import type { AppColorTheme } from "../app-theme";
 import type { AppLocale } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
-import { syncSystemTrayFromSettings } from "../system-tray-sync";
+import { syncMainProcessFromSettings } from "../system-tray-sync";
 
 interface ChatSettingsPanelProps {
   compact?: boolean;
@@ -48,6 +49,14 @@ const SCROLLBACK_LABEL_KEYS: Record<number, MessageKey> = {
   10000: "scrollback.10k",
   20000: "scrollback.20k",
   50000: "scrollback.50k",
+};
+
+const PTY_BUFFER_LABEL_KEYS: Record<number, MessageKey> = {
+  [256 * 1024]: "ptyBuffer.256k",
+  [1024 * 1024]: "ptyBuffer.1m",
+  [4 * 1024 * 1024]: "ptyBuffer.4m",
+  [16 * 1024 * 1024]: "ptyBuffer.16m",
+  [64 * 1024 * 1024]: "ptyBuffer.64m",
 };
 
 const LOCALE_OPTIONS: { value: AppLocale; labelKey: MessageKey }[] = [
@@ -95,12 +104,15 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
       if (partial.systemTrayEnabled !== undefined) {
         void window.api.setSystemTrayEnabled(next.systemTrayEnabled);
       }
+      if (partial.terminalPtyBufferChars !== undefined) {
+        void window.api.setPtyBufferMaxChars(next.terminalPtyBufferChars);
+      }
       return next;
     });
   }, []);
 
   useEffect(() => {
-    syncSystemTrayFromSettings();
+    syncMainProcessFromSettings();
   }, []);
 
   useEffect(() => {
@@ -109,7 +121,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         const next = loadSettings();
         setSettings(next);
         applyAppTheme(next.appTheme);
-        syncSystemTrayFromSettings();
+        syncMainProcessFromSettings();
       }
     };
     window.addEventListener("storage", onStorage);
@@ -464,6 +476,41 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
                 className="w-28 rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
               />
               <span className="text-[11px] text-text-tertiary">{t("settings.scrollbackHint")}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12px] text-text-secondary">{t("settings.ptyBuffer")}</label>
+            <div className="flex flex-wrap gap-2">
+              {PTY_BUFFER_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => updateSettings({ terminalPtyBufferChars: p.value })}
+                  className={`cursor-pointer rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
+                    settings.terminalPtyBufferChars === p.value
+                      ? "border-accent/60 bg-accent/10 font-medium text-accent"
+                      : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
+                  }`}
+                >
+                  {t(PTY_BUFFER_LABEL_KEYS[p.value])}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="number"
+                min={256 * 1024}
+                max={64 * 1024 * 1024}
+                step={256 * 1024}
+                value={settings.terminalPtyBufferChars}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (Number.isFinite(n)) updateSettings({ terminalPtyBufferChars: n });
+                }}
+                className="w-28 rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+              />
+              <span className="text-[11px] text-text-tertiary">{t("settings.ptyBufferHint")}</span>
             </div>
           </div>
 

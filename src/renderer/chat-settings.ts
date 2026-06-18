@@ -19,11 +19,15 @@ export const DEFAULT_TERMINAL_FONT_FAMILY =
 
 export const DEFAULT_TERMINAL_FONT_SIZE = 14;
 export const DEFAULT_TERMINAL_SCROLLBACK = 20_000;
+/** PTY output buffer for export, search, and pty-logs mirror (chars, not lines). */
+export const DEFAULT_TERMINAL_PTY_BUFFER_CHARS = 4 * 1024 * 1024;
 
 const MIN_TERMINAL_FONT_SIZE = 8;
 const MAX_TERMINAL_FONT_SIZE = 32;
 const MIN_TERMINAL_SCROLLBACK = 1_000;
 const MAX_TERMINAL_SCROLLBACK = 100_000;
+const MIN_TERMINAL_PTY_BUFFER_CHARS = 256 * 1024;
+const MAX_TERMINAL_PTY_BUFFER_CHARS = 64 * 1024 * 1024;
 
 export interface ChatSettings {
   locale: AppLocale;
@@ -34,6 +38,8 @@ export interface ChatSettings {
   terminalFontFamily: string;
   terminalFontSize: number;
   terminalScrollback: number;
+  /** Rolling PTY transcript cap (export / search / pty-logs). */
+  terminalPtyBufferChars: number;
   /** Right-click pastes clipboard; with selection, copies first. Shift+right-click opens menu. */
   terminalRightClickPaste: boolean;
   /** Copy the selection to the clipboard as soon as a mouse drag finishes. */
@@ -75,6 +81,14 @@ export const SCROLLBACK_PRESETS = [
   { label: "50K lines", value: 50_000 },
 ] as const;
 
+export const PTY_BUFFER_PRESETS = [
+  { label: "256 KB", value: 256 * 1024 },
+  { label: "1 MB", value: 1024 * 1024 },
+  { label: "4 MB", value: 4 * 1024 * 1024 },
+  { label: "16 MB", value: 16 * 1024 * 1024 },
+  { label: "64 MB", value: 64 * 1024 * 1024 },
+] as const;
+
 function clampInt(n: unknown, min: number, max: number, fallback: number): number {
   const v = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(v)) return fallback;
@@ -110,6 +124,7 @@ const DEFAULTS: ChatSettings = {
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
   terminalScrollback: DEFAULT_TERMINAL_SCROLLBACK,
+  terminalPtyBufferChars: DEFAULT_TERMINAL_PTY_BUFFER_CHARS,
   terminalRightClickPaste: true,
   terminalCopyOnSelect: true,
   workingDir: "",
@@ -139,6 +154,12 @@ export function loadSettings(): ChatSettings {
         MIN_TERMINAL_SCROLLBACK,
         MAX_TERMINAL_SCROLLBACK,
         DEFAULT_TERMINAL_SCROLLBACK,
+      ),
+      terminalPtyBufferChars: clampInt(
+        stored.terminalPtyBufferChars,
+        MIN_TERMINAL_PTY_BUFFER_CHARS,
+        MAX_TERMINAL_PTY_BUFFER_CHARS,
+        DEFAULT_TERMINAL_PTY_BUFFER_CHARS,
       ),
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),

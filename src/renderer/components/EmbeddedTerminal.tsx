@@ -20,6 +20,7 @@ import {
   exportTerminalOutput,
 } from "../terminal/terminal-output-export";
 import { getXtermTheme } from "../app-theme";
+import { disposeTerminal } from "../terminal/xterm-dispose";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { useLocale } from "../i18n/LocaleProvider";
 
@@ -497,7 +498,7 @@ export function EmbeddedTerminal({
       unbindLinks();
       ro.disconnect();
       searchAddon.dispose();
-      term.dispose();
+      disposeTerminal(term);
     };
   }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback, onRestart]);
 
