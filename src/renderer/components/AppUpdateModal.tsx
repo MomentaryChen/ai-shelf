@@ -151,12 +151,12 @@ export function AppUpdateModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-overlay p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="app-update-title"
     >
-      <div className="flex max-h-[min(90vh,28rem)] w-full max-w-md flex-col rounded-xl border border-border bg-bg-card shadow-xl">
+      <div className="flex max-h-[min(90vh,28rem)] w-full max-w-md flex-col rounded-xl border border-border bg-bg-card shadow-float">
         <div className="shrink-0 border-b border-border px-6 py-4">
           <h2 id="app-update-title" className="text-lg font-semibold text-text-primary">
             {title}

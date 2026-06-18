@@ -31,14 +31,14 @@ export function ProfileGroupNameDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-bg-overlay p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-sm rounded-xl border border-chrome-border bg-chrome-surface p-4 shadow-xl">
+      <div className="w-full max-w-sm rounded-xl border border-chrome-border bg-chrome-surface p-4 shadow-pop">
         <h2 className="mb-3 text-sm font-semibold text-chrome-text">{title}</h2>
         <input
           type="text"
@@ -55,7 +55,7 @@ export function ProfileGroupNameDialog({
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-lg px-3 py-1.5 text-[12px] text-chrome-text-dim hover:bg-white/5"
+            className="rounded-lg px-3 py-1.5 text-[12px] text-chrome-text-dim transition-colors hover:bg-chrome-hover hover:text-chrome-text"
             onClick={onClose}
             disabled={busy}
           >
@@ -63,7 +63,7 @@ export function ProfileGroupNameDialog({
           </button>
           <button
             type="button"
-            className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
             disabled={busy || !name.trim()}
             onClick={() => onSubmit(name.trim())}
           >

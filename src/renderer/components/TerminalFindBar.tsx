@@ -77,7 +77,7 @@ export function TerminalFindBar({
 
   return (
     <div
-      className="pointer-events-auto absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-chrome-border-strong bg-chrome-surface-hover/95 px-2 py-1.5 shadow-lg backdrop-blur-sm"
+      className="pointer-events-auto absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-chrome-border-strong bg-chrome-surface-hover/95 px-2 py-1.5 shadow-pop backdrop-blur-sm"
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => {
         e.stopPropagation();

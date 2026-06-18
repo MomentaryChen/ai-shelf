@@ -742,7 +742,7 @@ export function Sidebar({
               )}
             </button>
             {accountMenuOpen && (
-              <div className={`absolute z-30 w-44 rounded-lg border border-chrome-border-input bg-chrome-surface p-1 shadow-xl ${collapsed ? "bottom-0 left-14" : "bottom-12 right-0"}`}>
+              <div className={`absolute z-30 w-44 rounded-lg border border-chrome-border-input bg-chrome-surface p-1 shadow-pop ${collapsed ? "bottom-0 left-14" : "bottom-12 right-0"}`}>
                 <MenuAction label="Account" onClick={() => onProfileMenuAction?.("account")} />
                 <MenuAction label="Billing" onClick={() => onProfileMenuAction?.("billing")} />
                 <MenuAction label="Logout" onClick={() => onProfileMenuAction?.("logout")} danger />
@@ -835,7 +835,7 @@ function IconTooltipButton({
     >
       {icon}
       {collapsed && (
-        <span className="pointer-events-none absolute left-10 top-1/2 hidden -translate-y-1/2 rounded-md bg-chrome-surface px-2 py-1 text-xs text-chrome-text shadow-lg group-hover:block">
+        <span className="pointer-events-none absolute left-10 top-1/2 hidden -translate-y-1/2 rounded-md bg-chrome-surface px-2 py-1 text-xs text-chrome-text shadow-pop group-hover:block">
           {label}
         </span>
       )}
