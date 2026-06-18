@@ -1,5 +1,6 @@
 import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
+import { StatCard } from "./StatCard";
 import { Badge, InstallStatusBadge } from "./Badge";
 import { Tag } from "./Tag";
 import { McpSyncPanel } from "./McpSyncPanel";
@@ -80,10 +81,7 @@ export function McpTab({ data }: { data: ProviderEntry[] }) {
 
       {allServers.length > 0 && (
         <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-          <div className="rounded-lg border border-border bg-bg-secondary p-4 text-center">
-            <div className="text-[28px] font-bold text-accent">{allServers.length}</div>
-            <div className="mt-1 text-xs text-text-secondary">{t("inventory.mcpUnique")}</div>
-          </div>
+          <StatCard value={allServers.length} label={t("inventory.mcpUnique")} />
         </div>
       )}
 

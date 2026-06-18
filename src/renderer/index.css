@@ -7,6 +7,29 @@ body,
   margin: 0;
 }
 
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Align numeric columns / counters so digits don't jitter as values change. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Respect the OS "reduce motion" setting — kill animation + transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Keyboard focus affordance — only on :focus-visible (keyboard), never on mouse
    click. Components that set `focus:outline-none` (with their own ring) win on
    specificity, so this only adds a ring to otherwise-unstyled interactive
@@ -126,19 +149,32 @@ input:focus-visible,
 }
 
 @theme {
-  --color-bg-primary: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-bg-card: #334155;
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-tertiary: #64748b;
+  /* Inventory / dialog surface family — refined neutral-dark scale
+     (cohesive with the chrome-* near-black system, less blue-saturated). */
+  --color-bg-primary: #0d1117;
+  --color-bg-secondary: #161b22;
+  --color-bg-card: #21262d;
+  --color-bg-elevated: #1c2128;
+  --color-bg-overlay: rgb(1 4 9 / 0.72);
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #8b949e;
+  --color-text-tertiary: #6e7681;
   --color-accent: #38bdf8;
   --color-accent-hover: #7dd3fc;
-  --color-ok: #4ade80;
-  --color-fail: #f87171;
-  --color-warn: #fbbf24;
-  --color-border: #475569;
-  --color-scrollbar-thumb-hover: #64748b;
+  --color-accent-soft: rgb(56 189 248 / 0.14);
+  --color-on-accent: #06141d;
+  --color-ok: #3fb950;
+  --color-fail: #f85149;
+  --color-warn: #d29922;
+  --color-border: #30363d;
+  --color-border-strong: #444c56;
+  --color-border-subtle: #21262d;
+  --color-scrollbar-thumb-hover: #484f58;
+  /* Elevation — soft, dark-appropriate shadows (Tailwind v4 emits these as
+     var() refs, so the per-theme overrides below take effect at runtime). */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.28);
+  --shadow-pop: 0 8px 24px -6px rgb(0 0 0 / 0.5);
+  --shadow-float: 0 16px 40px -12px rgb(0 0 0 / 0.6);
   /* Terminal chrome (sidebar, pane headers, top bar) */
   --color-chrome-bg: #0a0a0a;
   --color-chrome-bg-top: #0c0c0e;
@@ -179,19 +215,28 @@ input:focus-visible,
 
 /* App color themes (default: dark — matches @theme above) */
 html[data-app-theme="light"] {
-  --color-bg-primary: #f8fafc;
-  --color-bg-secondary: #e2e8f0;
-  --color-bg-card: #cbd5e1;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-tertiary: #94a3b8;
+  --color-bg-primary: #f6f8fa;
+  --color-bg-secondary: #ffffff;
+  --color-bg-card: #f0f3f6;
+  --color-bg-elevated: #ffffff;
+  --color-bg-overlay: rgb(31 35 40 / 0.4);
+  --color-text-primary: #1f2328;
+  --color-text-secondary: #59636e;
+  --color-text-tertiary: #818b98;
   --color-accent: #0284c7;
   --color-accent-hover: #0369a1;
-  --color-ok: #16a34a;
-  --color-fail: #dc2626;
-  --color-warn: #ca8a04;
-  --color-border: #94a3b8;
-  --color-scrollbar-thumb-hover: #64748b;
+  --color-accent-soft: rgb(2 132 199 / 0.1);
+  --color-on-accent: #ffffff;
+  --color-ok: #1a7f37;
+  --color-fail: #cf222e;
+  --color-warn: #9a6700;
+  --color-border: #d0d7de;
+  --color-border-strong: #afb8c1;
+  --color-border-subtle: #eaeef2;
+  --color-scrollbar-thumb-hover: #afb8c1;
+  --shadow-card: 0 1px 2px rgb(31 35 40 / 0.08);
+  --shadow-pop: 0 8px 24px -6px rgb(31 35 40 / 0.16);
+  --shadow-float: 0 16px 40px -12px rgb(31 35 40 / 0.2);
   --color-chrome-bg: #f1f5f9;
   --color-chrome-bg-top: #f8fafc;
   --color-chrome-bg-bottom: #e2e8f0;
@@ -232,16 +277,26 @@ html[data-app-theme="contrast"] {
   --color-bg-primary: #000000;
   --color-bg-secondary: #000000;
   --color-bg-card: #1a1a1a;
+  --color-bg-elevated: #000000;
+  --color-bg-overlay: rgb(0 0 0 / 0.88);
   --color-text-primary: #ffffff;
   --color-text-secondary: #ffffff;
   --color-text-tertiary: #e5e5e5;
   --color-accent: #ffff00;
   --color-accent-hover: #ffff99;
+  --color-accent-soft: rgb(255 255 0 / 0.2);
+  --color-on-accent: #000000;
   --color-ok: #00ff00;
   --color-fail: #ff4444;
   --color-warn: #ffff00;
   --color-border: #ffffff;
+  --color-border-strong: #ffffff;
+  --color-border-subtle: #ffffff;
   --color-scrollbar-thumb-hover: #ffffff;
+  /* High-contrast: render "elevation" as a solid hairline ring, not a blur. */
+  --shadow-card: 0 0 0 1px #ffffff;
+  --shadow-pop: 0 0 0 1px #ffffff;
+  --shadow-float: 0 0 0 1px #ffffff;
   --color-chrome-bg: #000000;
   --color-chrome-bg-top: #000000;
   --color-chrome-bg-bottom: #000000;

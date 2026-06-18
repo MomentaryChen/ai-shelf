@@ -2,7 +2,7 @@ export function Tag({ children, title }: { children: React.ReactNode; title?: st
   return (
     <span
       title={title}
-      className="inline-block rounded-md border border-border bg-bg-card px-2.5 py-0.5 text-xs text-text-primary"
+      className="inline-block rounded-md border border-border-subtle bg-bg-card px-2 py-0.5 text-xs text-text-secondary transition-colors duration-150 hover:border-border-strong hover:text-text-primary"
     >
       {children}
     </span>

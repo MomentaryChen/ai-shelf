@@ -18,7 +18,11 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
   const { t } = useLocale();
 
   return (
-    <nav role="tablist" aria-label={t("app.mode.aria")} className="flex shrink-0 items-center">
+    <nav
+      role="tablist"
+      aria-label={t("app.mode.aria")}
+      className="flex shrink-0 items-center gap-0.5 rounded-md bg-bg-secondary p-0.5"
+    >
       {MODES.map((m) => {
         const active = mode === m.id;
         return (
@@ -29,12 +33,12 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
             aria-selected={active}
             disabled={disabled}
             onClick={() => onChange(m.id)}
-            className={`border-b-2 px-3 py-1.5 font-sans text-[12px] transition-colors duration-150 ${
+            className={`rounded-[5px] px-2.5 py-0.5 font-sans text-[11px] transition-[background,color,box-shadow] duration-150 ${
               disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"
             } ${
               active
-                ? "border-accent font-medium text-text-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary"
+                ? "bg-bg-card font-medium text-text-primary shadow-card"
+                : "text-text-secondary hover:text-text-primary"
             }`}
           >
             {t(m.labelKey)}

@@ -35,7 +35,7 @@ interface Props {
   onPaneCwdClick?: (paneId: string) => void;
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
-  /** True while dragging a tab from ProfileSidebar (enables drop overlay over xterm). */
+  /** True while dragging a tab from the profile sidebar (enables drop overlay over xterm). */
   sidebarPaneDragActive?: boolean;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
@@ -352,7 +352,7 @@ function WarpPaneShell({
               e.dataTransfer.effectAllowed = "move";
             }}
             onDragEnd={clearDrag}
-            className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded hover:bg-chrome-hover active:cursor-grabbing"
+            className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded opacity-60 transition-opacity hover:bg-chrome-hover group-hover/pane:opacity-100 active:cursor-grabbing"
             title={t("pane.dragHint")}
             aria-label={t("pane.dragHint")}
 
@@ -363,7 +363,7 @@ function WarpPaneShell({
         {focused && (
           <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={dotStyle} aria-hidden />
         )}
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.03]">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-chrome-border-subtle bg-chrome-surface-raised">
           <ToolLogo tool={pane.tool} size={14} />
         </span>
         {onRename ? (

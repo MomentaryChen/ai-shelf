@@ -31,7 +31,7 @@ export function PaneDropOverlay({
             zone === "swap" ? "bg-accent/18 ring-2 ring-inset ring-accent/55" : ""
           }`}
         >
-          <span className="flex max-w-[90%] flex-col items-center gap-0.5 rounded-md bg-chrome-bg/90 px-2 py-1 text-center text-[10px] font-medium text-chrome-accent-text shadow-lg">
+          <span className="flex max-w-[90%] flex-col items-center gap-0.5 rounded-md bg-chrome-bg/90 px-2 py-1 text-center text-[10px] font-medium text-chrome-accent-text shadow-pop">
             {targetLabel ? (
               <span className="truncate text-[9px] font-normal text-chrome-text-muted">
                 {targetLabel}
