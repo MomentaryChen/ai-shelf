@@ -1,9 +1,4 @@
 import type { Terminal } from "@xterm/xterm";
-import {
-  ClipboardAddon,
-  type ClipboardSelectionType,
-  type IClipboardProvider,
-} from "@xterm/addon-clipboard";
 import { tryConsumePaneShortcut } from "./pane-shortcuts";
 import { getStoredT } from "../i18n/stored-locale.js";
 
@@ -50,25 +45,6 @@ async function writeClipboardText(text: string): Promise<boolean> {
       }
     }
   });
-}
-
-/**
- * Clipboard provider for xterm's OSC 52 handling.
- *
- * writeText is intentionally a no-op: terminal programs (e.g. Claude Code's TUI)
- * emit OSC 52 clipboard-set sequences while rendering, which would otherwise
- * silently overwrite whatever the user just copied — making copy-then-paste
- * across panes lose the text. User-initiated copy/paste does not go through this
- * provider; it uses copyTerminalSelection / pasteIntoTerminal directly.
- */
-class ElectronClipboardProvider implements IClipboardProvider {
-  readText(_selection: ClipboardSelectionType): Promise<string> {
-    return readClipboardText();
-  }
-
-  writeText(_selection: ClipboardSelectionType, _data: string): Promise<void> {
-    return Promise.resolve();
-  }
 }
 
 const GUARD_MS = 80;
@@ -123,8 +99,10 @@ export function bindTerminalClipboard(
   options: TerminalClipboardOptions = {},
 ): () => void {
   const guards = createGuards();
-  const clipboardAddon = new ClipboardAddon(new ElectronClipboardProvider());
-  term.loadAddon(clipboardAddon);
+  // Swallow OSC 52 synchronously. Apps like Claude Code emit clipboard-set sequences
+  // while rendering; letting them through would overwrite user clipboard. User copy/paste
+  // uses our shortcuts instead. Async OSC handlers race with xterm 6.1 write/resize.
+  const osc52Disposable = term.parser.registerOscHandler(52, () => true);
 
   const deliverPaste = (text: string) => {
     if (options.onPaste) options.onPaste(text, term);
@@ -354,6 +332,6 @@ export function bindTerminalClipboard(
       container.removeEventListener("mousedown", onMouseDown, { capture: true });
     }
     term.attachCustomKeyEventHandler(() => true);
-    clipboardAddon.dispose();
+    osc52Disposable.dispose();
   };
 }
