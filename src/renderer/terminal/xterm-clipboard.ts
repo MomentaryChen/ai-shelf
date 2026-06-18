@@ -305,17 +305,28 @@ export function bindTerminalClipboard(
   container.addEventListener("contextmenu", onContextMenu, { capture: true });
 
   /**
-   * Copy-on-select: when a left-button drag finishes with text selected, push it
-   * to the clipboard. Deferred a tick so xterm has finalized the selection first.
+   * Copy-on-select via xterm's own selection event (more reliable than a DOM
+   * mouseup, whose listener xterm's document-level drag handling can bypass).
+   * Debounced so a drag copies once when it settles, and written directly so the
+   * per-pane copy guard can't drop the final selection mid-drag.
    */
-  const onMouseUpCopy = (ev: MouseEvent) => {
-    if (ev.button !== 0) return;
+  let lastAutoCopied = "";
+  let selCopyTimer = 0;
+  const onSelectionChange = () => {
     if (!(options.getCopyOnSelect?.() ?? false)) return;
-    setTimeout(() => {
-      if (term.hasSelection()) void copyTerminalSelection();
-    }, 0);
+    window.clearTimeout(selCopyTimer);
+    selCopyTimer = window.setTimeout(() => {
+      const text = term.getSelection();
+      if (!text) {
+        lastAutoCopied = "";
+        return;
+      }
+      if (text === lastAutoCopied) return;
+      lastAutoCopied = text;
+      void writeClipboardText(text);
+    }, 50);
   };
-  container.addEventListener("mouseup", onMouseUpCopy);
+  const selectionDisposable = term.onSelectionChange(onSelectionChange);
 
   const onMouseDown = (ev: MouseEvent) => {
     if (ev.button === 2) onPointerPaste(ev);
@@ -327,8 +338,9 @@ export function bindTerminalClipboard(
 
   return () => {
     removeMenu();
+    window.clearTimeout(selCopyTimer);
+    selectionDisposable.dispose();
     container.removeEventListener("contextmenu", onContextMenu, { capture: true });
-    container.removeEventListener("mouseup", onMouseUpCopy);
     if (isFirefox) {
       container.removeEventListener("mousedown", onMouseDown, { capture: true });
     }
