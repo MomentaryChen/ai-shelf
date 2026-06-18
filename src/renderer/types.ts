@@ -453,6 +453,8 @@ export interface ElectronAPI {
   relaunchApp: () => Promise<{ ok: boolean }>;
   setSystemTrayEnabled: (enabled: boolean) => Promise<{ ok: boolean; systemTrayEnabled: boolean }>;
   getSystemTrayEnabled: () => Promise<{ systemTrayEnabled: boolean }>;
+  setPtyBufferMaxChars: (chars: number) => Promise<{ ok: boolean; terminalPtyBufferChars: number }>;
+  getPtyBufferMaxChars: () => Promise<{ terminalPtyBufferChars: number }>;
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
   toggleDevTools: () => Promise<void>;

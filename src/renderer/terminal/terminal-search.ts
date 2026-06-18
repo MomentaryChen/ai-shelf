@@ -12,7 +12,7 @@ const SEARCH_DEBOUNCE_MS = 120;
 
 export { MATCH_COUNT_CAP };
 
-/** Align with main process PTY_OUTPUT_BUFFERS tail (~256KB). */
+/** Align with main process PTY_OUTPUT_BUFFERS rolling tail. */
 export const XTERM_SCROLLBACK_LINES = 20_000;
 
 export interface TerminalMatch {
