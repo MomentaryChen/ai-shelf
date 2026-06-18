@@ -135,8 +135,12 @@ export function bindTerminalClipboard(
 
   const pasteIntoTerminal = async (): Promise<boolean> => {
     const now = Date.now();
-    if (now < guards.pasteUntil) return false;
+    if (now < guards.pasteUntil) {
+      console.debug("[clipdbg] paste blocked by guard");
+      return false;
+    }
     const text = await readClipboardText();
+    console.debug("[clipdbg] paste read len=", text.length);
     if (!text) return false;
     guards.pasteUntil = now + GUARD_MS;
     deliverPaste(text);
@@ -324,6 +328,7 @@ export function bindTerminalClipboard(
     window.clearTimeout(selCopyTimer);
     selCopyTimer = window.setTimeout(() => {
       lastAutoCopied = text;
+      console.debug("[clipdbg] copy-on-select write len=", text.length);
       void writeClipboardText(text);
     }, 50);
   };
