@@ -28,6 +28,17 @@ export const MCP_SYNC_TOOL_IDS = [
   "opencode",
 ] as const;
 
+/**
+ * Normalize a tool identifier to its canonical inventory id.
+ * Cursor is detected via its `agent` command, so its entry's `tool` field is
+ * `"agent"`; map that (and `cursor-agent`) back to `"cursor"` so config-path
+ * and MCP lookups resolve consistently.
+ */
+export function canonicalToolId(tool: string): string {
+  if (tool === "agent" || tool === "cursor-agent") return "cursor";
+  return tool;
+}
+
 export const TOOL_LAUNCH_CMD: Record<string, string> = {
   claude: "claude",
   copilot: "copilot",

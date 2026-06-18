@@ -114,6 +114,53 @@ export interface McpSyncResult {
   error?: string;
 }
 
+export type McpConfigFormat = "json" | "toml" | "unknown";
+
+export interface McpServerRecord {
+  name: string;
+  entry: Record<string, unknown>;
+  enabled: boolean;
+}
+
+export interface McpListResult {
+  tool: string;
+  configPath: string;
+  format: McpConfigFormat;
+  supported: boolean;
+  servers: McpServerRecord[];
+  error?: string;
+}
+
+export interface McpEditResult {
+  success: boolean;
+  error?: string;
+}
+
+export type McpTransport = "stdio" | "http" | "unknown";
+
+export interface McpPingResult {
+  name: string;
+  ok: boolean;
+  transport: McpTransport;
+  serverName?: string;
+  serverVersion?: string;
+  error?: string;
+  durationMs: number;
+}
+
+export interface McpPingToolResult {
+  tool: string;
+  configPath: string;
+  results: McpPingResult[];
+}
+
+export interface ConfigFileReadResult {
+  success: boolean;
+  content: string;
+  exists: boolean;
+  error?: string;
+}
+
 export interface EnvVar {
   key: string;
   set: boolean;
@@ -279,6 +326,18 @@ export interface ElectronAPI {
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
+  readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
+  writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
+  mcpListServers: (tool: string) => Promise<McpListResult>;
+  mcpUpsertServer: (
+    tool: string,
+    name: string,
+    entry: Record<string, unknown>,
+    enabled: boolean,
+  ) => Promise<McpEditResult>;
+  mcpDeleteServer: (tool: string, name: string) => Promise<McpEditResult>;
+  mcpSetServerEnabled: (tool: string, name: string, enabled: boolean) => Promise<McpEditResult>;
+  mcpPingTool: (tool: string) => Promise<McpPingToolResult>;
   openPath: (filePath: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
   launchInTerminal: (tool: string, terminal?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;

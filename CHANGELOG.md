@@ -9,6 +9,12 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **In-app config editing** — Config tab files (JSON/TOML/YAML/MD) are now editable in a modal editor with live JSON validation; a `.bak` backup is written before every save.
+- **MCP server management** — MCP tab gains per-tool add / edit / enable-disable / delete of MCP servers (no longer sync-only). JSON tools disable servers via a reversible `mcpServersDisabled` sidecar; Codex (TOML) uses its native `enabled` flag.
+- **MCP connectivity test** — Doctor tab can run a real JSON-RPC `initialize` handshake against each enabled MCP server (stdio + HTTP/SSE) and reports reachability, `serverInfo`, and round-trip time — beyond the previous JSON-validity-only check.
+
 ## [2.1.17] - 2026-06-03
 
 Profile sidebar polish and middle-click terminal tab close.

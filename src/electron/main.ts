@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
-import { join, normalize } from "node:path";
+import { join, normalize, dirname } from "node:path";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
@@ -16,7 +16,7 @@ import { sortProviderEntries } from "../tool-sort.js";
 import { TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
-import { getMcpConfigPath, tryReadJson, backupFile, writeJson } from "../utils/config.js";
+import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
 import {
   collectAllMcpServers,
   readMcpServers,
@@ -24,6 +24,13 @@ import {
   validateMcpConfigPath,
   writeMcpServers,
 } from "../utils/mcp-sync.js";
+import {
+  deleteMcpServer,
+  listMcpServersDetailed,
+  setMcpServerEnabled,
+  upsertMcpServer,
+} from "../utils/mcp-edit.js";
+import { pingToolServers } from "../utils/mcp-ping.js";
 import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
@@ -843,6 +850,60 @@ ipcMain.handle("sync-mcp", async (_event, opts: {
 
   return results;
 });
+
+// --- In-app config editing & MCP server management ---
+
+ipcMain.handle("read-config-file", (_event, filePath: string) => {
+  if (typeof filePath !== "string" || !filePath) {
+    return { success: false, error: "Invalid path", content: "", exists: false };
+  }
+  try {
+    if (!existsSync(filePath)) return { success: true, content: "", exists: false };
+    return { success: true, content: readFileSync(filePath, "utf-8"), exists: true };
+  } catch (err) {
+    return { success: false, error: (err as Error).message, content: "", exists: false };
+  }
+});
+
+ipcMain.handle("write-config-file", (_event, filePath: string, content: string) => {
+  if (typeof filePath !== "string" || !filePath) return { success: false, error: "Invalid path" };
+  if (typeof content !== "string") return { success: false, error: "Invalid content" };
+  try {
+    if (filePath.endsWith(".json")) {
+      try {
+        parseJsonLoose(content);
+      } catch (e) {
+        return { success: false, error: `Invalid JSON: ${(e as Error).message}` };
+      }
+    }
+    if (existsSync(filePath)) backupFile(filePath);
+    mkdirSync(dirname(filePath), { recursive: true });
+    writeFileSync(filePath, content, "utf-8");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("mcp-list-servers", (_event, tool: string) => listMcpServersDetailed(tool));
+
+ipcMain.handle(
+  "mcp-upsert-server",
+  (_event, tool: string, name: string, entry: Record<string, unknown>, enabled: boolean) =>
+    upsertMcpServer(tool, name, entry, enabled),
+);
+
+ipcMain.handle("mcp-delete-server", (_event, tool: string, name: string) =>
+  deleteMcpServer(tool, name),
+);
+
+ipcMain.handle(
+  "mcp-set-server-enabled",
+  (_event, tool: string, name: string, enabled: boolean) =>
+    setMcpServerEnabled(tool, name, enabled),
+);
+
+ipcMain.handle("mcp-ping-tool", (_event, tool: string) => pingToolServers(tool));
 
 function normalizeOpenPath(raw: string): string {
   let p = raw.trim();

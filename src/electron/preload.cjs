@@ -61,6 +61,15 @@ contextBridge.exposeInMainWorld("api", {
   },
   getMcpRaw: () => ipcRenderer.invoke("get-mcp-raw"),
   syncMcp: (opts) => ipcRenderer.invoke("sync-mcp", opts),
+  readConfigFile: (filePath) => ipcRenderer.invoke("read-config-file", filePath),
+  writeConfigFile: (filePath, content) => ipcRenderer.invoke("write-config-file", filePath, content),
+  mcpListServers: (tool) => ipcRenderer.invoke("mcp-list-servers", tool),
+  mcpUpsertServer: (tool, name, entry, enabled) =>
+    ipcRenderer.invoke("mcp-upsert-server", tool, name, entry, enabled),
+  mcpDeleteServer: (tool, name) => ipcRenderer.invoke("mcp-delete-server", tool, name),
+  mcpSetServerEnabled: (tool, name, enabled) =>
+    ipcRenderer.invoke("mcp-set-server-enabled", tool, name, enabled),
+  mcpPingTool: (tool) => ipcRenderer.invoke("mcp-ping-tool", tool),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   launchInTerminal: (tool, terminal, cwd) => ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd),

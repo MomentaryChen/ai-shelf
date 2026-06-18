@@ -3,14 +3,20 @@ import { Card } from "./Card";
 import { Badge, InstallStatusBadge } from "./Badge";
 import { Tag } from "./Tag";
 import { McpSyncPanel } from "./McpSyncPanel";
+import { McpServerManager } from "./McpServerManager";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
+import { MCP_SYNC_TOOL_IDS, canonicalToolId } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
+
+const EDITABLE_TOOLS = new Set<string>(MCP_SYNC_TOOL_IDS);
 
 function McpCards({ entries }: { entries: ProviderEntry[] }) {
   const { t } = useLocale();
-  return entries.map((e) => (
+  return entries.map((e) => {
+    const toolId = canonicalToolId(e.tool);
+    return (
     <Card
       key={e.tool}
       className={installedCardClass(e.available)}
@@ -29,7 +35,9 @@ function McpCards({ entries }: { entries: ProviderEntry[] }) {
         <p className="text-[13px] text-text-tertiary">{t("inventory.skipMcp")}</p>
       ) : (
         <>
-          {e.mcp.servers.length > 0 ? (
+          {EDITABLE_TOOLS.has(toolId) ? (
+            <McpServerManager tool={toolId} />
+          ) : e.mcp.servers.length > 0 ? (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {e.mcp.servers.map((s) => <Tag key={s}>🔌 {s}</Tag>)}
             </div>
@@ -55,7 +63,8 @@ function McpCards({ entries }: { entries: ProviderEntry[] }) {
         </>
       )}
     </Card>
-  ));
+    );
+  });
 }
 
 export function McpTab({ data }: { data: ProviderEntry[] }) {
