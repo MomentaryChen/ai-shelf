@@ -127,20 +127,28 @@ function formatWindowTitle(base: string): string {
   return title;
 }
 
-/** Only one app process; a second launch focuses the existing instance instead of opening another window. */
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-if (!gotSingleInstanceLock) {
-  app.quit();
-} else {
-  app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      if (!mainWindow.isVisible()) mainWindow.show();
-      mainWindow.focus();
-    } else {
-      createWindow();
-    }
-  });
+/**
+ * Packaged builds run as a single process: a second launch focuses the existing
+ * instance instead of opening another window. In dev (`electron:dev`, i.e.
+ * `!app.isPackaged`) we skip the lock so multiple independent instances can run
+ * side by side — `gotSingleInstanceLock` stays true there so the whenReady/activate
+ * guards below don't bail out. Note: dev instances share the same userData dir / SQLite DB.
+ */
+const gotSingleInstanceLock = app.isPackaged ? app.requestSingleInstanceLock() : true;
+if (app.isPackaged) {
+  if (!gotSingleInstanceLock) {
+    app.quit();
+  } else {
+    app.on("second-instance", () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+      } else {
+        createWindow();
+      }
+    });
+  }
 }
 
 const INVENTORY_CACHE_TTL_MS = 30_000;
