@@ -473,6 +473,21 @@ export function useProfileWorkspace(
     [],
   );
 
+  /** Focus a pane and show it without hiding other visible panes (preserves split layout). */
+  const focusPaneInDisplay = useCallback(
+    (profileId: string, paneId: string) => {
+      if (activeProfileRef.current?.id !== profileId) return;
+      const node = layoutRef.current;
+      if (!node || !findPane(node, paneId)) return;
+      const nextMinimized = unminimizePaneIds(minimizedPaneIdsRef.current, [paneId]);
+      applyMinimizedPaneIds(nextMinimized);
+      setFocusedPaneId(paneId);
+      syncLiveCacheDisplay(profileId, paneId, [...nextMinimized]);
+    },
+    [applyMinimizedPaneIds, setFocusedPaneId, syncLiveCacheDisplay],
+  );
+
+  /** Show only `paneId` in the main area (minimize all siblings). Used when adding a lone pane. */
   const showPaneInDisplay = useCallback(
     (profileId: string, paneId: string) => {
       if (activeProfileRef.current?.id !== profileId) return;
@@ -574,6 +589,7 @@ export function useProfileWorkspace(
     minimizedPaneIds,
     displayLayout,
     isPaneMinimized,
+    focusPaneInDisplay,
     showPaneInDisplay,
     placePaneInDisplay,
     minimizePane,
