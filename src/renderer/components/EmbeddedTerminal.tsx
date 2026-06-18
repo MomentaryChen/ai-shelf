@@ -29,6 +29,7 @@ interface Props {
   fontSize: number;
   scrollback: number;
   rightClickPaste?: boolean;
+  copyOnSelect?: boolean;
   active?: boolean;
   focused?: boolean;
   onExit: () => void;
@@ -65,6 +66,7 @@ export function EmbeddedTerminal({
   fontSize,
   scrollback,
   rightClickPaste = true,
+  copyOnSelect = true,
   active = true,
   focused = true,
   onExit,
@@ -247,6 +249,9 @@ export function EmbeddedTerminal({
   const rightClickPasteRef = useRef(rightClickPaste);
   rightClickPasteRef.current = rightClickPaste;
 
+  const copyOnSelectRef = useRef(copyOnSelect);
+  copyOnSelectRef.current = copyOnSelect;
+
   activeRef.current = active;
   onWriteRef.current = onWrite;
   onSessionLostRef.current = onSessionLost;
@@ -304,6 +309,7 @@ export function EmbeddedTerminal({
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
+      getCopyOnSelect: () => copyOnSelectRef.current,
       onPaste: (text) => {
         pasteToThisPaneOnly = true;
         term.paste(text);

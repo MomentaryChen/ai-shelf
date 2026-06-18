@@ -82,6 +82,8 @@ export interface TerminalClipboardOptions {
   onCopyOutputForIssue?: () => void;
   /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
   getRightClickPaste?: () => boolean;
+  /** When true, finishing a mouse selection copies it to the clipboard automatically. */
+  getCopyOnSelect?: () => boolean;
   /**
    * Paste into this terminal. When omitted, uses term.paste (may fan out via onData broadcast).
    * Prefer term.paste via a single-pane bypass in EmbeddedTerminal.
@@ -302,6 +304,19 @@ export function bindTerminalClipboard(
 
   container.addEventListener("contextmenu", onContextMenu, { capture: true });
 
+  /**
+   * Copy-on-select: when a left-button drag finishes with text selected, push it
+   * to the clipboard. Deferred a tick so xterm has finalized the selection first.
+   */
+  const onMouseUpCopy = (ev: MouseEvent) => {
+    if (ev.button !== 0) return;
+    if (!(options.getCopyOnSelect?.() ?? false)) return;
+    setTimeout(() => {
+      if (term.hasSelection()) void copyTerminalSelection();
+    }, 0);
+  };
+  container.addEventListener("mouseup", onMouseUpCopy);
+
   const onMouseDown = (ev: MouseEvent) => {
     if (ev.button === 2) onPointerPaste(ev);
   };
@@ -313,6 +328,7 @@ export function bindTerminalClipboard(
   return () => {
     removeMenu();
     container.removeEventListener("contextmenu", onContextMenu, { capture: true });
+    container.removeEventListener("mouseup", onMouseUpCopy);
     if (isFirefox) {
       container.removeEventListener("mousedown", onMouseDown, { capture: true });
     }

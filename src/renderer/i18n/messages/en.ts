@@ -51,6 +51,9 @@ export const en = {
   "settings.rightClickPaste": "Right-click to paste",
   "settings.rightClickPasteHint":
     "When enabled, right-click pastes from the clipboard; with a selection, it copies first. Hold Shift and right-click for the context menu (Copy, Paste, Find…).",
+  "settings.copyOnSelect": "Copy on selection",
+  "settings.copyOnSelectHint":
+    "When enabled, selecting text with the mouse copies it to the clipboard automatically — so you can paste it straight into another terminal.",
   "settings.systemTray": "System tray",
   "settings.systemTrayEnable": "Minimize to system tray",
   "settings.systemTrayHint":

@@ -51,6 +51,9 @@ export const zh: Record<MessageKey, string> = {
   "settings.rightClickPaste": "右鍵貼上",
   "settings.rightClickPasteHint":
     "啟用後，右鍵會從剪貼簿貼上；若有選取文字則先複製。按住 Shift 再右鍵可開啟內容選單（複製、貼上、尋找…）。",
+  "settings.copyOnSelect": "選取即複製",
+  "settings.copyOnSelectHint":
+    "啟用後，用滑鼠選取文字會自動複製到剪貼簿——這樣就能直接貼到另一個終端機。",
   "settings.systemTray": "系統匣",
   "settings.systemTrayEnable": "最小化到系統匣",
   "settings.systemTrayHint":
