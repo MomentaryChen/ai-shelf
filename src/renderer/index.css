@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 html,
 body,
@@ -211,6 +212,54 @@ input:focus-visible,
   --color-sidebar-accent: rgb(255 255 255 / 0.06);
   --color-foreground: var(--color-chrome-text);
   --color-muted-foreground: var(--color-chrome-text-muted);
+}
+
+/* shadcn/ui token bridge: map shadcn's semantic tokens onto the existing
+   chrome/accent palette. They point at --color-chrome-* / --color-accent, which
+   are overridden per html[data-app-theme=...] below, so shadcn components
+   inherit all 3 themes. The brand "accent" is intentionally NOT remapped;
+   shadcn's hover/selected surface uses --accent-surface instead. */
+:root {
+  --background: var(--color-chrome-bg);
+  --card: var(--color-chrome-surface-raised);
+  --card-foreground: var(--color-chrome-text);
+  --popover: var(--color-chrome-surface-menu);
+  --popover-foreground: var(--color-chrome-text);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-on-accent);
+  --secondary: var(--color-chrome-surface-hover);
+  --secondary-foreground: var(--color-chrome-text);
+  --muted: var(--color-chrome-surface);
+  --accent-surface: var(--color-chrome-surface-hover-strong);
+  --accent-surface-foreground: var(--color-chrome-text);
+  --destructive: var(--color-fail);
+  --destructive-foreground: #ffffff;
+  --input: var(--color-chrome-border-input);
+  --ring: var(--color-chrome-border-focus);
+  --radius: 0.625rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-accent-surface: var(--accent-surface);
+  --color-accent-surface-foreground: var(--accent-surface-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 /* App color themes (default: dark — matches @theme above) */

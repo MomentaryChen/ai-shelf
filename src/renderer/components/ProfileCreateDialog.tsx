@@ -12,6 +12,14 @@ import {
   profileCreateDefaults,
   type ProfileStartFrom,
 } from "../utils/profile-templates";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Props {
   open: boolean;
@@ -63,6 +71,7 @@ export function ProfileCreateDialog({
   );
   const wasOpenRef = useRef(false);
   const startKeyRef = useRef("blank:");
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const justOpened = open && !wasOpenRef.current;
@@ -111,8 +120,6 @@ export function ProfileCreateDialog({
       return tools[0] ?? PLAIN_SHELL_TOOL_ID;
     });
   }, [open, tools]);
-
-  if (!open) return null;
 
   const effectiveTool = tools.includes(tool) ? tool : (tools[0] ?? PLAIN_SHELL_TOOL_ID);
   const canCopy = profiles.length > 0;
@@ -172,17 +179,20 @@ export function ProfileCreateDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-overlay p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <form
-        className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 text-chrome-text shadow-float"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        className="max-h-[90vh] max-w-sm overflow-y-auto"
+        onOpenAutoFocus={(e) => {
+          // Radix focuses the first tabbable (the "start from" select) by default;
+          // land the caret in the name field instead, like the pre-shadcn dialog.
+          e.preventDefault();
+          nameInputRef.current?.focus();
+        }}
       >
-        <h2 className="mb-4 text-[15px] font-semibold text-chrome-text">{t("profile.dialog.createTitle")}</h2>
-
+        <DialogHeader>
+          <DialogTitle className="text-[15px]">{t("profile.dialog.createTitle")}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">
             {t("profile.dialog.startFromLegend")}
@@ -281,7 +291,7 @@ export function ProfileCreateDialog({
           <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.name")}</span>
 
           <input
-            autoFocus
+            ref={nameInputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("profile.dialog.namePlaceholder")}
@@ -358,23 +368,16 @@ export function ProfileCreateDialog({
           {t("profile.syncBroadcast")}
         </label>
 
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded-md px-4 py-2 text-[13px] text-chrome-text-muted hover:text-chrome-text"
-          >
+        <DialogFooter className="mt-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t("profile.dialog.cancel")}
-          </button>
-          <button
-            type="submit"
-            disabled={!name.trim() || !groupId}
-            className="cursor-pointer rounded-md bg-accent px-4 py-2 text-[13px] font-medium text-text-primary hover:bg-accent-hover disabled:opacity-40"
-          >
+          </Button>
+          <Button type="submit" size="sm" disabled={!name.trim() || !groupId}>
             {t("profile.dialog.create")}
-          </button>
-        </div>
-      </form>
-    </div>
+          </Button>
+        </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

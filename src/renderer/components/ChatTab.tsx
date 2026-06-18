@@ -1,4 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Monitor, Terminal, FolderOpen, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import { EmptyState } from "./EmptyState";
@@ -119,7 +129,6 @@ export function ChatTab({
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
   const [broadcastInput, setBroadcastInput] = useState(false);
-  const [showNewMenu, setShowNewMenu] = useState(false);
   const [profileBusy, setProfileBusy] = useState(false);
   const [terminalError, setTerminalError] = useState<string | null>(null);
   const [addingTerminal, setAddingTerminal] = useState(false);
@@ -135,7 +144,6 @@ export function ChatTab({
   const [displayDropActive, setDisplayDropActive] = useState(false);
   const [profileSidebarDrag, setProfileSidebarDrag] = useState(false);
   useAppThemeRevision();
-  const newMenuRef = useRef<HTMLDivElement>(null);
   const initialRestoreDoneRef = useRef(false);
   const restoreInFlightRef = useRef(false);
 
@@ -310,14 +318,6 @@ export function ChatTab({
     return () => document.removeEventListener("dragend", onDragEnd);
   }, []);
 
-  useEffect(() => {
-    if (!showNewMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (!newMenuRef.current?.contains(e.target as Node)) setShowNewMenu(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showNewMenu]);
 
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
@@ -1114,9 +1114,6 @@ export function ChatTab({
       restoring={profileBusy || restoring}
       externalTerminal={settings.externalTerminal}
       onExternalTerminalChange={(v) => updateSettings({ externalTerminal: v })}
-      newMenuRef={newMenuRef}
-      showNewMenu={showNewMenu}
-      onToggleNewMenu={() => setShowNewMenu((o) => !o)}
       onAddPane={(tool) => void addPane(tool)}
       onOpenFolder={() => void openFolderPane()}
       available={data.filter((e) => e.available)}
@@ -1267,33 +1264,32 @@ export function ChatTab({
   );
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
-      {sidebarDialogs}
-      {sidebar}
-      {!sidebarCollapsed && (
-        <div
-          className="w-2.5 shrink-0 self-stretch"
-          style={{ width: 10 }}
-        >
-          <ResizeDivider
-            mode="delta"
-            orientation="horizontal"
-            onResize={(delta) =>
-              setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
-            }
-          />
-        </div>
-      )}
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-        {topBar}
-        {terminalError && (
-          <div className="shrink-0 border-b border-fail/30 bg-fail/15 px-3 py-2 text-[12px] text-fail">
-            {terminalError}
+    <TooltipProvider>
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
+        {sidebarDialogs}
+        {sidebar}
+        {!sidebarCollapsed && (
+          <div className="w-2.5 shrink-0 self-stretch" style={{ width: 10 }}>
+            <ResizeDivider
+              mode="delta"
+              orientation="horizontal"
+              onResize={(delta) =>
+                setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
+              }
+            />
           </div>
         )}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          {topBar}
+          {terminalError && (
+            <div className="shrink-0 border-b border-fail/30 bg-fail/15 px-3 py-2 text-[12px] text-fail">
+              {terminalError}
+            </div>
+          )}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -1307,9 +1303,6 @@ function WarpTopBar({
   restoring,
   externalTerminal,
   onExternalTerminalChange,
-  newMenuRef,
-  showNewMenu,
-  onToggleNewMenu,
   onAddPane,
   onOpenFolder,
   available,
@@ -1324,9 +1317,6 @@ function WarpTopBar({
   restoring: boolean;
   externalTerminal: ExternalTerminal;
   onExternalTerminalChange: (v: ExternalTerminal) => void;
-  newMenuRef: React.RefObject<HTMLDivElement | null>;
-  showNewMenu: boolean;
-  onToggleNewMenu: () => void;
   onAddPane: (tool: string) => void;
   onOpenFolder: () => void;
   available: ProviderEntry[];
@@ -1378,65 +1368,50 @@ function WarpTopBar({
       )}
       {restoring && <span className="text-[11px] text-chrome-text-subtle">{t("chat.restoringShort")}</span>}
 
-      <div ref={newMenuRef} className="relative ml-auto flex items-center gap-2">
-        <button
-          type="button"
+      <div className="ml-auto flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!canAddPane || restoring}
           onClick={onOpenFolder}
           title={canAddPane ? t("chat.pickFolderPane") : t("chat.maxPanesTitle", { max: maxPanes })}
-          className="cursor-pointer rounded-md border border-chrome-border-strong px-2 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
-
         >
-          📁 {t("chat.folderBtn")}
-        </button>
-        <button
-          type="button"
-          disabled={!canAddPane}
-          onClick={onToggleNewMenu}
-          title={
-            canAddPane
-              ? t("chat.addPaneTitle", splitShortcutLabels)
-              : t("chat.maxPanesTitle", { max: maxPanes })
-          }
-          className="cursor-pointer rounded-md border border-chrome-border-strong px-2.5 py-1 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
-
-        >
-          {t("chat.addPane")}
-        </button>
-        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
-        {showNewMenu && canAddPane && (
-          <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-pop">
-            <button
-              type="button"
+          <FolderOpen />
+          {t("chat.folderBtn")}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canAddPane}
+              title={
+                canAddPane
+                  ? t("chat.addPaneTitle", splitShortcutLabels)
+                  : t("chat.maxPanesTitle", { max: maxPanes })
+              }
+            >
+              {t("chat.addPane")}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[160px]">
+            <DropdownMenuItem
               title={t("chat.plainShellTitle")}
-              onClick={() => {
-                onAddPane(PLAIN_SHELL_TOOL_ID);
-                onToggleNewMenu();
-              }}
-              className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[12px] hover:bg-chrome-surface-hover-strong"
+              onSelect={() => onAddPane(PLAIN_SHELL_TOOL_ID)}
             >
               <ToolLogo tool={PLAIN_SHELL_TOOL_ID} size={14} />
               {profileToolLabel(PLAIN_SHELL_TOOL_ID)}
-            </button>
-            {available.length > 0 && (
-              <div className="my-1 border-t border-chrome-border-subtle" role="separator" />
-            )}
+            </DropdownMenuItem>
+            {available.length > 0 && <DropdownMenuSeparator />}
             {available.map((e) => (
-              <button
-                key={e.tool}
-                type="button"
-                onClick={() => {
-                  onAddPane(e.tool);
-                  onToggleNewMenu();
-                }}
-                className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[12px] hover:bg-chrome-surface-hover-strong"
-              >
+              <DropdownMenuItem key={e.tool} onSelect={() => onAddPane(e.tool)}>
                 <ToolLogo tool={e.tool} size={14} />
                 {toolLabel(e.tool)}
-              </button>
+              </DropdownMenuItem>
             ))}
-          </div>
-        )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
       </div>
     </div>
   );
@@ -1503,20 +1478,14 @@ function ToolCard({
 
       ) : (
         <div className="mt-auto grid grid-cols-2 gap-3">
-          <button
-            disabled={extBusy}
-            onClick={handleExternal}
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-chrome-border-strong py-2.5 text-[13px] disabled:opacity-50"
-          >
-            {extBusy ? <span className="animate-spin">⟳</span> : "🖥️"} {t("chat.externalBtn")}
-          </button>
-          <button
-            disabled={inAppBusy}
-            onClick={handleInApp}
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-accent/50 bg-accent/15 py-2.5 text-[13px] font-medium text-accent disabled:opacity-50"
-          >
-            {inAppBusy ? <span className="animate-spin">⟳</span> : "⌨️"} {t("chat.inAppBtn")}
-          </button>
+          <Button variant="outline" className="w-full" disabled={extBusy} onClick={handleExternal}>
+            {extBusy ? <Loader2 className="animate-spin" /> : <Monitor />}
+            {t("chat.externalBtn")}
+          </Button>
+          <Button className="w-full" disabled={inAppBusy} onClick={handleInApp}>
+            {inAppBusy ? <Loader2 className="animate-spin" /> : <Terminal />}
+            {t("chat.inAppBtn")}
+          </Button>
         </div>
       )}
     </div>
