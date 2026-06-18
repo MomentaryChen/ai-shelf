@@ -173,11 +173,11 @@ export function ProfileCreateDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-overlay p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <form
-        className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 text-chrome-text shadow-2xl"
+        className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-xl border border-chrome-border-strong bg-chrome-surface-raised p-5 text-chrome-text shadow-float"
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
       >

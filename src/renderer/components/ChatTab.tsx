@@ -1400,7 +1400,7 @@ function WarpTopBar({
         </button>
         <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
         {showNewMenu && canAddPane && (
-          <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-xl">
+          <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-chrome-border-strong bg-chrome-surface-raised py-1 shadow-pop">
             <button
               type="button"
               title={t("chat.plainShellTitle")}
