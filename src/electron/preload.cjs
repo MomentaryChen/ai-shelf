@@ -129,6 +129,8 @@ contextBridge.exposeInMainWorld("api", {
   relaunchApp: () => ipcRenderer.invoke("relaunch-app"),
   setSystemTrayEnabled: (enabled) => ipcRenderer.invoke("set-system-tray-enabled", enabled),
   getSystemTrayEnabled: () => ipcRenderer.invoke("get-system-tray-enabled"),
+  setPtyBufferMaxChars: (chars) => ipcRenderer.invoke("set-pty-buffer-max-chars", chars),
+  getPtyBufferMaxChars: () => ipcRenderer.invoke("get-pty-buffer-max-chars"),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),
