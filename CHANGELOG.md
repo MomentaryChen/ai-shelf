@@ -9,6 +9,19 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [2.1.17] - 2026-06-03
+
+Profile sidebar polish and middle-click terminal tab close.
+
+### Changed
+
+- **Profile sidebar** — Thicker card borders for clearer group separation.
+- **Profile sidebar** — Remove numbered prefixes from section labels.
+
+### Fixed
+
+- **Terminal tabs** — Restore middle-click to close a tab in the sidebar.
+
 ## [2.1.16] - 2026-06-03
 
 Fix TypeScript build for Windows auto-update signature hook.
@@ -353,6 +366,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[2.1.17]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.17
 [2.1.11]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.11
 [2.1.10]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.10
 [2.1.9]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.9
