@@ -459,6 +459,8 @@ export interface ElectronAPI {
   openSettingsWindow: () => Promise<void>;
   toggleDevTools: () => Promise<void>;
   onTrayActivateProfile: (cb: (profileId: string) => void) => () => void;
+  onProfileLayoutFlush: (cb: () => void) => () => void;
+  sendProfileLayoutFlushDone: () => void;
 }
 
 declare global {

@@ -1679,13 +1679,76 @@ app.whenReady().then(() => {
 });
 
 // Kill all active PTY sessions before the app exits
-app.on("before-quit", () => {
+let profileLayoutFlushDone = false;
+let profileLayoutFlushInProgress = false;
+
+function isTerminalRendererWindow(win: BrowserWindow): boolean {
+  if (win.webContents.isDestroyed()) return false;
+  const url = win.webContents.getURL();
+  return !url.includes("#settings");
+}
+
+function flushProfileLayoutsFromRenderer(): Promise<void> {
+  const wins = BrowserWindow.getAllWindows().filter(isTerminalRendererWindow);
+  if (wins.length === 0) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const pending = new Set(wins.map((w) => w.webContents.id));
+    const timeout = setTimeout(() => {
+      ipcMain.removeListener("profile-layout-flush-done", onDone);
+      resolve();
+    }, 3000);
+
+    const onDone = (e: Electron.IpcMainEvent) => {
+      pending.delete(e.sender.id);
+      if (pending.size === 0) {
+        clearTimeout(timeout);
+        ipcMain.removeListener("profile-layout-flush-done", onDone);
+        resolve();
+      }
+    };
+
+    ipcMain.on("profile-layout-flush-done", onDone);
+    for (const win of wins) {
+      if (win.webContents.isDestroyed()) {
+        pending.delete(win.webContents.id);
+        continue;
+      }
+      win.webContents.send("profile-layout-flush");
+    }
+    if (pending.size === 0) {
+      clearTimeout(timeout);
+      ipcMain.removeListener("profile-layout-flush-done", onDone);
+      resolve();
+    }
+  });
+}
+
+function tearDownOnQuit(): void {
   setAppQuitting(true);
   for (const [, proc] of PTY_SESSIONS) {
     try { proc.kill(); } catch { /* already dead */ }
   }
   PTY_SESSIONS.clear();
   closeWorkspaceContext();
+}
+
+app.on("before-quit", (e) => {
+  if (profileLayoutFlushDone) {
+    tearDownOnQuit();
+    return;
+  }
+  if (profileLayoutFlushInProgress) {
+    e.preventDefault();
+    return;
+  }
+  e.preventDefault();
+  profileLayoutFlushInProgress = true;
+  void flushProfileLayoutsFromRenderer().finally(() => {
+    profileLayoutFlushInProgress = false;
+    profileLayoutFlushDone = true;
+    app.quit();
+  });
 });
 
 app.on("window-all-closed", () => {

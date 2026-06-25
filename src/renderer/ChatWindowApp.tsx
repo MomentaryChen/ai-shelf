@@ -5,7 +5,7 @@ import { useLocale } from "./i18n/LocaleProvider";
 
 export function ChatWindowApp() {
   const { t } = useLocale();
-  const { data, scanning, error, hasData } = useInventoryScan();
+  const { data, scanning, error, hasData, ready } = useInventoryScan();
   const inventoryScanning = scanning;
 
   return (
@@ -20,7 +20,7 @@ export function ChatWindowApp() {
           {t("app.loadInventoryFailed")}
         </p>
       )}
-      {hasData && <ChatTab data={data} inventoryScanning={inventoryScanning} />}
+      {ready && <ChatTab data={data} inventoryScanning={inventoryScanning} />}
     </div>
   );
 }
