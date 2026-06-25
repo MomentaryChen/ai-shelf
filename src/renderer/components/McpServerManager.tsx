@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { McpListResult, McpServerRecord } from "../types";
-import { Button } from "./Button";
+import { Button } from "@/components/ui/button";
 import { useLocale } from "../i18n/LocaleProvider";
 import { ConfigFileEditorModal } from "./ConfigFileEditorModal";
 import { McpServerEditorModal } from "./McpServerEditorModal";
@@ -61,7 +61,7 @@ export function McpServerManager({ tool }: { tool: string }) {
               📝 {t("mcpManage.editRaw")}
             </Button>
           )}
-          <Button size="sm" variant="primary" onClick={() => setEditing("new")}>
+          <Button size="sm" variant="default" onClick={() => setEditing("new")}>
             ＋ {t("mcpManage.add")}
           </Button>
         </div>
@@ -94,7 +94,7 @@ export function McpServerManager({ tool }: { tool: string }) {
                   <>
                     <Button
                       size="sm"
-                      variant="danger"
+                      variant="destructive"
                       disabled={busy === rec.name}
                       onClick={() => remove(rec.name)}
                     >
@@ -119,7 +119,7 @@ export function McpServerManager({ tool }: { tool: string }) {
                     </Button>
                     <Button
                       size="sm"
-                      variant="danger"
+                      variant="destructive"
                       onClick={() => setConfirmDelete(rec.name)}
                       title={t("mcpManage.confirmDelete", { name: rec.name })}
                     >

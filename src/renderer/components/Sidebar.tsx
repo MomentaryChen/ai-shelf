@@ -16,6 +16,7 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useLocale } from "../i18n/LocaleProvider";
 import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
 import { EditablePaneTitle } from "./EditablePaneTitle";
@@ -380,11 +381,11 @@ export function Sidebar({
             <div className="mt-1 flex items-center gap-1 px-1">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-chrome-text-dim" />
-                <input
+                <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search profiles…"
-                  className="h-7 w-full rounded-md border border-chrome-border-input bg-chrome-surface pl-7 pr-2 text-[11px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-focus focus:outline-none"
+                  className="h-7 border-chrome-border-input bg-chrome-surface pl-7 text-[11px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-focus"
                 />
               </div>
               <IconAction

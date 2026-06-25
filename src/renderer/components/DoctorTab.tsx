@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { DoctorResult, McpPingResult, ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { Badge, InstallStatusBadge } from "./Badge";
-import { Button } from "./Button";
+import { Button } from "@/components/ui/button";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
@@ -35,7 +35,7 @@ function McpConnectivity({ entry }: { entry: ProviderEntry }) {
         <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
           🔌 MCP
         </span>
-        <Button size="sm" variant="secondary" onClick={run} disabled={testing}>
+        <Button size="sm" variant="outline" onClick={run} disabled={testing}>
           {testing
             ? t("doctor.mcpTesting")
             : results

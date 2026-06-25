@@ -1,7 +1,9 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
 /**
  * Compact dashboard stat tile: a small uppercase label over a large tabular
- * number. Presentational only — used by inventory summary grids. `valueClassName`
- * tints the number (e.g. accent / warn / ok) without touching the frame.
+ * number. Presentational only — used by inventory summary grids.
  */
 export function StatCard({
   value,
@@ -13,11 +15,17 @@ export function StatCard({
   valueClassName?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-bg-secondary p-4 shadow-card transition-colors duration-150 hover:border-border-strong">
-      <div className="text-[11px] font-medium tracking-wide text-text-tertiary uppercase">{label}</div>
-      <div className={`mt-1.5 text-[26px] leading-none font-semibold tabular-nums ${valueClassName}`}>
-        {value}
-      </div>
-    </div>
+    <Card className="p-4 transition-colors duration-150 hover:border-border-strong">
+      <CardHeader className="p-0">
+        <CardTitle className="text-[11px] font-medium tracking-wide text-text-tertiary uppercase">
+          {label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="mt-1.5 p-0">
+        <div className={cn("text-[26px] leading-none font-semibold tabular-nums", valueClassName)}>
+          {value}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

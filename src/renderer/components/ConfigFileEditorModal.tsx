@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "../i18n/LocaleProvider";
-import { Button } from "./Button";
 
 interface Props {
   path: string;
@@ -70,27 +78,12 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4"
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-border bg-bg-card p-4 shadow-xl">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-text-primary">{t("configEditor.title")}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-text-secondary hover:text-text-primary"
-            aria-label={t("configEditor.cancel")}
-          >
-            ✕
-          </button>
-        </div>
-        <p className="mb-3 break-all font-mono text-xs text-text-secondary">{path}</p>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col border-border bg-bg-card text-text-primary">
+        <DialogHeader>
+          <DialogTitle className="text-sm text-text-primary">{t("configEditor.title")}</DialogTitle>
+        </DialogHeader>
+        <p className="break-all font-mono text-xs text-text-secondary">{path}</p>
 
         {loading ? (
           <div className="py-12 text-center text-sm text-text-secondary">
@@ -100,11 +93,11 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
           <div className="py-12 text-center text-sm text-fail">❌ {loadError}</div>
         ) : (
           <>
-            <textarea
+            <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               spellCheck={false}
-              className="min-h-[340px] flex-1 resize-none rounded-lg border border-border bg-bg-primary p-3 font-mono text-xs leading-relaxed text-text-primary focus:border-accent focus:outline-none"
+              className="min-h-[340px] flex-1 resize-none border-border bg-bg-primary font-mono text-xs leading-relaxed text-text-primary"
             />
             {jsonError && (
               <p className="mt-2 break-all text-xs text-fail">
@@ -114,24 +107,23 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
             {saveError && <p className="mt-2 break-all text-xs text-fail">❌ {saveError}</p>}
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-xs text-text-tertiary">{t("configEditor.backupNote")}</span>
-              <div className="flex gap-2">
+              <DialogFooter className="gap-2 sm:justify-end">
                 <Button size="sm" variant="ghost" onClick={onClose}>
                   {t("configEditor.cancel")}
                 </Button>
                 <Button
                   size="sm"
-                  variant="primary"
                   onClick={save}
                   disabled={saving || !dirty || !!jsonError}
                   title={!dirty ? t("configEditor.noChanges") : undefined}
                 >
                   {saving ? t("configEditor.saving") : t("configEditor.save")}
                 </Button>
-              </div>
+              </DialogFooter>
             </div>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

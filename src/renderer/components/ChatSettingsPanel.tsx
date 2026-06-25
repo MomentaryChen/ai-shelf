@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { APP_THEME_OPTIONS, applyAppTheme } from "../app-theme";
 import { applyImportedLocalStorage, collectLocalStorageForBackup } from "../backup-storage";
 import {
@@ -200,56 +206,46 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
       {/* Language */}
       <div>
         <p className={sectionTitle}>{t("settings.language")}</p>
-        <div className="flex flex-wrap gap-2">
+        <ToggleGroup
+          type="single"
+          value={locale}
+          onValueChange={(value) => {
+            if (!value) return;
+            setLocale(value as AppLocale);
+            updateSettings({ locale: value as AppLocale });
+          }}
+        >
           {LOCALE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => {
-                setLocale(opt.value);
-                updateSettings({ locale: opt.value });
-              }}
-              className={`cursor-pointer rounded-lg border px-4 py-2 text-[13px] transition-all duration-150 ${
-                locale === opt.value
-                  ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                  : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-              }`}
-            >
+            <ToggleGroupItem key={opt.value} value={opt.value}>
               {t(opt.labelKey)}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       {/* App color theme */}
       <div>
         <p className={sectionTitle}>{t("settings.theme")}</p>
-        <div className="flex flex-wrap gap-2">
-          {APP_THEME_OPTIONS.map((opt) => {
-            const active = settings.appTheme === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => updateSettings({ appTheme: opt.value })}
-                className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
-                  active
-                    ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                    : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-                }`}
+        <ToggleGroup
+          type="single"
+          value={settings.appTheme}
+          onValueChange={(value) => {
+            if (value) updateSettings({ appTheme: value as AppColorTheme });
+          }}
+        >
+          {APP_THEME_OPTIONS.map((opt) => (
+            <ToggleGroupItem key={opt.value} value={opt.value} className="gap-2">
+              <span
+                className="inline-flex h-3.5 w-3.5 shrink-0 overflow-hidden rounded-sm border border-border"
+                aria-hidden
               >
-                <span
-                  className="inline-flex h-3.5 w-3.5 shrink-0 overflow-hidden rounded-sm border border-border"
-                  aria-hidden
-                >
-                  <span className="h-full w-1/2" style={{ background: opt.preview.bg }} />
-                  <span className="h-full w-1/2" style={{ background: opt.preview.accent }} />
-                </span>
-                {t(THEME_LABEL_KEYS[opt.value])}
-              </button>
-            );
-          })}
-        </div>
+                <span className="h-full w-1/2" style={{ background: opt.preview.bg }} />
+                <span className="h-full w-1/2" style={{ background: opt.preview.accent }} />
+              </span>
+              {t(THEME_LABEL_KEYS[opt.value])}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
         <p className="mt-1.5 text-[11px] text-text-tertiary">{t("settings.themeHint")}</p>
       </div>
 
@@ -270,21 +266,27 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
               </option>
             ))}
           </select>
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={browsePath}
-            className="shrink-0 cursor-pointer rounded-lg border border-border px-3.5 py-2 text-[12px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
+            className="shrink-0 text-[12px]"
           >
             {t("settings.browse")}
-          </button>
+          </Button>
         </div>
         {settings.dirHistory.length > 0 && (
           <div className="mt-1.5 flex justify-end px-0.5">
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
               onClick={() => updateSettings({ dirHistory: [], workingDir: "" })}
-              className="cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-fail"
+              className="h-auto p-0 text-[10px] text-text-tertiary hover:text-fail"
             >
               {t("settings.clearHistory")}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -292,26 +294,24 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
       {/* Terminal preference */}
       <div>
         <p className={sectionTitle}>{t("settings.externalTerminal")}</p>
-        <div className="flex flex-wrap gap-2">
+        <ToggleGroup
+          type="single"
+          value={settings.externalTerminal}
+          onValueChange={(value) => {
+            if (value) updateSettings({ externalTerminal: value as ExternalTerminal });
+          }}
+        >
           {TERMINAL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => updateSettings({ externalTerminal: opt.value })}
-              className={`cursor-pointer rounded-lg border px-4 py-2 text-[13px] transition-all duration-150 ${
-                settings.externalTerminal === opt.value
-                  ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                  : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-              }`}
-            >
+            <ToggleGroupItem key={opt.value} value={opt.value}>
               {opt.value === "auto" ? "🔍 " : ""}
               {opt.value === "wt" ? "🪟 " : ""}
               {opt.value === "pwsh" ? "🔵 " : ""}
               {opt.value === "powershell" ? "💙 " : ""}
               {opt.value === "cmd" ? "⬛ " : ""}
               {t(TERMINAL_LABEL_KEYS[opt.value])}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       {/* Tool launch arguments */}
@@ -331,30 +331,35 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
       <div>
         <p className={sectionTitle}>{t("settings.terminalBg")}</p>
         <div className="flex flex-wrap items-center gap-2">
-          {BG_PRESETS.map((p) => {
-            const active = settings.terminalBg === p.value;
-            const labelKey = BG_LABEL_KEYS[p.label];
-            return (
-              <button
-                key={p.label}
-                onClick={() => updateSettings({ terminalBg: p.value })}
-                title={labelKey ? t(labelKey) : p.label}
-                className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
-                  active
-                    ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                    : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-                }`}
-              >
-                <span
-                  className="inline-block h-3.5 w-3.5 rounded-sm border border-white/20"
-                  style={{ background: p.preview }}
-                />
-                {labelKey ? t(labelKey) : p.label}
-              </button>
-            );
-          })}
-          <label
-            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
+          <ToggleGroup
+            type="single"
+            value={
+              BG_PRESETS.some((p) => p.value === settings.terminalBg) ? settings.terminalBg : ""
+            }
+            onValueChange={(value) => {
+              if (value) updateSettings({ terminalBg: value });
+            }}
+          >
+            {BG_PRESETS.map((p) => {
+              const labelKey = BG_LABEL_KEYS[p.label];
+              return (
+                <ToggleGroupItem
+                  key={p.label}
+                  value={p.value}
+                  title={labelKey ? t(labelKey) : p.label}
+                  className="gap-2"
+                >
+                  <span
+                    className="inline-block h-3.5 w-3.5 rounded-sm border border-white/20"
+                    style={{ background: p.preview }}
+                  />
+                  {labelKey ? t(labelKey) : p.label}
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+          <Label
+            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] font-normal transition-all duration-150 ${
               !BG_PRESETS.some((p) => p.value === settings.terminalBg) && settings.terminalBg
                 ? "border-accent/60 bg-accent/10 font-medium text-accent"
                 : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
@@ -367,7 +372,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
               className="h-3.5 w-3.5 cursor-pointer rounded-sm border-0 bg-transparent p-0 outline-none"
             />
             {t("settings.custom")}
-          </label>
+          </Label>
         </div>
       </div>
 
@@ -389,41 +394,46 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         <p className={sectionTitle}>{t("settings.terminalDisplay")}</p>
         <div className="flex flex-col gap-4">
           <div>
-            <label className="mb-1.5 block text-[12px] text-text-secondary">{t("settings.fontFamily")}</label>
-            <input
+            <Label className="mb-1.5 block text-[12px] font-normal text-text-secondary">
+              {t("settings.fontFamily")}
+            </Label>
+            <Input
               type="text"
               value={settings.terminalFontFamily}
               onChange={(e) => updateSettings({ terminalFontFamily: e.target.value })}
               spellCheck={false}
-              className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+              className="border-border bg-bg-secondary font-mono text-[12px] focus-visible:border-accent/40"
               title={DEFAULT_TERMINAL_FONT_FAMILY}
             />
             <div className="mt-1.5 flex justify-end">
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
                 onClick={() => updateSettings({ terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY })}
-                className="cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-text-primary"
+                className="h-auto p-0 text-[10px] text-text-tertiary hover:text-text-primary"
               >
                 {t("settings.resetDefault")}
-              </button>
+              </Button>
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[12px] text-text-secondary">
+            <Label className="mb-1.5 block text-[12px] font-normal text-text-secondary">
               {t("settings.fontSize", { size: settings.terminalFontSize })}
-            </label>
+            </Label>
             <div className="flex items-center gap-3">
-              <input
-                type="range"
+              <Slider
                 min={8}
                 max={32}
                 step={1}
-                value={settings.terminalFontSize}
-                onChange={(e) => updateSettings({ terminalFontSize: Number(e.target.value) })}
-                className="min-w-0 flex-1 cursor-pointer accent-accent"
+                value={[settings.terminalFontSize]}
+                onValueChange={([n]) => {
+                  if (n !== undefined) updateSettings({ terminalFontSize: n });
+                }}
+                className="min-w-0 flex-1"
               />
-              <input
+              <Input
                 type="number"
                 min={8}
                 max={32}
@@ -432,38 +442,39 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
                   const n = Number(e.target.value);
                   if (Number.isFinite(n)) updateSettings({ terminalFontSize: n });
                 }}
-                className="w-14 shrink-0 rounded-lg border border-border bg-bg-secondary px-2 py-1.5 text-center font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+                className="w-14 shrink-0 border-border bg-bg-secondary px-2 py-1.5 text-center font-mono text-[12px] focus-visible:border-accent/40"
               />
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
                 onClick={() => updateSettings({ terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE })}
-                className="shrink-0 cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-text-primary"
+                className="h-auto shrink-0 p-0 text-[10px] text-text-tertiary hover:text-text-primary"
               >
                 {DEFAULT_TERMINAL_FONT_SIZE}px
-              </button>
+              </Button>
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[12px] text-text-secondary">{t("settings.scrollback")}</label>
-            <div className="flex flex-wrap gap-2">
+            <Label className="mb-1.5 block text-[12px] font-normal text-text-secondary">
+              {t("settings.scrollback")}
+            </Label>
+            <ToggleGroup
+              type="single"
+              value={String(settings.terminalScrollback)}
+              onValueChange={(value) => {
+                if (value) updateSettings({ terminalScrollback: Number(value) });
+              }}
+            >
               {SCROLLBACK_PRESETS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => updateSettings({ terminalScrollback: p.value })}
-                  className={`cursor-pointer rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
-                    settings.terminalScrollback === p.value
-                      ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                      : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-                  }`}
-                >
+                <ToggleGroupItem key={p.value} value={String(p.value)} size="sm">
                   {t(SCROLLBACK_LABEL_KEYS[p.value])}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
             <div className="mt-2 flex items-center gap-2">
-              <input
+              <Input
                 type="number"
                 min={1000}
                 max={100000}
@@ -473,32 +484,31 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
                   const n = Number(e.target.value);
                   if (Number.isFinite(n)) updateSettings({ terminalScrollback: n });
                 }}
-                className="w-28 rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+                className="w-28 border-border bg-bg-secondary font-mono text-[12px] focus-visible:border-accent/40"
               />
               <span className="text-[11px] text-text-tertiary">{t("settings.scrollbackHint")}</span>
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[12px] text-text-secondary">{t("settings.ptyBuffer")}</label>
-            <div className="flex flex-wrap gap-2">
+            <Label className="mb-1.5 block text-[12px] font-normal text-text-secondary">
+              {t("settings.ptyBuffer")}
+            </Label>
+            <ToggleGroup
+              type="single"
+              value={String(settings.terminalPtyBufferChars)}
+              onValueChange={(value) => {
+                if (value) updateSettings({ terminalPtyBufferChars: Number(value) });
+              }}
+            >
               {PTY_BUFFER_PRESETS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => updateSettings({ terminalPtyBufferChars: p.value })}
-                  className={`cursor-pointer rounded-lg border px-3.5 py-2 text-[13px] transition-all duration-150 ${
-                    settings.terminalPtyBufferChars === p.value
-                      ? "border-accent/60 bg-accent/10 font-medium text-accent"
-                      : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
-                  }`}
-                >
+                <ToggleGroupItem key={p.value} value={String(p.value)} size="sm">
                   {t(PTY_BUFFER_LABEL_KEYS[p.value])}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
             <div className="mt-2 flex items-center gap-2">
-              <input
+              <Input
                 type="number"
                 min={256 * 1024}
                 max={64 * 1024 * 1024}
@@ -508,49 +518,50 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
                   const n = Number(e.target.value);
                   if (Number.isFinite(n)) updateSettings({ terminalPtyBufferChars: n });
                 }}
-                className="w-28 rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+                className="w-28 border-border bg-bg-secondary font-mono text-[12px] focus-visible:border-accent/40"
               />
               <span className="text-[11px] text-text-tertiary">{t("settings.ptyBufferHint")}</span>
             </div>
           </div>
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors hover:border-accent/40">
-            <input
-              type="checkbox"
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
               checked={settings.terminalRightClickPaste}
-              onChange={(e) => updateSettings({ terminalRightClickPaste: e.target.checked })}
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded accent-accent"
+              onCheckedChange={(v) => updateSettings({ terminalRightClickPaste: v === true })}
+              className="mt-0.5"
             />
             <span className="flex flex-col gap-0.5">
               <span className="text-[13px] text-text-primary">{t("settings.rightClickPaste")}</span>
-              <span className="text-[11px] leading-snug text-text-tertiary">{t("settings.rightClickPasteHint")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("settings.rightClickPasteHint")}
+              </span>
             </span>
-          </label>
+          </Label>
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors hover:border-accent/40">
-            <input
-              type="checkbox"
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
               checked={settings.terminalCopyOnSelect}
-              onChange={(e) => updateSettings({ terminalCopyOnSelect: e.target.checked })}
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded accent-accent"
+              onCheckedChange={(v) => updateSettings({ terminalCopyOnSelect: v === true })}
+              className="mt-0.5"
             />
             <span className="flex flex-col gap-0.5">
               <span className="text-[13px] text-text-primary">{t("settings.copyOnSelect")}</span>
-              <span className="text-[11px] leading-snug text-text-tertiary">{t("settings.copyOnSelectHint")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("settings.copyOnSelectHint")}
+              </span>
             </span>
-          </label>
+          </Label>
         </div>
       </div>
 
       {/* System tray */}
       <div>
         <p className={sectionTitle}>{t("settings.systemTray")}</p>
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors hover:border-accent/40">
-          <input
-            type="checkbox"
+        <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+          <Checkbox
             checked={settings.systemTrayEnabled}
-            onChange={(e) => updateSettings({ systemTrayEnabled: e.target.checked })}
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded accent-accent"
+            onCheckedChange={(v) => updateSettings({ systemTrayEnabled: v === true })}
+            className="mt-0.5"
           />
           <span className="flex flex-col gap-0.5">
             <span className="text-[13px] text-text-primary">{t("settings.systemTrayEnable")}</span>
@@ -558,7 +569,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
               {t("settings.systemTrayHint")}
             </span>
           </span>
-        </label>
+        </Label>
       </div>
 
       {/* Data backup & restore */}
@@ -566,22 +577,22 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         <p className={sectionTitle}>{t("settings.backup")}</p>
         <p className="mb-3 text-[11px] leading-snug text-text-tertiary">{t("settings.backupHint")}</p>
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => void handleExportBackup()}
             disabled={backupBusy !== null}
-            className="cursor-pointer rounded-lg border border-border px-4 py-2 text-[13px] text-text-secondary transition-all duration-150 hover:border-accent/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             {backupBusy === "export" ? "…" : t("settings.exportBackup")}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => void handleImportBackup()}
             disabled={backupBusy !== null}
-            className="cursor-pointer rounded-lg border border-border px-4 py-2 text-[13px] text-text-secondary transition-all duration-150 hover:border-accent/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             {backupBusy === "import" ? "…" : t("settings.importBackup")}
-          </button>
+          </Button>
         </div>
         {backupMessage && (
           <p

@@ -1,13 +1,8 @@
 import { useLocale } from "../i18n/LocaleProvider";
+import { Badge as UiBadge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type Variant = "ok" | "fail" | "warn" | "info";
-
-const VARIANT_CLASSES: Record<Variant, string> = {
-  ok: "bg-ok/12 text-ok ring-ok/25",
-  fail: "bg-fail/12 text-fail ring-fail/25",
-  warn: "bg-warn/12 text-warn ring-warn/25",
-  info: "bg-accent/12 text-accent ring-accent/25",
-};
 
 const DOT_CLASSES: Record<Variant, string> = {
   ok: "bg-ok",
@@ -16,14 +11,24 @@ const DOT_CLASSES: Record<Variant, string> = {
   info: "bg-accent",
 };
 
-export function Badge({ text, variant, dot = false }: { text: string; variant: Variant; dot?: boolean }) {
+export function Badge({
+  text,
+  variant,
+  dot = false,
+  className,
+}: {
+  text: string;
+  variant: Variant;
+  dot?: boolean;
+  className?: string;
+}) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ring-inset ${VARIANT_CLASSES[variant]}`}
-    >
-      {dot && <span className={`h-1.5 w-1.5 rounded-full ${DOT_CLASSES[variant]}`} aria-hidden />}
+    <UiBadge variant={variant} className={cn(className)}>
+      {dot && (
+        <span className={cn("h-1.5 w-1.5 rounded-full", DOT_CLASSES[variant])} aria-hidden />
+      )}
       {text}
-    </span>
+    </UiBadge>
   );
 }
 

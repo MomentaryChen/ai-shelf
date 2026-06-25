@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetState
 import type { ProviderEntry, ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
 import { Badge, InstallStatusBadge } from "./Badge";
-import { Button } from "./Button";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
@@ -201,7 +201,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
       </h2>
 
       <div className="mb-3 flex justify-end">
-        <Button variant="secondary" onClick={() => void runCheckAll()} disabled={checkingAll}>
+        <Button variant="outline" onClick={() => void runCheckAll()} disabled={checkingAll}>
           🔍 {t("inventory.update.recheckAll")}
         </Button>
       </div>
@@ -353,7 +353,7 @@ function ToolUpdateCard({
               <span>{t("inventory.update.noUpdateNeeded")}</span>
             </div>
           ) : (
-            <Button variant="primary" onClick={onUpdate} disabled={isUpdating}>
+            <Button onClick={onUpdate} disabled={isUpdating}>
               {isUpdating
                 ? `⏳ ${t("inventory.update.updating")}`
                 : `⬆️ ${t("inventory.update.runUpdate")}`}

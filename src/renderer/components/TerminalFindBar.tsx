@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useLocale } from "../i18n/LocaleProvider";
+
 interface Props {
   open: boolean;
   /** Increment to (re)focus the search input without stealing focus back to xterm. */
@@ -84,7 +89,7 @@ export function TerminalFindBar({
         inputRef.current?.focus({ preventScroll: true });
       }}
     >
-      <input
+      <Input
         ref={inputRef}
         type="text"
         value={query}
@@ -102,37 +107,38 @@ export function TerminalFindBar({
           }
         }}
         placeholder={t("find.placeholder")}
-        className="w-44 min-w-0 rounded border border-chrome-border-strong bg-chrome-bg px-2 py-1 text-[12px] text-chrome-text outline-none ring-accent focus:ring-1"
+        className="h-auto w-44 min-w-0 border-chrome-border-strong bg-chrome-bg px-2 py-1 text-[12px] text-chrome-text focus-visible:border-accent"
         aria-label={t("find.aria")}
-
       />
-      <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-chrome-text-muted">
-        <input
-          type="checkbox"
+      <Label className="flex cursor-pointer select-none items-center gap-1 text-[11px] font-normal text-chrome-text-muted">
+        <Checkbox
           checked={caseSensitive}
-          onChange={(e) => onCaseSensitiveChange(e.target.checked)}
-          className="accent-accent"
+          onCheckedChange={(v) => onCaseSensitiveChange(v === true)}
         />
         Aa
-      </label>
-      <button
+      </Label>
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         title={t("find.prev")}
         onClick={onPrevious}
         disabled={!hasQuery || matchCount === 0}
-        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim"
+        className="size-7 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover hover:text-chrome-text"
       >
         ↑
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         title={t("find.next")}
         onClick={onNext}
         disabled={!hasQuery || matchCount === 0}
-        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim"
+        className="size-7 text-[12px] text-chrome-text-secondary hover:bg-chrome-surface-hover hover:text-chrome-text"
       >
         ↓
-      </button>
+      </Button>
       {status ? (
         <span
           className="max-w-[14rem] truncate text-center text-[11px] tabular-nums text-chrome-text-subtle"
@@ -141,14 +147,16 @@ export function TerminalFindBar({
           {status}
         </span>
       ) : null}
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         title={t("find.close")}
         onClick={onClose}
-        className="cursor-pointer rounded px-1.5 py-0.5 text-[12px] text-chrome-text-muted hover:bg-chrome-surface-hover hover:text-chrome-text"
+        className="size-7 text-[12px] text-chrome-text-muted hover:bg-chrome-surface-hover hover:text-chrome-text"
       >
         ✕
-      </button>
+      </Button>
     </div>
   );
 }

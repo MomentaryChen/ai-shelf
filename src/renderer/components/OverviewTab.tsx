@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { EnvVarGroup, ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { StatCard } from "./StatCard";
@@ -111,32 +113,30 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
       {/* Toolbar */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
-          <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-tertiary">
+          <span className="pointer-events-none absolute top-1/2 left-2.5 z-10 -translate-y-1/2 text-text-tertiary">
             ⌕
           </span>
-          <input
+          <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("inventory.search.placeholder")}
-            className="w-full rounded-lg border border-border bg-bg-secondary py-1.5 pr-3 pl-8 text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
+            className="border-border bg-bg-secondary py-1.5 pr-3 pl-8 text-[13px] placeholder:text-text-tertiary focus-visible:border-accent"
           />
         </div>
-        <div className="flex items-center gap-0.5 rounded-md bg-bg-secondary p-0.5">
+        <ToggleGroup
+          type="single"
+          value={filter}
+          onValueChange={(value) => {
+            if (value) setFilter(value as ToolFilter);
+          }}
+          className="gap-0.5 rounded-md bg-bg-secondary p-0.5"
+        >
           {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={`cursor-pointer rounded-[5px] px-2.5 py-1 text-[12px] transition-[background,color,box-shadow] duration-150 ${
-                filter === f.id
-                  ? "bg-bg-card font-medium text-text-primary shadow-card"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
+            <ToggleGroupItem key={f.id} value={f.id} size="compact" className="border-transparent data-[state=off]:border-transparent data-[state=off]:hover:border-transparent">
               {f.label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       <Card>

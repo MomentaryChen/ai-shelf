@@ -1,3 +1,4 @@
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 
@@ -21,30 +22,30 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
     <nav
       role="tablist"
       aria-label={t("app.mode.aria")}
-      className="flex shrink-0 items-center gap-0.5 rounded-md bg-bg-secondary p-0.5"
+      className="flex shrink-0 items-center rounded-md bg-bg-secondary p-0.5"
     >
-      {MODES.map((m) => {
-        const active = mode === m.id;
-        return (
-          <button
+      <ToggleGroup
+        type="single"
+        value={mode}
+        onValueChange={(value) => {
+          if (value) onChange(value as AppMode);
+        }}
+        disabled={disabled}
+        className="gap-0.5"
+      >
+        {MODES.map((m) => (
+          <ToggleGroupItem
             key={m.id}
-            type="button"
+            value={m.id}
             role="tab"
-            aria-selected={active}
-            disabled={disabled}
-            onClick={() => onChange(m.id)}
-            className={`rounded-[5px] px-2.5 py-0.5 font-sans text-[11px] transition-[background,color,box-shadow] duration-150 ${
-              disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"
-            } ${
-              active
-                ? "bg-bg-card font-medium text-text-primary shadow-card"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
+            aria-selected={mode === m.id}
+            size="chrome"
+            className="border-transparent data-[state=off]:border-transparent data-[state=off]:hover:border-transparent"
           >
             {t(m.labelKey)}
-          </button>
-        );
-      })}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
     </nav>
   );
 }
