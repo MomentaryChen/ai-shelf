@@ -53,6 +53,7 @@ export function App() {
   const [appMode, setAppMode] = useState<AppMode>("terminal");
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [terminalCommands, setTerminalCommands] = useState<Command[]>([]);
   const [, startTransition] = useTransition();
 
   function handleModeChange(mode: AppMode) {
@@ -74,16 +75,17 @@ export function App() {
   const tabsEnabled = ready;
   const showSpinner = scanning && !hasData && !error;
 
-  // Cmd/Ctrl+K toggles the command palette from anywhere.
+  // Cmd/Ctrl+K toggles the command palette from anywhere (capture so xterm does not eat it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
+        e.stopPropagation();
         setPaletteOpen((o) => !o);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
   const goTo = (tab: TabId) => {
@@ -91,7 +93,7 @@ export function App() {
     setActiveTab(tab);
   };
 
-  const commands = useMemo<Command[]>(() => {
+  const inventoryCommands = useMemo<Command[]>(() => {
     const navigate: Command[] = TABS.map((it) => ({
       id: `go-${it.id}`,
       title: `${t("cmd.go")} ${t(it.labelKey)}`,
@@ -126,6 +128,35 @@ export function App() {
     return [...navigate, ...actions];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
+
+  const sharedModeCommands = useMemo<Command[]>(
+    () => [
+      {
+        id: "mode-terminal",
+        title: t("cmd.action.terminal"),
+        group: t("cmd.group.actions"),
+        icon: "🖥️",
+        run: () => handleModeChange("terminal"),
+      },
+      {
+        id: "mode-inventory",
+        title: t("cmd.action.inventory"),
+        group: t("cmd.group.actions"),
+        icon: "📦",
+        run: () => handleModeChange("inventory"),
+      },
+    ],
+    [t],
+  );
+
+  const commands = useMemo<Command[]>(() => {
+    if (appMode === "terminal") {
+      const terminalIds = new Set(terminalCommands.map((c) => c.id));
+      const extras = sharedModeCommands.filter((c) => !terminalIds.has(c.id));
+      return [...terminalCommands, ...extras];
+    }
+    return inventoryCommands;
+  }, [appMode, terminalCommands, sharedModeCommands, inventoryCommands]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
@@ -187,7 +218,12 @@ export function App() {
               appMode === "terminal" ? "" : "hidden"
             }`}
           >
-            <ChatTab data={data} active={appMode === "terminal"} inventoryScanning={scanning} />
+            <ChatTab
+              data={data}
+              active={appMode === "terminal"}
+              inventoryScanning={scanning}
+              onRegisterCommands={setTerminalCommands}
+            />
           </main>
         )}
 

@@ -69,6 +69,8 @@ import {
 import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
+import type { Command } from "./CommandPalette";
+import { useTerminalCommands } from "../hooks/useTerminalCommands";
 
 const TERMINAL_LABEL_KEYS: Record<ExternalTerminal, MessageKey> = {
   auto: "terminal.auto",
@@ -116,10 +118,12 @@ export function ChatTab({
   data,
   active = true,
   inventoryScanning = false,
+  onRegisterCommands,
 }: {
   data: ProviderEntry[];
   active?: boolean;
   inventoryScanning?: boolean;
+  onRegisterCommands?: (commands: Command[]) => void;
 }) {
   const { t } = useLocale();
   const [layout, setLayout] = useState<LayoutNode | null>(null);
@@ -775,6 +779,36 @@ export function ChatTab({
       extraArgs,
     );
   }
+
+  const paletteActions = useMemo(
+    () => ({
+      addPane: (tool: string) => void addPane(tool),
+      openExternal: (tool: string) => void openExternal(tool),
+      activateProfile: (profileId: string) => {
+        const profile = sidebarForest?.groups
+          .flatMap((g) => g.profiles)
+          .find((p) => p.id === profileId);
+        if (profile) void handleActivateProfileRef.current(profile);
+      },
+    }),
+    [addPane, sidebarForest, settings.toolLaunchArgs, settings.externalTerminal, resolveCwd],
+  );
+
+  const terminalCommands = useTerminalCommands(
+    t,
+    data,
+    sidebarForest,
+    activeProfile?.id ?? null,
+    paletteActions,
+  );
+
+  useEffect(() => {
+    if (!active) {
+      onRegisterCommands?.([]);
+      return;
+    }
+    onRegisterCommands?.(terminalCommands);
+  }, [active, terminalCommands, onRegisterCommands]);
 
   const profileLabel = activeProfile?.name ?? null;
 
