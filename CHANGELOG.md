@@ -9,6 +9,30 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-06-25
+
+Warm & Soft default theme, full shadcn migration, terminal command palette, and profile UX improvements.
+
+### Added
+
+- **Terminal command palette** — Cmd/Ctrl+K to jump between profiles and tools.
+- **Profile quick-switch hotkeys** — keyboard shortcuts for fast profile switching.
+- **Broadcast sync visuals** — clearer multi-agent input sync indicators.
+- **Profile accent colors** — unified accent colors across sidebar and terminal panes.
+- **shadcn/ui migration** — inventory and settings screens fully migrated to shadcn components.
+- **Warm and Soft design system** — warm cream/clay theme applied as the default UI.
+
+### Changed
+
+- **README** — Terminal mode demo GIF added to the hero section.
+
+### Fixed
+
+- **Profile layout restore** — flush layout before quit so startup restore is reliable.
+- **App update modal** — larger dialog with scrollable error details.
+- **React re-render loop** — stabilize `isRestoring` to stop React #185 infinite updates.
+- **Broadcast sync indicators** — calmer idle state so indicators no longer flash when idle.
+
 ## [3.0.1] - 2026-06-25
 
 Fix Windows in-app auto-update signature verification.
