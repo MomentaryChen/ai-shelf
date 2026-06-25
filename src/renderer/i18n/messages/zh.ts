@@ -338,6 +338,8 @@ export const zh: Record<MessageKey, string> = {
   "chat.restorePaneHint": "— 點上方「+ Pane」開啟 terminal（最多 {max} 個，會自動記住）",
   "chat.shortcutHint":
     "窗格快捷鍵：{focusNext} 下一個、{focusPrev} 上一個、{splitRight} 向右分割、{splitDown} 向下分割、{focusPane} 窗格 1–9；Ctrl+W 關閉、Ctrl+L 清屏、Ctrl+Shift+R 重啟、Ctrl+F 搜尋。右鍵選單亦可清屏／重啟。",
+  "chat.profileShortcutHint":
+    "Profile 快捷鍵：{profileByIndex} 依群組順序切換（終端機外）；{profileCycle} 下一個最近使用、{profileCyclePrev} 上一個最近使用。",
   "chat.debugHint": "除錯：按 F12 或 Ctrl+Shift+I 開啟開發者工具；也可按 Alt → View → Developer Tools",
   "chat.pickProfileTitle": "尚未選擇 Profile",
   "chat.pickProfile": "從左側挑一個或新建 Profile，我們會幫你還原上次的 terminal 視窗與工作目錄。",

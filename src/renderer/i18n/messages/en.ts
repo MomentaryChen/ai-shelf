@@ -350,6 +350,8 @@ export const en = {
   "chat.restorePaneHint": "— click \"+ Pane\" above to open a terminal (up to {max}, layout is saved)",
   "chat.shortcutHint":
     "Pane shortcuts: {focusNext} next, {focusPrev} previous, {splitRight} split right, {splitDown} split down, {focusPane} pane 1–9; Ctrl+W close, Ctrl+L clear, Ctrl+Shift+R restart, Ctrl+F search. Right-click menu can also clear or restart.",
+  "chat.profileShortcutHint":
+    "Profile shortcuts: {profileByIndex} switch by group order (outside terminal); {profileCycle} next recent, {profileCyclePrev} previous recent.",
   "chat.debugHint":
     "Debug: press F12 or Ctrl+Shift+I for DevTools, or Alt → View → Developer Tools",
   "chat.pickProfileTitle": "No profile selected yet",
