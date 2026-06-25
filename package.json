@@ -1,7 +1,7 @@
 {
   "name": "ai-shelf-workspace",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "AI Shelf monorepo — inventory, workspace orchestration, and desktop app",
   "type": "module",
   "main": "dist/electron/main.js",

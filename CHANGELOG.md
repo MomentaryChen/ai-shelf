@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-06-25
+
+Fix Windows in-app auto-update signature verification.
+
+### Fixed
+
+- **Desktop auto-update** — Authenticode check no longer fails because `cmd.exe` intercepted the PowerShell pipeline; verification uses `-EncodedCommand` so self-signed release installers (HashValid) are accepted again.
+
 ## [3.0.0] - 2026-06-25
 
 Major release: modern UI overhaul, in-app config/MCP editing, and terminal multitasking improvements.
@@ -395,6 +403,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[3.0.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.0.1
 [3.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.0.0
 [2.1.17]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.17
 [2.1.11]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.11

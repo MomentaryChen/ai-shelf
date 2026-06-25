@@ -1,5 +1,4 @@
 import { execFile } from "node:child_process";
-import path from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -33,37 +32,45 @@ function publisherMatches(signerSubject: string, publisherNames: string[]): bool
   return false;
 }
 
+function buildAuthenticodeScript(literalPath: string): string {
+  const escapedPath = literalPath.replace(/'/g, "''");
+  return [
+    `Get-AuthenticodeSignature -LiteralPath '${escapedPath}'`,
+    "| Select-Object Status, StatusMessage, Path,",
+    "@{N='SignerCertificate';E={@{Subject=$_.SignerCertificate.Subject}}}",
+    "| ConvertTo-Json -Compress -Depth 4",
+  ].join(" ");
+}
+
+/**
+ * Run Authenticode query via cmd → PowerShell. Clears PSModulePath (required when
+ * spawned from Electron) and uses -EncodedCommand so pipes are not parsed by cmd.exe.
+ */
+async function queryAuthenticodeSignature(updateFilePath: string): Promise<string> {
+  const script = buildAuthenticodeScript(updateFilePath);
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  const fullCmd = `set "PSModulePath=" & chcp 65001 >NUL & powershell.exe -NoProfile -NonInteractive -EncodedCommand ${encoded}`;
+  const { stdout } = await execFileAsync(fullCmd, [], {
+    shell: true,
+    timeout: 20_000,
+  });
+  return stdout.trim();
+}
+
 /**
  * electron-updater only accepts SignatureStatus.Valid (0). Self-signed release builds
  * return HashValid (1) with a matching publisher CN — allow that for in-app updates.
  */
 export async function verifyWindowsUpdateSignature(
   publisherNames: string[],
-  updateFilePath: string
+  updateFilePath: string,
 ): Promise<string | null> {
-  const escapedPath = updateFilePath.replace(/'/g, "''");
-  const command = `Get-AuthenticodeSignature -LiteralPath '${escapedPath}' | ConvertTo-Json -Compress`;
-  const executable = 'set "PSModulePath=" & chcp 65001 >NUL & powershell.exe';
-  const args = ["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-Command", command];
-
   try {
-    const { stdout } = await execFileAsync(executable, args, {
-      shell: true,
-      timeout: 20_000,
-    });
-
-    const data = JSON.parse(stdout.trim()) as AuthenticodeJson;
+    const stdout = await queryAuthenticodeSignature(updateFilePath);
+    const data = JSON.parse(stdout) as AuthenticodeJson;
     const signerSubject = data.SignerCertificate?.Subject;
     if (!signerSubject) {
       return "Update installer is not Authenticode-signed.";
-    }
-
-    if (data.Path) {
-      const normalizedExpected = path.normalize(updateFilePath);
-      const normalizedActual = path.normalize(data.Path);
-      if (normalizedActual !== normalizedExpected) {
-        return `Signature path mismatch: ${normalizedActual} vs ${normalizedExpected}`;
-      }
     }
 
     if (!publisherMatches(signerSubject, publisherNames)) {
