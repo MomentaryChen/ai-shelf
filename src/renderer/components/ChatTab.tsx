@@ -23,6 +23,8 @@ import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
+import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
+import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
   formatFocusPaneBinding,
@@ -150,12 +152,16 @@ export function ChatTab({
   const panes = layout ? collectPanes(layout) : [];
   const paneShortcutLabels = useMemo(() => {
     const b = settings.paneShortcuts;
+    const profile = formatProfileQuickSwitchLabels();
     return {
       focusNext: formatPaneKeyChord(b.focusNext),
       focusPrev: formatPaneKeyChord(b.focusPrev),
       splitRight: formatPaneKeyChord(b.splitHorizontal),
       splitDown: formatPaneKeyChord(b.splitVertical),
       focusPane: formatFocusPaneBinding(b.focusPane),
+      profileByIndex: profile.profileByIndex,
+      profileCycle: profile.profileCycle,
+      profileCyclePrev: profile.profileCyclePrev,
     };
   }, [settings.paneShortcuts]);
   const bg = settings.terminalBg || getAppBg();
@@ -610,20 +616,6 @@ export function ChatTab({
     [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
 
-  usePaneShortcuts({
-    panes,
-    focusedPaneId,
-    enabled: active && layout !== null && !profileBusy && !restoring,
-    onFocusPane: (paneId) => {
-      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
-      else setFocusedPaneId(paneId);
-    },
-    onClosePane: closePane,
-    onClearPane: clearPaneScreen,
-    onRestartPane: (id) => void respawnPane(id),
-    onSplitPane: (id, dir) => void splitPane(id, dir),
-  });
-
   async function handleActivateProfile(profile: ProfileInfo) {
     setProfileBusy(true);
     setTerminalError(null);
@@ -841,6 +833,28 @@ export function ChatTab({
       }),
     [currentGroup?.profiles, getProfilePanes, activeProfile?.id, isPaneMinimized],
   );
+
+  useProfileQuickSwitch({
+    groupProfiles: currentGroup?.profiles ?? [],
+    allProfiles,
+    activeProfileId: activeProfile?.id ?? null,
+    enabled: active && !profileBusy && !restoring,
+    onActivate: (profile) => handleActivateProfileRef.current(profile),
+  });
+
+  usePaneShortcuts({
+    panes,
+    focusedPaneId,
+    enabled: active && layout !== null && !profileBusy && !restoring,
+    onFocusPane: (paneId) => {
+      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+      else setFocusedPaneId(paneId);
+    },
+    onClosePane: closePane,
+    onClearPane: clearPaneScreen,
+    onRestartPane: (id) => void respawnPane(id),
+    onSplitPane: (id, dir) => void splitPane(id, dir),
+  });
 
   const sidebar = (
     <div style={{ width: sidebarCollapsed ? 64 : sidebarWidth }}>
@@ -1230,6 +1244,9 @@ export function ChatTab({
             <p className="mt-2 text-[12px] text-fail">{terminalError}</p>
           )}
           <p className="mt-2 text-[11px] text-chrome-text-dim">{t("chat.shortcutHint", paneShortcutLabels)}</p>
+          <p className="mt-1 text-[11px] text-chrome-text-dim">
+            {t("chat.profileShortcutHint", paneShortcutLabels)}
+          </p>
           <p className="mt-1 text-[11px] text-chrome-text-dim">{t("chat.debugHint")}</p>
         </div>
       ) : (
