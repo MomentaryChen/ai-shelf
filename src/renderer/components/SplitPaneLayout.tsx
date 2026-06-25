@@ -41,6 +41,9 @@ interface Props {
   sidebarPaneDragActive?: boolean;
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
+  broadcastActive?: boolean;
+  broadcastPulseKey?: number;
+  broadcastPaneCount?: number;
 }
 
 type ProfileDragOver = { targetPaneId: string; zone: PaneDropZone };
@@ -102,6 +105,9 @@ function SplitPaneLayoutInner({
   renderTerminal,
   sidebarPaneDragActive = false,
   profileAccentColor = null,
+  broadcastActive = false,
+  broadcastPulseKey = 0,
+  broadcastPaneCount = 0,
   drag,
 }: Props & { drag: PaneDragState }) {
   if (node.kind === "pane") {
@@ -114,6 +120,9 @@ function SplitPaneLayoutInner({
           focused={focused}
           bg={bg}
           profileAccentColor={profileAccentColor}
+          broadcastActive={broadcastActive}
+          broadcastPulseKey={broadcastPulseKey}
+          broadcastPaneCount={broadcastPaneCount}
           drag={drag}
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
@@ -159,6 +168,9 @@ function SplitPaneLayoutInner({
           renderTerminal={renderTerminal}
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
+          broadcastActive={broadcastActive}
+          broadcastPulseKey={broadcastPulseKey}
+          broadcastPaneCount={broadcastPaneCount}
           drag={drag}
         />
       </div>
@@ -192,6 +204,9 @@ function SplitPaneLayoutInner({
           renderTerminal={renderTerminal}
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
+          broadcastActive={broadcastActive}
+          broadcastPulseKey={broadcastPulseKey}
+          broadcastPaneCount={broadcastPaneCount}
           drag={drag}
         />
       </div>
@@ -204,6 +219,9 @@ function WarpPaneShell({
   focused,
   bg,
   profileAccentColor,
+  broadcastActive = false,
+  broadcastPulseKey = 0,
+  broadcastPaneCount = 0,
   drag,
   onFocus,
   onClose,
@@ -218,6 +236,9 @@ function WarpPaneShell({
   focused: boolean;
   bg: string;
   profileAccentColor?: string | null;
+  broadcastActive?: boolean;
+  broadcastPulseKey?: number;
+  broadcastPaneCount?: number;
   sidebarPaneDragActive?: boolean;
   drag: PaneDragState;
   onFocus: () => void;
@@ -259,10 +280,21 @@ function WarpPaneShell({
     setProfileDragOver(null);
   }
 
+  useEffect(() => {
+    if (!broadcastActive || !broadcastPulseKey) return;
+    const el = shellRef.current;
+    if (!el) return;
+    el.classList.remove("broadcast-pane-flash");
+    void el.offsetWidth;
+    el.classList.add("broadcast-pane-flash");
+  }, [broadcastPulseKey, broadcastActive]);
+
   return (
     <div
       ref={shellRef}
       className={`group/pane relative flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
+        broadcastActive ? "broadcast-pane-sync" : ""
+      } ${
         isDragOver || isProfileDragOver
           ? "ring-2 ring-accent/35"
           : isDragging
@@ -386,6 +418,15 @@ function WarpPaneShell({
             {paneDisplayLabel(pane)}
           </span>
         )}
+        {broadcastActive && (
+          <span
+            className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
+            title={t("chat.broadcastSyncTitle", { count: broadcastPaneCount })}
+          >
+            <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-accent" aria-hidden />
+            {t("pane.broadcastSyncBadge")}
+          </span>
+        )}
         {onCwdClick ? (
           <button
             type="button"
@@ -478,6 +519,14 @@ function WarpPaneShell({
           />
         )}
         {children}
+        {broadcastActive && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-center bg-gradient-to-t from-[color-mix(in_srgb,var(--color-bg-primary)_90%,transparent)] to-transparent px-2 pb-1.5 pt-5">
+            <span className="inline-flex items-center gap-1 rounded-md border border-accent/25 bg-chrome-surface-raised/92 px-2 py-0.5 text-[10px] text-chrome-accent-text shadow-sm backdrop-blur-sm">
+              <span className="broadcast-sync-dot h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden />
+              {t("pane.broadcastInputHint", { count: broadcastPaneCount })}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
