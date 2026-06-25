@@ -1,5 +1,7 @@
 # AI Shelf
 
+![Terminal 模式 — 建立 Profile、雙開窗格、廣播輸入](docs/assets/terminal-demo.gif)
+
 > 統一工具集：一次檢視、啟動與編排 Claude Code、GitHub Copilot、Cursor 等 AI CLI。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

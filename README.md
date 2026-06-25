@@ -1,5 +1,7 @@
 # AI Shelf
 
+![Terminal mode — create profile, dual panes, broadcast input](docs/assets/terminal-demo.gif)
+
 > Unified toolkit to inspect, launch, and orchestrate AI CLIs — Claude Code, GitHub Copilot, and Cursor — in one place.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
