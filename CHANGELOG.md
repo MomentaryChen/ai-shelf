@@ -9,11 +9,34 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-06-25
+
+Major release: modern UI overhaul, in-app config/MCP editing, and terminal multitasking improvements.
+
 ### Added
 
 - **In-app config editing** — Config tab files (JSON/TOML/YAML/MD) are now editable in a modal editor with live JSON validation; a `.bak` backup is written before every save.
 - **MCP server management** — MCP tab gains per-tool add / edit / enable-disable / delete of MCP servers (no longer sync-only). JSON tools disable servers via a reversible `mcpServersDisabled` sidecar; Codex (TOML) uses its native `enabled` flag.
 - **MCP connectivity test** — Doctor tab can run a real JSON-RPC `initialize` handshake against each enabled MCP server (stdio + HTTP/SSE) and reports reachability, `serverInfo`, and round-trip time — beyond the previous JSON-validity-only check.
+- **Inventory layout overhaul** — Sidebar navigation, dashboard, search, and ⌘K command palette.
+- **Copy-on-select** — Terminal selection copies to the clipboard so paste works across split panes.
+- **Per-tool launch arguments** — Configure extra CLI flags per tool in Terminal Settings.
+- **Configurable PTY output buffer** — Scrollback buffer size is configurable (4 MB default).
+- **Dev multi-window** — `electron .` can run multiple app instances for parallel dev sessions.
+- **shadcn/ui integration** — Token-bridged shadcn components; launcher batch migrated to the new system.
+
+### Changed
+
+- **Modern refined-dark UI** — Full visual refresh across inventory, terminal chrome, dialogs, and menus.
+- **Terminal icons** — Unified on Lucide instead of mixed icon sets.
+- **Inventory tool cards** — Collapsed by default in Config, MCP, and Doctor tabs.
+
+### Fixed
+
+- **Cross-pane clipboard** — Terminal apps no longer clobber the system clipboard via OSC 52.
+- **Copy-on-select** — Reliable copy when switching panes quickly; reduced pane-focus flicker from redundant layout rebuilds.
+- **xterm input** — Mouse drag and OSC 52 parser race conditions resolved.
+- **Split layout** — Layout preserved when focusing panes.
 
 ## [2.1.17] - 2026-06-03
 
@@ -372,6 +395,7 @@ First public release of **AI Shelf** — a unified toolkit to inspect, launch, a
 - Building from source requires Node.js ≥ 22 and pnpm ≥ 10.
 - macOS and Linux desktop installers are not included in this release.
 
+[3.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.0.0
 [2.1.17]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.17
 [2.1.11]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.11
 [2.1.10]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v2.1.10
