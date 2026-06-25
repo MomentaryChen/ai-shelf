@@ -100,6 +100,7 @@ export function useProfileWorkspace(
     restoringRef.current = value;
     setRestoring(value);
   }, []);
+  const isRestoring = useCallback(() => restoringRef.current, []);
   const [migrationDone, setMigrationDone] = useState(false);
   const layoutRef = useRef(layout);
   const focusedPaneIdRef = useRef(focusedPaneId);
@@ -623,7 +624,7 @@ export function useProfileWorkspace(
   return {
     activeProfile,
     restoring,
-    isRestoring: () => restoringRef.current,
+    isRestoring,
     migrationDone,
     activateProfile,
     restoreLastProfile,
