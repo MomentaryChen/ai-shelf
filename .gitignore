@@ -31,3 +31,6 @@ Desktop.ini
 # Logs
 *.log
 npm-debug.log*
+
+# Playwright GIF capture (regenerate via pnpm gen:terminal-demo-gif)
+tests/artifacts/terminal-demo-frames/
