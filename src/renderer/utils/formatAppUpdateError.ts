@@ -15,7 +15,7 @@ export function resolveAppUpdateErrorKey(raw: string | null): MessageKey {
   return "appUpdate.errorDefault";
 }
 
-export function shortenAppUpdateErrorDetail(raw: string | null, maxLen = 280): string | null {
+export function shortenAppUpdateErrorDetail(raw: string | null, maxLen = 4000): string | null {
   if (!raw?.trim()) return null;
   const msg = raw.trim();
   if (msg.length <= maxLen) return msg;
