@@ -140,7 +140,6 @@ export function ChatTab({
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
   const [broadcastInput, setBroadcastInput] = useState(false);
-  const [broadcastPulseKey, setBroadcastPulseKey] = useState(0);
   const [profileBusy, setProfileBusy] = useState(false);
   const [terminalError, setTerminalError] = useState<string | null>(null);
   const [addingTerminal, setAddingTerminal] = useState(false);
@@ -273,7 +272,6 @@ export function ChatTab({
       const current = panesRef.current;
       if (broadcastInput && current.length > 1) {
         for (const p of current) window.api.ptyWrite(p.sessionId, data);
-        setBroadcastPulseKey((k) => k + 1);
       } else {
         window.api.ptyWrite(sessionId, data);
       }
@@ -1213,7 +1211,6 @@ export function ChatTab({
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
         broadcastActive={broadcastActive}
-        broadcastPulseKey={broadcastPulseKey}
         broadcastPaneCount={panes.length}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);

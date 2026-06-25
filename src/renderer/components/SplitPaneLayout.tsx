@@ -42,7 +42,6 @@ interface Props {
   renderTerminal: (pane: PaneInfo, focused: boolean) => ReactNode;
   profileAccentColor?: string | null;
   broadcastActive?: boolean;
-  broadcastPulseKey?: number;
   broadcastPaneCount?: number;
 }
 
@@ -106,7 +105,6 @@ function SplitPaneLayoutInner({
   sidebarPaneDragActive = false,
   profileAccentColor = null,
   broadcastActive = false,
-  broadcastPulseKey = 0,
   broadcastPaneCount = 0,
   drag,
 }: Props & { drag: PaneDragState }) {
@@ -121,7 +119,6 @@ function SplitPaneLayoutInner({
           bg={bg}
           profileAccentColor={profileAccentColor}
           broadcastActive={broadcastActive}
-          broadcastPulseKey={broadcastPulseKey}
           broadcastPaneCount={broadcastPaneCount}
           drag={drag}
           onFocus={() => onFocusPane(node.pane.id)}
@@ -169,7 +166,6 @@ function SplitPaneLayoutInner({
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
           broadcastActive={broadcastActive}
-          broadcastPulseKey={broadcastPulseKey}
           broadcastPaneCount={broadcastPaneCount}
           drag={drag}
         />
@@ -205,7 +201,6 @@ function SplitPaneLayoutInner({
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
           broadcastActive={broadcastActive}
-          broadcastPulseKey={broadcastPulseKey}
           broadcastPaneCount={broadcastPaneCount}
           drag={drag}
         />
@@ -220,7 +215,6 @@ function WarpPaneShell({
   bg,
   profileAccentColor,
   broadcastActive = false,
-  broadcastPulseKey = 0,
   broadcastPaneCount = 0,
   drag,
   onFocus,
@@ -237,7 +231,6 @@ function WarpPaneShell({
   bg: string;
   profileAccentColor?: string | null;
   broadcastActive?: boolean;
-  broadcastPulseKey?: number;
   broadcastPaneCount?: number;
   sidebarPaneDragActive?: boolean;
   drag: PaneDragState;
@@ -279,15 +272,6 @@ function WarpPaneShell({
     setDropZone(null);
     setProfileDragOver(null);
   }
-
-  useEffect(() => {
-    if (!broadcastActive || !broadcastPulseKey) return;
-    const el = shellRef.current;
-    if (!el) return;
-    el.classList.remove("broadcast-pane-flash");
-    void el.offsetWidth;
-    el.classList.add("broadcast-pane-flash");
-  }, [broadcastPulseKey, broadcastActive]);
 
   return (
     <div

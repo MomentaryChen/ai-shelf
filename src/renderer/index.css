@@ -90,45 +90,9 @@ input:focus-visible,
   animation: profile-live-pulse 2s ease-in-out infinite;
 }
 
-/* Broadcast input — sync badge pulse + keystroke flash across panes */
-@keyframes broadcast-sync-badge-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 35%, transparent);
-  }
-  50% {
-    opacity: 0.88;
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 12%, transparent);
-  }
-}
-
-@keyframes broadcast-input-flash {
-  0% {
-    box-shadow: inset 0 -2px 0 0 transparent;
-  }
-  35% {
-    box-shadow: inset 0 -3px 0 0 color-mix(in srgb, var(--color-accent) 60%, transparent);
-  }
-  100% {
-    box-shadow: inset 0 -2px 0 0 transparent;
-  }
-}
-
-.broadcast-sync-badge {
-  animation: broadcast-sync-badge-pulse 2.4s ease-in-out infinite;
-}
-
-.broadcast-sync-dot {
-  animation: profile-live-pulse 1.8s ease-in-out infinite;
-}
-
+/* Broadcast input — static accent border on synced panes */
 .broadcast-pane-sync {
   border-color: color-mix(in srgb, var(--color-accent) 38%, var(--color-chrome-border)) !important;
-}
-
-.broadcast-pane-flash {
-  animation: broadcast-input-flash 380ms ease-out;
 }
 
 /* Dark-themed scrollbars (inventory / settings overflow areas) */
