@@ -144,6 +144,32 @@ export function useProfileWorkspace(
     await saveGroupSnapshot(profile.workspaceId, profile.id, snapshot);
   }, []);
 
+  const persistTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const persistInFlightRef = useRef<Promise<void> | null>(null);
+
+  const runPersist = useCallback(async () => {
+    if (persistInFlightRef.current) {
+      await persistInFlightRef.current;
+      return;
+    }
+    const run = persistCurrentProfile().finally(() => {
+      if (persistInFlightRef.current === run) persistInFlightRef.current = null;
+    });
+    persistInFlightRef.current = run;
+    await run;
+  }, [persistCurrentProfile]);
+
+  const flushPersistCurrentProfile = useCallback(async () => {
+    if (persistTimerRef.current !== null) {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    while (persistInFlightRef.current) {
+      await persistInFlightRef.current;
+    }
+    await runPersist();
+  }, [runPersist]);
+
   const minimizedPaneIdsRef = useRef(minimizedPaneIds);
   minimizedPaneIdsRef.current = minimizedPaneIds;
 
@@ -391,13 +417,22 @@ export function useProfileWorkspace(
         focusedPaneId: focusedPaneIdRef.current,
         minimizedPaneIds: [...minimizedPaneIdsRef.current],
       });
-      const t = window.setTimeout(() => {
-        void persistCurrentProfile();
+      if (persistTimerRef.current !== null) {
+        window.clearTimeout(persistTimerRef.current);
+      }
+      persistTimerRef.current = window.setTimeout(() => {
+        persistTimerRef.current = null;
+        void runPersist();
       }, 400);
-      return () => window.clearTimeout(t);
+      return () => {
+        if (persistTimerRef.current !== null) {
+          window.clearTimeout(persistTimerRef.current);
+          persistTimerRef.current = null;
+        }
+      };
     }
     profileLiveCacheRef.current.delete(cacheKey(activeProfile.workspaceId, activeProfile.id));
-  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, persistCurrentProfile, cacheKey]);
+  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, runPersist, cacheKey]);
 
   const getProfilePanes = useCallback(
     (profileId: string): PaneInfo[] => {
@@ -430,12 +465,12 @@ export function useProfileWorkspace(
     [getProfilePanes],
   );
 
-  // Persist on unmount only — do not ptyKill here (breaks Strict Mode / profile switch cache).
+  // Flush on unmount — do not ptyKill here (breaks Strict Mode / profile switch cache).
   useEffect(() => {
     return () => {
-      void persistCurrentProfile();
+      void flushPersistCurrentProfile();
     };
-  }, [persistCurrentProfile]);
+  }, [flushPersistCurrentProfile]);
 
   const syncActiveProfile = useCallback((profile: ProfileInfo) => {
     if (activeProfileRef.current?.id !== profile.id) return;
@@ -592,7 +627,8 @@ export function useProfileWorkspace(
     migrationDone,
     activateProfile,
     restoreLastProfile,
-    persistCurrentProfile,
+    persistCurrentProfile: runPersist,
+    flushPersistCurrentProfile,
     syncActiveProfile,
     getProfileDefaultCwd,
     discardProfileSessions,

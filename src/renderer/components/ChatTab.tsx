@@ -223,6 +223,7 @@ export function ChatTab({
     unminimizePanes,
     forgetMinimizedPane,
     persistCurrentProfile,
+    flushPersistCurrentProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -382,6 +383,15 @@ export function ChatTab({
       cancelled = true;
     };
   }, [migrationDone, restoreLastProfile, updateSettings]);
+
+  useEffect(() => {
+    const unsub = window.api.onProfileLayoutFlush(() => {
+      void flushPersistCurrentProfile().finally(() => {
+        window.api.sendProfileLayoutFlushDone();
+      });
+    });
+    return unsub;
+  }, [flushPersistCurrentProfile]);
 
   const resolveCwd = useCallback(
     (override?: string) => {

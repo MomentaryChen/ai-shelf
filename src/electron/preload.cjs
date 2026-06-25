@@ -139,4 +139,10 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("tray-activate-profile", handler);
     return () => ipcRenderer.off("tray-activate-profile", handler);
   },
+  onProfileLayoutFlush: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("profile-layout-flush", handler);
+    return () => ipcRenderer.off("profile-layout-flush", handler);
+  },
+  sendProfileLayoutFlushDone: () => ipcRenderer.send("profile-layout-flush-done"),
 });

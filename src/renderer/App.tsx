@@ -212,7 +212,7 @@ export function App() {
           </p>
         )}
 
-        {hasData && (
+        {ready && (
           <main
             className={`absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden ${
               appMode === "terminal" ? "" : "hidden"
