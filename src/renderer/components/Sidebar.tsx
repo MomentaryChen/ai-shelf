@@ -512,14 +512,19 @@ export function Sidebar({
                         <IconAction title="Profile settings" onClick={() => onProfileSettings?.(item.id)}>
                           ⚙
                         </IconAction>
-                        <label className="ml-1 inline-flex items-center gap-1 text-[10px] text-chrome-text-muted">
+                        <label
+                          className="ml-1 inline-flex items-center gap-1 text-[10px] text-chrome-text-muted"
+                          title={t("profile.syncBroadcastTitle")}
+                        >
                           <input
                             type="checkbox"
                             checked={item.broadcastInput ?? false}
                             onChange={(e) => onProfileToggleBroadcast?.(item.id, e.target.checked)}
                             className="h-3 w-3 rounded accent-accent"
                           />
-                          sync
+                          <span className={item.broadcastInput ? "text-chrome-accent-text" : undefined}>
+                            {t("chat.syncLabel")}
+                          </span>
                         </label>
                       </div>
                     </div>

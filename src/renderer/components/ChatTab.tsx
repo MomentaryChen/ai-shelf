@@ -129,6 +129,7 @@ export function ChatTab({
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
   const [broadcastInput, setBroadcastInput] = useState(false);
+  const [broadcastPulseKey, setBroadcastPulseKey] = useState(0);
   const [profileBusy, setProfileBusy] = useState(false);
   const [terminalError, setTerminalError] = useState<string | null>(null);
   const [addingTerminal, setAddingTerminal] = useState(false);
@@ -256,12 +257,15 @@ export function ChatTab({
       const current = panesRef.current;
       if (broadcastInput && current.length > 1) {
         for (const p of current) window.api.ptyWrite(p.sessionId, data);
+        setBroadcastPulseKey((k) => k + 1);
       } else {
         window.api.ptyWrite(sessionId, data);
       }
     },
     [broadcastInput],
   );
+
+  const broadcastActive = broadcastInput && panes.length > 1;
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -1145,6 +1149,9 @@ export function ChatTab({
         bg={bg}
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
+        broadcastActive={broadcastActive}
+        broadcastPulseKey={broadcastPulseKey}
+        broadcastPaneCount={panes.length}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
           else setFocusedPaneId(paneId);
@@ -1361,7 +1368,15 @@ function WarpTopBar({
           {paneCount > 0 && (
             <span className="shrink-0 text-[10px] tabular-nums text-chrome-text-faint">
               {paneCount}/{maxPanes}
-              {broadcastInput && paneCount > 1 ? ` · ${t("chat.syncLabel")}` : ""}
+            </span>
+          )}
+          {broadcastInput && paneCount > 1 && (
+            <span
+              className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
+              title={t("chat.broadcastSyncTitle", { count: paneCount })}
+            >
+              <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-accent" aria-hidden />
+              {t("chat.syncLabel")}
             </span>
           )}
         </div>
