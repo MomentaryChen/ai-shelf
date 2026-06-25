@@ -28,103 +28,102 @@ export function profileAccentOrDefault(accent?: string | null): string {
   return accent ?? DEFAULT_FOCUS;
 }
 
-const PROFILE_CARD_BORDER_WIDTH = 2;
-
-/** Profile card container — border, fill, optional glow when active. */
-export function profileCardStyle(
-  accentColor: string | null | undefined,
-  isActive: boolean,
+/** Accent swatch dot — sidebar, top bar, pane header. */
+export function profileAccentMarkerStyle(
+  accentColor: string,
+  size: "sm" | "md" = "md",
 ): import("react").CSSProperties {
-  const borderBase = { borderWidth: PROFILE_CARD_BORDER_WIDTH, borderStyle: "solid" as const };
+  return {
+    backgroundColor: accentColor,
+    boxShadow: `0 0 ${size === "sm" ? 6 : 8}px ${tint(accentColor, size === "sm" ? "88" : "66")}`,
+  };
+}
+
+/** Sidebar profile group card border. */
+export function profileSidebarGroupStyle(
+  accentColor: string | null | undefined,
+): import("react").CSSProperties {
   if (!accentColor) {
-    return isActive
-      ? {
-          ...borderBase,
-          backgroundColor: chromeVar("--color-chrome-profile-card-active-bg", "#12161f"),
-          borderColor: chromeVar("--color-chrome-profile-card-active-border", "#3a5070"),
-          boxShadow: "0 0 0 2px rgba(126, 182, 255, 0.14), 0 4px 16px rgba(0,0,0,0.35)",
-        }
-      : {
-          ...borderBase,
-          backgroundColor: chromeVar("--color-chrome-profile-card-bg", "#111113"),
-          borderColor: chromeVar("--color-chrome-profile-card-border", "#303035"),
-        };
+    return { borderColor: "var(--color-chrome-border-subtle)" };
   }
-  return {
-    ...borderBase,
-    backgroundColor: tint(accentColor, isActive ? "14" : "08"),
-    borderColor: tint(accentColor, isActive ? "62" : "40"),
-    boxShadow: isActive
-      ? `0 0 0 2px ${tint(accentColor, "28")}, 0 4px 20px ${tint(accentColor, "18")}`
-      : "0 1px 2px rgba(0,0,0,0.2)",
-  };
+  return { borderColor: tint(accentColor, "77") };
 }
 
-/** 2px top stripe on profile card. */
-export function profileCardTopStripe(
+/** Sidebar profile row when selected. */
+export function profileSidebarProfileActiveStyle(
   accentColor: string | null | undefined,
 ): import("react").CSSProperties | undefined {
   if (!accentColor) return undefined;
-  return {
-    background: `linear-gradient(90deg, ${tint(accentColor, "cc")}, ${tint(accentColor, "44")})`,
-    height: 2,
-  };
+  return { backgroundColor: tint(accentColor, "2b") };
 }
 
-export function profileRowAccentStyle(
-  accentColor: string | null | undefined,
-  isActive: boolean,
-): import("react").CSSProperties | undefined {
-  if (!accentColor) return undefined;
-  return {
-    backgroundColor: isActive ? tint(accentColor, "20") : "transparent",
-  };
-}
-
-export function profileSessionsWellStyle(
-  accentColor: string | null | undefined,
-): import("react").CSSProperties {
-  const accent = profileAccentOrDefault(accentColor);
-  return {
-    borderLeftWidth: 3,
-    borderLeftColor: tint(accent, "77"),
-    backgroundColor: chromeVar("--color-chrome-sessions-well-bg", "rgba(0,0,0,0.22)"),
-  };
-}
-
-export function profileSessionRowStyle(
+/** Sidebar terminal tab row. */
+export function profileSidebarTerminalStyle(
   accentColor: string | null | undefined,
   selected: boolean,
-): import("react").CSSProperties {
-  const accent = profileAccentOrDefault(accentColor);
+): import("react").CSSProperties | undefined {
+  if (!accentColor || !selected) return undefined;
   return {
-    backgroundColor: selected ? tint(accent, "1c") : "transparent",
-    boxShadow: selected ? `inset 3px 0 0 ${accent}` : "inset 3px 0 0 transparent",
+    backgroundColor: tint(accentColor, "24"),
+    boxShadow: `inset 3px 0 0 ${accentColor}`,
   };
 }
 
+/** Terminal-mode top bar profile badge. */
+export function profileTopBarBadgeStyle(
+  accentColor: string | null | undefined,
+): import("react").CSSProperties {
+  if (accentColor) {
+    return {
+      backgroundColor: tint(accentColor, "12"),
+      borderColor: tint(accentColor, "30"),
+    };
+  }
+  const fallback = chromeVar("--color-chrome-accent-text", "#8ab4ff");
+  return {
+    backgroundColor: `color-mix(in srgb, ${fallback} 8%, transparent)`,
+    borderColor: `color-mix(in srgb, ${fallback} 20%, transparent)`,
+  };
+}
+
+export function profileTopBarLabelStyle(
+  accentColor: string | null | undefined,
+): import("react").CSSProperties {
+  const fallback = chromeVar("--color-chrome-accent-text", "#8ab4ff");
+  return { color: accentColor ?? fallback };
+}
+
+/** Pane shell border — always tinted when profile has an accent; stronger when focused. */
 export function profilePaneChromeStyle(
   accentColor: string | null | undefined,
   focused: boolean,
 ): import("react").CSSProperties | undefined {
-  if (!focused) return undefined;
-  const accent = profileAccentOrDefault(accentColor);
+  if (!accentColor) return undefined;
   return {
-    borderColor: tint(accent, "88"),
-    boxShadow: `0 0 0 1px ${tint(accent, "30")}, 0 8px 24px ${tint(accent, "12")}`,
+    borderColor: tint(accentColor, focused ? "88" : "30"),
+    boxShadow: focused
+      ? `0 0 0 1px ${tint(accentColor, "30")}, 0 8px 24px ${tint(accentColor, "12")}`
+      : `0 0 0 1px ${tint(accentColor, "12")}`,
   };
 }
 
+/** Pane title bar — gradient + bottom border tied to profile accent. */
 export function profilePaneHeaderStyle(
   accentColor: string | null | undefined,
   focused: boolean,
 ): import("react").CSSProperties {
-  const accent = profileAccentOrDefault(accentColor);
+  const unfocusedBg = chromeVar("--color-chrome-pane-header-unfocused", "rgba(0,0,0,0.4)");
+  if (!accentColor) {
+    return {
+      background: unfocusedBg,
+      borderBottomColor: chromeVar("--color-chrome-border-subtle", "#2a2a30"),
+    };
+  }
   return {
     background: focused
-      ? `linear-gradient(90deg, ${tint(accent, "18")} 0%, ${chromeVar("--color-chrome-pane-header-unfocused", "rgba(0,0,0,0.45)")} 48%)`
-      : chromeVar("--color-chrome-pane-header-unfocused", "rgba(0,0,0,0.4)"),
-    borderBottomColor: tint(accent, focused ? "40" : "18"),
+      ? `linear-gradient(90deg, ${tint(accentColor, "18")} 0%, ${unfocusedBg} 48%)`
+      : `linear-gradient(90deg, ${tint(accentColor, "0a")} 0%, ${unfocusedBg} 52%)`,
+    borderBottomColor: tint(accentColor, focused ? "40" : "20"),
   };
 }
 
@@ -132,8 +131,5 @@ export function profilePaneHeaderDotStyle(
   accentColor: string | null | undefined,
 ): import("react").CSSProperties {
   const accent = profileAccentOrDefault(accentColor);
-  return {
-    backgroundColor: accent,
-    boxShadow: `0 0 6px ${tint(accent, "88")}`,
-  };
+  return profileAccentMarkerStyle(accent, "sm");
 }

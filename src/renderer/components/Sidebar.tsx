@@ -21,6 +21,12 @@ import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { ToolLogo } from "./ToolLogo";
 import { profileToolLabel } from "../utils/available-tools";
+import {
+  profileAccentMarkerStyle,
+  profileSidebarGroupStyle,
+  profileSidebarProfileActiveStyle,
+  profileSidebarTerminalStyle,
+} from "../utils/profile-colors";
 
 function tryCloseTerminalOnMiddleClick(
   e: { button: number; preventDefault(): void; stopPropagation(): void },
@@ -427,7 +433,7 @@ export function Sidebar({
                         ? "ring-2 ring-accent/35"
                         : ""
                     }`}
-                    style={accent ? { borderColor: `${accent}77` } : { borderColor: "var(--color-chrome-border-subtle)" }}
+                    style={profileSidebarGroupStyle(accent)}
                     onDragOver={(e) => {
                       if (!draggingProfileId) return;
                       e.preventDefault();
@@ -463,16 +469,13 @@ export function Sidebar({
                             ? "bg-chrome-hover text-chrome-text"
                             : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                         }`}
-                        style={active && accent ? { backgroundColor: `${accent}2b` } : undefined}
+                        style={active ? profileSidebarProfileActiveStyle(accent) : undefined}
                       >
                         <span className="inline-flex min-w-0 items-center gap-1.5">
                           {accent && (
                             <span
                               className="h-2.5 w-2.5 shrink-0 rounded-[3px] shadow-sm"
-                              style={{
-                                backgroundColor: accent,
-                                boxShadow: `0 0 8px ${accent}66`,
-                              }}
+                              style={profileAccentMarkerStyle(accent)}
                             />
                           )}
                           <span className="truncate font-medium">{item.name}</span>
@@ -598,7 +601,7 @@ export function Sidebar({
                                   ? "bg-chrome-hover text-chrome-text"
                                   : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                               }`}
-                              style={terminalActive && accent ? { backgroundColor: `${accent}24` } : undefined}
+                              style={profileSidebarTerminalStyle(accent, terminalActive)}
                               title={
                                 canMiddleClose
                                   ? `${terminalTitle} · ${t("profile.middleClickClose")}`

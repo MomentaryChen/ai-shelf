@@ -269,7 +269,9 @@ function WarpPaneShell({
             ? "opacity-45 scale-[0.99]"
             : focused && !profileAccentColor
               ? "border-chrome-border-focus ring-1 ring-chrome-hover-strong"
-              : "border-chrome-border"
+              : profileAccentColor
+                ? "border-transparent"
+                : "border-chrome-border"
       }`}
       style={{ background: bg, ...chromeStyle }}
       onMouseDown={onFocus}
@@ -362,8 +364,12 @@ function WarpPaneShell({
             <DragHandle />
           </span>
         )}
-        {focused && (
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={dotStyle} aria-hidden />
+        {profileAccentColor && (
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${focused ? "" : "opacity-50"}`}
+            style={dotStyle}
+            aria-hidden
+          />
         )}
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-chrome-border-subtle bg-chrome-surface-raised">
           <ToolLogo tool={pane.tool} size={14} />

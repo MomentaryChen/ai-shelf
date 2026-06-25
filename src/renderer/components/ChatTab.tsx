@@ -50,7 +50,12 @@ import {
   readProfilePaneDrag,
   visiblePanes,
 } from "../terminal/profile-pane-display";
-import { applyAppTheme, getChromeCssVar, useAppThemeRevision } from "../app-theme";
+import { applyAppTheme, useAppThemeRevision } from "../app-theme";
+import {
+  profileAccentMarkerStyle,
+  profileTopBarBadgeStyle,
+  profileTopBarLabelStyle,
+} from "../utils/profile-colors";
 import {
   TERMINAL_OPTIONS,
   getAppBg,
@@ -1386,36 +1391,25 @@ function WarpTopBar({
   const { t } = useLocale();
   const accent = profileAccentColor;
   const hasAccent = Boolean(accent);
-  const defaultAccent = getChromeCssVar("--color-chrome-accent-text", "#8ab4ff");
 
   return (
     <div className="relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
       {profileLabel && (
         <div
           className="flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1"
-          style={
-            hasAccent && accent
-              ? {
-                  backgroundColor: `${accent}12`,
-                  borderColor: `${accent}30`,
-                }
-              : {
-                  backgroundColor: `color-mix(in srgb, ${defaultAccent} 8%, transparent)`,
-                  borderColor: `color-mix(in srgb, ${defaultAccent} 20%, transparent)`,
-                }
-          }
+          style={profileTopBarBadgeStyle(accent)}
           title={profileLabel}
         >
           {hasAccent && (
             <span
               className="h-2 w-2 shrink-0 rounded-[2px]"
-              style={{ backgroundColor: accent!, boxShadow: `0 0 6px ${accent}88` }}
+              style={profileAccentMarkerStyle(accent!, "sm")}
               aria-hidden
             />
           )}
           <span
             className="min-w-0 truncate text-[11px] font-medium"
-            style={{ color: hasAccent && accent ? accent : defaultAccent }}
+            style={profileTopBarLabelStyle(accent)}
           >
             {profileLabel}
           </span>
