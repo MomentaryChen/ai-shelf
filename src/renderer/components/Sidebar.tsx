@@ -431,7 +431,7 @@ export function Sidebar({
                     key={item.id}
                     className={`group rounded-lg border bg-chrome-surface/30 transition-colors ${
                       dragOverProfileId === item.id && draggingProfileId !== item.id
-                        ? "ring-2 ring-accent/35"
+                        ? "ring-2 ring-chrome-ui-accent/35"
                         : ""
                     }`}
                     style={profileSidebarGroupStyle(accent)}
@@ -524,7 +524,7 @@ export function Sidebar({
                             type="checkbox"
                             checked={item.broadcastInput ?? false}
                             onChange={(e) => onProfileToggleBroadcast?.(item.id, e.target.checked)}
-                            className="h-3 w-3 rounded accent-accent"
+                            className="h-3 w-3 rounded accent-chrome-ui-accent"
                           />
                           <span className={item.broadcastInput ? "text-chrome-accent-text" : undefined}>
                             {t("chat.syncLabel")}
@@ -627,7 +627,7 @@ export function Sidebar({
                               {dragOverTerminal?.profileId === terminal.profileId &&
                                 dragOverTerminal.terminalId === terminal.id && (
                                   <span
-                                    className={`pointer-events-none absolute left-1 right-1 h-0.5 rounded-full bg-accent ${
+                                    className={`pointer-events-none absolute left-1 right-1 h-0.5 rounded-full bg-chrome-ui-accent ${
                                       dragOverTerminal.zone === "above" ? "top-0" : "bottom-0"
                                     }`}
                                   />

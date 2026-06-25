@@ -1,21 +1,22 @@
 import { useEffect, useState } from "react";
 
-export type AppColorTheme = "light" | "dark" | "contrast";
+export type AppColorTheme = "warm" | "light" | "dark" | "contrast";
 
-export const DEFAULT_APP_THEME: AppColorTheme = "dark";
+export const DEFAULT_APP_THEME: AppColorTheme = "warm";
 
 export const APP_THEME_OPTIONS: {
   value: AppColorTheme;
   label: string;
   preview: { bg: string; fg: string; accent: string };
 }[] = [
+  { value: "warm", label: "暖色", preview: { bg: "#FBF7F0", fg: "#4A4039", accent: "#C97B5A" } },
   { value: "light", label: "淺色", preview: { bg: "#f8fafc", fg: "#0f172a", accent: "#0284c7" } },
   { value: "dark", label: "深色", preview: { bg: "#0f172a", fg: "#f1f5f9", accent: "#38bdf8" } },
   { value: "contrast", label: "對比色", preview: { bg: "#000000", fg: "#ffffff", accent: "#ffff00" } },
 ];
 
 export function normalizeAppTheme(raw: unknown): AppColorTheme {
-  if (raw === "light" || raw === "dark" || raw === "contrast") return raw;
+  if (raw === "warm" || raw === "light" || raw === "dark" || raw === "contrast") return raw;
   return DEFAULT_APP_THEME;
 }
 
@@ -43,7 +44,7 @@ export function getChromeCssVar(name: string, fallback: string): string {
 
 /** xterm.js palette aligned with the active app theme (for embedded terminals). */
 export function getXtermTheme(background: string): Record<string, string> {
-  const theme = document.documentElement.dataset.appTheme ?? "dark";
+  const theme = document.documentElement.dataset.appTheme ?? "warm";
   if (theme === "light") {
     return {
       background,
@@ -94,27 +95,53 @@ export function getXtermTheme(background: string): Record<string, string> {
       brightWhite: "#ffffff",
     };
   }
+  if (theme === "dark") {
+    return {
+      background,
+      foreground: "#cccccc",
+      cursor: "#ffffff",
+      cursorAccent: background,
+      selectionBackground: "#ffffff40",
+      black: "#0c0c0c",
+      brightBlack: "#767676",
+      red: "#c50f1f",
+      brightRed: "#e74856",
+      green: "#13a10e",
+      brightGreen: "#16c60c",
+      yellow: "#c19c00",
+      brightYellow: "#f9f1a5",
+      blue: "#0037da",
+      brightBlue: "#3b78ff",
+      magenta: "#881798",
+      brightMagenta: "#b4009e",
+      cyan: "#3a96dd",
+      brightCyan: "#61d6d6",
+      white: "#cccccc",
+      brightWhite: "#f2f2f2",
+    };
+  }
+  /* warm: brown-tinted terminal palette synced with clay/cream UI */
   return {
     background,
-    foreground: "#cccccc",
-    cursor: "#ffffff",
+    foreground: "#e8ddd0",
+    cursor: "#f1e8da",
     cursorAccent: background,
-    selectionBackground: "#ffffff40",
-    black: "#0c0c0c",
-    brightBlack: "#767676",
-    red: "#c50f1f",
-    brightRed: "#e74856",
-    green: "#13a10e",
-    brightGreen: "#16c60c",
-    yellow: "#c19c00",
-    brightYellow: "#f9f1a5",
-    blue: "#0037da",
-    brightBlue: "#3b78ff",
-    magenta: "#881798",
-    brightMagenta: "#b4009e",
-    cyan: "#3a96dd",
-    brightCyan: "#61d6d6",
-    white: "#cccccc",
-    brightWhite: "#f2f2f2",
+    selectionBackground: "rgb(201 123 90 / 0.35)",
+    black: "#2c2420",
+    brightBlack: "#6b5f56",
+    red: "#c45c4a",
+    brightRed: "#d97a6a",
+    green: "#7fb069",
+    brightGreen: "#95c47f",
+    yellow: "#c9a227",
+    brightYellow: "#dbb84a",
+    blue: "#5a8fbd",
+    brightBlue: "#7aa8cc",
+    magenta: "#a86b7a",
+    brightMagenta: "#c08896",
+    cyan: "#8a9a7b",
+    brightCyan: "#a3b294",
+    white: "#e8ddd0",
+    brightWhite: "#f1e8da",
   };
 }

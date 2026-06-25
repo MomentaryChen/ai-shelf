@@ -66,7 +66,7 @@ export function CommandPalette({
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-[560px] overflow-hidden rounded-xl border border-border shadow-float"
+        className="warm-rise w-full max-w-[560px] overflow-hidden rounded-[28px] border border-sand bg-bg-elevated warm-shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <Command>

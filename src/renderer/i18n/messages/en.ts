@@ -25,6 +25,7 @@ export const en = {
   "cmd.group.profiles": "Profiles",
   "cmd.group.external": "External terminal",
   "cmd.action.terminal": "Switch to Terminal",
+  "status.live": "Live",
   "cmd.action.inventory": "Switch to Inventory",
   "cmd.action.refresh": "Refresh inventory",
   "cmd.terminal.openClaudeCursor": "Open Claude + Cursor",
@@ -54,6 +55,7 @@ export const en = {
   "settings.language": "Language",
   "settings.theme": "App color theme",
   "settings.theme.light": "Light",
+  "settings.theme.warm": "Warm & soft",
   "settings.theme.dark": "Dark",
   "settings.theme.contrast": "High contrast",
   "settings.themeHint":
@@ -107,6 +109,7 @@ export const en = {
   "terminal.powershell": "PowerShell 5 (built-in)",
   "terminal.cmd": "Command Prompt",
   "bg.wt": "Windows Terminal",
+  "bg.warmInk": "Warm ink",
   "bg.appTheme": "App theme",
   "bg.black": "Pure black",
   "bg.psBlue": "PowerShell blue",

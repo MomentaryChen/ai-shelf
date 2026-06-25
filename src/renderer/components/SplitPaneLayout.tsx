@@ -280,7 +280,7 @@ function WarpPaneShell({
         broadcastActive ? "broadcast-pane-sync" : ""
       } ${
         isDragOver || isProfileDragOver
-          ? "ring-2 ring-accent/35"
+          ? "ring-2 ring-chrome-ui-accent/35"
           : isDragging
             ? "opacity-45 scale-[0.99]"
             : focused && !profileAccentColor
@@ -404,10 +404,10 @@ function WarpPaneShell({
         )}
         {broadcastActive && (
           <span
-            className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
+            className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
             title={t("chat.broadcastSyncTitle", { count: broadcastPaneCount })}
           >
-            <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-accent" aria-hidden />
+            <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-chrome-ui-accent" aria-hidden />
             {t("pane.broadcastSyncBadge")}
           </span>
         )}
@@ -504,9 +504,9 @@ function WarpPaneShell({
         )}
         {children}
         {broadcastActive && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-center bg-gradient-to-t from-[color-mix(in_srgb,var(--color-bg-primary)_90%,transparent)] to-transparent px-2 pb-1.5 pt-5">
-            <span className="inline-flex items-center gap-1 rounded-md border border-accent/25 bg-chrome-surface-raised/92 px-2 py-0.5 text-[10px] text-chrome-accent-text shadow-sm backdrop-blur-sm">
-              <span className="broadcast-sync-dot h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-center bg-gradient-to-t from-[color-mix(in_srgb,var(--color-chrome-bg)_90%,transparent)] to-transparent px-2 pb-1.5 pt-5">
+            <span className="inline-flex items-center gap-1 rounded-md border border-chrome-ui-accent/25 bg-chrome-surface-raised/92 px-2 py-0.5 text-[10px] text-chrome-accent-text shadow-sm backdrop-blur-sm">
+              <span className="broadcast-sync-dot h-1 w-1 shrink-0 rounded-full bg-chrome-ui-accent" aria-hidden />
               {t("pane.broadcastInputHint", { count: broadcastPaneCount })}
             </span>
           </div>

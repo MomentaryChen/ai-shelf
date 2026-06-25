@@ -106,9 +106,7 @@ export function TerminalFindBar({
             else onNext();
           }
         }}
-        placeholder={t("find.placeholder")}
-        className="h-auto w-44 min-w-0 border-chrome-border-strong bg-chrome-bg px-2 py-1 text-[12px] text-chrome-text focus-visible:border-accent"
-        aria-label={t("find.aria")}
+        className="h-auto w-44 min-w-0 border-chrome-border-strong bg-chrome-bg px-2 py-1 text-[12px] text-chrome-text focus-visible:border-chrome-ui-accent focus-visible:ring-chrome-ui-accent/40"
       />
       <Label className="flex cursor-pointer select-none items-center gap-1 text-[11px] font-normal text-chrome-text-muted">
         <Checkbox

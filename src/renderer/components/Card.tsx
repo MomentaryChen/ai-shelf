@@ -32,12 +32,13 @@ export function Card({
   const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed);
   const hasHeader = title || trailing;
   const interactive = hoverable
-    ? "transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-pop"
+    ? "transition-[border-color,box-shadow,transform] duration-200 hover:shadow-pop"
     : "";
+  const cardClass = cn("warm-rise rounded-[28px] warm-shadow-card", interactive);
 
   if (!collapsible) {
     return (
-      <UiCard className={cn("mb-3 p-5", interactive, className)}>
+      <UiCard className={cn("mb-4 p-5", cardClass, className)}>
         {hasHeader && (
           <CardHeader className="mb-4">
             {title && <CardTitle>{title}</CardTitle>}
@@ -53,9 +54,9 @@ export function Card({
     <Collapsible
       open={!collapsed}
       onOpenChange={(open) => setCollapsed(!open)}
-      className={cn("mb-3", className)}
+      className={cn("mb-4", className)}
     >
-      <UiCard className={cn("p-5", interactive)}>
+      <UiCard className={cn("p-5", cardClass)}>
         {hasHeader && (
           <CollapsibleTrigger asChild>
             <button

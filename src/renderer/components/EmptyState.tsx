@@ -8,7 +8,7 @@ export type EmptyStateTone = "default" | "chrome";
  * already-translated strings (or nodes) in.
  *
  * `tone` selects the token family (inventory/dialog vs terminal/sidebar chrome)
- * so callers in either surface read correctly across all three app themes.
+ * so callers in either surface read correctly across all app themes.
  */
 const TONE: Record<EmptyStateTone, { title: string; desc: string }> = {
   default: { title: "text-text-primary", desc: "text-text-secondary" },
@@ -37,12 +37,15 @@ export function EmptyState({
   className?: string;
 }) {
   const c = TONE[tone];
-  const pad = compact ? "px-3 py-5 gap-1.5" : "px-4 py-10 gap-2.5";
-  const frame = bordered
-    ? tone === "chrome"
+  const pad = compact ? "px-4 py-5 gap-2" : "px-5 py-10 gap-3";
+  const frame =
+    bordered && tone === "chrome"
       ? "rounded-xl border border-dashed border-chrome-border-subtle"
-      : "rounded-xl border border-dashed border-border"
-    : "";
+      : bordered
+        ? "rounded-[28px] border border-dashed border-sand warm-shadow-card"
+        : tone === "default"
+          ? "warm-rise"
+          : "";
   return (
     <div
       className={`flex flex-col items-center justify-center text-center ${pad} ${frame} ${className}`.trim()}
@@ -52,13 +55,13 @@ export function EmptyState({
           {icon}
         </div>
       )}
-      <p className={`${compact ? "text-[13px]" : "text-sm"} font-medium ${c.title}`}>{title}</p>
+      <p className={`${compact ? "text-[15px]" : "text-[15px]"} font-semibold ${c.title}`}>{title}</p>
       {description && (
-        <p className={`${compact ? "text-[11px]" : "text-xs"} leading-snug ${c.desc}`}>
+        <p className={`${compact ? "text-[13px]" : "text-[13px]"} leading-normal ${c.desc}`}>
           {description}
         </p>
       )}
-      {action && <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2">{action}</div>}
+      {action && <div className="mt-2 flex flex-wrap items-center justify-center gap-2">{action}</div>}
     </div>
   );
 }
