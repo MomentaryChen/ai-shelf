@@ -43,6 +43,7 @@ const TERMINAL_LABEL_KEYS: Record<ExternalTerminal, MessageKey> = {
 };
 
 const BG_LABEL_KEYS: Record<string, MessageKey> = {
+  "Warm ink": "bg.warmInk",
   "Windows Terminal": "bg.wt",
   "App theme": "bg.appTheme",
   "Pure black": "bg.black",
@@ -71,6 +72,7 @@ const LOCALE_OPTIONS: { value: AppLocale; labelKey: MessageKey }[] = [
 ];
 
 const THEME_LABEL_KEYS: Record<AppColorTheme, MessageKey> = {
+  warm: "settings.theme.warm",
   light: "settings.theme.light",
   dark: "settings.theme.dark",
   contrast: "settings.theme.contrast",

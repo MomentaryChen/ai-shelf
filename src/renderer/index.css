@@ -12,6 +12,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 /* Align numeric columns / counters so digits don't jitter as values change. */
@@ -92,7 +95,7 @@ input:focus-visible,
 
 /* Broadcast input — static accent border on synced panes */
 .broadcast-pane-sync {
-  border-color: color-mix(in srgb, var(--color-accent) 38%, var(--color-chrome-border)) !important;
+  border-color: color-mix(in srgb, var(--color-chrome-ui-accent) 38%, var(--color-chrome-border)) !important;
 }
 
 /* Dark-themed scrollbars (inventory / settings overflow areas) */
@@ -154,65 +157,126 @@ input:focus-visible,
   font-weight: 600;
 }
 
+/* Warm & Soft — motion */
+@keyframes warm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes warm-dot-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.warm-rise {
+  animation: warm-rise 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.warm-typing-dot {
+  animation: warm-dot-blink 1.2s ease-in-out infinite;
+  background: #c0a98d;
+}
+
+.warm-shadow-card {
+  box-shadow: var(--shadow-warm-card);
+}
+
+.warm-shadow-accent {
+  box-shadow: var(--shadow-warm-accent);
+}
+
+.warm-clay-gradient {
+  background: linear-gradient(135deg, var(--color-clay-soft), var(--color-clay));
+}
+
 @theme {
-  /* Inventory / dialog surface family — refined neutral-dark scale
-     (cohesive with the chrome-* near-black system, less blue-saturated). */
-  --color-bg-primary: #0d1117;
-  --color-bg-secondary: #161b22;
-  --color-bg-card: #21262d;
-  --color-bg-elevated: #1c2128;
-  --color-bg-overlay: rgb(1 4 9 / 0.72);
-  --color-text-primary: #e6edf3;
-  --color-text-secondary: #8b949e;
-  --color-text-tertiary: #6e7681;
-  --color-accent: #38bdf8;
-  --color-accent-hover: #7dd3fc;
-  --color-accent-soft: rgb(56 189 248 / 0.14);
-  --color-on-accent: #06141d;
-  --color-ok: #3fb950;
-  --color-fail: #f85149;
-  --color-warn: #d29922;
-  --color-border: #30363d;
-  --color-border-strong: #444c56;
-  --color-border-subtle: #21262d;
-  --color-scrollbar-thumb-hover: #484f58;
-  /* Elevation — soft, dark-appropriate shadows (Tailwind v4 emits these as
-     var() refs, so the per-theme overrides below take effect at runtime). */
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.28);
-  --shadow-pop: 0 8px 24px -6px rgb(0 0 0 / 0.5);
-  --shadow-float: 0 16px 40px -12px rgb(0 0 0 / 0.6);
-  /* Terminal chrome (sidebar, pane headers, top bar) */
-  --color-chrome-bg: #0a0a0a;
-  --color-chrome-bg-top: #0c0c0e;
-  --color-chrome-bg-bottom: #09090b;
-  --color-chrome-surface: #111114;
-  --color-chrome-surface-raised: #141414;
-  --color-chrome-surface-focus: #131316;
-  --color-chrome-surface-hover: #1a1a1a;
-  --color-chrome-surface-hover-strong: #1f1f1f;
-  --color-chrome-surface-menu: #151515;
-  --color-chrome-border: #1a1a1e;
-  --color-chrome-border-subtle: #252525;
-  --color-chrome-border-input: #252528;
-  --color-chrome-border-strong: #2a2a2a;
-  --color-chrome-border-hover: #404040;
-  --color-chrome-border-focus: #3a3a42;
-  --color-chrome-text: #e8e8ec;
-  --color-chrome-text-secondary: #b4b4ba;
-  --color-chrome-text-muted: #8b8b92;
-  --color-chrome-text-subtle: #6b6b6b;
-  --color-chrome-text-faint: #6b6b72;
-  --color-chrome-text-dim: #5c5c64;
-  --color-chrome-accent-text: #8ab4ff;
-  --color-chrome-hover: rgb(255 255 255 / 0.04);
-  --color-chrome-hover-strong: rgb(255 255 255 / 0.06);
-  --color-chrome-profile-card-bg: #111113;
-  --color-chrome-profile-card-active-bg: #12161f;
-  --color-chrome-profile-card-border: #303035;
-  --color-chrome-profile-card-active-border: #3a5070;
-  --color-chrome-badge-bg: #1e1e22;
-  --color-chrome-sessions-well-bg: rgb(0 0 0 / 0.22);
-  --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.4);
+  /* Warm & Soft inventory / dialog surfaces (default theme) */
+  --color-cream: #fbf7f0;
+  --color-surface: #ffffff;
+  --color-sand: #f1e8da;
+  --color-sand-deep: #e8dece;
+  --color-clay: #c97b5a;
+  --color-clay-soft: #d08a66;
+  --color-clay-deep: #b26544;
+  --color-ink: #4a4039;
+  --color-ink-muted: #9b8e80;
+  --color-success: #7fb069;
+  --color-bg-primary: var(--color-cream);
+  --color-bg-secondary: var(--color-surface);
+  --color-bg-card: var(--color-surface);
+  --color-bg-elevated: var(--color-surface);
+  --color-bg-overlay: rgb(74 64 57 / 0.32);
+  --color-text-primary: var(--color-ink);
+  --color-text-secondary: var(--color-ink-muted);
+  --color-text-tertiary: #b5a99a;
+  --color-accent: var(--color-clay);
+  --color-accent-hover: var(--color-clay-deep);
+  --color-accent-soft: rgb(201 123 90 / 0.18);
+  --color-on-accent: #ffffff;
+  --color-ok: var(--color-success);
+  --color-fail: #c45c4a;
+  --color-warn: #c9a227;
+  --color-border: var(--color-sand);
+  --color-border-strong: #ddd2c4;
+  --color-border-subtle: var(--color-sand);
+  --color-scrollbar-thumb-hover: #c9bba8;
+  --shadow-warm-card: 0 12px 40px -12px rgb(120 90 60 / 0.18), 0 0 0 1px rgb(120 90 60 / 0.04);
+  --shadow-warm-accent: 0 4px 14px -6px rgb(201 123 90 / 0.45);
+  --shadow-card: var(--shadow-warm-card);
+  --shadow-pop: 0 8px 28px -8px rgb(120 90 60 / 0.14);
+  --shadow-float: 0 16px 48px -12px rgb(120 90 60 / 0.18);
+  --radius-warm-card: 28px;
+  --radius-warm-control: 22px;
+  --radius-warm-bubble: 20px;
+  /* Terminal chrome — warm palette (sidebar, pane headers, top bar) */
+  --color-chrome-bg: #f1e8da;
+  --color-chrome-bg-top: #faf7f2;
+  --color-chrome-bg-bottom: #e8dece;
+  --color-chrome-surface: #faf7f0;
+  --color-chrome-surface-raised: #ffffff;
+  --color-chrome-surface-focus: #ffffff;
+  --color-chrome-surface-hover: #f1e8da;
+  --color-chrome-surface-hover-strong: #e8dece;
+  --color-chrome-surface-menu: #faf7f2;
+  --color-chrome-border: #ddd2c4;
+  --color-chrome-border-subtle: #e8dece;
+  --color-chrome-border-input: #ddd2c4;
+  --color-chrome-border-strong: #c9bba8;
+  --color-chrome-border-hover: #b5a99a;
+  --color-chrome-border-focus: #c97b5a;
+  --color-chrome-text: #4a4039;
+  --color-chrome-text-secondary: #7a6f66;
+  --color-chrome-text-muted: #9b8e80;
+  --color-chrome-text-subtle: #9b8e80;
+  --color-chrome-text-faint: #b5a99a;
+  --color-chrome-text-dim: #9b8e80;
+  --color-chrome-accent-text: #b26544;
+  --color-chrome-ui-accent: #c97b5a;
+  --color-chrome-ui-accent-soft: rgb(201 123 90 / 0.18);
+  --color-chrome-hover: rgb(74 64 57 / 0.06);
+  --color-chrome-hover-strong: rgb(74 64 57 / 0.1);
+  --color-chrome-profile-card-bg: #faf7f2;
+  --color-chrome-profile-card-active-bg: #f1e8da;
+  --color-chrome-profile-card-border: #ddd2c4;
+  --color-chrome-profile-card-active-border: #c97b5a;
+  --color-chrome-badge-bg: #e8dece;
+  --color-chrome-sessions-well-bg: rgb(74 64 57 / 0.06);
+  --color-chrome-pane-header-unfocused: rgb(241 232 218 / 0.88);
+  --color-terminal-bg: #2c2420;
   /* Semantic sidebar tokens */
   --color-sidebar-accent: rgb(255 255 255 / 0.06);
   --color-foreground: var(--color-chrome-text);
@@ -225,23 +289,39 @@ input:focus-visible,
    inherit all 3 themes. The brand "accent" is intentionally NOT remapped;
    shadcn's hover/selected surface uses --accent-surface instead. */
 :root {
-  --background: var(--color-chrome-bg);
-  --card: var(--color-chrome-surface-raised);
-  --card-foreground: var(--color-chrome-text);
-  --popover: var(--color-chrome-surface-menu);
-  --popover-foreground: var(--color-chrome-text);
-  --primary: var(--color-accent);
-  --primary-foreground: var(--color-on-accent);
-  --secondary: var(--color-chrome-surface-hover);
-  --secondary-foreground: var(--color-chrome-text);
-  --muted: var(--color-chrome-surface);
-  --accent-surface: var(--color-chrome-surface-hover-strong);
-  --accent-surface-foreground: var(--color-chrome-text);
+  --cream: #fbf7f0;
+  --surface: #ffffff;
+  --sand: #f1e8da;
+  --sand-deep: #e8dece;
+  --clay: #c97b5a;
+  --clay-soft: #d08a66;
+  --clay-deep: #b26544;
+  --ink: #4a4039;
+  --muted: #9b8e80;
+  --success: #7fb069;
+  --r-card: 28px;
+  --r-control: 22px;
+  --r-bubble: 20px;
+  --ease-in: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-warm-card: 0 12px 40px -12px rgb(120 90 60 / 0.18), 0 0 0 1px rgb(120 90 60 / 0.04);
+  --shadow-warm-accent: 0 4px 14px -6px rgb(201 123 90 / 0.45);
+  --background: var(--color-cream);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-clay);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-sand);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-sand);
+  --accent-surface: var(--color-sand-deep);
+  --accent-surface-foreground: var(--color-ink);
   --destructive: var(--color-fail);
   --destructive-foreground: #ffffff;
-  --input: var(--color-chrome-border-input);
-  --ring: var(--color-chrome-border-focus);
-  --radius: 0.625rem;
+  --input: var(--color-sand);
+  --ring: var(--color-clay);
+  --radius: 0.875rem;
 }
 
 @theme inline {
@@ -267,7 +347,85 @@ input:focus-visible,
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* App color themes (default: dark — matches @theme above) */
+/* App color themes (default: warm — inventory + terminal chrome share warm palette) */
+html[data-app-theme="warm"] {
+  /* Same as @theme defaults */
+}
+
+html[data-app-theme="dark"] {
+  --color-bg-primary: #0d1117;
+  --color-bg-secondary: #161b22;
+  --color-bg-card: #21262d;
+  --color-bg-elevated: #1c2128;
+  --color-bg-overlay: rgb(1 4 9 / 0.72);
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #8b949e;
+  --color-text-tertiary: #6e7681;
+  --color-accent: #38bdf8;
+  --color-accent-hover: #7dd3fc;
+  --color-accent-soft: rgb(56 189 248 / 0.14);
+  --color-on-accent: #06141d;
+  --color-ok: #3fb950;
+  --color-fail: #f85149;
+  --color-warn: #d29922;
+  --color-border: #30363d;
+  --color-border-strong: #444c56;
+  --color-border-subtle: #21262d;
+  --color-scrollbar-thumb-hover: #484f58;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.28);
+  --shadow-pop: 0 8px 24px -6px rgb(0 0 0 / 0.5);
+  --shadow-float: 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --background: var(--color-chrome-bg);
+  --card: var(--color-chrome-surface-raised);
+  --card-foreground: var(--color-chrome-text);
+  --popover: var(--color-chrome-surface-menu);
+  --popover-foreground: var(--color-chrome-text);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-on-accent);
+  --secondary: var(--color-chrome-surface-hover);
+  --secondary-foreground: var(--color-chrome-text);
+  --muted: var(--color-chrome-surface);
+  --accent-surface: var(--color-chrome-surface-hover-strong);
+  --accent-surface-foreground: var(--color-chrome-text);
+  --input: var(--color-chrome-border-input);
+  --ring: var(--color-chrome-border-focus);
+  --color-chrome-bg: #0a0a0a;
+  --color-chrome-bg-top: #0c0c0e;
+  --color-chrome-bg-bottom: #09090b;
+  --color-chrome-surface: #111114;
+  --color-chrome-surface-raised: #141414;
+  --color-chrome-surface-focus: #131316;
+  --color-chrome-surface-hover: #1a1a1a;
+  --color-chrome-surface-hover-strong: #1f1f1f;
+  --color-chrome-surface-menu: #151515;
+  --color-chrome-border: #1a1a1e;
+  --color-chrome-border-subtle: #252525;
+  --color-chrome-border-input: #252528;
+  --color-chrome-border-strong: #2a2a2a;
+  --color-chrome-border-hover: #404040;
+  --color-chrome-border-focus: #3a3a42;
+  --color-chrome-text: #e8e8ec;
+  --color-chrome-text-secondary: #b4b4ba;
+  --color-chrome-text-muted: #8b8b92;
+  --color-chrome-text-subtle: #6b6b6b;
+  --color-chrome-text-faint: #6b6b72;
+  --color-chrome-text-dim: #5c5c64;
+  --color-chrome-accent-text: #8ab4ff;
+  --color-chrome-ui-accent: #38bdf8;
+  --color-chrome-ui-accent-soft: rgb(56 189 248 / 0.14);
+  --color-chrome-hover: rgb(255 255 255 / 0.04);
+  --color-chrome-hover-strong: rgb(255 255 255 / 0.06);
+  --color-chrome-profile-card-bg: #111113;
+  --color-chrome-profile-card-active-bg: #12161f;
+  --color-chrome-profile-card-border: #303035;
+  --color-chrome-profile-card-active-border: #3a5070;
+  --color-chrome-badge-bg: #1e1e22;
+  --color-chrome-sessions-well-bg: rgb(0 0 0 / 0.22);
+  --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.4);
+  --color-sidebar-accent: rgb(255 255 255 / 0.06);
+  --color-terminal-bg: #0c0c0c;
+}
+
 html[data-app-theme="light"] {
   --color-bg-primary: #f6f8fa;
   --color-bg-secondary: #ffffff;
@@ -313,6 +471,8 @@ html[data-app-theme="light"] {
   --color-chrome-text-faint: #64748b;
   --color-chrome-text-dim: #94a3b8;
   --color-chrome-accent-text: #0284c7;
+  --color-chrome-ui-accent: #0284c7;
+  --color-chrome-ui-accent-soft: rgb(2 132 199 / 0.14);
   --color-chrome-hover: rgb(15 23 42 / 0.04);
   --color-chrome-hover-strong: rgb(15 23 42 / 0.08);
   --color-chrome-profile-card-bg: #f8fafc;
@@ -325,6 +485,32 @@ html[data-app-theme="light"] {
   --color-sidebar-accent: rgb(15 23 42 / 0.08);
   --color-foreground: var(--color-chrome-text);
   --color-muted-foreground: var(--color-chrome-text-muted);
+  --background: var(--color-bg-secondary);
+  --card: var(--color-bg-card);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-bg-elevated);
+  --popover-foreground: var(--color-text-primary);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-on-accent);
+  --secondary: var(--color-sand, #f1e8da);
+  --secondary-foreground: var(--color-text-primary);
+  --input: var(--color-border);
+  --ring: var(--color-accent);
+  --color-terminal-bg: #1e1e1e;
+}
+
+/* Warm glow focus — all surfaces including terminal chrome */
+html[data-app-theme="warm"] input:not(.xterm-helper-textarea):focus-visible,
+html[data-app-theme="warm"] textarea:not(.xterm-helper-textarea):focus-visible,
+html[data-app-theme="warm"] select:focus-visible,
+html:not([data-app-theme]) input:not(.xterm-helper-textarea):focus-visible,
+html:not([data-app-theme]) textarea:not(.xterm-helper-textarea):focus-visible,
+html:not([data-app-theme]) select:focus-visible {
+  outline: none;
+  border-color: var(--color-clay);
+  box-shadow:
+    0 0 0 2px rgb(201 123 90 / 0.35),
+    0 4px 16px -6px rgb(201 123 90 / 0.25);
 }
 
 html[data-app-theme="contrast"] {
@@ -373,6 +559,8 @@ html[data-app-theme="contrast"] {
   --color-chrome-text-faint: #e5e5e5;
   --color-chrome-text-dim: #cccccc;
   --color-chrome-accent-text: #ffff00;
+  --color-chrome-ui-accent: #ffff00;
+  --color-chrome-ui-accent-soft: rgb(255 255 0 / 0.2);
   --color-chrome-hover: rgb(255 255 0 / 0.12);
   --color-chrome-hover-strong: rgb(255 255 0 / 0.2);
   --color-chrome-profile-card-bg: #000000;
@@ -385,4 +573,71 @@ html[data-app-theme="contrast"] {
   --color-sidebar-accent: rgb(255 255 0 / 0.16);
   --color-foreground: var(--color-chrome-text);
   --color-muted-foreground: var(--color-chrome-text-muted);
+  --background: var(--color-bg-primary);
+  --card: var(--color-bg-card);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-bg-elevated);
+  --popover-foreground: var(--color-text-primary);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-on-accent);
+  --secondary: var(--color-bg-card);
+  --secondary-foreground: var(--color-text-primary);
+  --input: var(--color-border);
+  --ring: var(--color-accent);
+  --color-terminal-bg: #000000;
+}
+
+/* Terminal workspace — warm scrollbars + portaled menus inherit chrome tokens */
+[data-surface="chrome"] {
+  color: var(--color-chrome-text);
+  scrollbar-color: var(--color-chrome-border) var(--color-chrome-bg);
+}
+
+[data-surface="chrome"] *::-webkit-scrollbar-track {
+  background: var(--color-chrome-bg);
+}
+
+[data-surface="chrome"] *::-webkit-scrollbar-thumb {
+  background: var(--color-chrome-border);
+}
+
+[data-surface="chrome"] *::-webkit-scrollbar-thumb:hover {
+  background: var(--color-chrome-border-hover);
+}
+
+[data-surface="chrome"] button:focus-visible,
+[data-surface="chrome"] a:focus-visible,
+[data-surface="chrome"] select:focus-visible,
+[data-surface="chrome"] [role="button"]:focus-visible {
+  outline: 2px solid var(--color-chrome-ui-accent);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+html[data-app-theme="warm"] [data-surface="chrome"] button:focus-visible,
+html[data-app-theme="warm"] [data-surface="chrome"] a:focus-visible,
+html[data-app-theme="warm"] [data-surface="chrome"] select:focus-visible,
+html[data-app-theme="warm"] [data-surface="chrome"] [role="button"]:focus-visible,
+html:not([data-app-theme]) [data-surface="chrome"] button:focus-visible,
+html:not([data-app-theme]) [data-surface="chrome"] a:focus-visible,
+html:not([data-app-theme]) [data-surface="chrome"] select:focus-visible,
+html:not([data-app-theme]) [data-surface="chrome"] [role="button"]:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-chrome-ui-accent-soft),
+    0 4px 16px -6px color-mix(in srgb, var(--color-chrome-ui-accent) 25%, transparent);
+}
+
+html[data-surface-context="chrome"] [data-slot="dropdown-menu-content"],
+html[data-surface-context="chrome"] [data-slot="tooltip-content"] {
+  border-color: var(--color-chrome-border-strong);
+  background: var(--color-chrome-surface-menu);
+  color: var(--color-chrome-text);
+  box-shadow: var(--shadow-pop);
+}
+
+html[data-surface-context="chrome"] [data-slot="dropdown-menu-item"]:focus,
+html[data-surface-context="chrome"] [data-slot="dropdown-menu-item"][data-highlighted] {
+  background: var(--color-chrome-surface-hover-strong);
+  color: var(--color-chrome-text);
 }

@@ -88,6 +88,17 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
+  useEffect(() => {
+    if (appMode === "terminal") {
+      document.documentElement.dataset.surfaceContext = "chrome";
+    } else {
+      delete document.documentElement.dataset.surfaceContext;
+    }
+    return () => {
+      delete document.documentElement.dataset.surfaceContext;
+    };
+  }, [appMode]);
+
   const goTo = (tab: TabId) => {
     handleModeChange("inventory");
     setActiveTab(tab);
@@ -163,7 +174,13 @@ export function App() {
       <AppUpdateModal />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
 
-      <header className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-bg-primary px-2">
+      <header
+        className={`flex h-9 shrink-0 items-center gap-1 border-b px-2 ${
+          appMode === "terminal"
+            ? "border-chrome-border bg-chrome-bg text-chrome-text"
+            : "border-border bg-bg-primary text-text-primary"
+        }`}
+      >
         <AppModeSwitch mode={appMode} onChange={handleModeChange} disabled={!ready && scanning} />
 
         {appMode === "terminal" && (scanning || enriching) && hasData && (
@@ -179,10 +196,20 @@ export function App() {
             type="button"
             onClick={() => setPaletteOpen(true)}
             title={t("app.cmdk")}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary transition-colors duration-150 hover:border-border-strong hover:text-text-primary"
+            className={`flex cursor-pointer items-center gap-1.5 rounded-[22px] border px-2 py-1 text-[11px] transition-colors duration-150 ${
+              appMode === "terminal"
+                ? "border-chrome-border-strong bg-chrome-surface text-chrome-text-secondary hover:border-chrome-border-hover hover:bg-chrome-hover hover:text-chrome-text"
+                : "border-border bg-bg-secondary text-text-secondary hover:border-border-strong hover:text-text-primary"
+            }`}
           >
             <span>{t("app.cmdk")}</span>
-            <kbd className="rounded border border-border-subtle bg-bg-card px-1 text-[10px] text-text-tertiary">
+            <kbd
+              className={`rounded border px-1 text-[10px] ${
+                appMode === "terminal"
+                  ? "border-chrome-border-subtle bg-chrome-surface-raised text-chrome-text-faint"
+                  : "border-border-subtle bg-bg-card text-text-tertiary"
+              }`}
+            >
               {IS_MAC ? "⌘K" : "Ctrl K"}
             </kbd>
           </button>
@@ -202,12 +229,12 @@ export function App() {
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {showSpinner && appMode === "terminal" && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-chrome-bg">
             <Spinner label={t("app.detecting")} />
           </div>
         )}
         {error && !hasData && appMode === "terminal" && (
-          <p className="absolute inset-0 flex items-center justify-center text-text-secondary">
+          <p className="absolute inset-0 flex items-center justify-center bg-chrome-bg text-chrome-text-muted">
             {t("app.loadInventoryFailed")}
           </p>
         )}

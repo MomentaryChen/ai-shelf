@@ -67,8 +67,9 @@ export const TERMINAL_OPTIONS: { value: ExternalTerminal; label: string }[] = [
 ];
 
 export const BG_PRESETS = [
+  { label: "Warm ink", value: "#2c2420", preview: "#2c2420" },
+  { label: "App theme", value: "", preview: "var(--color-terminal-bg)" },
   { label: "Windows Terminal", value: "#0c0c0c", preview: "#0c0c0c" },
-  { label: "App theme", value: "", preview: "var(--color-bg-primary)" },
   { label: "Pure black", value: "#000000", preview: "#000000" },
   { label: "PowerShell blue", value: "#012456", preview: "#012456" },
   { label: "VS Code", value: "#1e1e1e", preview: "#1e1e1e" },
@@ -120,7 +121,7 @@ const DEFAULTS: ChatSettings = {
   locale: detectSystemLocale(),
   appTheme: DEFAULT_APP_THEME,
   externalTerminal: "auto",
-  terminalBg: "#0c0c0c",
+  terminalBg: "#2c2420",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
   terminalScrollback: DEFAULT_TERMINAL_SCROLLBACK,
@@ -183,5 +184,12 @@ export function bumpDirHistory(history: string[], dir: string, max = 12): string
 }
 
 export function getAppBg(): string {
-  return getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() || "#0f172a";
+  const terminalBg = getComputedStyle(document.documentElement)
+    .getPropertyValue("--color-terminal-bg")
+    .trim();
+  if (terminalBg) return terminalBg;
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() ||
+    "#2c2420"
+  );
 }

@@ -15,6 +15,7 @@ import { EmptyState } from "./EmptyState";
 import { toolLabel } from "../utils";
 import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
+import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
@@ -159,6 +160,7 @@ export function ChatTab({
   const restoreInFlightRef = useRef(false);
 
   const panes = layout ? collectPanes(layout) : [];
+  const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
   const paneShortcutLabels = useMemo(() => {
     const b = settings.paneShortcuts;
     const profile = formatProfileQuickSwitchLabels();
@@ -1192,7 +1194,7 @@ export function ChatTab({
   const terminalArea = layout ? (
     <div
       className={`relative flex min-h-0 flex-1 flex-col overflow-hidden p-1.5 ${
-        displayDropActive ? "ring-2 ring-inset ring-accent/40" : ""
+        displayDropActive ? "ring-2 ring-inset ring-chrome-ui-accent/40" : ""
       }`}
       onDragOver={handleDisplayDragOver}
       onDragLeave={(e) => {
@@ -1335,7 +1337,7 @@ export function ChatTab({
 
   return (
     <TooltipProvider>
-      <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text">
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text" data-surface="chrome">
         {sidebarDialogs}
         {sidebar}
         {!sidebarCollapsed && (
@@ -1357,6 +1359,7 @@ export function ChatTab({
             </div>
           )}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
+          <TerminalStatusBar pane={focusedPane} />
         </div>
       </div>
     </TooltipProvider>
@@ -1424,10 +1427,10 @@ function WarpTopBar({
           )}
           {broadcastInput && paneCount > 1 && (
             <span
-              className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
+              className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
               title={t("chat.broadcastSyncTitle", { count: paneCount })}
             >
-              <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-accent" aria-hidden />
+              <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-chrome-ui-accent" aria-hidden />
               {t("chat.syncLabel")}
             </span>
           )}
@@ -1437,7 +1440,7 @@ function WarpTopBar({
 
       <div className="ml-auto flex items-center gap-2">
         <Button
-          variant="outline"
+          variant="chromeOutline"
           size="sm"
           disabled={!canAddPane || restoring}
           onClick={onOpenFolder}
@@ -1449,7 +1452,7 @@ function WarpTopBar({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="outline"
+              variant="chromeOutline"
               size="sm"
               disabled={!canAddPane}
               title={
@@ -1545,11 +1548,11 @@ function ToolCard({
 
       ) : (
         <div className="mt-auto grid grid-cols-2 gap-3">
-          <Button variant="outline" className="w-full" disabled={extBusy} onClick={handleExternal}>
+          <Button variant="chromeOutline" className="w-full" disabled={extBusy} onClick={handleExternal}>
             {extBusy ? <Loader2 className="animate-spin" /> : <Monitor />}
             {t("chat.externalBtn")}
           </Button>
-          <Button className="w-full" disabled={inAppBusy} onClick={handleInApp}>
+          <Button variant="chromeSolid" className="w-full" disabled={inAppBusy} onClick={handleInApp}>
             {inAppBusy ? <Loader2 className="animate-spin" /> : <Terminal />}
             {t("chat.inAppBtn")}
           </Button>
