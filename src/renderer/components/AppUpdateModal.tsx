@@ -156,7 +156,7 @@ export function AppUpdateModal() {
       aria-modal="true"
       aria-labelledby="app-update-title"
     >
-      <div className="flex max-h-[min(90vh,28rem)] w-full max-w-md flex-col rounded-xl border border-border bg-bg-card shadow-float">
+      <div className="flex max-h-[min(90vh,36rem)] w-full max-w-xl flex-col rounded-xl border border-border bg-bg-card shadow-float">
         <div className="shrink-0 border-b border-border px-6 py-4">
           <h2 id="app-update-title" className="text-lg font-semibold text-text-primary">
             {title}
@@ -178,7 +178,7 @@ export function AppUpdateModal() {
               </p>
               {releaseNotesHtml && (
                 <div
-                  className="release-notes mt-3 max-h-36 overflow-y-auto rounded-lg bg-bg-primary/60 p-3 text-xs text-text-secondary"
+                  className="release-notes mt-3 max-h-48 overflow-y-auto rounded-lg bg-bg-primary/60 p-3 text-xs text-text-secondary"
                   onClick={onReleaseNotesClick}
                   dangerouslySetInnerHTML={{ __html: releaseNotesHtml }}
                 />
@@ -214,15 +214,12 @@ export function AppUpdateModal() {
           {phase === "error" && (
             <>
               <p className="text-sm text-fail">{t(errorSummaryKey)}</p>
-              {errorDetail && errorSummaryKey === "appUpdate.errorDefault" && (
-                <p className="mt-2 break-words font-mono text-xs text-text-secondary">{errorDetail}</p>
-              )}
-              {errorDetail && errorSummaryKey === "appUpdate.errorSignature" && (
-                <details className="mt-3 text-xs text-text-secondary">
+              {errorDetail && (
+                <details className="mt-3 text-xs text-text-secondary" open={errorSummaryKey === "appUpdate.errorDefault"}>
                   <summary className="cursor-pointer select-none text-text-primary">
                     {t("appUpdate.errorDetail")}
                   </summary>
-                  <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-bg-primary/60 p-2 font-mono text-[11px] leading-snug">
+                  <pre className="mt-2 max-h-64 overflow-y-auto overscroll-contain whitespace-pre-wrap break-words rounded-lg bg-bg-primary/60 p-3 font-mono text-[11px] leading-snug">
                     {errorDetail}
                   </pre>
                 </details>
