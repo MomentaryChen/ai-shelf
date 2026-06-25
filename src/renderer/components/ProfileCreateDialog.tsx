@@ -13,6 +13,9 @@ import {
   type ProfileStartFrom,
 } from "../utils/profile-templates";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -259,12 +262,12 @@ export function ProfileCreateDialog({
               </p>
             )}
             <div className="mt-2 flex gap-2">
-              <input
+              <Input
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder={t("profileGroup.quickCreatePlaceholder")}
                 aria-label={t("profileGroup.quickCreatePlaceholder")}
-                className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
+                className="min-w-0 flex-1 border-chrome-border-subtle bg-chrome-bg text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-hover"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -287,27 +290,29 @@ export function ProfileCreateDialog({
             )}
           </label>
 
-        <label className="mb-3 block">
-          <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.name")}</span>
-
-          <input
+        <Label className="mb-3 block">
+          <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
+            {t("profile.dialog.name")}
+          </span>
+          <Input
             ref={nameInputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("profile.dialog.namePlaceholder")}
-            className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
+            className="border-chrome-border-subtle bg-chrome-bg text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-hover"
           />
-        </label>
+        </Label>
 
-        <label className="mb-3 block">
-          <span className="mb-1 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.defaultDir")}</span>
-
+        <Label className="mb-3 block">
+          <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
+            {t("profile.dialog.defaultDir")}
+          </span>
           <div className="flex gap-2">
-            <input
+            <Input
               value={cwd}
               onChange={(e) => setCwd(e.target.value)}
               placeholder={t("profile.dialog.cwdPlaceholder")}
-              className="min-w-0 flex-1 rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus:border-chrome-border-hover focus:outline-none"
+              className="min-w-0 flex-1 border-chrome-border-subtle bg-chrome-bg text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-hover"
             />
             <button
               type="button"
@@ -317,7 +322,7 @@ export function ProfileCreateDialog({
               {t("profile.dialog.browse")}
             </button>
           </div>
-        </label>
+        </Label>
 
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.accentLegend")}</legend>
@@ -358,15 +363,10 @@ export function ProfileCreateDialog({
           </div>
         </fieldset>
 
-        <label className="mb-5 flex cursor-pointer items-center gap-2 rounded-md border border-chrome-border-subtle px-3 py-2.5 text-[13px] text-chrome-text-secondary">
-          <input
-            type="checkbox"
-            checked={broadcastInput}
-            onChange={(e) => setBroadcastInput(e.target.checked)}
-            className="accent-accent"
-          />
+        <Label className="mb-5 flex cursor-pointer items-center gap-2 rounded-md border border-chrome-border-subtle px-3 py-2.5 text-[13px] font-normal text-chrome-text-secondary">
+          <Checkbox checked={broadcastInput} onCheckedChange={(v) => setBroadcastInput(v === true)} />
           {t("profile.syncBroadcast")}
-        </label>
+        </Label>
 
         <DialogFooter className="mt-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>

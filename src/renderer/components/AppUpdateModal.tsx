@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { sanitizeReleaseNotesHtml } from "../utils/releaseNotesHtml";
 import {
   resolveAppUpdateErrorKey,
   shortenAppUpdateErrorDetail,
 } from "../utils/formatAppUpdateError";
 import { useLocale } from "../i18n/LocaleProvider";
-import { Button } from "./Button";
 
 type Phase = "hidden" | "confirm" | "downloading" | "ready" | "error";
 
@@ -110,8 +117,9 @@ export function AppUpdateModal() {
     void window.api.checkAppUpdate();
   };
 
-  if (!enabled || phase === "hidden") return null;
+  if (!enabled) return null;
 
+  const open = phase !== "hidden";
   const title =
     phase === "ready"
       ? t("appUpdate.ready")
@@ -119,49 +127,26 @@ export function AppUpdateModal() {
         ? t("appUpdate.failed")
         : t("appUpdate.available");
 
-  const footer =
-    phase === "confirm" ? (
-      <>
-        <Button type="button" variant="secondary" onClick={dismiss}>
-          {t("appUpdate.later")}
-        </Button>
-        <Button type="button" variant="primary" onClick={startDownload}>
-          {t("appUpdate.now")}
-        </Button>
-      </>
-    ) : phase === "ready" ? (
-      <>
-        <Button type="button" variant="secondary" onClick={dismiss}>
-          {t("appUpdate.restartLater")}
-        </Button>
-        <Button type="button" variant="primary" onClick={restartToInstall}>
-          {t("appUpdate.restartNow")}
-        </Button>
-      </>
-    ) : phase === "error" ? (
-      <>
-        <Button type="button" variant="secondary" onClick={dismiss}>
-          {t("appUpdate.close")}
-        </Button>
-        <Button type="button" variant="primary" onClick={retryCheck}>
-          {t("appUpdate.retry")}
-        </Button>
-      </>
-    ) : null;
-
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-overlay p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="app-update-title"
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) dismiss();
+      }}
     >
-      <div className="flex max-h-[min(90vh,36rem)] w-full max-w-xl flex-col rounded-xl border border-border bg-bg-card shadow-float">
-        <div className="shrink-0 border-b border-border px-6 py-4">
-          <h2 id="app-update-title" className="text-lg font-semibold text-text-primary">
-            {title}
-          </h2>
-        </div>
+      <DialogContent
+        showCloseButton={phase !== "downloading"}
+        className="flex max-h-[min(90vh,36rem)] max-w-xl flex-col gap-0 overflow-hidden border-border bg-bg-card p-0 text-text-primary"
+        onPointerDownOutside={(e) => {
+          if (phase === "downloading") e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (phase === "downloading") e.preventDefault();
+        }}
+      >
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
+          <DialogTitle className="text-lg text-text-primary">{title}</DialogTitle>
+        </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {phase === "confirm" && (
@@ -215,7 +200,10 @@ export function AppUpdateModal() {
             <>
               <p className="text-sm text-fail">{t(errorSummaryKey)}</p>
               {errorDetail && (
-                <details className="mt-3 text-xs text-text-secondary" open={errorSummaryKey === "appUpdate.errorDefault"}>
+                <details
+                  className="mt-3 text-xs text-text-secondary"
+                  open={errorSummaryKey === "appUpdate.errorDefault"}
+                >
                   <summary className="cursor-pointer select-none text-text-primary">
                     {t("appUpdate.errorDetail")}
                   </summary>
@@ -228,12 +216,39 @@ export function AppUpdateModal() {
           )}
         </div>
 
-        {footer ? (
-          <div className="flex shrink-0 justify-end gap-2 border-t border-border px-6 py-4">
-            {footer}
-          </div>
-        ) : null}
-      </div>
-    </div>
+        {phase === "confirm" && (
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+            <Button type="button" variant="outline" onClick={dismiss}>
+              {t("appUpdate.later")}
+            </Button>
+            <Button type="button" onClick={startDownload}>
+              {t("appUpdate.now")}
+            </Button>
+          </DialogFooter>
+        )}
+
+        {phase === "ready" && (
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+            <Button type="button" variant="outline" onClick={dismiss}>
+              {t("appUpdate.restartLater")}
+            </Button>
+            <Button type="button" onClick={restartToInstall}>
+              {t("appUpdate.restartNow")}
+            </Button>
+          </DialogFooter>
+        )}
+
+        {phase === "error" && (
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+            <Button type="button" variant="outline" onClick={dismiss}>
+              {t("appUpdate.close")}
+            </Button>
+            <Button type="button" onClick={retryCheck}>
+              {t("appUpdate.retry")}
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

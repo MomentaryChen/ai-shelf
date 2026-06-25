@@ -1,4 +1,16 @@
 import { useState } from "react";
+import {
+  Card as UiCard,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 export function Card({
   title,
@@ -12,12 +24,9 @@ export function Card({
   title?: React.ReactNode;
   trailing?: React.ReactNode;
   children: React.ReactNode;
-  /** Lift the border on hover — use for cards that act as a clickable target. */
   hoverable?: boolean;
   className?: string;
-  /** When true, the header toggles visibility of the card body. */
   collapsible?: boolean;
-  /** Initial collapsed state when collapsible. */
   defaultCollapsed?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed);
@@ -25,41 +34,51 @@ export function Card({
   const interactive = hoverable
     ? "transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-pop"
     : "";
-  const titleClass =
-    "flex items-center gap-2 text-[15px] font-semibold tracking-tight text-text-primary";
+
+  if (!collapsible) {
+    return (
+      <UiCard className={cn("mb-3 p-5", interactive, className)}>
+        {hasHeader && (
+          <CardHeader className="mb-4">
+            {title && <CardTitle>{title}</CardTitle>}
+            {trailing}
+          </CardHeader>
+        )}
+        <CardContent>{children}</CardContent>
+      </UiCard>
+    );
+  }
 
   return (
-    <div
-      className={`mb-3 rounded-xl border border-border bg-bg-secondary p-5 shadow-card ${interactive} ${className}`.trim()}
+    <Collapsible
+      open={!collapsed}
+      onOpenChange={(open) => setCollapsed(!open)}
+      className={cn("mb-3", className)}
     >
-      {hasHeader &&
-        (collapsible ? (
-          <div
-            role="button"
-            tabIndex={0}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed((c) => !c)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setCollapsed((c) => !c);
-              }
-            }}
-            className={`flex cursor-pointer select-none items-center justify-between gap-3 ${collapsed ? "" : "mb-4"}`}
-          >
-            <div className={titleClass}>
-              <span className="w-3 shrink-0 text-xs text-text-tertiary">{collapsed ? "▶" : "▼"}</span>
-              {title}
-            </div>
-            {trailing}
-          </div>
-        ) : (
-          <div className="mb-4 flex items-center justify-between gap-3">
-            {title && <div className={titleClass}>{title}</div>}
-            {trailing}
-          </div>
-        ))}
-      {(!collapsible || !collapsed) && children}
-    </div>
+      <UiCard className={cn("p-5", interactive)}>
+        {hasHeader && (
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "flex w-full cursor-pointer select-none items-center justify-between gap-3 text-left",
+                collapsed ? "" : "mb-4",
+              )}
+            >
+              <CardTitle>
+                <span className="w-3 shrink-0 text-xs text-text-tertiary">
+                  {collapsed ? "▶" : "▼"}
+                </span>
+                {title}
+              </CardTitle>
+              {trailing}
+            </button>
+          </CollapsibleTrigger>
+        )}
+        <CollapsibleContent>
+          <CardContent>{children}</CardContent>
+        </CollapsibleContent>
+      </UiCard>
+    </Collapsible>
   );
 }

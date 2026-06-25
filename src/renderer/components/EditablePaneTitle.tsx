@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { normalizePaneTitle } from "../utils/pane-label";
+import { Input } from "@/components/ui/input";
 import { useLocale } from "../i18n/LocaleProvider";
 
 interface Props {
@@ -55,7 +56,7 @@ export function EditablePaneTitle({
 
   if (editing) {
     return (
-      <input
+      <Input
         ref={inputRef}
         type="text"
         value={draft}
@@ -64,9 +65,8 @@ export function EditablePaneTitle({
         onKeyDown={onKeyDown}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        className={`min-w-0 flex-1 rounded border border-chrome-border-hover bg-chrome-surface-raised px-1.5 py-0.5 text-[12px] text-chrome-text outline-none focus:border-accent ${inputClassName}`}
+        className={`h-auto min-w-0 flex-1 rounded border-chrome-border-hover bg-chrome-surface-raised px-1.5 py-0.5 text-[12px] text-chrome-text focus-visible:border-accent ${inputClassName}`}
         aria-label={t("pane.tabTitle")}
-
       />
     );
   }

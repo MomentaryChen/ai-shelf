@@ -1,10 +1,25 @@
-export function Tag({ children, title }: { children: React.ReactNode; title?: string }) {
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+export function Tag({
+  children,
+  title,
+  className,
+}: {
+  children: React.ReactNode;
+  title?: string;
+  className?: string;
+}) {
   return (
-    <span
+    <Badge
+      variant="outline"
       title={title}
-      className="inline-block rounded-md border border-border-subtle bg-bg-card px-2 py-0.5 text-xs text-text-secondary transition-colors duration-150 hover:border-border-strong hover:text-text-primary"
+      className={cn(
+        "rounded-md px-2 py-0.5 text-xs font-normal text-text-secondary transition-colors duration-150 hover:border-border-strong hover:text-text-primary",
+        className,
+      )}
     >
       {children}
-    </span>
+    </Badge>
   );
 }

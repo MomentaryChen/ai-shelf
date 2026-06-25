@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocale } from "../i18n/LocaleProvider";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -41,12 +42,12 @@ export function ProfileGroupNameDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <input
+        <Input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("profileGroup.namePlaceholder")}
-          className="h-9 w-full rounded-lg border border-chrome-border-input bg-chrome-surface-focus px-2.5 text-[13px] text-chrome-text focus:border-chrome-border-focus focus:outline-none"
+          className="border-chrome-border-input bg-chrome-surface-focus text-[13px] text-chrome-text focus-visible:border-chrome-border-focus"
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter" && name.trim()) onSubmit(name.trim());

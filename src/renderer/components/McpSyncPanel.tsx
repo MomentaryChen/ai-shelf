@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { McpRawData, McpSyncResult } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
-import { Button } from "./Button";
+import { Button } from "@/components/ui/button";
 
 import { MCP_SYNC_TOOL_IDS } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -142,7 +142,6 @@ export function McpSyncPanel() {
           <div className="ml-auto flex gap-2">
             <Button
               size="sm"
-              variant="primary"
               onClick={() => doSync([...selected])}
               disabled={syncing || selected.size === 0 || targetTools.size === 0}
             >
@@ -150,7 +149,7 @@ export function McpSyncPanel() {
             </Button>
             <Button
               size="sm"
-              variant="secondary"
+              variant="outline"
               onClick={() => doSync(syncableServers)}
               disabled={syncing || targetTools.size === 0}
             >

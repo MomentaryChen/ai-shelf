@@ -7,6 +7,7 @@ import {
   type PaneFocusPaneBinding,
   type PaneShortcutBindings,
 } from "../terminal/pane-key-bindings";
+import { Button } from "@/components/ui/button";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 
@@ -90,13 +91,15 @@ export function PaneShortcutBindingsEditor({ bindings, onChange, compact = false
       />
       <p className="text-[11px] leading-snug text-text-tertiary">{t("settings.paneShortcut.hint")}</p>
       <div className="flex justify-end">
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           onClick={resetDefaults}
-          className="cursor-pointer text-[10px] text-text-tertiary transition-colors hover:text-text-primary"
+          className="h-auto p-0 text-[10px] text-text-tertiary hover:text-text-primary"
         >
           {t("settings.resetDefault")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -119,17 +122,19 @@ function ShortcutRow({
   return (
     <div className={className}>
       <span className="min-w-0 text-[12px] text-text-secondary">{label}</span>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={onStart}
-        className={`shrink-0 cursor-pointer rounded-md border px-3 py-1.5 font-mono text-[12px] transition-all duration-150 ${
+        className={`shrink-0 font-mono text-[12px] ${
           recording
-            ? "border-accent/60 bg-accent/10 text-accent"
+            ? "border-accent/60 bg-accent/10 text-accent hover:bg-accent/10"
             : "border-border bg-bg-secondary text-text-primary hover:border-accent/40"
         }`}
       >
         {recording ? t("settings.paneShortcut.pressKeys") : display}
-      </button>
+      </Button>
     </div>
   );
 }
