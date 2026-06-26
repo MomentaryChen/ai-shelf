@@ -1,8 +1,10 @@
 /** Types mirroring the inventory data from the main process. */
 
 import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
+import type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
+export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -698,6 +700,11 @@ export interface ElectronAPI {
   ) => Promise<{ ok: true; state: AuthStatePublic } | { ok: false; error: string }>;
   authClearSession: () => Promise<{ ok: true; state: AuthStatePublic }>;
   authGetState: (configured: boolean) => Promise<AuthStatePublic>;
+  syncExportLocal: () => Promise<{ ok: true; bundle: SyncBundle } | { ok: false; error: string }>;
+  syncApplyBundle: (bundle: SyncBundle) => Promise<{ ok: true } | { ok: false; error: string }>;
+  syncGetMeta: () => Promise<SyncMeta>;
+  syncSetMeta: (partial: Partial<SyncMeta>) => Promise<{ ok: true; meta: SyncMeta } | { ok: false; error: string }>;
+  onSyncDataApplied: (cb: () => void) => () => void;
 }
 
 declare global {

@@ -180,4 +180,13 @@ contextBridge.exposeInMainWorld("api", {
   authReportSession: (report) => ipcRenderer.invoke("auth-report-session", report),
   authClearSession: () => ipcRenderer.invoke("auth-clear-session"),
   authGetState: (configured) => ipcRenderer.invoke("auth-get-state", configured),
+  syncExportLocal: () => ipcRenderer.invoke("sync-export-local"),
+  syncApplyBundle: (bundle) => ipcRenderer.invoke("sync-apply-bundle", bundle),
+  syncGetMeta: () => ipcRenderer.invoke("sync-get-meta"),
+  syncSetMeta: (partial) => ipcRenderer.invoke("sync-set-meta", partial),
+  onSyncDataApplied: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("sync-data-applied", handler);
+    return () => ipcRenderer.off("sync-data-applied", handler);
+  },
 });
