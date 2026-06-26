@@ -8,6 +8,7 @@ import { syncMainProcessFromSettings } from "./system-tray-sync";
 import { SettingsWindowApp } from "./SettingsWindowApp";
 import { LocaleProvider } from "./i18n/LocaleProvider";
 import { useAuthSessionBridge } from "./hooks/useAuthSession";
+import { useCloudSyncOnSignIn } from "./hooks/useCloudSync";
 import "./index.css";
 
 applyAppTheme(loadSettings().appTheme);
@@ -17,6 +18,7 @@ const route = window.location.hash.replace(/^#\/?/, "");
 
 function AuthBridge() {
   useAuthSessionBridge();
+  useCloudSyncOnSignIn();
   return null;
 }
 

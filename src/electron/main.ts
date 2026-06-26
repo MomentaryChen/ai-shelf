@@ -94,6 +94,7 @@ import {
 import { showPaneAgentNotification, syncTrayPaneAttention } from "./agent-notify.js";
 import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
 import { registerAuthHandlers } from "./auth-handlers.js";
+import { registerSyncHandlers } from "./sync-handlers.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 import { runChecksForEntry } from "./doctor-checks.js";
 import {
@@ -106,6 +107,7 @@ import {
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerAuthHandlers();
+registerSyncHandlers();
 registerUsageHandlers();
 
 /** Update commands for each AI tool */

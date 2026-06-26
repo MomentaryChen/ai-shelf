@@ -148,12 +148,17 @@ export const zh: Record<MessageKey, string> = {
   "settings.custom": "自訂",
   "settings.account": "帳號與同步",
   "settings.accountHint":
-    "使用 Google 登入以連結此裝置。雲端同步將以此身分識別（即將推出）。",
+    "使用 Google 登入，在裝置間同步 Profile 與版面配置。資料會儲存在你的 Firestore 帳號下。",
   "settings.accountNotConfigured":
     "尚未設定 Google 登入。請在 .env.local 填入 Firebase 設定（參考 .env.example）。",
   "settings.accountSignInGoogle": "使用 Google 登入",
   "settings.accountSignOut": "登出",
   "settings.accountSignInFailed": "登入失敗：{error}",
+  "settings.accountSyncNow": "立即同步",
+  "settings.accountSyncing": "同步中…",
+  "settings.accountLastSync": "上次同步：{time}",
+  "settings.accountNeverSynced": "此裝置尚未同步",
+  "settings.accountSyncFailed": "同步失敗：{error}",
   "settings.backup": "資料備份與還原",
   "settings.backupHint":
     "將 Profile、版面、工作區與 App 設定匯出成檔案。換機、重裝或升級時可還原資料。",
