@@ -285,5 +285,5 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 ## 備註
 
 - 截圖順序由 `tests/e2e/screenshot.spec.ts` 產出，檔名與順序請與本文件、`pages.md` 保持一致。
-- Release 前重產 README/docs 圖片：`pnpm gen:docs-assets`（見 [RELEASE.md](RELEASE.md)）。
+- Release 前重產 README/docs 圖片：在 Windows CI 跑 **Actions → Docs assets**（正式來源），或本地 `pnpm gen:docs-assets` 預覽 — 見 [RELEASE.md](RELEASE.md)。
 - 若 Inventory 分頁標籤或順序異動，請同步更新中英文頁面與前述測試常數。
