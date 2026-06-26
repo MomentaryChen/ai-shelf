@@ -1,8 +1,8 @@
 import { SETTINGS_KEY, type ChatSettings } from "../chat-settings.js";
 import {
   DEFAULT_LOCALE,
-  detectSystemLocale,
-  resolveLocale,
+  normalizeLocalePreference,
+  resolveLocalePreference,
   translate,
   type AppLocale,
   type MessageKey,
@@ -12,7 +12,7 @@ import {
 export function getStoredLocale(): AppLocale {
   try {
     const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as Partial<ChatSettings>;
-    return resolveLocale(stored.locale ?? detectSystemLocale());
+    return resolveLocalePreference(normalizeLocalePreference(stored.locale));
   } catch {
     return DEFAULT_LOCALE;
   }

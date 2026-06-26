@@ -1,5 +1,10 @@
 import { DEFAULT_APP_THEME, normalizeAppTheme, type AppColorTheme } from "./app-theme";
-import { detectSystemLocale, resolveLocale, type AppLocale } from "./i18n/index.js";
+import {
+  DEFAULT_LOCALE_PREFERENCE,
+  normalizeLocalePreference,
+  type AppLocale,
+  type LocalePreference,
+} from "./i18n/index.js";
 import {
   normalizeToolLaunchArgs,
   type ToolLaunchArgs,
@@ -10,7 +15,7 @@ import {
   type PaneShortcutBindings,
 } from "./terminal/pane-key-bindings";
 
-export type { AppColorTheme, AppLocale };
+export type { AppColorTheme, AppLocale, LocalePreference };
 
 export type ExternalTerminal = "auto" | "wt" | "pwsh" | "powershell" | "cmd";
 
@@ -30,7 +35,7 @@ const MIN_TERMINAL_PTY_BUFFER_CHARS = 256 * 1024;
 const MAX_TERMINAL_PTY_BUFFER_CHARS = 64 * 1024 * 1024;
 
 export interface ChatSettings {
-  locale: AppLocale;
+  locale: LocalePreference;
   /** App UI color theme (light / dark / high contrast). */
   appTheme: AppColorTheme;
   externalTerminal: ExternalTerminal;
@@ -158,7 +163,7 @@ function normalizeSystemTrayEnabled(raw: unknown): boolean {
 }
 
 const DEFAULTS: ChatSettings = {
-  locale: detectSystemLocale(),
+  locale: DEFAULT_LOCALE_PREFERENCE,
   appTheme: DEFAULT_APP_THEME,
   externalTerminal: "auto",
   terminalBg: "#2c2420",
@@ -187,7 +192,7 @@ export function loadSettings(): ChatSettings {
     return {
       ...DEFAULTS,
       ...stored,
-      locale: resolveLocale(stored.locale ?? DEFAULTS.locale),
+      locale: normalizeLocalePreference(stored.locale ?? DEFAULTS.locale),
       appTheme: normalizeAppTheme(stored.appTheme),
       terminalBg: normalizeTerminalBg(stored.terminalBg),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),

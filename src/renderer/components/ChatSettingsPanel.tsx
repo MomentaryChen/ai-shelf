@@ -28,7 +28,7 @@ import { useLocale } from "../i18n/LocaleProvider";
 import { PaneShortcutBindingsEditor } from "./PaneShortcutBindingsEditor";
 import { ToolLaunchArgsEditor } from "./ToolLaunchArgsEditor";
 import type { AppColorTheme } from "../app-theme";
-import type { AppLocale } from "../i18n/index";
+import type { LocalePreference } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
 import { syncMainProcessFromSettings } from "../system-tray-sync";
 import { useHealthMonitor } from "../hooks/useHealthMonitor";
@@ -70,12 +70,14 @@ const PTY_BUFFER_LABEL_KEYS: Record<number, MessageKey> = {
   [64 * 1024 * 1024]: "ptyBuffer.64m",
 };
 
-const LOCALE_OPTIONS: { value: AppLocale; labelKey: MessageKey }[] = [
+const LOCALE_OPTIONS: { value: LocalePreference; labelKey: MessageKey }[] = [
+  { value: "system", labelKey: "settings.language.system" },
   { value: "en", labelKey: "settings.language.en" },
   { value: "zh", labelKey: "settings.language.zh" },
 ];
 
 const THEME_LABEL_KEYS: Record<AppColorTheme, MessageKey> = {
+  system: "settings.theme.system",
   warm: "settings.theme.warm",
   light: "settings.theme.light",
   dark: "settings.theme.dark",
@@ -101,7 +103,7 @@ function dirOptionLabel(dir: string): string {
 }
 
 export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
-  const { locale, setLocale, t } = useLocale();
+  const { localePreference, setLocale, t } = useLocale();
   const { state: healthState, setPrefs: setHealthPrefs } = useHealthMonitor();
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
   const [backupBusy, setBackupBusy] = useState<"export" | "import" | null>(null);
@@ -215,11 +217,11 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         <p className={sectionTitle}>{t("settings.language")}</p>
         <ToggleGroup
           type="single"
-          value={locale}
+          value={localePreference}
           onValueChange={(value) => {
             if (!value) return;
-            setLocale(value as AppLocale);
-            updateSettings({ locale: value as AppLocale });
+            setLocale(value as LocalePreference);
+            updateSettings({ locale: value as LocalePreference });
           }}
         >
           {LOCALE_OPTIONS.map((opt) => (

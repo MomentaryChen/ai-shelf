@@ -3,12 +3,27 @@ import { zh } from "./messages/zh.js";
 
 export type AppLocale = "en" | "zh";
 
+export type LocalePreference = "system" | AppLocale;
+
 export const DEFAULT_LOCALE: AppLocale = "en";
+
+export const DEFAULT_LOCALE_PREFERENCE: LocalePreference = "system";
 
 const MESSAGES: Record<AppLocale, Record<MessageKey, string>> = { en, zh };
 
+export function normalizeLocalePreference(raw: unknown): LocalePreference {
+  if (raw === "system" || raw === "en" || raw === "zh") return raw;
+  return DEFAULT_LOCALE_PREFERENCE;
+}
+
+export function resolveLocalePreference(pref: LocalePreference): AppLocale {
+  if (pref === "system") return detectSystemLocale();
+  return pref;
+}
+
+/** @deprecated Use normalizeLocalePreference + resolveLocalePreference. */
 export function resolveLocale(raw: unknown): AppLocale {
-  return raw === "zh" ? "zh" : "en";
+  return resolveLocalePreference(normalizeLocalePreference(raw));
 }
 
 export function detectSystemLocale(): AppLocale {
