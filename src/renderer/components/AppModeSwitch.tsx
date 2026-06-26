@@ -22,7 +22,7 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
     <nav
       role="tablist"
       aria-label={t("app.mode.aria")}
-      className="flex shrink-0 items-center rounded-md bg-bg-secondary p-0.5"
+      className="flex shrink-0 items-center rounded-md bg-bg-secondary p-0.5 transition-colors duration-200"
     >
       <ToggleGroup
         type="single"

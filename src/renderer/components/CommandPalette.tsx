@@ -200,7 +200,7 @@ export function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-bg-overlay px-4 pt-[12vh]"
+      className="ui-backdrop-enter fixed inset-0 z-50 flex items-start justify-center bg-bg-overlay px-4 pt-[12vh]"
       onMouseDown={onClose}
     >
       <div
