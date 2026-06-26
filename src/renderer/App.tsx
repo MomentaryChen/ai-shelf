@@ -14,6 +14,7 @@ import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
 import { InventoryNav, type NavItem } from "./components/InventoryNav";
 import { CommandPalette, type Command } from "./components/CommandPalette";
 import { useInventoryScan } from "./hooks/useInventoryScan";
+import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
 
@@ -74,6 +75,20 @@ export function App() {
     setModelOverrides,
     reload,
   } = useInventoryScan();
+
+  const { state: healthState, refresh: refreshHealth } = useHealthMonitor();
+
+  const navBadges = useMemo(() => {
+    if (!healthState?.prefs.backgroundChecksEnabled) return undefined;
+    const badges: Partial<Record<TabId, number>> = {};
+    const doctorCount =
+      healthState.doctorSummary.failCount + healthState.doctorSummary.warnCount;
+    if (doctorCount > 0) badges.doctor = doctorCount;
+    if (healthState.outdatedTools.length > 0) {
+      badges.update = healthState.outdatedTools.length;
+    }
+    return Object.keys(badges).length > 0 ? badges : undefined;
+  }, [healthState]);
 
   const tabsEnabled = ready;
   const showSpinner = scanning && !hasData && !error;
@@ -352,6 +367,7 @@ export function App() {
                 active={activeTab}
                 onSelect={setActiveTab}
                 disabled={!tabsEnabled && activeTab !== "usage"}
+                badges={navBadges}
               />
             <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
               <div className="mx-auto w-full max-w-[1400px]">
@@ -364,7 +380,14 @@ export function App() {
                 {hasData && (
                   <>
                     {activeTab === "overview" && (
-                      <OverviewTab data={data} modelOverrides={modelOverrides} />
+                      <OverviewTab
+                        data={data}
+                        modelOverrides={modelOverrides}
+                        healthState={healthState}
+                        onGoDoctor={() => goTo("doctor")}
+                        onGoUpdate={() => goTo("update")}
+                        onRefreshHealth={refreshHealth}
+                      />
                     )}
                     {activeTab === "models" && <ModelsTab data={data} />}
                     {activeTab === "skills" && (

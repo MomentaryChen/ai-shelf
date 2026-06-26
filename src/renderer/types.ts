@@ -114,6 +114,43 @@ export interface McpSyncResult {
   error?: string;
 }
 
+export type McpSyncPreviewAction = "add" | "skip" | "conflict";
+
+export interface McpSyncPreviewItem {
+  serverName: string;
+  targetTool: string;
+  action: McpSyncPreviewAction;
+  sourceTool?: string;
+  incomingJson?: string;
+  existingJson?: string;
+}
+
+export type HealthAlertKind = "update" | "doctor-fail" | "doctor-warn" | "auth";
+
+export interface HealthAlert {
+  id: string;
+  kind: HealthAlertKind;
+  severity: "warn" | "fail";
+  tool?: string;
+  message: string;
+}
+
+export interface HealthMonitorPrefs {
+  backgroundChecksEnabled: boolean;
+  trayBadgeEnabled: boolean;
+  weeklyDoctorSummary: boolean;
+}
+
+export interface HealthMonitorState {
+  lastCheckAt: string | null;
+  lastWeeklySummaryAt: string | null;
+  checking: boolean;
+  alerts: HealthAlert[];
+  outdatedTools: { tool: string; current: string; latest: string }[];
+  doctorSummary: { failCount: number; warnCount: number; tools: string[] };
+  prefs: HealthMonitorPrefs;
+}
+
 export interface SkillsRawData {
   [tool: string]: {
     skills: Record<string, { name: string; description?: string; path: string; scope: string }>;
@@ -447,6 +484,16 @@ export interface ElectronAPI {
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
+  previewMcpSync: (opts: {
+    serverNames: string[];
+    targetTools: string[];
+  }) => Promise<McpSyncPreviewItem[]>;
+  getHealthMonitorState: () => Promise<HealthMonitorState>;
+  runHealthCheck: () => Promise<HealthMonitorState>;
+  setHealthMonitorPrefs: (
+    partial: Partial<HealthMonitorPrefs>,
+  ) => Promise<{ ok: boolean; prefs: HealthMonitorPrefs }>;
+  onHealthMonitorState: (cb: (state: HealthMonitorState) => void) => () => void;
   getSkillsRaw: () => Promise<SkillsRawData>;
   syncSkills: (opts: { skillNames: string[]; targetTools: string[] }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;

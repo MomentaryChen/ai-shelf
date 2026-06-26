@@ -22,7 +22,6 @@ import {
   collectAllMcpServers,
   readMcpServers,
   SYNC_TOOLS,
-  validateMcpConfigPath,
   writeMcpServers,
 } from "../utils/mcp-sync.js";
 import {
@@ -50,6 +49,7 @@ import {
   initAppUpdater,
   isDesktopAutoUpdateEnabled,
   isDesktopUpdateDownloaded,
+  onAppUpdateCheckSettled,
   quitAndInstallAppUpdate,
   scheduleStartupUpdateCheck,
   syncAppUpdateUiToRenderer,
@@ -93,6 +93,15 @@ import {
 } from "./tray.js";
 import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
+import { runChecksForEntry } from "./doctor-checks.js";
+import {
+  applyHealthMonitorPrefs,
+  getHealthMonitorState,
+  initHealthMonitor,
+  onAppUpdateStateChanged,
+  runHealthCheck,
+} from "./health-monitor.js";
+import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerUsageHandlers();
 
@@ -422,49 +431,14 @@ ipcMain.handle("clear-inventory-cache", () => {
 });
 
 /** Shared: run doctor checks for a single inventory entry */
-async function runChecksForEntry(entry: Awaited<ReturnType<typeof detectAll>>[number]) {
-  const checks: { name: string; status: "pass" | "fail" | "warn"; detail: string }[] = [];
-
-  checks.push({
-    name: "binary",
-    status: entry.available ? "pass" : "fail",
-    detail: entry.available
-      ? `${entry.tool} found (${entry.version})`
-      : `${entry.tool} not found in PATH`,
-  });
-
-  if (entry.available) {
-    checks.push({
-      name: "auth",
-      status: entry.auth === "ok" ? "pass" : entry.auth === "missing" ? "fail" : "warn",
-      detail: `auth: ${entry.auth}`,
-    });
-  }
-
-  for (const p of entry.config.paths) {
-    if (p.endsWith(".json")) {
-      const ok = tryReadJson(p) !== null;
-      checks.push({ name: "config", status: ok ? "pass" : "fail", detail: `${ok ? "valid" : "invalid"} JSON: ${p}` });
-    }
-  }
-
-  for (const p of entry.mcp.configPaths) {
-    const ok = validateMcpConfigPath(entry.tool, p);
-    const kind = p.endsWith(".toml") ? "TOML" : "JSON";
-    checks.push({
-      name: "mcp-config",
-      status: ok ? "pass" : "fail",
-      detail: `${ok ? "valid" : "invalid"} MCP config (${kind}): ${p}`,
-    });
-  }
-
-  return { tool: entry.tool, checks };
+async function runDoctorForEntry(entry: Awaited<ReturnType<typeof detectAll>>[number]) {
+  return runChecksForEntry(entry);
 }
 
 ipcMain.handle("run-doctor", async () => {
   const entries = getCachedInventory() ?? await detectAll({ quick: true });
   if (!getCachedInventory()) setInventoryCache(entries);
-  return Promise.all(entries.map(runChecksForEntry));
+  return Promise.all(entries.map(runDoctorForEntry));
 });
 
 ipcMain.handle("doctor-tool", async (_event, tool: string) => {
@@ -477,7 +451,7 @@ ipcMain.handle("doctor-tool", async (_event, tool: string) => {
     entry = detected;
     setInventoryCache(mergeInventoryEntry(getCachedInventory() ?? [], entry));
   }
-  return runChecksForEntry(entry);
+  return runDoctorForEntry(entry);
 });
 
 ipcMain.handle("get-env-vars", () => {
@@ -900,6 +874,32 @@ ipcMain.handle("sync-mcp", async (_event, opts: {
   }
 
   return results;
+});
+
+ipcMain.handle("preview-mcp-sync", (_event, opts: {
+  serverNames: string[];
+  targetTools: string[];
+}) => previewMcpSync(opts));
+
+// --- Health monitor ---
+
+ipcMain.handle("get-health-monitor-state", () => getHealthMonitorState());
+
+ipcMain.handle("run-health-check", () => runHealthCheck());
+
+ipcMain.handle("set-health-monitor-prefs", (_event, partial: unknown) => {
+  if (!partial || typeof partial !== "object") {
+    return { ok: false, prefs: getHealthMonitorState().prefs };
+  }
+  const p = partial as Record<string, unknown>;
+  const patch: Record<string, boolean> = {};
+  if (typeof p.backgroundChecksEnabled === "boolean") {
+    patch.backgroundChecksEnabled = p.backgroundChecksEnabled;
+  }
+  if (typeof p.trayBadgeEnabled === "boolean") patch.trayBadgeEnabled = p.trayBadgeEnabled;
+  if (typeof p.weeklyDoctorSummary === "boolean") patch.weeklyDoctorSummary = p.weeklyDoctorSummary;
+  const prefs = applyHealthMonitorPrefs(patch);
+  return { ok: true, prefs };
 });
 
 // --- Skills Sync ---
@@ -1848,6 +1848,8 @@ app.whenReady().then(() => {
   createWindow();
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
+  initHealthMonitor(() => mainWindow);
+  onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
 });
 
 // Kill all active PTY sessions before the app exits

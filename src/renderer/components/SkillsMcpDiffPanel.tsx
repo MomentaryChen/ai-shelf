@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import type { McpRawData, McpSyncResult, ProviderEntry, SkillSyncResult } from "../types";
+import type { McpRawData, McpSyncPreviewItem, McpSyncResult, ProviderEntry, SkillSyncResult } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { Tag } from "./Tag";
+import { McpSyncPreviewDialog } from "./McpSyncPreviewDialog";
 import {
   findProviderEntry,
   mcpServersMissingInCursor,
@@ -22,6 +23,8 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
   const [syncingSkills, setSyncingSkills] = useState(false);
   const [mcpResults, setMcpResults] = useState<McpSyncResult[] | null>(null);
   const [skillResults, setSkillResults] = useState<SkillSyncResult[] | null>(null);
+  const [mcpPreviewOpen, setMcpPreviewOpen] = useState(false);
+  const [mcpPreviewItems, setMcpPreviewItems] = useState<McpSyncPreviewItem[]>([]);
 
   const claude = findProviderEntry(data, "claude");
   const cursor = findProviderEntry(data, "cursor");
@@ -64,7 +67,7 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
     );
   }
 
-  const doMcpSync = async () => {
+  const executeMcpSync = async () => {
     if (missingMcp.length === 0) return;
     setSyncingMcp(true);
     setMcpResults(null);
@@ -79,6 +82,26 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
       setMcpResults([{ tool: "cursor", added: [], skipped: [], error: "Sync failed" }]);
     } finally {
       setSyncingMcp(false);
+      setMcpPreviewOpen(false);
+    }
+  };
+
+  const doMcpSync = async () => {
+    if (missingMcp.length === 0) return;
+    try {
+      const preview = await window.api.previewMcpSync({
+        serverNames: missingMcp,
+        targetTools: ["cursor"],
+      });
+      const adds = preview.filter((p) => p.action === "add");
+      if (adds.length === 0) {
+        setMcpResults([{ tool: "cursor", added: [], skipped: missingMcp }]);
+        return;
+      }
+      setMcpPreviewItems(preview);
+      setMcpPreviewOpen(true);
+    } catch {
+      await executeMcpSync();
     }
   };
 
@@ -210,6 +233,14 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
           {t("inventory.diffFix.openMcpSync")}
         </button>
       )}
+
+      <McpSyncPreviewDialog
+        open={mcpPreviewOpen}
+        items={mcpPreviewItems}
+        syncing={syncingMcp}
+        onCancel={() => setMcpPreviewOpen(false)}
+        onConfirm={() => void executeMcpSync()}
+      />
     </Card>
   );
 }

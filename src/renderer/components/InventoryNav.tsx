@@ -16,11 +16,13 @@ export function InventoryNav<T extends string>({
   active,
   onSelect,
   disabled = false,
+  badges,
 }: {
   items: NavItem<T>[];
   active: T;
   onSelect: (id: T) => void;
   disabled?: boolean;
+  badges?: Partial<Record<T, number>>;
 }) {
   const { t } = useLocale();
   return (
@@ -33,6 +35,7 @@ export function InventoryNav<T extends string>({
       </div>
       {items.map((it) => {
         const isActive = it.id === active;
+        const badge = badges?.[it.id];
         return (
           <button
             key={it.id}
@@ -58,6 +61,12 @@ export function InventoryNav<T extends string>({
               {it.icon}
             </span>
             <span className="flex-1 truncate">{t(it.labelKey)}</span>
+            {badge != null && badge > 0 && (
+              <span
+                aria-label={`${badge} alerts`}
+                className="h-2 w-2 shrink-0 rounded-full bg-fail"
+              />
+            )}
           </button>
         );
       })}

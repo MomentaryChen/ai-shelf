@@ -1,11 +1,14 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
+import type { NativeImage } from "electron";
 import { getProfileForest, setLastActiveGroup } from "./workspace-host.js";
 
 let tray: Tray | null = null;
 let isQuitting = false;
 let trayDeps: TrayDeps | null = null;
 let minimizeToTrayEnabled = true;
+let baseTrayIcon: NativeImage | null = null;
+let trayHealthAlert = false;
 
 export function isSystemTrayEnabled(): boolean {
   return minimizeToTrayEnabled;
@@ -28,6 +31,40 @@ export function setAppQuitting(quitting: boolean): void {
 
 export function getAppQuitting(): boolean {
   return isQuitting;
+}
+
+/** Draw a small red dot on the tray icon when health alerts are present. */
+function iconWithHealthBadge(base: NativeImage, alert: boolean): NativeImage {
+  if (!alert) return base;
+  const size = base.getSize();
+  const buf = Buffer.from(base.toBitmap());
+  const w = size.width;
+  const dot = 4;
+  for (let dy = 0; dy < dot; dy++) {
+    for (let dx = 0; dx < dot; dx++) {
+      const x = w - dot + dx;
+      const y = dy;
+      const i = (y * w + x) * 4;
+      buf[i] = 0;
+      buf[i + 1] = 0;
+      buf[i + 2] = 220;
+      buf[i + 3] = 255;
+    }
+  }
+  return nativeImage.createFromBuffer(buf, { width: w, height: size.height });
+}
+
+function applyTrayIcon(): void {
+  if (!tray || !baseTrayIcon) return;
+  tray.setImage(iconWithHealthBadge(baseTrayIcon, trayHealthAlert));
+  tray.setToolTip(
+    trayHealthAlert ? "AI Shelf — health attention needed" : "AI Shelf",
+  );
+}
+
+export function setTrayHealthAlert(alert: boolean): void {
+  trayHealthAlert = alert;
+  applyTrayIcon();
 }
 
 function getTerminalWindow(deps: TrayDeps): BrowserWindow | null {
@@ -148,7 +185,8 @@ export function refreshTrayMenu(deps?: TrayDeps): void {
 export function initTray(deps: TrayDeps): Tray {
   trayDeps = deps;
   const icon = nativeImage.createFromPath(deps.iconPath);
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  baseTrayIcon = icon.resize({ width: 16, height: 16 });
+  tray = new Tray(iconWithHealthBadge(baseTrayIcon, trayHealthAlert));
   tray.setToolTip("AI Shelf");
   refreshTrayMenu(deps);
 
