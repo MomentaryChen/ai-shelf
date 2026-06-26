@@ -94,4 +94,28 @@ function CommandItem({
   );
 }
 
-export { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList };
+function CommandShortcut({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="command-shortcut"
+      className={cn(
+        "ml-auto shrink-0 rounded border border-border-subtle bg-bg-card px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-text-tertiary",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+};

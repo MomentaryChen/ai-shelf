@@ -283,6 +283,15 @@ export function ChatTab({
 
   const broadcastActive = broadcastInput && panes.length > 1;
 
+  // Palette "broadcast command" — always sends to every pane and presses Enter,
+  // independent of the broadcast-input toggle (which only mirrors keystrokes).
+  const broadcastCommandToPanes = useCallback((text: string) => {
+    const current = panesRef.current;
+    if (current.length === 0) return;
+    const line = text.endsWith("\n") || text.endsWith("\r") ? text : `${text}\r`;
+    for (const p of current) window.api.ptyWrite(p.sessionId, line);
+  }, []);
+
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === SETTINGS_KEY) {
@@ -801,15 +810,33 @@ export function ChatTab({
           .find((p) => p.id === profileId);
         if (profile) void handleActivateProfileRef.current(profile);
       },
+      broadcastCommand: broadcastCommandToPanes,
     }),
-    [addPane, sidebarForest, settings.toolLaunchArgs, settings.externalTerminal, resolveCwd],
+    [
+      addPane,
+      openExternal,
+      sidebarForest,
+      broadcastCommandToPanes,
+      settings.toolLaunchArgs,
+      settings.externalTerminal,
+      resolveCwd,
+    ],
   );
+
+  // Group used to map Ctrl+1–9 shortcut hints in the palette (mirrors currentGroupId below).
+  const paletteGroupId =
+    selectedGroupId ??
+    activeProfile?.workspaceId ??
+    sidebarForest?.lastActiveGroupId ??
+    sidebarForest?.groups[0]?.id ??
+    null;
 
   const terminalCommands = useTerminalCommands(
     t,
     data,
     sidebarForest,
     activeProfile?.id ?? null,
+    { currentGroupId: paletteGroupId, paneCount: panes.length },
     paletteActions,
   );
 

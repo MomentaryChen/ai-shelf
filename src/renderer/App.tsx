@@ -138,10 +138,94 @@ export function App() {
         icon: "🔄",
         run: () => reload(),
       },
+      {
+        id: "run-doctor",
+        title: t("cmd.action.doctor"),
+        group: t("cmd.group.actions"),
+        icon: "🩺",
+        keywords: "doctor health check",
+        run: () => goTo("doctor"),
+      },
+      {
+        id: "mcp-sync",
+        title: t("cmd.action.mcpSync"),
+        group: t("cmd.group.actions"),
+        icon: "🔌",
+        keywords: "mcp sync servers",
+        run: () => goTo("mcp"),
+      },
     ];
     return [...navigate, ...actions];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
+
+  // Available in both modes: open config files and jump to a skill / MCP server by
+  // name. Marked hideWhenEmpty so they surface only once the user starts typing.
+  const globalCommands = useMemo<Command[]>(() => {
+    const basename = (p: string) => p.split(/[\\/]/).pop() || p;
+
+    const configSeen = new Set<string>();
+    const configCommands: Command[] = [];
+    for (const entry of data) {
+      const paths = [
+        ...entry.config.paths,
+        ...entry.config.instructionFiles,
+        ...entry.mcp.configPaths,
+      ];
+      for (const path of paths) {
+        if (configSeen.has(path)) continue;
+        configSeen.add(path);
+        configCommands.push({
+          id: `open-config-${path}`,
+          title: t("cmd.openConfig", { name: basename(path) }),
+          group: t("cmd.group.config"),
+          icon: "📄",
+          keywords: `${entry.tool} config ${path}`,
+          hideWhenEmpty: true,
+          run: () => void window.api.openPath(path),
+        });
+      }
+    }
+
+    const skillSeen = new Set<string>();
+    const skillCommands: Command[] = [];
+    for (const entry of data) {
+      for (const skill of entry.skills) {
+        if (skillSeen.has(skill)) continue;
+        skillSeen.add(skill);
+        skillCommands.push({
+          id: `find-skill-${skill}`,
+          title: t("cmd.skillSearch", { name: skill }),
+          group: t("cmd.group.skills"),
+          icon: "⚡",
+          keywords: `skill ${skill}`,
+          hideWhenEmpty: true,
+          run: () => goTo("skills"),
+        });
+      }
+    }
+
+    const mcpSeen = new Set<string>();
+    const mcpCommands: Command[] = [];
+    for (const entry of data) {
+      for (const server of entry.mcp.servers) {
+        if (mcpSeen.has(server)) continue;
+        mcpSeen.add(server);
+        mcpCommands.push({
+          id: `find-mcp-${server}`,
+          title: t("cmd.mcpSearch", { name: server }),
+          group: t("cmd.group.mcp"),
+          icon: "🔌",
+          keywords: `mcp server ${server}`,
+          hideWhenEmpty: true,
+          run: () => goTo("mcp"),
+        });
+      }
+    }
+
+    return [...configCommands, ...skillCommands, ...mcpCommands];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, data]);
 
   const sharedModeCommands = useMemo<Command[]>(
     () => [
@@ -164,13 +248,17 @@ export function App() {
   );
 
   const commands = useMemo<Command[]>(() => {
-    if (appMode === "terminal") {
-      const terminalIds = new Set(terminalCommands.map((c) => c.id));
-      const extras = sharedModeCommands.filter((c) => !terminalIds.has(c.id));
-      return [...terminalCommands, ...extras];
-    }
-    return inventoryCommands;
-  }, [appMode, terminalCommands, sharedModeCommands, inventoryCommands]);
+    const base =
+      appMode === "terminal"
+        ? (() => {
+            const terminalIds = new Set(terminalCommands.map((c) => c.id));
+            const extras = sharedModeCommands.filter((c) => !terminalIds.has(c.id));
+            return [...terminalCommands, ...extras];
+          })()
+        : inventoryCommands;
+    const baseIds = new Set(base.map((c) => c.id));
+    return [...base, ...globalCommands.filter((c) => !baseIds.has(c.id))];
+  }, [appMode, terminalCommands, sharedModeCommands, inventoryCommands, globalCommands]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
