@@ -146,6 +146,14 @@ export const zh: Record<MessageKey, string> = {
   "settings.paneAgentStallOff": "關閉",
   "settings.paneAgentStallMin": "{minutes} 分鐘",
   "settings.custom": "自訂",
+  "settings.account": "帳號與同步",
+  "settings.accountHint":
+    "使用 Google 登入以連結此裝置。雲端同步將以此身分識別（即將推出）。",
+  "settings.accountNotConfigured":
+    "尚未設定 Google 登入。請在 .env.local 填入 Firebase 設定（參考 .env.example）。",
+  "settings.accountSignInGoogle": "使用 Google 登入",
+  "settings.accountSignOut": "登出",
+  "settings.accountSignInFailed": "登入失敗：{error}",
   "settings.backup": "資料備份與還原",
   "settings.backupHint":
     "將 Profile、版面、工作區與 App 設定匯出成檔案。換機、重裝或升級時可還原資料。",
