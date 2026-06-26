@@ -12,6 +12,8 @@ const appVersion = (
 
 export default defineConfig({
   root: "src/renderer",
+  /** Load `.env` from the monorepo root (not `src/renderer`). */
+  envDir: fileURLToPath(new URL(".", import.meta.url)),
   base: "./",
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
@@ -28,8 +30,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (!id.includes("node_modules")) return;
           if (id.includes("@xterm")) return "xterm";
-          if (id.includes("node_modules/react")) return "react";
+          if (id.includes("/react-dom/") || id.includes("/react/")) return "react";
+          if (id.includes("/cmdk/")) return "cmdk";
+          if (id.includes("/lucide-react/")) return "lucide";
+          if (id.includes("/@radix-ui/")) return "radix";
         },
       },
     },

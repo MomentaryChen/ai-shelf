@@ -1,37 +1,53 @@
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { applyAppTheme } from "./app-theme";
 import { App } from "./App";
-import { ChatWindowApp } from "./ChatWindowApp";
 import { loadSettings } from "./chat-settings";
 import { syncMainProcessFromSettings } from "./system-tray-sync";
-import { SettingsWindowApp } from "./SettingsWindowApp";
 import { LocaleProvider } from "./i18n/LocaleProvider";
-import { useAuthSessionBridge } from "./hooks/useAuthSession";
-import { useCloudSyncOnSignIn } from "./hooks/useCloudSync";
+import { isFirebaseConfigured } from "./firebase/config";
 import "./index.css";
+
+const AuthBridge = lazy(() => import("./AuthBridge").then((m) => ({ default: m.AuthBridge })));
+
+const ChatWindowApp = lazy(() =>
+  import("./ChatWindowApp").then((m) => ({ default: m.ChatWindowApp })),
+);
+const SettingsWindowApp = lazy(() =>
+  import("./SettingsWindowApp").then((m) => ({ default: m.SettingsWindowApp })),
+);
 
 applyAppTheme(loadSettings().appTheme);
 syncMainProcessFromSettings();
 
 const route = window.location.hash.replace(/^#\/?/, "");
 
-function AuthBridge() {
-  useAuthSessionBridge();
-  useCloudSyncOnSignIn();
-  return null;
-}
-
 function Root() {
-  if (route === "chat") return <ChatWindowApp />;
-  if (route === "settings") return <SettingsWindowApp />;
+  if (route === "chat") {
+    return (
+      <Suspense fallback={null}>
+        <ChatWindowApp />
+      </Suspense>
+    );
+  }
+  if (route === "settings") {
+    return (
+      <Suspense fallback={null}>
+        <SettingsWindowApp />
+      </Suspense>
+    );
+  }
   return <App />;
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <LocaleProvider>
-      <AuthBridge />
+      {isFirebaseConfigured() && (
+        <Suspense fallback={null}>
+          <AuthBridge />
+        </Suspense>
+      )}
       <Root />
     </LocaleProvider>
   </StrictMode>,

@@ -1,24 +1,53 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { Spinner } from "./components/Spinner";
-import { OverviewTab } from "./components/OverviewTab";
-import { ModelsTab } from "./components/ModelsTab";
-import { SkillsTab } from "./components/SkillsTab";
-import { McpTab } from "./components/McpTab";
-import { ConfigTab } from "./components/ConfigTab";
-import { DoctorTab } from "./components/DoctorTab";
-import { UpdateTab } from "./components/UpdateTab";
-import { UsageTab } from "./components/UsageTab";
-import { AppUpdateModal } from "./components/AppUpdateModal";
-import { ChatTab } from "./components/ChatTab";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
 import { InventoryNav, type NavItem } from "./components/InventoryNav";
-import { CommandPalette, type Command } from "./components/CommandPalette";
+import type { Command } from "./components/CommandPalette";
 import { ViewTransition } from "./components/ViewTransition";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
 import type { ProviderEntry } from "./types";
+
+const OverviewTab = lazy(() =>
+  import("./components/OverviewTab").then((m) => ({ default: m.OverviewTab })),
+);
+const ModelsTab = lazy(() =>
+  import("./components/ModelsTab").then((m) => ({ default: m.ModelsTab })),
+);
+const SkillsTab = lazy(() =>
+  import("./components/SkillsTab").then((m) => ({ default: m.SkillsTab })),
+);
+const McpTab = lazy(() => import("./components/McpTab").then((m) => ({ default: m.McpTab })));
+const ConfigTab = lazy(() =>
+  import("./components/ConfigTab").then((m) => ({ default: m.ConfigTab })),
+);
+const DoctorTab = lazy(() =>
+  import("./components/DoctorTab").then((m) => ({ default: m.DoctorTab })),
+);
+const UpdateTab = lazy(() =>
+  import("./components/UpdateTab").then((m) => ({ default: m.UpdateTab })),
+);
+const UsageTab = lazy(() =>
+  import("./components/UsageTab").then((m) => ({ default: m.UsageTab })),
+);
+const AppUpdateModal = lazy(() =>
+  import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
+);
+const ChatTab = lazy(() => import("./components/ChatTab").then((m) => ({ default: m.ChatTab })));
+const CommandPalette = lazy(() =>
+  import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
+);
 
 type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update" | "usage";
 
@@ -308,9 +337,13 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
-      <AppUpdateModal />
+      <Suspense fallback={null}>
+        <AppUpdateModal />
+      </Suspense>
       {paletteOpen && (
-        <CommandPalette open commands={commands} onClose={closePalette} />
+        <Suspense fallback={null}>
+          <CommandPalette open commands={commands} onClose={closePalette} />
+        </Suspense>
       )}
 
       <header
@@ -383,12 +416,14 @@ export function App() {
             data-active={appMode === "terminal"}
             className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
           >
-            <ChatTab
-              data={data}
-              active={appMode === "terminal"}
-              inventoryScanning={scanning}
-              onRegisterCommands={registerTerminalCommands}
-            />
+            <Suspense fallback={<Spinner label={t("app.detecting")} />}>
+              <ChatTab
+                data={data}
+                active={appMode === "terminal"}
+                inventoryScanning={scanning}
+                onRegisterCommands={registerTerminalCommands}
+              />
+            </Suspense>
           </main>
         )}
 
@@ -414,7 +449,7 @@ export function App() {
                     </p>
                   )}
                   {hasData && (
-                    <>
+                    <Suspense fallback={<Spinner label={t("app.detecting")} />}>
                       {activeTab === "overview" && (
                         <OverviewTab
                           data={data}
@@ -433,9 +468,13 @@ export function App() {
                       {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
                       {activeTab === "doctor" && <DoctorTab data={data} />}
                       {activeTab === "update" && <UpdateTab data={data} />}
-                    </>
+                    </Suspense>
                   )}
-                  {activeTab === "usage" && <UsageTab />}
+                  {activeTab === "usage" && (
+                    <Suspense fallback={<Spinner label={t("app.detecting")} />}>
+                      <UsageTab />
+                    </Suspense>
+                  )}
                 </ViewTransition>
               </div>
             </main>
