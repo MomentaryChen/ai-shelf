@@ -2,12 +2,22 @@ import { useMemo } from "react";
 import type { Command } from "../components/CommandPalette";
 import type { ProfileForest, ProviderEntry } from "../types";
 import { findProviderEntry } from "../utils/claude-cursor-diff";
+import { modLabel } from "../profile-quick-switch";
 import { toolLabel } from "../utils";
 
 export interface TerminalCommandActions {
   addPane: (tool: string) => void | Promise<void>;
   openExternal: (tool: string) => void | Promise<void>;
   activateProfile: (profileId: string) => void | Promise<void>;
+  /** Send a command line to every open pane (always all, regardless of broadcast toggle). */
+  broadcastCommand: (text: string) => void;
+}
+
+export interface TerminalCommandOptions {
+  /** Group whose profiles map to the Ctrl+1–9 quick-switch shortcuts. */
+  currentGroupId: string | null;
+  /** Number of open panes; the broadcast command is hidden when there are none. */
+  paneCount: number;
 }
 
 export function useTerminalCommands(
@@ -15,15 +25,31 @@ export function useTerminalCommands(
   data: ProviderEntry[],
   forest: ProfileForest | null,
   activeProfileId: string | null,
+  options: TerminalCommandOptions,
   actions: TerminalCommandActions,
 ): Command[] {
-  const { addPane, openExternal, activateProfile } = actions;
+  const { addPane, openExternal, activateProfile, broadcastCommand } = actions;
+  const { currentGroupId, paneCount } = options;
 
   return useMemo(() => {
     const available = data.filter((e) => e.available);
     const claude = findProviderEntry(data, "claude");
     const cursor = findProviderEntry(data, "cursor");
     const cmds: Command[] = [];
+
+    if (paneCount > 0) {
+      cmds.push({
+        id: "broadcast-command",
+        title: t("cmd.terminal.broadcast"),
+        group: t("cmd.group.agents"),
+        icon: "📡",
+        keywords: "broadcast send all panes command run",
+        input: {
+          placeholder: t("cmd.input.broadcastPlaceholder"),
+          onSubmit: (value) => broadcastCommand(value),
+        },
+      });
+    }
 
     if (claude?.available && cursor?.available) {
       cmds.push({
@@ -52,9 +78,15 @@ export function useTerminalCommands(
       });
     }
 
+    const mod = modLabel();
     const profiles =
       forest?.groups.flatMap((g) =>
-        g.profiles.map((p) => ({ ...p, groupName: g.name })),
+        g.profiles.map((p, idx) => ({
+          ...p,
+          groupName: g.name,
+          // Ctrl+1–9 only switch within the currently displayed group.
+          shortcut: g.id === currentGroupId && idx < 9 ? `${mod}+${idx + 1}` : undefined,
+        })),
       ) ?? [];
 
     for (const profile of profiles) {
@@ -67,6 +99,7 @@ export function useTerminalCommands(
         group: t("cmd.group.profiles"),
         icon: "👤",
         keywords: `${profile.name} ${profile.groupName} profile`,
+        shortcut: profile.shortcut,
         run: () => void activateProfile(profile.id),
       });
     }
@@ -92,5 +125,16 @@ export function useTerminalCommands(
     });
 
     return cmds;
-  }, [t, data, forest, activeProfileId, addPane, openExternal, activateProfile]);
+  }, [
+    t,
+    data,
+    forest,
+    activeProfileId,
+    currentGroupId,
+    paneCount,
+    addPane,
+    openExternal,
+    activateProfile,
+    broadcastCommand,
+  ]);
 }
