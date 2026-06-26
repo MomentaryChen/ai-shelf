@@ -6,6 +6,7 @@ import { Badge } from "./Badge";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { ConfigFileEditorModal } from "./ConfigFileEditorModal";
+import { ConfigSnapshotPanel } from "./ConfigSnapshotPanel";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
 
@@ -80,7 +81,7 @@ function ConfigCards({
   );
 }
 
-export function ConfigTab({ data }: { data: ProviderEntry[] }) {
+export function ConfigTab({ data, onRefresh }: { data: ProviderEntry[]; onRefresh?: () => void }) {
   const { t } = useLocale();
   const { installed, notInstalled } = partitionByInstalled(data);
   const [editPath, setEditPath] = useState<string | null>(null);
@@ -88,6 +89,8 @@ export function ConfigTab({ data }: { data: ProviderEntry[] }) {
   return (
     <>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">⚙️ {t("app.tab.config")}</h2>
+
+      <ConfigSnapshotPanel onRestored={onRefresh} />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
       <ConfigCards entries={installed} onEdit={setEditPath} />

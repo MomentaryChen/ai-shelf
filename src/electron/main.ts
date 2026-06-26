@@ -74,6 +74,16 @@ import {
 } from "./workspace-host.js";
 import { applyBackup, createJsonBackup, createZipBackup } from "./backup-service.js";
 import {
+  createConfigSnapshot,
+  deleteConfigSnapshot,
+  diffConfigSnapshots,
+  exportConfigSnapshotBundle,
+  importConfigSnapshotBundle,
+  listConfigSnapshots,
+  restoreConfigSnapshot,
+} from "./config-snapshot-service.js";
+import { CONFIG_SNAPSHOT_BUNDLE_EXT } from "../shared/config-snapshot-keys.js";
+import {
   applySystemTrayEnabled,
   bindMinimizeToTray,
   isSystemTrayEnabled,
@@ -1677,6 +1687,105 @@ ipcMain.handle("import-backup", async () => {
       exportedAt: manifest.exportedAt,
       appVersion: manifest.appVersion,
     };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+// --- Config snapshots (MCP / .claude.json / skills) ---
+
+async function inventoryForSnapshot(): Promise<ProviderEntry[]> {
+  const cached = getCachedInventory();
+  if (cached) return cached;
+  const entries = await detectAll({ quick: true });
+  setInventoryCache(entries);
+  return entries;
+}
+
+ipcMain.handle("config-snapshot-list", () => {
+  try {
+    return { success: true, snapshots: listConfigSnapshots() };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message, snapshots: [] };
+  }
+});
+
+ipcMain.handle("config-snapshot-create", async (_event, label: string) => {
+  try {
+    const entries = await inventoryForSnapshot();
+    const manifest = createConfigSnapshot(entries, label ?? "", app.getVersion());
+    return { success: true, snapshot: manifest };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("config-snapshot-restore", (_event, id: string) => {
+  try {
+    const manifest = restoreConfigSnapshot(id);
+    return { success: true, snapshot: manifest };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("config-snapshot-delete", (_event, id: string) => {
+  try {
+    deleteConfigSnapshot(id);
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("config-snapshot-diff", (_event, idA: string, idB: string) => {
+  try {
+    const diff = diffConfigSnapshots(idA, idB);
+    return { success: true, diff };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("config-snapshot-export", async (_event, id: string) => {
+  try {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Export config snapshot",
+      defaultPath: `ai-shelf-config-${stamp}.${CONFIG_SNAPSHOT_BUNDLE_EXT}`,
+      filters: [
+        { name: "AI Shelf Config Snapshot", extensions: [CONFIG_SNAPSHOT_BUNDLE_EXT, "zip"] },
+      ],
+    });
+    if (canceled || !filePath) return { success: false, canceled: true as const };
+
+    writeFileSync(filePath, exportConfigSnapshotBundle(id));
+    return { success: true, path: filePath };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("config-snapshot-import", async (_event, label?: string) => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: "Import config snapshot",
+      properties: ["openFile"],
+      filters: [
+        {
+          name: "AI Shelf Config Snapshot",
+          extensions: [CONFIG_SNAPSHOT_BUNDLE_EXT, "zip"],
+        },
+      ],
+    });
+    if (canceled || !filePaths[0]) return { success: false, canceled: true as const };
+
+    const manifest = importConfigSnapshotBundle(
+      readFileSync(filePaths[0]),
+      label ?? "",
+      app.getVersion(),
+    );
+    return { success: true, snapshot: manifest };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
   }

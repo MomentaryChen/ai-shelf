@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-06-26
+
+Desktop UI/UX design guidelines for Cursor agents.
+
+### Added
+
+- **Desktop UI/UX design guidelines** — Cursor rule for dev-tool chrome density, warm & soft surfaces, color tokens, components, and motion so UI work stays consistent.
+
 ## [3.1.0] - 2026-06-25
 
 Warm & Soft default theme, full shadcn migration, terminal command palette, and profile UX improvements.
