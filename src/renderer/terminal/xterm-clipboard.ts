@@ -117,6 +117,35 @@ function hasMod(ev: KeyboardEvent): boolean {
   return ev.ctrlKey || ev.metaKey;
 }
 
+function isMacPlatform(): boolean {
+  return /mac/i.test(navigator.platform || navigator.userAgent || "");
+}
+
+function isWindowsPlatform(): boolean {
+  return /win/i.test(navigator.platform || navigator.userAgent || "");
+}
+
+/** xterm's selectAll() only covers the viewport; select the full scrollback buffer. */
+function selectAllTerminalBuffer(term: Terminal): void {
+  const lastLine = Math.max(0, term.buffer.active.length - 1);
+  term.selectLines(0, lastLine);
+}
+
+/**
+ * Windows: Ctrl+A (user expectation). Mac: Cmd+A. Linux: Ctrl+Shift+A (Ctrl+A = shell line-start).
+ */
+function isTerminalSelectAllShortcut(ev: KeyboardEvent): boolean {
+  if (ev.key.toLowerCase() !== "a" || ev.altKey || !hasMod(ev)) return false;
+
+  if (isMacPlatform()) {
+    return ev.metaKey && !ev.ctrlKey && !ev.shiftKey;
+  }
+  if (isWindowsPlatform()) {
+    return ev.ctrlKey && !ev.metaKey;
+  }
+  return ev.ctrlKey && !ev.metaKey && ev.shiftKey;
+}
+
 /**
  * Bind copy/paste/select-all shortcuts and a minimal context menu.
  * Returns a dispose function.
@@ -217,10 +246,10 @@ export function bindTerminalClipboard(
       return true;
     }
 
-    // Select all: Ctrl+Shift+A (Ctrl+A is line-start in most shells)
-    if (hasMod(ev) && ev.shiftKey && key === "a") {
+    // Select all: Ctrl+A (Windows), Cmd+A (Mac), Ctrl+Shift+A (Linux)
+    if (isTerminalSelectAllShortcut(ev)) {
       consumeKey(ev);
-      term.selectAll();
+      selectAllTerminalBuffer(term);
       return false;
     }
 
@@ -282,7 +311,7 @@ export function bindTerminalClipboard(
     addItem(getStoredT("terminal.ctx.copy"), hasSelection, () => void copyTerminalSelection());
     addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal());
     addItem(getStoredT("terminal.ctx.find"), true, () => options?.onOpenFind?.());
-    addItem(getStoredT("terminal.ctx.selectAll"), true, () => term.selectAll());
+    addItem(getStoredT("terminal.ctx.selectAll"), true, () => selectAllTerminalBuffer(term));
     if (options.onExportOutput) {
       addItem(getStoredT("terminal.ctx.exportOutput"), true, options.onExportOutput);
     }
