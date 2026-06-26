@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react";
+import { prefersDarkColorScheme } from "./system-appearance.js";
 
-export type AppColorTheme = "warm" | "light" | "dark" | "contrast";
+export type AppColorTheme = "system" | "warm" | "light" | "dark" | "contrast";
 
-export const DEFAULT_APP_THEME: AppColorTheme = "warm";
+export type ResolvedAppColorTheme = "warm" | "light" | "dark" | "contrast";
+
+export const DEFAULT_APP_THEME: AppColorTheme = "system";
 
 export const APP_THEME_OPTIONS: {
   value: AppColorTheme;
   label: string;
   preview: { bg: string; fg: string; accent: string };
 }[] = [
+  {
+    value: "system",
+    label: "跟隨系統",
+    preview: { bg: "#0f172a", fg: "#FBF7F0", accent: "#C97B5A" },
+  },
   { value: "warm", label: "暖色", preview: { bg: "#FBF7F0", fg: "#4A4039", accent: "#C97B5A" } },
   { value: "light", label: "淺色", preview: { bg: "#f8fafc", fg: "#0f172a", accent: "#0284c7" } },
   { value: "dark", label: "深色", preview: { bg: "#0f172a", fg: "#f1f5f9", accent: "#38bdf8" } },
@@ -16,13 +24,31 @@ export const APP_THEME_OPTIONS: {
 ];
 
 export function normalizeAppTheme(raw: unknown): AppColorTheme {
-  if (raw === "warm" || raw === "light" || raw === "dark" || raw === "contrast") return raw;
+  if (
+    raw === "system" ||
+    raw === "warm" ||
+    raw === "light" ||
+    raw === "dark" ||
+    raw === "contrast"
+  ) {
+    return raw;
+  }
   return DEFAULT_APP_THEME;
 }
 
+/** Map stored preference to the palette applied to the DOM. */
+export function resolveAppTheme(theme: AppColorTheme): ResolvedAppColorTheme {
+  if (theme !== "system") return theme;
+  return prefersDarkColorScheme() ? "dark" : "warm";
+}
+
 export function applyAppTheme(theme: AppColorTheme): void {
-  document.documentElement.dataset.appTheme = theme;
-  window.dispatchEvent(new CustomEvent("app-theme-change", { detail: { theme } }));
+  const resolved = resolveAppTheme(theme);
+  document.documentElement.dataset.appTheme = resolved;
+  document.documentElement.dataset.appThemePref = theme;
+  window.dispatchEvent(
+    new CustomEvent("app-theme-change", { detail: { theme, resolved } }),
+  );
 }
 
 /** Bump when theme changes so components using inline chrome styles re-read CSS variables. */
