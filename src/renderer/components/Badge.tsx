@@ -2,13 +2,14 @@ import { useLocale } from "../i18n/LocaleProvider";
 import { Badge as UiBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-type Variant = "ok" | "fail" | "warn" | "info";
+type Variant = "ok" | "fail" | "warn" | "info" | "neutral";
 
 const DOT_CLASSES: Record<Variant, string> = {
   ok: "bg-ok",
   fail: "bg-fail",
   warn: "bg-warn",
   info: "bg-accent",
+  neutral: "bg-secondary-foreground",
 };
 
 export function Badge({

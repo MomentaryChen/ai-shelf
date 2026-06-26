@@ -17,6 +17,7 @@ const badgeVariants = cva(
         fail: "bg-fail/12 text-fail ring-1 ring-inset ring-fail/25",
         warn: "bg-warn/12 text-warn ring-1 ring-inset ring-warn/25",
         info: "bg-accent/12 text-accent ring-1 ring-inset ring-accent/25",
+        neutral: "bg-secondary text-secondary-foreground",
       },
     },
     defaultVariants: {

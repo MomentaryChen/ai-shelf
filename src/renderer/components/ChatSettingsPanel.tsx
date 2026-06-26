@@ -471,7 +471,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             >
               {SCROLLBACK_PRESETS.map((p) => (
                 <ToggleGroupItem key={p.value} value={String(p.value)} size="sm">
-                  {t(SCROLLBACK_LABEL_KEYS[p.value])}
+                  {t(SCROLLBACK_LABEL_KEYS[p.value]!)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
@@ -505,7 +505,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             >
               {PTY_BUFFER_PRESETS.map((p) => (
                 <ToggleGroupItem key={p.value} value={String(p.value)} size="sm">
-                  {t(PTY_BUFFER_LABEL_KEYS[p.value])}
+                  {t(PTY_BUFFER_LABEL_KEYS[p.value]!)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>

@@ -42,8 +42,8 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
 
   useEffect(() => {
     if (snapshots.length >= 2 && !diffA && !diffB) {
-      setDiffA(snapshots[1].id);
-      setDiffB(snapshots[0].id);
+      setDiffA(snapshots[1]!.id);
+      setDiffB(snapshots[0]!.id);
     }
   }, [snapshots, diffA, diffB]);
 
@@ -60,7 +60,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
   const createSnapshot = () =>
     run("create", async () => {
       const res = await window.api.configSnapshotCreate(label);
-      if (res.success && res.snapshot) {
+      if (res.success) {
         setLabel("");
         setMessage({
           kind: "ok",
@@ -103,7 +103,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
   const exportBundle = (id: string) =>
     run(`export-${id}`, async () => {
       const res = await window.api.configSnapshotExport(id);
-      if (res.success && res.path) {
+      if (res.success) {
         setMessage({ kind: "ok", text: t("configSnapshot.exported", { path: res.path }) });
       } else if (!res.canceled) {
         setMessage({ kind: "err", text: res.error ?? t("configSnapshot.error") });
@@ -128,7 +128,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
         return;
       }
       const res = await window.api.configSnapshotDiff(diffA, diffB);
-      if (res.success && res.diff) {
+      if (res.success) {
         setDiffResult(res.diff);
       } else {
         setMessage({ kind: "err", text: res.error ?? t("configSnapshot.error") });

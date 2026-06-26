@@ -8,6 +8,35 @@ interface InternalSearchOptions {
   noScroll?: boolean;
 }
 
+/**
+ * The shipped `@xterm/addon-search` JS reads an undocumented third `noScroll`
+ * argument at runtime, but its public typings only declare two parameters. These
+ * thin wrappers preserve the no-scroll behavior while keeping the call sites typed.
+ */
+type SearchFindFn = (
+  term: string,
+  options?: ISearchOptions,
+  internal?: InternalSearchOptions,
+) => boolean;
+
+function findNextInternal(
+  addon: SearchAddon,
+  term: string,
+  options: ISearchOptions,
+  internal?: InternalSearchOptions,
+): boolean {
+  return (addon.findNext as SearchFindFn)(term, options, internal);
+}
+
+function findPreviousInternal(
+  addon: SearchAddon,
+  term: string,
+  options: ISearchOptions,
+  internal?: InternalSearchOptions,
+): boolean {
+  return (addon.findPrevious as SearchFindFn)(term, options, internal);
+}
+
 const SEARCH_DEBOUNCE_MS = 120;
 
 export { MATCH_COUNT_CAP };
@@ -89,7 +118,7 @@ export function collectAllMatchesViaAddon(
   let capped = false;
 
   for (let i = 0; i < MATCH_COUNT_CAP; i++) {
-    if (!addon.findNext(query, opts, { noScroll: true })) {
+    if (!findNextInternal(addon, query, opts, { noScroll: true })) {
       break;
     }
     const range = term.getSelectionPosition();
@@ -161,7 +190,7 @@ export function jumpToMatchViaAddon(
   term.clearSelection();
 
   for (let i = 0; i < index - 1; i++) {
-    if (!addon.findNext(query, opts, { noScroll: true })) {
+    if (!findNextInternal(addon, query, opts, { noScroll: true })) {
       term.clearSelection();
       return false;
     }
@@ -264,8 +293,8 @@ export function runTerminalSearch(
     ? { noScroll: true }
     : undefined;
   return direction === "next"
-    ? addon.findNext(query, opts, internal)
-    : addon.findPrevious(query, opts, internal);
+    ? findNextInternal(addon, query, opts, internal)
+    : findPreviousInternal(addon, query, opts, internal);
 }
 
 /** @deprecated kept for PTY mapping helpers if needed elsewhere */

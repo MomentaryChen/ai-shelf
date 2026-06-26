@@ -12,9 +12,10 @@
     "ai": "dist/cli.js"
   },
   "scripts": {
-    "build": "pnpm build:cli && tsc && vite build && node -e \"const fs=require('fs');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');\"",
+    "build": "pnpm build:cli && tsc && tsc -p src/renderer/tsconfig.json && vite build && node -e \"const fs=require('fs');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');\"",
     "build:cli": "pnpm --filter ai-shelf run build",
     "build:desktop": "pnpm run build",
+    "typecheck": "tsc --noEmit && tsc -p src/renderer/tsconfig.json",
     "dev": "tsc --watch",
     "dev:cli": "pnpm --filter ai-shelf run dev",
     "dev:renderer": "vite",
