@@ -28,6 +28,15 @@ export const MCP_SYNC_TOOL_IDS = [
   "opencode",
 ] as const;
 
+/** Tools whose SKILL.md directories support cross-tool skills sync. */
+export const SKILL_SYNC_TOOL_IDS = [
+  "claude",
+  "cursor",
+  "gemini",
+  "crush",
+  "goose",
+] as const;
+
 /**
  * Normalize a tool identifier to its canonical inventory id.
  * Cursor is detected via its `agent` command, so its entry's `tool` field is

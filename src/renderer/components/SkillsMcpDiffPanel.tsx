@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { McpRawData, McpSyncResult, ProviderEntry } from "../types";
+import type { McpRawData, McpSyncResult, ProviderEntry, SkillSyncResult } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { Tag } from "./Tag";
@@ -18,14 +18,17 @@ interface SkillsMcpDiffPanelProps {
 export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelProps) {
   const { t } = useLocale();
   const [rawData, setRawData] = useState<McpRawData | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [results, setResults] = useState<McpSyncResult[] | null>(null);
+  const [syncingMcp, setSyncingMcp] = useState(false);
+  const [syncingSkills, setSyncingSkills] = useState(false);
+  const [mcpResults, setMcpResults] = useState<McpSyncResult[] | null>(null);
+  const [skillResults, setSkillResults] = useState<SkillSyncResult[] | null>(null);
 
   const claude = findProviderEntry(data, "claude");
   const cursor = findProviderEntry(data, "cursor");
 
   const load = useCallback(async () => {
-    setResults(null);
+    setMcpResults(null);
+    setSkillResults(null);
     try {
       const next = await window.api.getMcpRaw();
       setRawData(next);
@@ -45,8 +48,9 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
   const missingMcp = mcpServersMissingInCursor(rawData);
   const missingSkills = skillsMissingInCursor(claude, cursor);
   const hasMcpGap = missingMcp.length > 0;
+  const hasSkillsGap = missingSkills.length > 0;
 
-  if (!hasMcpGap && missingSkills.length === 0) {
+  if (!hasMcpGap && !hasSkillsGap) {
     return (
       <Card className="mb-5 border-ok/30 bg-ok/5">
         <div className="flex items-center gap-3">
@@ -60,32 +64,50 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
     );
   }
 
-  const doSync = async () => {
+  const doMcpSync = async () => {
     if (missingMcp.length === 0) return;
-    setSyncing(true);
-    setResults(null);
+    setSyncingMcp(true);
+    setMcpResults(null);
     try {
       const res = await window.api.syncMcp({
         serverNames: missingMcp,
         targetTools: ["cursor"],
       });
-      setResults(res);
+      setMcpResults(res);
       await load();
     } catch {
-      setResults([{ tool: "cursor", added: [], skipped: [], error: "Sync failed" }]);
+      setMcpResults([{ tool: "cursor", added: [], skipped: [], error: "Sync failed" }]);
     } finally {
-      setSyncing(false);
+      setSyncingMcp(false);
+    }
+  };
+
+  const doSkillsSync = async () => {
+    if (missingSkills.length === 0) return;
+    setSyncingSkills(true);
+    setSkillResults(null);
+    try {
+      const res = await window.api.syncSkills({
+        skillNames: missingSkills,
+        targetTools: ["cursor"],
+      });
+      setSkillResults(res);
+      await window.api.startInventoryScan();
+    } catch {
+      setSkillResults([{ tool: "cursor", added: [], skipped: [], error: "Sync failed" }]);
+    } finally {
+      setSyncingSkills(false);
     }
   };
 
   return (
     <Card
-      className={`mb-5 ${hasMcpGap ? "border-warn/40 bg-warn/5" : "border-border"}`}
+      className={`mb-5 ${hasMcpGap || hasSkillsGap ? "border-warn/40 bg-warn/5" : "border-border"}`}
       title={`🔧 ${t("inventory.diffFix.title")}`}
     >
       <p className="mb-3 text-[13px] text-text-secondary">{t("inventory.diffFix.subtitle")}</p>
 
-      {missingSkills.length > 0 && (
+      {hasSkillsGap && (
         <div className="mb-4 rounded-lg border border-border/60 bg-bg-primary px-3 py-2.5">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-secondary">
             {t("inventory.diffFix.skillsMissing")}
@@ -96,6 +118,36 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
             ))}
           </div>
           <p className="mt-2 text-xs text-text-tertiary">{t("inventory.diffFix.skillsMissingHint")}</p>
+
+          {skillResults && (
+            <div className="mt-3 rounded-lg border border-border bg-bg-primary p-3">
+              {skillResults.map((r) => (
+                <div key={r.tool} className="text-sm">
+                  <strong>📐 {r.tool}</strong>:{" "}
+                  {r.error ? (
+                    <span className="text-fail">❌ {r.error}</span>
+                  ) : r.added.length > 0 ? (
+                    <span className="text-ok">
+                      {t("inventory.diffFix.syncSkillsAdded", { names: r.added.join(", ") })}
+                    </span>
+                  ) : (
+                    <span className="text-text-secondary">{t("inventory.skillsSync.noChanges")}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => void doSkillsSync()}
+              disabled={syncingSkills}
+              className="cursor-pointer rounded-md border border-accent bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {syncingSkills ? t("inventory.diffFix.syncing") : t("inventory.diffFix.syncSkills")}
+            </button>
+          </div>
         </div>
       )}
 
@@ -112,9 +164,9 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
             </div>
           </div>
 
-          {results && (
+          {mcpResults && (
             <div className="mb-4 rounded-lg border border-border bg-bg-primary p-3">
-              {results.map((r) => (
+              {mcpResults.map((r) => (
                 <div key={r.tool} className="text-sm">
                   <strong>📐 {r.tool}</strong>:{" "}
                   {r.error ? (
@@ -134,11 +186,11 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => void doSync()}
-              disabled={syncing}
+              onClick={() => void doMcpSync()}
+              disabled={syncingMcp}
               className="cursor-pointer rounded-md border border-accent bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {syncing ? t("inventory.diffFix.syncing") : t("inventory.diffFix.oneClickFix")}
+              {syncingMcp ? t("inventory.diffFix.syncing") : t("inventory.diffFix.oneClickFix")}
             </button>
             <button
               type="button"

@@ -14,8 +14,16 @@ function runClipboardOp<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function readClipboardText(): Promise<string> {
-  return runClipboardOp(async () => {
+/** Last write completed through our queue; paste prefers this briefly after copy. */
+let lastOurWrite = { text: "", at: 0, seq: 0 };
+let lastPasteSeq = 0;
+let writeSeq = 0;
+
+/** After copy, paste within this window skips a stale OS / navigator read. */
+const PASTE_AFTER_WRITE_MS = 200;
+
+function runOsClipboardRead(): Promise<string> {
+  return (async () => {
     try {
       const text = await window.api.clipboardReadText();
       if (text) return text;
@@ -27,18 +35,39 @@ async function readClipboardText(): Promise<string> {
     } catch {
       return "";
     }
+  })();
+}
+
+async function readClipboardText(): Promise<string> {
+  return runClipboardOp(async () => {
+    const age = Date.now() - lastOurWrite.at;
+    if (
+      lastOurWrite.text &&
+      lastOurWrite.seq > lastPasteSeq &&
+      age < PASTE_AFTER_WRITE_MS
+    ) {
+      lastPasteSeq = lastOurWrite.seq;
+      return lastOurWrite.text;
+    }
+    const text = await runOsClipboardRead();
+    if (text) return text;
+    if (lastOurWrite.text && age < PASTE_AFTER_WRITE_MS) return lastOurWrite.text;
+    return "";
   });
 }
 
 async function writeClipboardText(text: string): Promise<boolean> {
   if (!text) return false;
+  const seq = ++writeSeq;
   return runClipboardOp(async () => {
     try {
       await window.api.clipboardWriteText(text);
+      lastOurWrite = { text, at: Date.now(), seq };
       return true;
     } catch {
       try {
         await navigator.clipboard.writeText(text);
+        lastOurWrite = { text, at: Date.now(), seq };
         return true;
       } catch {
         return false;
@@ -50,12 +79,11 @@ async function writeClipboardText(text: string): Promise<boolean> {
 const GUARD_MS = 80;
 
 interface TerminalClipboardGuards {
-  copyUntil: number;
   pasteUntil: number;
 }
 
 function createGuards(): TerminalClipboardGuards {
-  return { copyUntil: 0, pasteUntil: 0 };
+  return { pasteUntil: 0 };
 }
 
 export interface TerminalClipboardOptions {
@@ -89,6 +117,35 @@ function hasMod(ev: KeyboardEvent): boolean {
   return ev.ctrlKey || ev.metaKey;
 }
 
+function isMacPlatform(): boolean {
+  return /mac/i.test(navigator.platform || navigator.userAgent || "");
+}
+
+function isWindowsPlatform(): boolean {
+  return /win/i.test(navigator.platform || navigator.userAgent || "");
+}
+
+/** xterm's selectAll() only covers the viewport; select the full scrollback buffer. */
+function selectAllTerminalBuffer(term: Terminal): void {
+  const lastLine = Math.max(0, term.buffer.active.length - 1);
+  term.selectLines(0, lastLine);
+}
+
+/**
+ * Windows: Ctrl+A (user expectation). Mac: Cmd+A. Linux: Ctrl+Shift+A (Ctrl+A = shell line-start).
+ */
+function isTerminalSelectAllShortcut(ev: KeyboardEvent): boolean {
+  if (ev.key.toLowerCase() !== "a" || ev.altKey || !hasMod(ev)) return false;
+
+  if (isMacPlatform()) {
+    return ev.metaKey && !ev.ctrlKey && !ev.shiftKey;
+  }
+  if (isWindowsPlatform()) {
+    return ev.ctrlKey && !ev.metaKey;
+  }
+  return ev.ctrlKey && !ev.metaKey && ev.shiftKey;
+}
+
 /**
  * Bind copy/paste/select-all shortcuts and a minimal context menu.
  * Returns a dispose function.
@@ -110,12 +167,27 @@ export function bindTerminalClipboard(
     term.focus();
   };
 
+  let lastExplicitCopy = { text: "", at: 0 };
+  let lastAutoCopied = "";
+  let selCopyTimer = 0;
+  let selCopyGeneration = 0;
+
+  const cancelPendingAutoCopy = () => {
+    selCopyGeneration += 1;
+    window.clearTimeout(selCopyTimer);
+    selCopyTimer = 0;
+  };
+
   const copyTerminalSelection = async (): Promise<boolean> => {
-    const now = Date.now();
-    if (now < guards.copyUntil) return false;
     const text = term.getSelection();
     if (!text) return false;
-    guards.copyUntil = now + GUARD_MS;
+    const now = Date.now();
+    if (text === lastExplicitCopy.text && now - lastExplicitCopy.at < GUARD_MS) {
+      return true;
+    }
+    lastExplicitCopy = { text, at: now };
+    cancelPendingAutoCopy();
+    lastAutoCopied = text;
     return writeClipboardText(text);
   };
 
@@ -174,10 +246,10 @@ export function bindTerminalClipboard(
       return true;
     }
 
-    // Select all: Ctrl+Shift+A (Ctrl+A is line-start in most shells)
-    if (hasMod(ev) && ev.shiftKey && key === "a") {
+    // Select all: Ctrl+A (Windows), Cmd+A (Mac), Ctrl+Shift+A (Linux)
+    if (isTerminalSelectAllShortcut(ev)) {
       consumeKey(ev);
-      term.selectAll();
+      selectAllTerminalBuffer(term);
       return false;
     }
 
@@ -239,7 +311,7 @@ export function bindTerminalClipboard(
     addItem(getStoredT("terminal.ctx.copy"), hasSelection, () => void copyTerminalSelection());
     addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal());
     addItem(getStoredT("terminal.ctx.find"), true, () => options?.onOpenFind?.());
-    addItem(getStoredT("terminal.ctx.selectAll"), true, () => term.selectAll());
+    addItem(getStoredT("terminal.ctx.selectAll"), true, () => selectAllTerminalBuffer(term));
     if (options.onExportOutput) {
       addItem(getStoredT("terminal.ctx.exportOutput"), true, options.onExportOutput);
     }
@@ -269,7 +341,10 @@ export function bindTerminalClipboard(
     removeMenu();
 
     if (term.hasSelection()) {
-      void copyTerminalSelection();
+      void (async () => {
+        const copied = await copyTerminalSelection();
+        if (copied) term.clearSelection();
+      })();
       return;
     }
 
@@ -296,8 +371,6 @@ export function bindTerminalClipboard(
    * Debounced so a drag copies once when it settles, and written directly so the
    * per-pane copy guard can't drop the final selection mid-drag.
    */
-  let lastAutoCopied = "";
-  let selCopyTimer = 0;
   const onSelectionChange = () => {
     if (!(options.getCopyOnSelect?.() ?? false)) return;
     const text = term.getSelection();
@@ -307,8 +380,10 @@ export function bindTerminalClipboard(
     if (!text || text === lastAutoCopied) return;
     // Capture `text` now and write that exact value; re-reading on the timer
     // could see an already-cleared selection after the pane lost focus.
+    const gen = ++selCopyGeneration;
     window.clearTimeout(selCopyTimer);
     selCopyTimer = window.setTimeout(() => {
+      if (gen !== selCopyGeneration) return;
       lastAutoCopied = text;
       void writeClipboardText(text);
     }, 50);

@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld("api", {
   },
   getMcpRaw: () => ipcRenderer.invoke("get-mcp-raw"),
   syncMcp: (opts) => ipcRenderer.invoke("sync-mcp", opts),
+  getSkillsRaw: () => ipcRenderer.invoke("get-skills-raw"),
+  syncSkills: (opts) => ipcRenderer.invoke("sync-skills", opts),
   readConfigFile: (filePath) => ipcRenderer.invoke("read-config-file", filePath),
   writeConfigFile: (filePath, content) => ipcRenderer.invoke("write-config-file", filePath, content),
   mcpListServers: (tool) => ipcRenderer.invoke("mcp-list-servers", tool),
@@ -145,4 +147,11 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.off("profile-layout-flush", handler);
   },
   sendProfileLayoutFlushDone: () => ipcRenderer.send("profile-layout-flush-done"),
+  usageGetProviders: () => ipcRenderer.invoke("usage-get-providers"),
+  usageGetCredentialStatus: () => ipcRenderer.invoke("usage-get-credential-status"),
+  usageSetCredential: (tool, fieldKey, value) =>
+    ipcRenderer.invoke("usage-set-credential", tool, fieldKey, value),
+  usageClearCredential: (tool) => ipcRenderer.invoke("usage-clear-credential", tool),
+  usageTestCredential: (tool, fieldKey) => ipcRenderer.invoke("usage-test-credential", tool, fieldKey),
+  usageFetchDashboard: (opts) => ipcRenderer.invoke("usage-fetch-dashboard", opts),
 });

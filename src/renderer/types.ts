@@ -114,6 +114,15 @@ export interface McpSyncResult {
   error?: string;
 }
 
+export interface SkillsRawData {
+  [tool: string]: {
+    skills: Record<string, { name: string; description?: string; path: string; scope: string }>;
+    writeRoot: string | null;
+  };
+}
+
+export type SkillSyncResult = McpSyncResult;
+
 export type McpConfigFormat = "json" | "toml" | "unknown";
 
 export interface McpServerRecord {
@@ -286,6 +295,85 @@ export interface PtySearchResult {
   capped: boolean;
 }
 
+export type UsageToolId = "claude" | "codex" | "cursor" | "gemini" | "copilot";
+
+export interface UsageCredentialFieldMeta {
+  key: string;
+  label: string;
+  labelKey?: string;
+  groupKey?: string;
+  groupLabelKey?: string;
+  noteKey?: string;
+  placeholder?: string;
+  helpUrl?: string;
+  helpLinkKey?: string;
+}
+
+export interface UsageProviderMeta {
+  toolId: UsageToolId;
+  label: string;
+  supported: boolean;
+  unsupportedReason?: string;
+  credentialNoteKey?: string;
+  docsUrl?: string;
+  fields: UsageCredentialFieldMeta[];
+}
+
+export interface UsageCredentialStatus {
+  toolId: UsageToolId;
+  configured: boolean;
+  maskedHint?: string;
+  methods?: Array<{ fieldKey: string; labelKey: string; maskedHint?: string }>;
+}
+
+export interface UsageDayBucket {
+  date: string;
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export interface UsageModelBreakdown {
+  model: string;
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export interface UsageQuotaWindow {
+  key: string;
+  labelKey: string;
+  label?: string;
+  usedPercent: number;
+  resetAt?: string;
+}
+
+export interface UsageToolSnapshot {
+  toolId: UsageToolId;
+  label: string;
+  status: "ok" | "not_configured" | "unsupported" | "error";
+  error?: string;
+  authSourceKey?: string;
+  totalCostUsd?: number;
+  totalInputTokens?: number;
+  totalOutputTokens?: number;
+  daily: UsageDayBucket[];
+  byModel?: UsageModelBreakdown[];
+  quotas?: UsageQuotaWindow[];
+}
+
+export interface UsageDashboardResult {
+  rangeDays: number;
+  fetchedAt: string;
+  encryptionAvailable: boolean;
+  tools: UsageToolSnapshot[];
+  summary: {
+    totalCostUsd: number;
+    configuredCount: number;
+    supportedCount: number;
+  };
+}
+
 export interface ElectronAPI {
   getInventory: () => Promise<ProviderEntry[]>;
   startInventoryScan: () => Promise<void>;
@@ -326,6 +414,8 @@ export interface ElectronAPI {
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
+  getSkillsRaw: () => Promise<SkillsRawData>;
+  syncSkills: (opts: { skillNames: string[]; targetTools: string[] }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
   mcpListServers: (tool: string) => Promise<McpListResult>;
@@ -461,6 +551,25 @@ export interface ElectronAPI {
   onTrayActivateProfile: (cb: (profileId: string) => void) => () => void;
   onProfileLayoutFlush: (cb: () => void) => () => void;
   sendProfileLayoutFlushDone: () => void;
+  usageGetProviders: () => Promise<{
+    providers: UsageProviderMeta[];
+    encryptionAvailable: boolean;
+  }>;
+  usageGetCredentialStatus: () => Promise<{
+    statuses: UsageCredentialStatus[];
+    encryptionAvailable: boolean;
+  }>;
+  usageSetCredential: (
+    tool: UsageToolId,
+    fieldKey: string,
+    value: string,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  usageClearCredential: (tool: UsageToolId) => Promise<{ ok: boolean; error?: string }>;
+  usageTestCredential: (tool: UsageToolId, fieldKey?: string) => Promise<{ ok: boolean; error?: string }>;
+  usageFetchDashboard: (opts?: { days?: number }) => Promise<
+    | { ok: true; dashboard: UsageDashboardResult }
+    | { ok: false; error: string }
+  >;
 }
 
 declare global {

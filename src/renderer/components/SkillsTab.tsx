@@ -3,6 +3,7 @@ import { Card } from "./Card";
 import { DataTable, Td } from "./DataTable";
 import { Badge, InstallStatusBadge } from "./Badge";
 import { SkillsMcpDiffPanel } from "./SkillsMcpDiffPanel";
+import { SkillsSyncPanel } from "./SkillsSyncPanel";
 import { SkillTags, resolveSkillDetails } from "./SkillTags";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
@@ -50,6 +51,8 @@ export function SkillsTab({
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">⚡ {t("app.tab.skills")}</h2>
 
       <SkillsMcpDiffPanel data={data} onOpenMcpSync={onOpenMcpSync} />
+
+      <SkillsSyncPanel />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
       <SkillsCards entries={installed} />
