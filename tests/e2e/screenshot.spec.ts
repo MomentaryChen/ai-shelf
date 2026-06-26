@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "path";
 import { mkdirSync } from "fs";
 import { fileURLToPath } from "url";
-import { DOCS_SCREENSHOT_LOCALE, forceDocsLocale } from "./helpers/docs-locale.js";
+import { DOCS_SCREENSHOT_LOCALE, forceDocsLocale, waitForTerminalPane } from "./helpers/docs-locale.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MAIN = join(__dirname, "../../dist/electron/main.js");
@@ -42,13 +42,9 @@ async function waitForAppReady(page: Page) {
   await expect(inventoryTab).toBeEnabled({ timeout: CONTENT_TIMEOUT });
 }
 
-async function waitForTerminalPane(page: Page) {
-  await expect(page.getByText(/^Profiles?$/)).toBeVisible({ timeout: CONTENT_TIMEOUT });
-}
-
 async function switchToTerminal(page: Page) {
   await page.getByRole("tab", { name: /Terminal|終端/i }).click();
-  await waitForTerminalPane(page);
+  await waitForTerminalPane(page, CONTENT_TIMEOUT);
 }
 
 async function switchToInventory(page: Page) {

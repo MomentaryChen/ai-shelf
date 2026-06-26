@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { forceDocsLocale } from "./helpers/docs-locale.js";
+import { forceDocsLocale, waitForTerminalPane } from "./helpers/docs-locale.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MAIN = join(__dirname, "../../dist/electron/main.js");
@@ -115,9 +115,7 @@ async function waitForAppReady(page: Page) {
 
 async function switchToTerminal(page: Page) {
   await page.getByRole("tab", { name: /Terminal|終端/i }).click();
-  await expect(page.getByText(/^Profiles?$/)).toBeVisible({
-    timeout: CONTENT_TIMEOUT,
-  });
+  await waitForTerminalPane(page, CONTENT_TIMEOUT);
 }
 
 async function resizeMainWindow(app: ElectronApplication) {
