@@ -1,34 +1,26 @@
-import { test, expect, _electron as electron } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "path";
 import { mkdirSync } from "fs";
 import { fileURLToPath } from "url";
+import { DOCS_SCREENSHOT_LOCALE, waitForTerminalPane } from "./helpers/docs-locale.js";
+import { prepareDocsSession } from "./helpers/docs-demo-workspace.js";
+import { launchDocsElectron } from "./helpers/launch-docs-electron.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN = join(__dirname, "../../dist/electron/main.js");
 const OUT = join(__dirname, "../screenshots");
 
-/** Keep in sync with `src/renderer/App.tsx` `TABS` labels and order. */
-const INVENTORY_TABS = [
-  { label: "📋 Overview" },
-  { label: "🧠 Models" },
-  { label: "⚡ Skills" },
-  { label: "🔌 MCP" },
-  { label: "⚙️ Config" },
-  { label: "🩺 Doctor" },
-  { label: "🔄 Update" },
-] as const;
-
-/** Screenshots for README / docs — order matches docs/pages.md */
-const SCREENSHOTS = [
-  { filename: "01.overview.png", mode: "inventory" as const, tabIndex: 0 },
+/** Left-rail nav — keep in sync with `src/renderer/App.tsx` inventory tabs (excludes usage). */
+const INVENTORY_NAV = [
+  { filename: "01.overview.png", tabIndex: 0, nav: /Overview|總覽/i },
   { filename: "02.terminal.png", mode: "terminal" as const },
-  ...INVENTORY_TABS.slice(1).map((tab, i) => ({
-    filename: `${String(i + 3).padStart(2, "0")}.${tab.label.replace(/^\S+\s/, "").toLowerCase()}.png`,
-    mode: "inventory" as const,
-    tabIndex: i + 1,
-  })),
+  { filename: "03.models.png", tabIndex: 1, nav: /Models|模型/i },
+  { filename: "04.skills.png", tabIndex: 2, nav: /Skills|技能/i },
+  { filename: "05.mcp.png", tabIndex: 3, nav: /^MCP$/i },
+  { filename: "06.config.png", tabIndex: 4, nav: /Config|設定/i },
+  { filename: "07.doctor.png", tabIndex: 5, nav: /Doctor|診斷/i },
+  { filename: "08.update.png", tabIndex: 6, nav: /Update|更新/i },
 ] as const;
 
 /**
@@ -46,82 +38,74 @@ test.beforeAll(() => {
 
 async function waitForAppReady(page: Page) {
   await page.waitForLoadState("domcontentloaded");
-  const inventoryTab = page.getByRole("tab", { name: "Inventory" });
+  const inventoryTab = page.getByRole("tab", { name: /Inventory|清單/i });
   await expect(inventoryTab).toBeVisible({ timeout: CONTENT_TIMEOUT });
   await expect(inventoryTab).toBeEnabled({ timeout: CONTENT_TIMEOUT });
 }
 
-async function waitForTerminalPane(page: Page) {
-  await expect(page.getByText("Profiles", { exact: true })).toBeVisible({ timeout: CONTENT_TIMEOUT });
-}
-
 async function switchToTerminal(page: Page) {
-  await page.getByRole("tab", { name: "Terminal" }).click();
-  await waitForTerminalPane(page);
+  await page.getByRole("tab", { name: /Terminal|終端/i }).click();
+  await waitForTerminalPane(page, CONTENT_TIMEOUT);
 }
 
 async function switchToInventory(page: Page) {
-  await page.getByRole("tab", { name: "Inventory" }).click();
-  const overview = page.getByRole("button", { name: INVENTORY_TABS[0].label });
+  await page.getByRole("tab", { name: /Inventory|清單/i }).click();
+  const overview = page.getByRole("button", { name: INVENTORY_NAV[0].nav });
   await expect(overview).toBeVisible({ timeout: CONTENT_TIMEOUT });
   await expect(overview).toBeEnabled({ timeout: CONTENT_TIMEOUT });
 }
 
 async function goToInventoryTab(page: Page, tabIndex: number) {
-  if (tabIndex > 0) {
-    await page.getByRole("button", { name: INVENTORY_TABS[tabIndex].label }).click();
+  const item = INVENTORY_NAV.find((it) => "tabIndex" in it && it.tabIndex === tabIndex);
+  if (item && "nav" in item && tabIndex > 0) {
+    await page.getByRole("button", { name: item.nav }).click();
   }
 }
 
 /** Let async panels (Doctor IPC, Update scan) finish instead of a fixed sleep. */
-async function waitForScreenshotSettled(
-  page: Page,
-  shot: (typeof SCREENSHOTS)[number],
-) {
-  if (shot.mode === "terminal") {
-    await page.waitForTimeout(1_000);
-    return;
-  }
-
-  switch (shot.tabIndex) {
+async function waitForScreenshotSettled(page: Page, tabIndex: number) {
+  switch (tabIndex) {
     case 0:
-      await expect(page.getByText("已安裝 / 偵測總數", { exact: true })).toBeVisible({
-        timeout: ASYNC_PANEL_TIMEOUT,
-      });
+      await expect(
+        page.getByText(
+          DOCS_SCREENSHOT_LOCALE === "zh" ? "已安裝 / 偵測總數" : "Installed / detected",
+          { exact: true },
+        ),
+      ).toBeVisible({ timeout: ASYNC_PANEL_TIMEOUT });
       break;
     case 1:
-      await expect(page.getByRole("heading", { name: "🧠 Models" })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /🧠.*Models|模型/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 2:
-      await expect(page.getByRole("heading", { name: "⚡ Skills" })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /⚡.*Skills|技能/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 3:
-      await expect(page.getByRole("heading", { name: "🔌 MCP Servers" })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /🔌.*MCP/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 4:
-      await expect(page.getByRole("heading", { name: "⚙️ Config Files" })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /⚙️.*Config|設定/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 5:
-      await expect(page.getByRole("heading", { name: "🩺 Doctor" })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /🩺.*Doctor|診斷/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
-      await expect(page.getByText("Checking…")).toHaveCount(0, { timeout: ASYNC_PANEL_TIMEOUT });
+      await expect(page.getByText(/Checking…|檢查中…/)).toHaveCount(0, { timeout: ASYNC_PANEL_TIMEOUT });
       break;
     case 6:
-      await expect(page.getByRole("heading", { name: "🔄 Update" })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /🔄.*Update|更新/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
-      await expect(page.getByRole("button", { name: "🔍 Re-check All" })).toBeEnabled({
-        timeout: ASYNC_PANEL_TIMEOUT,
-      });
+      await expect(
+        page.getByRole("button", { name: /🔍.*Re-check|全部重新檢查/i }),
+      ).toBeEnabled({ timeout: ASYNC_PANEL_TIMEOUT });
       break;
     default:
       break;
@@ -165,7 +149,6 @@ async function forceCloseElectron(app: ElectronApplication, timeoutMs = 5_000): 
     proc = undefined;
   }
 
-  // Attempt graceful quit first.
   try {
     await app.evaluate(({ app: electronApp }) => {
       electronApp.quit();
@@ -174,21 +157,14 @@ async function forceCloseElectron(app: ElectronApplication, timeoutMs = 5_000): 
     /* main process may already be tearing down */
   }
 
-  // Kill the entire process tree NOW, while the main PID is still alive.
-  // Must happen before app.close() which internally calls proc.kill() (main-only) and
-  // would orphan GPU/renderer/network-service children whose inherited stdio handles
-  // then keep Node's event loop alive after Playwright prints ✓.
   killProcessTree(pid);
 
-  // Unref the child process so Node doesn't block waiting for its exit event.
   try {
     proc?.unref();
   } catch {
     /* ignore */
   }
 
-  // Clean up Playwright's CDP/WebSocket side. The process is already killed so
-  // this should resolve (or fail) quickly; the race cap is a last-resort guard.
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     try {
@@ -210,19 +186,22 @@ test("documentation screenshots", async () => {
   let app: ElectronApplication | undefined;
   let page: Page | undefined;
   try {
-    app = await electron.launch({ args: [MAIN] });
+    app = await launchDocsElectron();
     page = await app.firstWindow();
-    await waitForAppReady(page);
+    await prepareDocsSession(page, waitForAppReady);
 
-    for (const shot of SCREENSHOTS) {
+    for (const shot of INVENTORY_NAV) {
       await test.step(shot.filename, async () => {
-        if (shot.mode === "terminal") {
+        if ("mode" in shot && shot.mode === "terminal") {
           await switchToTerminal(page!);
+          await page!.waitForTimeout(1_000);
         } else {
           await switchToInventory(page!);
-          await goToInventoryTab(page!, shot.tabIndex);
+          if ("tabIndex" in shot) {
+            await goToInventoryTab(page!, shot.tabIndex);
+            await waitForScreenshotSettled(page!, shot.tabIndex);
+          }
         }
-        await waitForScreenshotSettled(page!, shot);
         await page!.screenshot({ path: join(OUT, shot.filename), fullPage: true });
       });
     }

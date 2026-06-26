@@ -11,6 +11,8 @@ const DEFAULT_CONFIG = {
 } as const;
 
 export function getAppDataDir(): string {
+  const override = process.env.AISHELF_APP_DATA_DIR?.trim();
+  if (override) return override;
   if (process.platform === "win32") {
     const appData = process.env.APPDATA ?? join(homedir(), "AppData", "Roaming");
     return join(appData, APP_NAME);

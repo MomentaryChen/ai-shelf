@@ -375,6 +375,13 @@ function ChatTabInner({
   }, [refreshSidebarForest, activeProfile?.id, panes.length]);
 
   useEffect(() => {
+    const unsub = window.api.onSyncDataApplied(() => {
+      void refreshSidebarForest();
+    });
+    return unsub;
+  }, [refreshSidebarForest]);
+
+  useEffect(() => {
     const onDragEnd = () => setProfileSidebarDrag(false);
     document.addEventListener("dragend", onDragEnd);
     return () => document.removeEventListener("dragend", onDragEnd);

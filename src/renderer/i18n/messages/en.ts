@@ -148,12 +148,17 @@ export const en = {
   "settings.custom": "Custom",
   "settings.account": "Account & sync",
   "settings.accountHint":
-    "Sign in with Google to link this device to your account. Cloud sync will use this identity (coming soon).",
+    "Sign in with Google to sync profiles and layouts across devices. Data is stored under your account in Firestore.",
   "settings.accountNotConfigured":
     "Google sign-in is not configured. Add Firebase settings to .env.local (see .env.example).",
   "settings.accountSignInGoogle": "Sign in with Google",
   "settings.accountSignOut": "Sign out",
   "settings.accountSignInFailed": "Sign-in failed: {error}",
+  "settings.accountSyncNow": "Sync now",
+  "settings.accountSyncing": "Syncing…",
+  "settings.accountLastSync": "Last synced: {time}",
+  "settings.accountNeverSynced": "Not synced yet on this device",
+  "settings.accountSyncFailed": "Sync failed: {error}",
   "settings.backup": "Data backup & restore",
   "settings.backupHint":
     "Export profiles, layouts, workspaces, and app settings to a file. Use when migrating devices, reinstalling, or upgrading.",
