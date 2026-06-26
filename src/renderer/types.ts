@@ -609,10 +609,18 @@ export interface ElectronAPI {
   getSystemTrayEnabled: () => Promise<{ systemTrayEnabled: boolean }>;
   setPtyBufferMaxChars: (chars: number) => Promise<{ ok: boolean; terminalPtyBufferChars: number }>;
   getPtyBufferMaxChars: () => Promise<{ terminalPtyBufferChars: number }>;
+  showPaneAgentNotification: (payload: {
+    title: string;
+    body: string;
+    paneId?: string;
+    silent?: boolean;
+  }) => Promise<{ ok: boolean }>;
+  setTrayPaneAttention: (count: number) => Promise<{ ok: boolean; count: number }>;
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
   toggleDevTools: () => Promise<void>;
   onTrayActivateProfile: (cb: (profileId: string) => void) => () => void;
+  onPaneAgentFocus: (cb: (paneId: string) => void) => () => void;
   onProfileLayoutFlush: (cb: () => void) => () => void;
   sendProfileLayoutFlushDone: () => void;
   usageGetProviders: () => Promise<{

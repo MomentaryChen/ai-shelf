@@ -91,6 +91,7 @@ import {
   setAppQuitting,
   type TrayDeps,
 } from "./tray.js";
+import { showPaneAgentNotification, syncTrayPaneAttention } from "./agent-notify.js";
 import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 
@@ -1838,6 +1839,24 @@ ipcMain.handle("set-pty-buffer-max-chars", (_event, chars: unknown) => {
 ipcMain.handle("get-pty-buffer-max-chars", () => ({
   terminalPtyBufferChars: ptyBufferMaxChars,
 }));
+
+ipcMain.handle(
+  "show-pane-agent-notification",
+  (_event, payload: { title?: string; body?: string; paneId?: string; silent?: boolean }) => {
+    const title = typeof payload?.title === "string" ? payload.title : "AI Shelf";
+    const body = typeof payload?.body === "string" ? payload.body : "";
+    return showPaneAgentNotification(
+      { title, body, paneId: payload?.paneId, silent: payload?.silent },
+      getTrayDeps(),
+    );
+  },
+);
+
+ipcMain.handle("set-tray-pane-attention", (_event, count: unknown) => {
+  const n = typeof count === "number" && Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+  syncTrayPaneAttention(n, getTrayDeps());
+  return { ok: true, count: n };
+});
 
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;

@@ -6,6 +6,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 let trayDeps: TrayDeps | null = null;
 let minimizeToTrayEnabled = true;
+let trayAttentionCount = 0;
 
 export function isSystemTrayEnabled(): boolean {
   return minimizeToTrayEnabled;
@@ -39,19 +40,34 @@ function getTerminalWindow(deps: TrayDeps): BrowserWindow | null {
 }
 
 function showTerminalWindow(deps: TrayDeps): void {
+  showTerminalFromNotification(deps);
+}
+
+/** Focus terminal when user clicks a pane-agent notification. */
+export function showTerminalFromNotification(deps: TrayDeps, paneId?: string): void {
   const chat = deps.getChatWindow();
   if (chat && !chat.isDestroyed()) {
     if (!chat.isVisible()) chat.show();
     chat.focus();
+    if (paneId) sendPaneAgentFocus(chat, paneId);
     return;
   }
   const main = deps.getMainWindow();
   if (main && !main.isDestroyed()) {
     if (!main.isVisible()) main.show();
     main.focus();
+    if (paneId) sendPaneAgentFocus(main, paneId);
     return;
   }
   deps.createChatWindow();
+}
+
+function sendPaneAgentFocus(win: BrowserWindow, paneId: string): void {
+  const send = () => {
+    if (!win.isDestroyed()) win.webContents.send("pane-agent-focus", paneId);
+  };
+  if (win.webContents.isLoading()) win.webContents.once("did-finish-load", send);
+  else send();
 }
 
 function hideTerminalWindows(deps: TrayDeps): void {
@@ -143,6 +159,27 @@ export function refreshTrayMenu(deps?: TrayDeps): void {
   const d = deps ?? trayDeps;
   if (!tray || !d) return;
   tray.setContextMenu(buildTrayMenu(d));
+  applyTrayAttentionPresentation();
+}
+
+function applyTrayAttentionPresentation(): void {
+  if (!tray) return;
+  const count = trayAttentionCount;
+  if (process.platform === "darwin") {
+    tray.setTitle(count > 0 ? String(count) : "");
+  }
+  const suffix = count > 0 ? ` (${count} need attention)` : "";
+  tray.setToolTip(`AI Shelf${suffix}`);
+}
+
+export function setTrayAttentionCount(count: number, deps?: TrayDeps): void {
+  trayAttentionCount = Math.max(0, Math.round(count));
+  if (deps) trayDeps = deps;
+  applyTrayAttentionPresentation();
+}
+
+export function getTrayAttentionCount(): number {
+  return trayAttentionCount;
 }
 
 export function initTray(deps: TrayDeps): Tray {
@@ -164,6 +201,7 @@ export function initTray(deps: TrayDeps): Tray {
 export function destroyTray(): void {
   tray?.destroy();
   tray = null;
+  trayAttentionCount = 0;
 }
 
 function showHiddenAppWindows(deps: TrayDeps): void {
