@@ -919,7 +919,9 @@ export function ChatTab({
     allProfiles,
     activeProfileId: activeProfile?.id ?? null,
     enabled: active && !profileBusy && !restoring,
-    onActivate: (profile) => handleActivateProfileRef.current(profile),
+    onActivate: (profile) => {
+      void handleActivateProfileRef.current(profile);
+    },
   });
 
   usePaneShortcuts({

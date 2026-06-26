@@ -321,12 +321,6 @@ export const en = {
   "inventory.diffFix.syncAdded": "+ synced: {names}",
   "inventory.diffFix.allSynced": "Claude and Cursor MCP configs match",
   "inventory.diffFix.allSyncedHint": "No MCP servers need syncing from Claude to Cursor.",
-  "inventory.update.noTools": "No installed tools to check",
-  "inventory.update.allUpToDate": "All installed tools are up to date",
-  "inventory.update.useCards": "Use the cards below to update",
-  "inventory.update.version": "Version:",
-  "inventory.update.checkingLatest": "checking latest…",
-  "inventory.update.noUpdateNeeded": "No update needed — already on the latest version",
   "workspace.title": "Workspaces",
   "workspace.failedLoad":
     "Failed to load workspaces (database unavailable — try restarting after pnpm install)",

@@ -102,6 +102,7 @@ export const zh: Record<MessageKey, string> = {
   "settings.systemTrayEnable": "最小化到系統匣",
   "settings.systemTrayHint":
     "啟用後，關閉視窗會隱藏到系統匣，程式繼續在背景執行。停用後，關閉最後一個視窗會結束程式。",
+  "settings.custom": "自訂",
   "settings.backup": "資料備份與還原",
   "settings.backupHint":
     "將 Profile、版面、工作區與 App 設定匯出成檔案。換機、重裝或升級時可還原資料。",
