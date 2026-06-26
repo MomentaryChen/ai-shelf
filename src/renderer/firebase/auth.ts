@@ -28,6 +28,10 @@ function getApp(): FirebaseApp | null {
   return app;
 }
 
+export function getFirebaseApp(): FirebaseApp | null {
+  return getApp();
+}
+
 export function getFirebaseAuth() {
   const firebaseApp = getApp();
   return firebaseApp ? getAuth(firebaseApp) : null;

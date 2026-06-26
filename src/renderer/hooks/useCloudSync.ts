@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
 import type { SyncStatus } from "../../shared/sync-types.js";
 import { getFirebaseAuth, isFirebaseConfigured } from "../firebase/auth.js";
 import { mergeSyncBundles } from "../firebase/sync-merge.js";
@@ -77,17 +76,30 @@ export function useCloudSyncOnSignIn(): void {
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
-    const auth = getFirebaseAuth();
-    if (!auth) return;
 
-    return onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        syncedUidRef.current = null;
-        return;
-      }
-      if (syncedUidRef.current === user.uid) return;
-      syncedUidRef.current = user.uid;
-      void runSyncRef.current();
-    });
+    let cancelled = false;
+    let unsub: (() => void) | undefined;
+
+    void (async () => {
+      const { onAuthStateChanged } = await import("firebase/auth");
+      if (cancelled) return;
+      const auth = getFirebaseAuth();
+      if (!auth) return;
+
+      unsub = onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          syncedUidRef.current = null;
+          return;
+        }
+        if (syncedUidRef.current === user.uid) return;
+        syncedUidRef.current = user.uid;
+        void runSyncRef.current();
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, []);
 }
