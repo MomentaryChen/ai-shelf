@@ -23,6 +23,7 @@ Desktop.ini
 # Environment
 .env
 .env.*
+!.env.example
 
 # Code signing / certificates
 .codesign/

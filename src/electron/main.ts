@@ -93,6 +93,7 @@ import {
 } from "./tray.js";
 import { showPaneAgentNotification, syncTrayPaneAttention } from "./agent-notify.js";
 import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
+import { registerAuthHandlers } from "./auth-handlers.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 import { runChecksForEntry } from "./doctor-checks.js";
 import {
@@ -104,6 +105,7 @@ import {
 } from "./health-monitor.js";
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
+registerAuthHandlers();
 registerUsageHandlers();
 
 /** Update commands for each AI tool */
@@ -139,6 +141,8 @@ const sharedWebPreferences = {
   preload: join(import.meta.dirname, "preload.cjs"),
   contextIsolation: true,
   nodeIntegration: false,
+  /** Required for Firebase Google sign-in popup windows. */
+  nativeWindowOpen: true,
 } as const;
 
 /** Window title: app name + version (+ dev git label). Version lives here only — not duplicated in the in-app header. */

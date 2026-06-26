@@ -30,6 +30,7 @@ import type { AppLocale } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
 import { syncMainProcessFromSettings } from "../system-tray-sync";
 import { useHealthMonitor } from "../hooks/useHealthMonitor";
+import { AccountPanel } from "./AccountPanel";
 
 interface ChatSettingsPanelProps {
   compact?: boolean;
@@ -717,6 +718,8 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           )}
         </div>
       </div>
+
+      <AccountPanel compact={compact} />
 
       {/* Data backup & restore */}
       <div>

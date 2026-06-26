@@ -1,5 +1,9 @@
 /** Types mirroring the inventory data from the main process. */
 
+import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
+
+export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
+
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
 export interface MCPInfo {
@@ -689,6 +693,11 @@ export interface ElectronAPI {
     | { ok: true; dashboard: UsageDashboardResult }
     | { ok: false; error: string }
   >;
+  authReportSession: (
+    report: AuthSessionReport,
+  ) => Promise<{ ok: true; state: AuthStatePublic } | { ok: false; error: string }>;
+  authClearSession: () => Promise<{ ok: true; state: AuthStatePublic }>;
+  authGetState: (configured: boolean) => Promise<AuthStatePublic>;
 }
 
 declare global {
