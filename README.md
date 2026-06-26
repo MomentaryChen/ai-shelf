@@ -244,8 +244,7 @@ pnpm rebuild:native:all      # all installed Electron versions
 
 # Quality & packaging
 pnpm test:e2e                # Playwright screenshot tests
-pnpm gen:docs-assets         # local preview only — CI commits canonical PNG/GIF (see docs/RELEASE.md)
-                             # GitHub Actions → Docs assets (windows-latest)
+pnpm gen:docs-assets         # refresh README/docs PNGs + GIF before release (Windows + ffmpeg)
 pnpm lint
 pnpm format / pnpm format:check
 pnpm package:win             # standalone CLI exe (pkg)

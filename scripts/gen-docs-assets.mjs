@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * Regenerate README / docs visual assets in one pass (single build).
+ * Regenerate README / docs visual assets locally before release (single build).
  * - tests/screenshots/*.png  → README, docs/pages.md, docs/pages.zh-TW.md
  * - docs/assets/terminal-demo.gif → README hero
  *
- * Run before release when the desktop UI changed. Requires a display (Windows desktop).
- * CI (canonical): GitHub Actions → Docs assets on windows-latest. PRs auto-commit when images differ.
- * Local output is for preview — inventory PNGs vary by installed CLIs; bytes won't match CI.
- * Locale: AISHELF_DOCS_LOCALE=zh (default). GIF step needs ffmpeg on PATH (see docs/RELEASE.md).
+ * Requires a Windows desktop + ffmpeg on PATH. Uses an isolated Demo profile group
+ * (see tests/e2e/helpers/docs-demo-workspace.ts). Locale: AISHELF_DOCS_LOCALE=zh (default).
  */
 import { spawnSync } from "node:child_process";
 
@@ -41,4 +39,4 @@ run(
 console.log("\nDocs assets updated:");
 console.log("  tests/screenshots/*.png");
 console.log("  docs/assets/terminal-demo.gif");
-console.log("\nCommit these files with the release (or a preceding docs commit).");
+console.log("\nCommit these files with the release.");

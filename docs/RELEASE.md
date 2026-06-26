@@ -19,34 +19,20 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 1. [ ] All changes committed and pushed to `main`
 2. [ ] Root and `packages/cli` `version` fields match the intended release
 3. [ ] `pnpm lint`
-4. [ ] **Docs visuals** — if this release changes the desktop UI, refresh README / pages screenshots **before** tagging:
-
-   Screenshots are generated on a **Windows GitHub Actions runner** (Electron + real display). Inventory tabs reflect whatever CLIs exist on that runner, so **local `pnpm gen:docs-assets` output will not match CI byte-for-byte** — treat CI as canonical.
-
-   **Option A — PR (automatic)**
-
-   1. Open a PR that touches `src/renderer/**` or `src/electron/**`.
-   2. The **Docs assets** workflow runs on `windows-latest`, regenerates PNG/GIF, and **commits back to the PR branch** when images differ.
-   3. Pull the bot commit (`docs: refresh README screenshots [skip ci]`) before merging.
-
-   **Option B — GitHub Actions manual (release on `develop` / `main`)**
-
-   1. Merge UI changes.
-   2. **Actions → Docs assets → Run workflow** on that branch (~15–30 min).
-   3. When the job commits `docs: refresh README screenshots [skip ci]`, pull on your machine if needed.
-
-   **Option C — Local preview (optional)**
+4. [ ] **Docs visuals** — if this release changes the desktop UI, refresh README / pages screenshots **locally on Windows before** tagging:
 
    ```powershell
    pnpm gen:docs-assets
    ```
 
-   Requires ffmpeg on `PATH` and a Windows desktop. Use to preview layout; commit images via Option A or B.
-
-   Locale is pinned to **zh** (`AISHELF_DOCS_LOCALE`) so output matches [pages.zh-TW.md](pages.zh-TW.md).
-
+   - Regenerates `tests/screenshots/*.png` and `docs/assets/terminal-demo.gif`
+   - Requires a **Windows desktop** (Electron display) and **ffmpeg** on `PATH`
+   - Terminal screenshots use an isolated **Demo** profile group (`tests/e2e/helpers/docs-demo-workspace.ts`), not your real workspace
+   - Locale is pinned to **zh** (`AISHELF_DOCS_LOCALE`) to match [pages.zh-TW.md](pages.zh-TW.md)
+   - Inventory tabs still reflect CLIs installed on your machine — review before committing
    - Individual targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
    - Skip only when the release has **no** UI/visual changes
+   - Commit the updated image files with the release
 5. [ ] Local smoke test: `pnpm dist:win` → install `release/AI-Shelf-Setup-<version>.exe`
 6. [ ] [CHANGELOG.md](../CHANGELOG.md) updated for user-facing changes
 7. [ ] README version badge (`**vX.Y.Z**`) matches the release

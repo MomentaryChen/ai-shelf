@@ -1,13 +1,14 @@
-import { test, expect, _electron as electron } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "path";
 import { mkdirSync } from "fs";
 import { fileURLToPath } from "url";
-import { DOCS_SCREENSHOT_LOCALE, forceDocsLocale, waitForTerminalPane } from "./helpers/docs-locale.js";
+import { DOCS_SCREENSHOT_LOCALE, waitForTerminalPane } from "./helpers/docs-locale.js";
+import { prepareDocsSession } from "./helpers/docs-demo-workspace.js";
+import { launchDocsElectron } from "./helpers/launch-docs-electron.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN = join(__dirname, "../../dist/electron/main.js");
 const OUT = join(__dirname, "../screenshots");
 
 /** Left-rail nav — keep in sync with `src/renderer/App.tsx` inventory tabs (excludes usage). */
@@ -185,10 +186,9 @@ test("documentation screenshots", async () => {
   let app: ElectronApplication | undefined;
   let page: Page | undefined;
   try {
-    app = await electron.launch({ args: [MAIN] });
+    app = await launchDocsElectron();
     page = await app.firstWindow();
-    await forceDocsLocale(page);
-    await waitForAppReady(page);
+    await prepareDocsSession(page, waitForAppReady);
 
     for (const shot of INVENTORY_NAV) {
       await test.step(shot.filename, async () => {
