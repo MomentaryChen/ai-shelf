@@ -99,6 +99,38 @@ export const en = {
   "settings.copyOnSelectHint":
     "When enabled, selecting text with the mouse copies it to the clipboard automatically — so you can paste it straight into another terminal.",
   "settings.systemTray": "System tray",
+  "healthMonitor.settingsTitle": "Environment health",
+  "healthMonitor.settingsHint":
+    "Background checks watch CLI versions and doctor status — like antivirus, but for your AI toolchain. No pop-ups unless you opt in.",
+  "healthMonitor.backgroundChecks": "Background health checks",
+  "healthMonitor.backgroundChecksHint":
+    "Every few hours, quietly check for CLI updates and doctor issues. Results appear on Overview and nav badges.",
+  "healthMonitor.trayBadge": "Tray alert dot",
+  "healthMonitor.trayBadgeHint": "Show a small red dot on the tray icon when something needs attention.",
+  "healthMonitor.weeklySummary": "Weekly health summary",
+  "healthMonitor.weeklySummaryHint":
+    "Optional desktop notification once a week when issues are found (e.g. MCP failures, auth expired).",
+  "healthMonitor.allClear": "Environment looks healthy",
+  "healthMonitor.watching": "Background monitor is active",
+  "healthMonitor.lastCheck": "Last check: {time}",
+  "healthMonitor.checking": "Checking…",
+  "healthMonitor.checkNow": "Check now",
+  "healthMonitor.attention": "{count} item(s) need attention",
+  "healthMonitor.more": "+{count} more",
+  "healthMonitor.openDoctor": "Open doctor",
+  "healthMonitor.openUpdate": "Open update",
+  "healthMonitor.mcpPreviewTitle": "Review MCP sync",
+  "healthMonitor.mcpPreviewHint":
+    "Preview what will change before writing config files. Existing servers with different settings are never overwritten.",
+  "healthMonitor.mcpPreviewConflicts": "{count} name conflict(s) — will skip",
+  "healthMonitor.mcpPreviewConflictSkip": "Server already exists with different config; sync will not overwrite.",
+  "healthMonitor.mcpPreviewShowDiff": "Show diff",
+  "healthMonitor.mcpPreviewAdds": "{count} server(s) will be added",
+  "healthMonitor.mcpPreviewFrom": "from {tool}",
+  "healthMonitor.mcpPreviewShowEntry": "Show entry",
+  "healthMonitor.mcpPreviewSkips": "{count} already synced (skipped)",
+  "healthMonitor.mcpPreviewCancel": "Cancel",
+  "healthMonitor.mcpPreviewConfirm": "Apply {count} addition(s)",
   "settings.systemTrayEnable": "Minimize to system tray",
   "settings.systemTrayHint":
     "When enabled, closing a window hides it to the tray and the app keeps running. When disabled, closing the last window quits the app.",

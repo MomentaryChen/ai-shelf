@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 
 import { MCP_SYNC_TOOL_IDS } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
+import { McpSyncPreviewDialog } from "./McpSyncPreviewDialog";
+import type { McpSyncPreviewItem } from "../types";
 
 const TOOLS = MCP_SYNC_TOOL_IDS;
 const TOOL_ICONS: Record<string, string> = {
@@ -24,6 +26,12 @@ export function McpSyncPanel() {
   const [targetTools, setTargetTools] = useState<Set<string>>(new Set(TOOLS));
   const [syncing, setSyncing] = useState(false);
   const [results, setResults] = useState<McpSyncResult[] | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewItems, setPreviewItems] = useState<McpSyncPreviewItem[]>([]);
+  const [pendingSync, setPendingSync] = useState<{
+    serverNames: string[];
+    targetTools: string[];
+  } | null>(null);
 
   const load = useCallback(async () => {
     setResults(null);
@@ -65,20 +73,51 @@ export function McpSyncPanel() {
       return next;
     });
 
-  const doSync = async (serverNames: string[]) => {
-    if (serverNames.length === 0 || targetTools.size === 0) return;
+  const executeSync = async (serverNames: string[], tools: string[]) => {
+    if (serverNames.length === 0 || tools.length === 0) return;
     setSyncing(true);
     setResults(null);
     try {
-      const res = await window.api.syncMcp({ serverNames, targetTools: [...targetTools] });
+      const res = await window.api.syncMcp({ serverNames, targetTools: tools });
       setResults(res);
       await load();
     } catch {
       setResults([{ tool: "all", added: [], skipped: [], error: "Sync failed" }]);
     } finally {
       setSyncing(false);
+      setPreviewOpen(false);
+      setPendingSync(null);
     }
   };
+
+  const requestSync = async (serverNames: string[]) => {
+    if (serverNames.length === 0 || targetTools.size === 0) return;
+    const tools = [...targetTools];
+    try {
+      const preview = await window.api.previewMcpSync({
+        serverNames,
+        targetTools: tools,
+      });
+      if (preview.length === 0) {
+        setResults([{ tool: "all", added: [], skipped: [], error: "No matching servers" }]);
+        return;
+      }
+      const adds = preview.filter((p) => p.action === "add");
+      if (adds.length === 0) {
+        setPreviewItems(preview);
+        setPendingSync({ serverNames, targetTools: tools });
+        setPreviewOpen(true);
+        return;
+      }
+      setPreviewItems(preview);
+      setPendingSync({ serverNames, targetTools: tools });
+      setPreviewOpen(true);
+    } catch {
+      await executeSync(serverNames, tools);
+    }
+  };
+
+  const doSync = (serverNames: string[]) => void requestSync(serverNames);
 
   return (
     <Card title={`🔌 ${t("inventory.mcpSync.title")}`}>
@@ -235,6 +274,19 @@ export function McpSyncPanel() {
           : <span className="text-ok">{t("inventory.mcpSync.allSyncedShort")}</span>}
         {syncedCount > 0 && ` · ${syncedCount} fully synced`}
       </div>
+
+      <McpSyncPreviewDialog
+        open={previewOpen}
+        items={previewItems}
+        syncing={syncing}
+        onCancel={() => {
+          setPreviewOpen(false);
+          setPendingSync(null);
+        }}
+        onConfirm={() => {
+          if (pendingSync) void executeSync(pendingSync.serverNames, pendingSync.targetTools);
+        }}
+      />
     </Card>
   );
 }

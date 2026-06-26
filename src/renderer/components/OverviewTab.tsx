@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { EnvVarGroup, ProviderEntry } from "../types";
+import type { EnvVarGroup, HealthMonitorState, ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { StatCard } from "./StatCard";
+import { HealthStatusBanner } from "./HealthStatusBanner";
 import { DataTable, Td } from "./DataTable";
 import { AuthBadgeForEntry, Badge, YesNo } from "./Badge";
 import { Tag } from "./Tag";
@@ -17,7 +18,21 @@ import { useLocale } from "../i18n/LocaleProvider";
 type ToolFilter = "all" | "installed" | "notInstalled";
 type SortKey = "default" | "tool" | "context";
 
-export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry[]; modelOverrides?: Record<string, string> }) {
+export function OverviewTab({
+  data,
+  modelOverrides = {},
+  healthState,
+  onGoDoctor,
+  onGoUpdate,
+  onRefreshHealth,
+}: {
+  data: ProviderEntry[];
+  modelOverrides?: Record<string, string>;
+  healthState?: HealthMonitorState | null;
+  onGoDoctor?: () => void;
+  onGoUpdate?: () => void;
+  onRefreshHealth?: () => void;
+}) {
   const { t } = useLocale();
   const sorted = sortByInstalled(data);
   const { installed, notInstalled } = partitionByInstalled(data);
@@ -96,6 +111,15 @@ export function OverviewTab({ data, modelOverrides = {} }: { data: ProviderEntry
 
   return (
     <>
+      {healthState && onGoDoctor && onGoUpdate && onRefreshHealth && (
+        <HealthStatusBanner
+          state={healthState}
+          onGoDoctor={onGoDoctor}
+          onGoUpdate={onGoUpdate}
+          onRefresh={onRefreshHealth}
+        />
+      )}
+
       {/* Summary grid */}
       <div className="ui-stagger-children mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         <StatCard value={`${available}/${data.length}`} label={t("inventory.overview.available")} />

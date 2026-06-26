@@ -99,6 +99,38 @@ export const zh: Record<MessageKey, string> = {
   "settings.copyOnSelectHint":
     "啟用後，用滑鼠選取文字會自動複製到剪貼簿——這樣就能直接貼到另一個終端機。",
   "settings.systemTray": "系統匣",
+  "healthMonitor.settingsTitle": "環境健康",
+  "healthMonitor.settingsHint":
+    "背景檢查會監看 CLI 版本與 Doctor 狀態——像防毒軟體一樣顧著你的 AI 工具鏈，預設不會強制打斷你。",
+  "healthMonitor.backgroundChecks": "背景健康檢查",
+  "healthMonitor.backgroundChecksHint":
+    "每隔數小時靜默檢查 CLI 更新與 Doctor 問題，結果顯示在總覽與側邊導覽紅點。",
+  "healthMonitor.trayBadge": "托盤警示小紅點",
+  "healthMonitor.trayBadgeHint": "有需要留意的事項時，在系統匣圖示上顯示小紅點。",
+  "healthMonitor.weeklySummary": "每週健康摘要",
+  "healthMonitor.weeklySummaryHint":
+    "可選：每週一次桌面通知（例如 MCP 失效、Copilot 需重新登入）。",
+  "healthMonitor.allClear": "環境狀態良好",
+  "healthMonitor.watching": "背景監控運作中",
+  "healthMonitor.lastCheck": "上次檢查：{time}",
+  "healthMonitor.checking": "檢查中…",
+  "healthMonitor.checkNow": "立即檢查",
+  "healthMonitor.attention": "{count} 項需要留意",
+  "healthMonitor.more": "另有 {count} 項",
+  "healthMonitor.openDoctor": "開啟 Doctor",
+  "healthMonitor.openUpdate": "開啟 Update",
+  "healthMonitor.mcpPreviewTitle": "檢視 MCP 同步",
+  "healthMonitor.mcpPreviewHint":
+    "寫入設定檔前先預覽變更。同名但內容不同的伺服器絕不會被覆寫。",
+  "healthMonitor.mcpPreviewConflicts": "{count} 個名稱衝突——將略過",
+  "healthMonitor.mcpPreviewConflictSkip": "此工具已有同名但不同的設定，同步不會覆寫。",
+  "healthMonitor.mcpPreviewShowDiff": "顯示差異",
+  "healthMonitor.mcpPreviewAdds": "將新增 {count} 個伺服器",
+  "healthMonitor.mcpPreviewFrom": "來自 {tool}",
+  "healthMonitor.mcpPreviewShowEntry": "顯示項目",
+  "healthMonitor.mcpPreviewSkips": "{count} 個已同步（略過）",
+  "healthMonitor.mcpPreviewCancel": "取消",
+  "healthMonitor.mcpPreviewConfirm": "套用 {count} 項新增",
   "settings.systemTrayEnable": "最小化到系統匣",
   "settings.systemTrayHint":
     "啟用後，關閉視窗會隱藏到系統匣，程式繼續在背景執行。停用後，關閉最後一個視窗會結束程式。",

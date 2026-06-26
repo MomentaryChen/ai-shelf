@@ -1,11 +1,14 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
+import type { NativeImage } from "electron";
 import { getProfileForest, setLastActiveGroup } from "./workspace-host.js";
 
 let tray: Tray | null = null;
 let isQuitting = false;
 let trayDeps: TrayDeps | null = null;
 let minimizeToTrayEnabled = true;
+let baseTrayIcon: NativeImage | null = null;
+let trayHealthAlert = false;
 let trayAttentionCount = 0;
 
 export function isSystemTrayEnabled(): boolean {
@@ -29,6 +32,48 @@ export function setAppQuitting(quitting: boolean): void {
 
 export function getAppQuitting(): boolean {
   return isQuitting;
+}
+
+/** Draw a small red dot on the tray icon when health alerts are present. */
+function iconWithHealthBadge(base: NativeImage, alert: boolean): NativeImage {
+  if (!alert) return base;
+  const size = base.getSize();
+  const buf = Buffer.from(base.toBitmap());
+  const w = size.width;
+  const dot = 4;
+  for (let dy = 0; dy < dot; dy++) {
+    for (let dx = 0; dx < dot; dx++) {
+      const x = w - dot + dx;
+      const y = dy;
+      const i = (y * w + x) * 4;
+      buf[i] = 0;
+      buf[i + 1] = 0;
+      buf[i + 2] = 220;
+      buf[i + 3] = 255;
+    }
+  }
+  return nativeImage.createFromBuffer(buf, { width: w, height: size.height });
+}
+
+function applyTrayPresentation(): void {
+  if (!tray || !baseTrayIcon) return;
+  tray.setImage(iconWithHealthBadge(baseTrayIcon, trayHealthAlert));
+
+  const count = trayAttentionCount;
+  if (process.platform === "darwin") {
+    tray.setTitle(count > 0 ? String(count) : "");
+  }
+
+  const hints: string[] = [];
+  if (trayHealthAlert) hints.push("health attention needed");
+  if (count > 0) hints.push(`${count} need attention`);
+  const suffix = hints.length > 0 ? ` — ${hints.join(", ")}` : "";
+  tray.setToolTip(`AI Shelf${suffix}`);
+}
+
+export function setTrayHealthAlert(alert: boolean): void {
+  trayHealthAlert = alert;
+  applyTrayPresentation();
 }
 
 function getTerminalWindow(deps: TrayDeps): BrowserWindow | null {
@@ -159,23 +204,13 @@ export function refreshTrayMenu(deps?: TrayDeps): void {
   const d = deps ?? trayDeps;
   if (!tray || !d) return;
   tray.setContextMenu(buildTrayMenu(d));
-  applyTrayAttentionPresentation();
-}
-
-function applyTrayAttentionPresentation(): void {
-  if (!tray) return;
-  const count = trayAttentionCount;
-  if (process.platform === "darwin") {
-    tray.setTitle(count > 0 ? String(count) : "");
-  }
-  const suffix = count > 0 ? ` (${count} need attention)` : "";
-  tray.setToolTip(`AI Shelf${suffix}`);
+  applyTrayPresentation();
 }
 
 export function setTrayAttentionCount(count: number, deps?: TrayDeps): void {
   trayAttentionCount = Math.max(0, Math.round(count));
   if (deps) trayDeps = deps;
-  applyTrayAttentionPresentation();
+  applyTrayPresentation();
 }
 
 export function getTrayAttentionCount(): number {
@@ -185,8 +220,9 @@ export function getTrayAttentionCount(): number {
 export function initTray(deps: TrayDeps): Tray {
   trayDeps = deps;
   const icon = nativeImage.createFromPath(deps.iconPath);
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip("AI Shelf");
+  baseTrayIcon = icon.resize({ width: 16, height: 16 });
+  tray = new Tray(iconWithHealthBadge(baseTrayIcon, trayHealthAlert));
+  applyTrayPresentation();
   refreshTrayMenu(deps);
 
   tray.on("click", () => {
@@ -202,6 +238,7 @@ export function destroyTray(): void {
   tray?.destroy();
   tray = null;
   trayAttentionCount = 0;
+  trayHealthAlert = false;
 }
 
 function showHiddenAppWindows(deps: TrayDeps): void {

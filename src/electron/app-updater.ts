@@ -34,6 +34,23 @@ const STARTUP_CHECK_DELAY_MS = 4_000;
 
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 let startupTimer: ReturnType<typeof setTimeout> | null = null;
+const settledListeners = new Set<() => void>();
+
+function notifyUpdateCheckSettled(): void {
+  for (const fn of settledListeners) {
+    try {
+      fn();
+    } catch {
+      /* listener error */
+    }
+  }
+}
+
+/** Fires after a background update check reaches a terminal state. */
+export function onAppUpdateCheckSettled(listener: () => void): () => void {
+  settledListeners.add(listener);
+  return () => settledListeners.delete(listener);
+}
 
 const state: AppUpdateState = {
   status: "idle",
@@ -103,6 +120,7 @@ function bindAutoUpdaterEvents(): void {
       version: state.latestVersion,
       releaseNotes: state.releaseNotes,
     });
+    notifyUpdateCheckSettled();
   });
 
   autoUpdater.on("update-not-available", (info) => {
@@ -112,6 +130,7 @@ function bindAutoUpdaterEvents(): void {
     sendToRenderer("app-update-not-available", {
       version: state.latestVersion,
     });
+    notifyUpdateCheckSettled();
   });
 
   autoUpdater.on("download-progress", (progress) => {
@@ -138,6 +157,7 @@ function bindAutoUpdaterEvents(): void {
     state.error = formatUpdateErrorMessage(err.message);
     console.error("[app-updater]", err.message);
     sendToRenderer("app-update-error", { message: state.error });
+    notifyUpdateCheckSettled();
   });
 }
 
@@ -215,6 +235,7 @@ export async function checkAppUpdate(): Promise<AppUpdateState> {
     state.error = err instanceof Error ? err.message : String(err);
     console.error("[app-updater]", state.error);
     sendToRenderer("app-update-error", { message: state.error });
+    notifyUpdateCheckSettled();
   }
   return getAppUpdateState();
 }

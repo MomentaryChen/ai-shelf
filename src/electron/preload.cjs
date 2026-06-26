@@ -61,6 +61,15 @@ contextBridge.exposeInMainWorld("api", {
   },
   getMcpRaw: () => ipcRenderer.invoke("get-mcp-raw"),
   syncMcp: (opts) => ipcRenderer.invoke("sync-mcp", opts),
+  previewMcpSync: (opts) => ipcRenderer.invoke("preview-mcp-sync", opts),
+  getHealthMonitorState: () => ipcRenderer.invoke("get-health-monitor-state"),
+  runHealthCheck: () => ipcRenderer.invoke("run-health-check"),
+  setHealthMonitorPrefs: (partial) => ipcRenderer.invoke("set-health-monitor-prefs", partial),
+  onHealthMonitorState: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("health-monitor-state", handler);
+    return () => ipcRenderer.off("health-monitor-state", handler);
+  },
   getSkillsRaw: () => ipcRenderer.invoke("get-skills-raw"),
   syncSkills: (opts) => ipcRenderer.invoke("sync-skills", opts),
   readConfigFile: (filePath) => ipcRenderer.invoke("read-config-file", filePath),

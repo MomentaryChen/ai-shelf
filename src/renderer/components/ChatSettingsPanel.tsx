@@ -29,6 +29,7 @@ import type { AppColorTheme } from "../app-theme";
 import type { AppLocale } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
 import { syncMainProcessFromSettings } from "../system-tray-sync";
+import { useHealthMonitor } from "../hooks/useHealthMonitor";
 
 interface ChatSettingsPanelProps {
   compact?: boolean;
@@ -98,6 +99,7 @@ function dirOptionLabel(dir: string): string {
 
 export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   const { locale, setLocale, t } = useLocale();
+  const { state: healthState, setPrefs: setHealthPrefs } = useHealthMonitor();
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
   const [backupBusy, setBackupBusy] = useState<"export" | "import" | null>(null);
   const [backupMessage, setBackupMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(
@@ -550,6 +552,57 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
               <span className="text-[13px] text-text-primary">{t("settings.copyOnSelect")}</span>
               <span className="text-[11px] leading-snug text-text-tertiary">
                 {t("settings.copyOnSelectHint")}
+              </span>
+            </span>
+          </Label>
+        </div>
+      </div>
+
+      {/* Environment health monitor */}
+      <div>
+        <p className={sectionTitle}>{t("healthMonitor.settingsTitle")}</p>
+        <p className="mb-3 text-[11px] leading-snug text-text-tertiary">
+          {t("healthMonitor.settingsHint")}
+        </p>
+        <div className="space-y-2">
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
+              checked={healthState?.prefs.backgroundChecksEnabled ?? true}
+              onCheckedChange={(v) => void setHealthPrefs({ backgroundChecksEnabled: v === true })}
+              className="mt-0.5"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">{t("healthMonitor.backgroundChecks")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("healthMonitor.backgroundChecksHint")}
+              </span>
+            </span>
+          </Label>
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
+              checked={healthState?.prefs.trayBadgeEnabled ?? true}
+              onCheckedChange={(v) => void setHealthPrefs({ trayBadgeEnabled: v === true })}
+              className="mt-0.5"
+              disabled={!healthState?.prefs.backgroundChecksEnabled}
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">{t("healthMonitor.trayBadge")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("healthMonitor.trayBadgeHint")}
+              </span>
+            </span>
+          </Label>
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
+              checked={healthState?.prefs.weeklyDoctorSummary ?? false}
+              onCheckedChange={(v) => void setHealthPrefs({ weeklyDoctorSummary: v === true })}
+              className="mt-0.5"
+              disabled={!healthState?.prefs.backgroundChecksEnabled}
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">{t("healthMonitor.weeklySummary")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("healthMonitor.weeklySummaryHint")}
               </span>
             </span>
           </Label>
