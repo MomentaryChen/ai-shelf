@@ -529,6 +529,20 @@ function fetchLatestNpmVersion(pkg: string): string | null {
   }
 }
 
+/** npm registry when available; optional baseline from installed version (single-tool refresh). */
+function resolveToolLatestVersion(
+  tool: string,
+  available: boolean,
+  currentVersion: string | null,
+  npmLatest: string | null | undefined,
+  inferNonNpmFromInstalled = false,
+): string | null {
+  if (!available) return null;
+  if (tool in TOOL_NPM_PACKAGE) return npmLatest ?? null;
+  if (inferNonNpmFromInstalled) return currentVersion ?? null;
+  return null;
+}
+
 ipcMain.handle("check-update", async () => {
   const results: {
     tool: string;
@@ -541,10 +555,10 @@ ipcMain.handle("check-update", async () => {
 
   let entries: Awaited<ReturnType<typeof detectAll>> = [];
   try {
-    entries = getCachedInventory() ?? await detectAll({ quick: true });
-    if (!getCachedInventory()) setInventoryCache(entries);
+    entries = await detectAll({ quick: true });
+    setInventoryCache(entries);
   } catch {
-    entries = [];
+    entries = getCachedInventory() ?? [];
   }
 
   const installedToolIds = new Set(
@@ -565,7 +579,12 @@ ipcMain.handle("check-update", async () => {
       tool: entry.tool,
       label: cfg?.label ?? entry.provider,
       currentVersion: entry.version ?? null,
-      latestVersion: entry.available ? (latestVersionMap[entry.tool] ?? null) : null,
+      latestVersion: resolveToolLatestVersion(
+        entry.tool,
+        entry.available,
+        entry.version ?? null,
+        latestVersionMap[entry.tool],
+      ),
       available: entry.available,
       updateCommand: cfg ? cfg.update.join(" ") : "",
     });
@@ -591,11 +610,14 @@ ipcMain.handle("refresh-tool-update-info", async (_event, tool: string) => {
 
   const cfg = TOOL_UPDATE_COMMANDS[detected.tool] ?? TOOL_UPDATE_COMMANDS[tool];
   const pkg = TOOL_NPM_PACKAGE[detected.tool] ?? TOOL_NPM_PACKAGE[tool];
-  const latestVersion = !detected.available
-    ? null
-    : pkg
-      ? fetchLatestNpmVersion(pkg)
-      : (detected.version ?? null);
+  const npmLatest = pkg ? fetchLatestNpmVersion(pkg) : null;
+  const latestVersion = resolveToolLatestVersion(
+    detected.tool,
+    detected.available,
+    detected.version ?? null,
+    npmLatest,
+    true,
+  );
 
   const cached = getCachedInventory();
   if (cached) {

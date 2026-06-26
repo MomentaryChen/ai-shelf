@@ -17,15 +17,23 @@ function updateMessageIndicatesUpToDate(message: string): boolean {
   return /already up to date|no update available|nothing to update|已是最新/i.test(message);
 }
 
-/** For tools without npm registry, treat current as latest after a successful update. */
+/** For tools without npm registry, treat current as latest after a successful update check. */
 function effectiveLatestVersion(
   tool: string,
   currentVersion: string | null,
   latestVersion: string | null,
   syncedAfterUpdate?: boolean,
+  updateMessage?: string,
 ): string | null {
+  if (
+    syncedAfterUpdate &&
+    currentVersion &&
+    (!toolHasNpmLatest(tool) ||
+      (updateMessage != null && updateMessageIndicatesUpToDate(updateMessage)))
+  ) {
+    return currentVersion;
+  }
   if (latestVersion != null) return latestVersion;
-  if (syncedAfterUpdate && !toolHasNpmLatest(tool) && currentVersion) return currentVersion;
   return null;
 }
 
@@ -47,6 +55,7 @@ function buildToolUpdateInfo(
     currentVersion,
     rawLatest,
     syncedAfterUpdate,
+    results[entry.tool]?.message,
   );
   return {
     tool: entry.tool,
@@ -201,7 +210,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
       </h2>
 
       <div className="mb-3 flex justify-end">
-        <Button variant="outline" onClick={() => void runCheckAll()} disabled={checkingAll}>
+        <Button variant="outline" onClick={() => void runCheckAll(false)} disabled={checkingAll}>
           🔍 {t("inventory.update.recheckAll")}
         </Button>
       </div>
