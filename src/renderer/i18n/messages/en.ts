@@ -138,9 +138,12 @@ export const en = {
   "settings.paneAgentAwarenessHint":
     "Status dots on each pane, plus optional alerts when an unfocused agent finishes or needs input.",
   "settings.paneAgentAwarenessEnable": "Show pane status indicators",
-  "settings.paneAgentNotifySystem": "Desktop notifications",
+  "settings.paneAgentNotifySystem": "Disable notifications",
+  "settings.paneAgentNotifySystemHint":
+    "Do not show desktop notification toasts. The tray badge is not affected.",
   "settings.paneAgentNotifyTrayBadge": "Tray attention badge",
-  "settings.paneAgentNotifySound": "Notification sound",
+  "settings.paneAgentNotifySound": "Mute sound",
+  "settings.paneAgentNotifySoundHint": "Turn off the in-app chime and system notification sounds.",
   "settings.paneAgentNotifyUnfocusedOnly": "Only when pane is not focused",
   "settings.paneAgentStallTimeout": "Mark as stuck after no output",
   "settings.paneAgentStallOff": "Off",

@@ -138,9 +138,11 @@ export const zh: Record<MessageKey, string> = {
   "settings.paneAgentAwarenessHint":
     "每個窗格顯示狀態指示，並可在未聚焦的代理完成或需要輸入時發出提醒。",
   "settings.paneAgentAwarenessEnable": "顯示窗格狀態指示",
-  "settings.paneAgentNotifySystem": "桌面通知",
+  "settings.paneAgentNotifySystem": "關閉通知",
+  "settings.paneAgentNotifySystemHint": "不顯示桌面通知氣泡。系統匣標記不受此選項影響。",
   "settings.paneAgentNotifyTrayBadge": "系統匣 attention 標記",
-  "settings.paneAgentNotifySound": "通知提示音",
+  "settings.paneAgentNotifySound": "關閉聲音",
+  "settings.paneAgentNotifySoundHint": "關閉應用程式提示音與系統通知音效。",
   "settings.paneAgentNotifyUnfocusedOnly": "僅在未聚焦的窗格",
   "settings.paneAgentStallTimeout": "無輸出多久標記為卡住",
   "settings.paneAgentStallOff": "關閉",
