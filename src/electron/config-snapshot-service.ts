@@ -72,7 +72,15 @@ function snapshotsRoot(): string {
 }
 
 function snapshotDir(id: string): string {
-  return join(snapshotsRoot(), id);
+  const root = snapshotsRoot();
+  const dir = join(root, id);
+  // `id` arrives from the renderer (delete / restore / diff / export). Reject
+  // any value that contains a path separator or escapes the snapshots root, so
+  // a crafted id cannot read or rmSync an arbitrary directory.
+  if (!id || /[\\/]/.test(id) || !isWithin(root, dir)) {
+    throw new Error(`Invalid snapshot id: ${id}`);
+  }
+  return dir;
 }
 
 function manifestPath(id: string): string {
