@@ -23,6 +23,7 @@ import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSetti
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
+import { usePaneAgentAwareness } from "../hooks/usePaneAgentAwareness";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
@@ -155,12 +156,32 @@ export function ChatTab({
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [displayDropActive, setDisplayDropActive] = useState(false);
   const [profileSidebarDrag, setProfileSidebarDrag] = useState(false);
+  const [windowFocused, setWindowFocused] = useState(() => document.hasFocus());
   useAppThemeRevision();
   const initialRestoreDoneRef = useRef(false);
   const restoreInFlightRef = useRef(false);
 
   const panes = layout ? collectPanes(layout) : [];
   const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
+
+  useEffect(() => {
+    const onFocus = () => setWindowFocused(true);
+    const onBlur = () => setWindowFocused(false);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
+
+  const { paneAgentStates, recordPaneAgentInput } = usePaneAgentAwareness(
+    panes,
+    focusedPaneId,
+    settings,
+    t,
+    windowFocused,
+  );
   const paneShortcutLabels = useMemo(() => {
     const b = settings.paneShortcuts;
     const profile = formatProfileQuickSwitchLabels();
@@ -273,12 +294,16 @@ export function ChatTab({
     (data: string, sessionId: string) => {
       const current = panesRef.current;
       if (broadcastInput && current.length > 1) {
-        for (const p of current) window.api.ptyWrite(p.sessionId, data);
+        for (const p of current) {
+          window.api.ptyWrite(p.sessionId, data);
+          recordPaneAgentInput(p.sessionId);
+        }
       } else {
         window.api.ptyWrite(sessionId, data);
+        recordPaneAgentInput(sessionId);
       }
     },
-    [broadcastInput],
+    [broadcastInput, recordPaneAgentInput],
   );
 
   const broadcastActive = broadcastInput && panes.length > 1;
@@ -289,8 +314,11 @@ export function ChatTab({
     const current = panesRef.current;
     if (current.length === 0) return;
     const line = text.endsWith("\n") || text.endsWith("\r") ? text : `${text}\r`;
-    for (const p of current) window.api.ptyWrite(p.sessionId, line);
-  }, []);
+    for (const p of current) {
+      window.api.ptyWrite(p.sessionId, line);
+      recordPaneAgentInput(p.sessionId);
+    }
+  }, [recordPaneAgentInput]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -683,6 +711,14 @@ export function ChatTab({
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    const unsub = window.api.onPaneAgentFocus((paneId) => {
+      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+      else setFocusedPaneId(paneId);
+    });
+    return unsub;
+  }, [activeProfile, focusPaneInDisplay]);
 
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
     if (activeProfile?.id !== profile.id) {
@@ -1243,6 +1279,7 @@ export function ChatTab({
         profileAccentColor={activeProfile?.accentColor ?? null}
         broadcastActive={broadcastActive}
         broadcastPaneCount={panes.length}
+        paneAgentStates={paneAgentStates}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
           else setFocusedPaneId(paneId);

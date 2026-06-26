@@ -574,6 +574,97 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         </Label>
       </div>
 
+      {/* Pane agent awareness */}
+      <div>
+        <p className={sectionTitle}>{t("settings.paneAgentAwareness")}</p>
+        <p className="mb-3 text-[11px] leading-snug text-text-tertiary">
+          {t("settings.paneAgentAwarenessHint")}
+        </p>
+        <div className="flex flex-col gap-2">
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
+              checked={settings.paneAgentAwarenessEnabled}
+              onCheckedChange={(v) => updateSettings({ paneAgentAwarenessEnabled: v === true })}
+              className="mt-0.5"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">
+                {t("settings.paneAgentAwarenessEnable")}
+              </span>
+            </span>
+          </Label>
+
+          {settings.paneAgentAwarenessEnabled && (
+            <>
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+                <Checkbox
+                  checked={settings.paneAgentNotifySystem}
+                  onCheckedChange={(v) => updateSettings({ paneAgentNotifySystem: v === true })}
+                  className="mt-0.5"
+                />
+                <span className="text-[13px] text-text-primary">{t("settings.paneAgentNotifySystem")}</span>
+              </Label>
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+                <Checkbox
+                  checked={settings.paneAgentNotifyTrayBadge}
+                  onCheckedChange={(v) => updateSettings({ paneAgentNotifyTrayBadge: v === true })}
+                  className="mt-0.5"
+                />
+                <span className="text-[13px] text-text-primary">{t("settings.paneAgentNotifyTrayBadge")}</span>
+              </Label>
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+                <Checkbox
+                  checked={settings.paneAgentNotifySound}
+                  onCheckedChange={(v) => updateSettings({ paneAgentNotifySound: v === true })}
+                  className="mt-0.5"
+                />
+                <span className="text-[13px] text-text-primary">{t("settings.paneAgentNotifySound")}</span>
+              </Label>
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+                <Checkbox
+                  checked={settings.paneAgentNotifyUnfocusedOnly}
+                  onCheckedChange={(v) =>
+                    updateSettings({ paneAgentNotifyUnfocusedOnly: v === true })
+                  }
+                  className="mt-0.5"
+                />
+                <span className="text-[13px] text-text-primary">
+                  {t("settings.paneAgentNotifyUnfocusedOnly")}
+                </span>
+              </Label>
+
+              <div className="rounded-lg border border-border px-3.5 py-3">
+                <p className="mb-2 text-[13px] text-text-primary">
+                  {t("settings.paneAgentStallTimeout")}
+                </p>
+                <ToggleGroup
+                  type="single"
+                  value={String(settings.paneAgentStallTimeoutSec)}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    updateSettings({ paneAgentStallTimeoutSec: Number(v) });
+                  }}
+                  className="flex flex-wrap justify-start gap-1"
+                >
+                  <ToggleGroupItem value="0" size="sm" className="text-xs">
+                    {t("settings.paneAgentStallOff")}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="60" size="sm" className="text-xs">
+                    {t("settings.paneAgentStallMin", { minutes: 1 })}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="120" size="sm" className="text-xs">
+                    {t("settings.paneAgentStallMin", { minutes: 2 })}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="300" size="sm" className="text-xs">
+                    {t("settings.paneAgentStallMin", { minutes: 5 })}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Data backup & restore */}
       <div>
         <p className={sectionTitle}>{t("settings.backup")}</p>

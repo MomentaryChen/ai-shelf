@@ -50,6 +50,18 @@ export interface ChatSettings {
   paneShortcuts: PaneShortcutBindings;
   /** Minimize to system tray and keep running when all windows are closed. */
   systemTrayEnabled: boolean;
+  /** Show per-pane agent status and completion alerts in multi-pane layouts. */
+  paneAgentAwarenessEnabled: boolean;
+  /** Desktop notification when an unfocused pane needs attention or finishes. */
+  paneAgentNotifySystem: boolean;
+  /** Tray tooltip / badge count for panes needing attention. */
+  paneAgentNotifyTrayBadge: boolean;
+  /** Play a short sound with pane-agent notifications. */
+  paneAgentNotifySound: boolean;
+  /** Only alert for panes that are not currently focused. */
+  paneAgentNotifyUnfocusedOnly: boolean;
+  /** Seconds without output before marking a busy pane as stalled; 0 disables. */
+  paneAgentStallTimeoutSec: number;
   /** Extra CLI flags appended when launching each AI tool (e.g. `--model opus`). */
   toolLaunchArgs: ToolLaunchArgs;
 }
@@ -112,6 +124,21 @@ function normalizeCopyOnSelect(raw: unknown): boolean {
   return true;
 }
 
+const MIN_PANE_AGENT_STALL_SEC = 0;
+const MAX_PANE_AGENT_STALL_SEC = 600;
+const DEFAULT_PANE_AGENT_STALL_SEC = 120;
+
+function normalizePaneAgentBool(raw: unknown, fallback: boolean): boolean {
+  if (typeof raw === "boolean") return raw;
+  return fallback;
+}
+
+function normalizePaneAgentStallSec(raw: unknown): number {
+  const v = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(v)) return DEFAULT_PANE_AGENT_STALL_SEC;
+  return Math.min(MAX_PANE_AGENT_STALL_SEC, Math.max(MIN_PANE_AGENT_STALL_SEC, Math.round(v)));
+}
+
 function normalizeSystemTrayEnabled(raw: unknown): boolean {
   if (typeof raw === "boolean") return raw;
   return true;
@@ -132,6 +159,12 @@ const DEFAULTS: ChatSettings = {
   dirHistory: [],
   paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
   systemTrayEnabled: true,
+  paneAgentAwarenessEnabled: true,
+  paneAgentNotifySystem: true,
+  paneAgentNotifyTrayBadge: true,
+  paneAgentNotifySound: false,
+  paneAgentNotifyUnfocusedOnly: true,
+  paneAgentStallTimeoutSec: DEFAULT_PANE_AGENT_STALL_SEC,
   toolLaunchArgs: {},
 };
 
@@ -166,6 +199,12 @@ export function loadSettings(): ChatSettings {
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
       systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
+      paneAgentAwarenessEnabled: normalizePaneAgentBool(stored.paneAgentAwarenessEnabled, true),
+      paneAgentNotifySystem: normalizePaneAgentBool(stored.paneAgentNotifySystem, true),
+      paneAgentNotifyTrayBadge: normalizePaneAgentBool(stored.paneAgentNotifyTrayBadge, true),
+      paneAgentNotifySound: normalizePaneAgentBool(stored.paneAgentNotifySound, false),
+      paneAgentNotifyUnfocusedOnly: normalizePaneAgentBool(stored.paneAgentNotifyUnfocusedOnly, true),
+      paneAgentStallTimeoutSec: normalizePaneAgentStallSec(stored.paneAgentStallTimeoutSec),
       toolLaunchArgs: normalizeToolLaunchArgs(stored.toolLaunchArgs),
     };
   } catch {

@@ -265,6 +265,39 @@ input:focus-visible,
   background: #c0a98d;
 }
 
+@keyframes pane-agent-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pane-agent-dot-running {
+  animation: pane-agent-pulse 1.4s ease-in-out infinite;
+}
+
+.pane-agent-dot-attention {
+  animation: pane-agent-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--clay, #c97b5a) 35%, transparent);
+}
+
+.pane-agent-dot-stalled {
+  animation: pane-agent-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane-agent-dot-running,
+  .pane-agent-dot-attention,
+  .pane-agent-dot-stalled {
+    animation: none;
+  }
+}
+
 .warm-shadow-card {
   box-shadow: var(--shadow-warm-card);
 }
