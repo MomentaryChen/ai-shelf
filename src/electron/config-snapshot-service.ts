@@ -11,7 +11,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
 import { zipSync, unzipSync, strToU8 } from "fflate";
 import { getAppDataDir } from "ai-shelf";
@@ -103,25 +103,73 @@ export function archiveKeyForSkill(skillName: string, relPath: string): string {
   return `skills/${skillName}/${rel}`;
 }
 
-/** Map archive keys to paths on this machine (supports bundles from other hosts). */
-export function resolveRestorePath(
+/** True when `target` is `base` itself or nested inside it (no `..` escape, no drive hop). */
+function isWithin(base: string, target: string): boolean {
+  const rel = relative(resolve(base), resolve(target));
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+/**
+ * Reject archive-key tails that try to escape their base directory via
+ * traversal (`..`), empty/`.` segments, or an absolute/drive-rooted segment.
+ */
+function isSafeRelativeTail(tail: string): boolean {
+  if (!tail) return false;
+  const parts = normalizeSlashes(tail).split("/");
+  if (parts.some((p) => p === "" || p === "." || p === "..")) return false;
+  // A leading drive letter (`C:`) or UNC marker would re-root the join.
+  return !/^[a-zA-Z]:/.test(parts[0] ?? "");
+}
+
+/**
+ * Resolve where an entry may be written on THIS machine, or `null` if it is not
+ * safe to restore. Untrusted bundles (imported from another host or tampered)
+ * must never be able to write outside the current user's home tree, so:
+ *  - `files/home/<tail>` is rebuilt under the current home with traversal rejected;
+ *  - a source-home-relative absolute path is rebuilt under the current home;
+ *  - any other absolute path is restored only when it already resolves inside
+ *    the current home; anything outside is refused (returns `null`).
+ */
+function safeRestoreTarget(
   entry: ConfigSnapshotEntry,
   sourceHome?: string,
-): string {
+): string | null {
+  const home = resolve(homedir());
   const key = normalizeSlashes(entry.archiveKey);
+
   if (key.startsWith("files/home/")) {
     const tail = key.slice("files/home/".length);
-    return join(homedir(), ...tail.split("/"));
+    if (!isSafeRelativeTail(tail)) return null;
+    const target = join(home, ...tail.split("/"));
+    return isWithin(home, target) ? target : null;
   }
+
   if (sourceHome && entry.absolutePath) {
     const homeNorm = normalizeSlashes(sourceHome);
     const absNorm = normalizeSlashes(entry.absolutePath);
     if (absNorm.toLowerCase().startsWith(homeNorm.toLowerCase())) {
       const tail = absNorm.slice(homeNorm.length).replace(/^\//, "");
-      return join(homedir(), ...tail.split("/"));
+      if (!isSafeRelativeTail(tail)) return null;
+      const target = join(home, ...tail.split("/"));
+      return isWithin(home, target) ? target : null;
     }
   }
-  return entry.absolutePath;
+
+  const abs = entry.absolutePath ? resolve(entry.absolutePath) : "";
+  return abs && isWithin(home, abs) ? abs : null;
+}
+
+/**
+ * Map archive keys to a display path on this machine (supports bundles from
+ * other hosts). Falls back to the stored absolute path for entries that are not
+ * safe to restore so the UI can still show their origin. Never used as a write
+ * sink — restore writes go through {@link safeRestoreTarget}.
+ */
+export function resolveRestorePath(
+  entry: ConfigSnapshotEntry,
+  sourceHome?: string,
+): string {
+  return safeRestoreTarget(entry, sourceHome) ?? entry.absolutePath;
 }
 
 export function remapManifestPaths(manifest: ConfigSnapshotManifest): ConfigSnapshotManifest {
@@ -317,6 +365,7 @@ function restoreFile(absPath: string, content: Buffer): void {
 }
 
 function restoreSkillDir(skillDir: string, prefix: string, bundle: Map<string, Buffer>): void {
+  const base = resolve(skillDir);
   const normPrefix = normalizeSlashes(prefix);
   mkdirSync(skillDir, { recursive: true });
 
@@ -324,7 +373,11 @@ function restoreSkillDir(skillDir: string, prefix: string, bundle: Map<string, B
     if (!key.startsWith(normPrefix)) continue;
     const rel = key.slice(normPrefix.length);
     if (!rel || rel.endsWith("/")) continue;
-    const dest = join(skillDir, ...rel.split("/"));
+    // Guard against zip-slip: reject traversal in the key and confirm the
+    // resolved destination stays inside the skill directory.
+    if (!isSafeRelativeTail(rel)) continue;
+    const dest = join(base, ...rel.split("/"));
+    if (!isWithin(base, dest)) continue;
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, content);
   }
@@ -333,9 +386,15 @@ function restoreSkillDir(skillDir: string, prefix: string, bundle: Map<string, B
 export function restoreConfigSnapshot(id: string): ConfigSnapshotManifest {
   const manifest = remapManifestPaths(loadManifest(id));
   const bundle = readBundleEntryMap(loadBundle(id));
+  const skipped: string[] = [];
 
   for (const entry of manifest.entries) {
-    const targetPath = resolveRestorePath(entry, manifest.sourceHome);
+    const targetPath = safeRestoreTarget(entry, manifest.sourceHome);
+    if (!targetPath) {
+      // Refuse to write outside the current home tree (untrusted/tampered bundle).
+      skipped.push(entry.archiveKey);
+      continue;
+    }
     if (entry.kind === "file") {
       const content = bundle.get(entry.archiveKey);
       if (!content) continue;
@@ -343,6 +402,13 @@ export function restoreConfigSnapshot(id: string): ConfigSnapshotManifest {
       continue;
     }
     restoreSkillDir(targetPath, entry.archiveKey, bundle);
+  }
+
+  if (skipped.length > 0) {
+    console.warn(
+      `[config-snapshot] Refused ${skipped.length} unsafe restore ` +
+        `target(s) outside the home directory: ${skipped.join(", ")}`,
+    );
   }
 
   return manifest;
