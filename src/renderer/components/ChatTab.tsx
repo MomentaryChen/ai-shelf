@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Monitor, Terminal, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -123,7 +123,12 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   opencode: "OpenCode — multi-provider terminal coding agent",
 };
 
-export function ChatTab({
+/** Ignore model-enrichment churn when deciding if terminal chrome needs a re-render. */
+function inventoryTerminalFingerprint(data: ProviderEntry[]): string {
+  return data.map((e) => `${e.tool}:${e.available ? 1 : 0}`).join("|");
+}
+
+function ChatTabInner({
   data,
   active = true,
   inventoryScanning = false,
@@ -826,15 +831,18 @@ export function ChatTab({
     await window.api.profileUpdate(profileId, { broadcastInput: enabled });
   }
 
-  async function openExternal(tool: string): Promise<{ success: boolean; error?: string }> {
-    const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
-    return window.api.launchInTerminal(
-      tool,
-      settings.externalTerminal,
-      resolveCwd() || undefined,
-      extraArgs,
-    );
-  }
+  const openExternal = useCallback(
+    async (tool: string): Promise<{ success: boolean; error?: string }> => {
+      const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
+      return window.api.launchInTerminal(
+        tool,
+        settings.externalTerminal,
+        resolveCwd() || undefined,
+        extraArgs,
+      );
+    },
+    [settings.toolLaunchArgs, settings.externalTerminal, resolveCwd],
+  );
 
   const paletteActions = useMemo(
     () => ({
@@ -848,15 +856,7 @@ export function ChatTab({
       },
       broadcastCommand: broadcastCommandToPanes,
     }),
-    [
-      addPane,
-      openExternal,
-      sidebarForest,
-      broadcastCommandToPanes,
-      settings.toolLaunchArgs,
-      settings.externalTerminal,
-      resolveCwd,
-    ],
+    [addPane, openExternal, sidebarForest, broadcastCommandToPanes],
   );
 
   // Group used to map Ctrl+1–9 shortcut hints in the palette (mirrors currentGroupId below).
@@ -1431,6 +1431,15 @@ export function ChatTab({
     </TooltipProvider>
   );
 }
+
+export const ChatTab = memo(ChatTabInner, (prev, next) => {
+  return (
+    prev.active === next.active &&
+    prev.inventoryScanning === next.inventoryScanning &&
+    prev.onRegisterCommands === next.onRegisterCommands &&
+    inventoryTerminalFingerprint(prev.data) === inventoryTerminalFingerprint(next.data)
+  );
+});
 
 function WarpTopBar({
   profileLabel,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, memo } from "react";
 import { ArrowDown } from "lucide-react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -61,7 +61,7 @@ function wheelLines(term: Terminal, ev: WheelEvent): number {
   return scaled;
 }
 
-export function EmbeddedTerminal({
+function EmbeddedTerminalInner({
   sessionId,
   bg,
   fontFamily,
@@ -83,10 +83,12 @@ export function EmbeddedTerminal({
   const activeRef = useRef(active);
   const onWriteRef = useRef(onWrite);
   const onSessionLostRef = useRef(onSessionLost);
+  const onRestartRef = useRef(onRestart);
+  const onExitRef = useRef(onExit);
   const fitRef = useRef<(() => void) | null>(null);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const [hasNewOutput, setHasNewOutput] = useState(false);
-  const stableOnExit = useCallback(onExit, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const stableOnExit = useCallback(() => onExitRef.current(), []);
 
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
@@ -257,6 +259,8 @@ export function EmbeddedTerminal({
   activeRef.current = active;
   onWriteRef.current = onWrite;
   onSessionLostRef.current = onSessionLost;
+  onRestartRef.current = onRestart;
+  onExitRef.current = onExit;
 
   useEffect(() => {
     setHasNewOutput(false);
@@ -307,7 +311,7 @@ export function EmbeddedTerminal({
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
-      onRestart: onRestart,
+      onRestart: () => onRestartRef.current?.(),
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
@@ -500,7 +504,7 @@ export function EmbeddedTerminal({
       searchAddon.dispose();
       disposeTerminal(term);
     };
-  }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback, onRestart]);
+  }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback]);
 
   useEffect(() => {
     const term = termRef.current;
@@ -594,3 +598,17 @@ export function EmbeddedTerminal({
     </div>
   );
 }
+
+export const EmbeddedTerminal = memo(
+  EmbeddedTerminalInner,
+  (prev, next) =>
+    prev.sessionId === next.sessionId &&
+    prev.bg === next.bg &&
+    prev.fontFamily === next.fontFamily &&
+    prev.fontSize === next.fontSize &&
+    prev.scrollback === next.scrollback &&
+    prev.rightClickPaste === next.rightClickPaste &&
+    prev.copyOnSelect === next.copyOnSelect &&
+    prev.active === next.active &&
+    prev.focused === next.focused,
+);

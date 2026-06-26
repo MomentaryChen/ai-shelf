@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Spinner } from "./components/Spinner";
 import { OverviewTab } from "./components/OverviewTab";
 import { ModelsTab } from "./components/ModelsTab";
@@ -18,8 +18,76 @@ import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
+import type { ProviderEntry } from "./types";
 
 type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update" | "usage";
+
+const EMPTY_COMMANDS: Command[] = [];
+
+function buildGlobalCommands(
+  data: ProviderEntry[],
+  t: (key: MessageKey, params?: Record<string, string | number>) => string,
+  goTo: (tab: TabId) => void,
+): Command[] {
+  const basename = (p: string) => p.split(/[\\/]/).pop() || p;
+
+  const configSeen = new Set<string>();
+  const configCommands: Command[] = [];
+  for (const entry of data) {
+    const paths = [...entry.config.paths, ...entry.config.instructionFiles, ...entry.mcp.configPaths];
+    for (const path of paths) {
+      if (configSeen.has(path)) continue;
+      configSeen.add(path);
+      configCommands.push({
+        id: `open-config-${path}`,
+        title: t("cmd.openConfig", { name: basename(path) }),
+        group: t("cmd.group.config"),
+        icon: "📄",
+        keywords: `${entry.tool} config ${path}`,
+        hideWhenEmpty: true,
+        run: () => void window.api.openPath(path),
+      });
+    }
+  }
+
+  const skillSeen = new Set<string>();
+  const skillCommands: Command[] = [];
+  for (const entry of data) {
+    for (const skill of entry.skills) {
+      if (skillSeen.has(skill)) continue;
+      skillSeen.add(skill);
+      skillCommands.push({
+        id: `find-skill-${skill}`,
+        title: t("cmd.skillSearch", { name: skill }),
+        group: t("cmd.group.skills"),
+        icon: "⚡",
+        keywords: `skill ${skill}`,
+        hideWhenEmpty: true,
+        run: () => goTo("skills"),
+      });
+    }
+  }
+
+  const mcpSeen = new Set<string>();
+  const mcpCommands: Command[] = [];
+  for (const entry of data) {
+    for (const server of entry.mcp.servers) {
+      if (mcpSeen.has(server)) continue;
+      mcpSeen.add(server);
+      mcpCommands.push({
+        id: `find-mcp-${server}`,
+        title: t("cmd.mcpSearch", { name: server }),
+        group: t("cmd.group.mcp"),
+        icon: "🔌",
+        keywords: `mcp server ${server}`,
+        hideWhenEmpty: true,
+        run: () => goTo("mcp"),
+      });
+    }
+  }
+
+  return [...configCommands, ...skillCommands, ...mcpCommands];
+}
 
 const TAB_ICONS: Record<TabId, string> = {
   overview: "📋",
@@ -58,8 +126,25 @@ export function App() {
   const [appMode, setAppMode] = useState<AppMode>("terminal");
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [terminalCommands, setTerminalCommands] = useState<Command[]>([]);
+  /** Bumped when the palette opens so `commands` re-reads the latest terminal ref. */
+  const [paletteCommandsRev, setPaletteCommandsRev] = useState(0);
+  const terminalCommandsRef = useRef<Command[]>([]);
+  const registerTerminalCommands = useCallback((cmds: Command[]) => {
+    terminalCommandsRef.current = cmds;
+  }, []);
   const [, startTransition] = useTransition();
+
+  const openPalette = useCallback(() => {
+    setPaletteCommandsRev((r) => r + 1);
+    setPaletteOpen(true);
+  }, []);
+
+  const togglePalette = useCallback(() => {
+    setPaletteOpen((open) => {
+      if (!open) setPaletteCommandsRev((r) => r + 1);
+      return !open;
+    });
+  }, []);
 
   function handleModeChange(mode: AppMode) {
     startTransition(() => setAppMode(mode));
@@ -76,6 +161,8 @@ export function App() {
     setModelOverrides,
     reload,
   } = useInventoryScan();
+  const inventoryDataRef = useRef(data);
+  inventoryDataRef.current = data;
 
   const { state: healthState, refresh: refreshHealth } = useHealthMonitor();
 
@@ -100,12 +187,12 @@ export function App() {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         e.stopPropagation();
-        setPaletteOpen((o) => !o);
+        togglePalette();
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
+  }, [togglePalette]);
 
   useEffect(() => {
     if (appMode === "terminal") {
@@ -179,74 +266,6 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
 
-  // Available in both modes: open config files and jump to a skill / MCP server by
-  // name. Marked hideWhenEmpty so they surface only once the user starts typing.
-  const globalCommands = useMemo<Command[]>(() => {
-    const basename = (p: string) => p.split(/[\\/]/).pop() || p;
-
-    const configSeen = new Set<string>();
-    const configCommands: Command[] = [];
-    for (const entry of data) {
-      const paths = [
-        ...entry.config.paths,
-        ...entry.config.instructionFiles,
-        ...entry.mcp.configPaths,
-      ];
-      for (const path of paths) {
-        if (configSeen.has(path)) continue;
-        configSeen.add(path);
-        configCommands.push({
-          id: `open-config-${path}`,
-          title: t("cmd.openConfig", { name: basename(path) }),
-          group: t("cmd.group.config"),
-          icon: "📄",
-          keywords: `${entry.tool} config ${path}`,
-          hideWhenEmpty: true,
-          run: () => void window.api.openPath(path),
-        });
-      }
-    }
-
-    const skillSeen = new Set<string>();
-    const skillCommands: Command[] = [];
-    for (const entry of data) {
-      for (const skill of entry.skills) {
-        if (skillSeen.has(skill)) continue;
-        skillSeen.add(skill);
-        skillCommands.push({
-          id: `find-skill-${skill}`,
-          title: t("cmd.skillSearch", { name: skill }),
-          group: t("cmd.group.skills"),
-          icon: "⚡",
-          keywords: `skill ${skill}`,
-          hideWhenEmpty: true,
-          run: () => goTo("skills"),
-        });
-      }
-    }
-
-    const mcpSeen = new Set<string>();
-    const mcpCommands: Command[] = [];
-    for (const entry of data) {
-      for (const server of entry.mcp.servers) {
-        if (mcpSeen.has(server)) continue;
-        mcpSeen.add(server);
-        mcpCommands.push({
-          id: `find-mcp-${server}`,
-          title: t("cmd.mcpSearch", { name: server }),
-          group: t("cmd.group.mcp"),
-          icon: "🔌",
-          keywords: `mcp server ${server}`,
-          hideWhenEmpty: true,
-          run: () => goTo("mcp"),
-        });
-      }
-    }
-
-    return [...configCommands, ...skillCommands, ...mcpCommands];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, data]);
-
   const sharedModeCommands = useMemo<Command[]>(
     () => [
       {
@@ -267,10 +286,15 @@ export function App() {
     [t],
   );
 
+  // Built only while the palette is open — avoids re-merging commands on every inventory tick.
   const commands = useMemo<Command[]>(() => {
+    if (!paletteOpen) return EMPTY_COMMANDS;
+
+    const globalCommands = buildGlobalCommands(inventoryDataRef.current, t, goTo);
     const base =
       appMode === "terminal"
         ? (() => {
+            const terminalCommands = terminalCommandsRef.current;
             const terminalIds = new Set(terminalCommands.map((c) => c.id));
             const extras = sharedModeCommands.filter((c) => !terminalIds.has(c.id));
             return [...terminalCommands, ...extras];
@@ -278,12 +302,16 @@ export function App() {
         : inventoryCommands;
     const baseIds = new Set(base.map((c) => c.id));
     return [...base, ...globalCommands.filter((c) => !baseIds.has(c.id))];
-  }, [appMode, terminalCommands, sharedModeCommands, inventoryCommands, globalCommands]);
+  }, [paletteOpen, paletteCommandsRev, appMode, sharedModeCommands, inventoryCommands, t]);
+
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
       <AppUpdateModal />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
+      {paletteOpen && (
+        <CommandPalette open commands={commands} onClose={closePalette} />
+      )}
 
       <header
         className={`flex h-9 shrink-0 items-center gap-1 border-b px-2 transition-colors duration-300 ${
@@ -305,7 +333,7 @@ export function App() {
         <div className="ml-auto flex shrink-0 items-center gap-1.5 pl-2">
           <button
             type="button"
-            onClick={() => setPaletteOpen(true)}
+            onClick={openPalette}
             title={t("app.cmdk")}
             className={`flex cursor-pointer items-center gap-1.5 rounded-[22px] border px-2 py-1 text-[11px] transition-colors duration-150 ${
               appMode === "terminal"
@@ -359,7 +387,7 @@ export function App() {
               data={data}
               active={appMode === "terminal"}
               inventoryScanning={scanning}
-              onRegisterCommands={setTerminalCommands}
+              onRegisterCommands={registerTerminalCommands}
             />
           </main>
         )}
