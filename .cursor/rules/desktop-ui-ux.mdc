@@ -1,0 +1,210 @@
+---
+description: 桌面端開發工具 UI/UX + Warm & Soft 前端設計原則
+alwaysApply: true
+---
+
+> **衝突處理**：使用者明確要求優先；否則依預設。**Chrome / 終端機** → Part I；**對話、引導、暖色表面** → Part II。
+
+---
+
+# Part I — 桌面端開發工具 UI/UX
+
+## 1. 高資訊密度 + 視覺層次
+
+開發工具使用者長時間處理大量資訊，不能像消費型 app 那樣大留白。用**層次**而非**空間**分隔：
+
+- **主要區域**（終端機、編輯區）：最強對比、最大面積
+- **次要區域**（側邊欄、狀態列）：降低對比，用 `text-muted-foreground` / `--color-chrome-text-muted` 往後退
+- **緊湊間距**：`gap-1` / `gap-2` 為主，避免 `gap-4` / `gap-6`
+
+```tsx
+// ❌ 消費型留白
+<div className="flex flex-col gap-6 p-8">
+  <h2 className="text-2xl">Sessions</h2>
+</div>
+
+// ✅ 開發工具密度
+<div className="flex flex-col gap-1.5 px-2 py-1">
+  <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sessions</h2>
+</div>
+```
+
+## 2. 桌面特有的視窗結構
+
+- **自訂標題列**：`titleBarStyle: 'hidden'` + 自繪標題列；Mac / Windows 視窗按鈕分別處理
+- **多面板佈局**：側邊欄 + 主區 + 底部面板，可拖曳調整（`SplitPaneLayout`、`ResizeDivider`）
+- **狀態列**：底部細條顯示連線狀態、路徑、shell 類型
+
+## 3. 深色模式優先（Chrome / 終端機）
+
+- 用帶極輕藍/灰調的深色，或專案 `--color-chrome-*` 系列
+- 表面分層：`background` → `card` → `popover` 逐層微提亮
+- 新 chrome UI 優先用既有 token，勿硬編碼 `#000`
+
+## 4. 終端機區域整合
+
+- 透過 `getXtermTheme()` 同步背景、選取色、ANSI 16 色
+- 等寬字體：JetBrains Mono、Fira Code 或 SF Mono
+- 終端機 pane 用 `warp-pane-body` 隔離 xterm 層級
+
+## 5. 鍵盤優先
+
+- **Command palette**：`Cmd/Ctrl+K`（`CommandPalette`）
+- 完整快捷鍵 + 可發現性（tooltip / palette 列出）
+- **Focus 回饋**：`:focus-visible` 明確 outline，勿 `outline-none` 除非有替代 ring
+
+---
+
+# Part II — Front-End Design Rules: Warm & Soft
+
+> 適用於對話氣泡、引導流程、設定面板、空狀態等暖色表面。與 Part I 並存：chrome 保持專業密度，暖色區塊用本節規則。
+
+## 6. Design Intent
+
+產品應感覺 **warm, soft, unhurried** — 像光線充足的陶藝工作室，而非 dashboard。偏好圓潤、柔和對比、安靜動效；避免尖角、硬邊框、炫目效果。
+
+**三個錨點詞**：soft, tactile, calm.
+
+若畫面感覺 cold、clinical、default SaaS → 做錯了，必須修正。
+
+## 7. Color Tokens
+
+使用下列**精確色值**。大面積表面禁止純黑 `#000` 或純白 `#FFF` — 會破壞暖感。
+
+| Token | Hex | Use |
+|-------|-----|-----|
+| `--cream` | `#FBF7F0` | App background |
+| `--surface` | `#FFFFFF` | Cards, panels (raised on cream) |
+| `--sand` | `#F1E8DA` | Secondary surfaces, assistant bubbles |
+| `--sand-deep` | `#E8DECE` | Disabled / inactive fills |
+| `--clay` | `#C97B5A` | Primary accent (buttons, active) |
+| `--clay-soft` | `#D08A66` | Gradient partner for clay |
+| `--clay-deep` | `#B26544` | Pressed / hover-darken accent |
+| `--ink` | `#4A4039` | Primary text |
+| `--muted` | `#9B8E80` | Secondary text, captions |
+| `--success` | `#7FB069` | Online dots, positive status |
+
+**Rules**
+- Primary actions：`linear-gradient(135deg, #D08A66, #C97B5A)` clay gradient
+- Body text 一律 `--ink`，禁止 gray-on-gray；caption 用 `--muted`
+- Status 色調柔和，禁止 neon
+- **單一 accent**，勿加第二亮色「平衡」色盤
+
+## 8. Typography
+
+- **Body / UI**：`Inter`, system-ui fallback。15px base、13px caption、17–18px titles
+- **Weights**：400 body、500 labels、600 titles。禁止 700+ — 在柔和表面上顯得刺耳
+- **Line-height**：body 1.5、緊湊 label 1.3
+- 一律 **sentence case**。禁止 ALL-CAPS label、Title Case 按鈕
+- 數字/資料可用 `tabular-nums`
+
+## 9. Shape, Spacing & Elevation
+
+**Radius** — 圓潤是招牌。禁止 < 6px
+- Cards / panels：`28px` (`--r-card`)
+- Input / large controls：`22px` (`--r-control`)
+- Bubbles：`20px` (`--r-bubble`)，**一角收至 6px** 指向傳送方
+- 圓形元素（avatar、send）：`9999px`
+
+**Spacing** — 4px scale：4, 8, 12, 16, 20, 24, 32。偏寬鬆；擁擠會破壞 calm。螢幕 padding ≥ 20px。
+
+**Elevation** — 僅暖色調陰影，禁止灰/黑 box-shadow：
+```css
+/* resting card */
+box-shadow: 0 12px 40px -12px rgba(120, 90, 60, 0.18),
+            0 0 0 1px rgba(120, 90, 60, 0.04);
+/* accent element */
+box-shadow: 0 4px 14px -6px rgba(201, 123, 90, 0.45);
+```
+優先 shadow 而非硬邊框。分隔線用 `1px` `--sand`，禁止灰色 rule。
+
+## 10. Components
+
+### Buttons
+- Primary：clay gradient、白字、full-round 或 22px radius
+- Idle/disabled：`--sand-deep` fill、無 shadow、`default` cursor
+- Press：`active:scale-90`（大按鈕可用 0.95），200ms
+- 無硬 outline；hover 加深至 `--clay-deep`
+
+### Inputs
+- 背景 `--cream`（非白），嵌在白色 card 內更柔和
+- **Focus = glow, not box**：
+  ```css
+  box-shadow: 0 0 0 2px rgba(201,123,90,0.35),
+              0 4px 16px -6px rgba(201,123,90,0.25);
+  ```
+- 多行自動增高，max-height ≈ 160px 後 scroll
+- Placeholder 用 `--muted`
+
+### Bubbles / Cards
+- User bubble：clay gradient、白字、accent shadow、**右下角**收緊至 6px
+- Assistant bubble：`--sand` fill、`--ink` text、**無 shadow**、**左下角**收緊至 6px
+- Max width ≈ 78% container
+
+### Status
+- Online/active：`--success` 小圓點 + label，禁止 loud badge
+
+## 11. Motion
+
+動效應 **gentle and physical**，禁止 snappy 或卡通彈跳。
+
+- **Easing**：進場 `cubic-bezier(0.22, 1, 0.36, 1)`；小狀態變化用 `ease`
+- **Entrance**：上升 8px + fade，~400ms
+  ```css
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  ```
+- **Loading / typing**：三點垂直閃爍（~1.2s loop、0.2s stagger），色 `#C0A98D`。禁止 spinner
+- **Transitions**：focus/color/scale 200–300ms。禁止 < 120ms（緊張）或 > 500ms（遲鈍）
+- 稀疏使用；一個精心動效勝過三個競爭動效
+- 尊重 `prefers-reduced-motion`：停用 rise/blink，保留即時狀態
+
+## 12. Voice & Copy
+
+- 對話式、平實、溫暖。Sentence case。禁止 jargon、驚嘆號濫用
+- 以使用者可控的事物命名，非系統內部術語
+- 按鈕寫動作："Send"、"Save changes"；結果呼應動作
+- 空狀態引導行動；錯誤冷靜說明原因與修法，不道歉
+
+## 13. Accessibility Floor（non-negotiable）
+
+- `--cream`/`--sand` 上文字用 `--ink`（對比合格）；禁止 body text 用 `--muted` on `--sand`
+- 白字僅用於 `--clay`/gradient，禁止 on `--sand`
+- 所有互動元素保留**可見 focus**（glow 可算）
+- `prefers-reduced-motion`：停用 rise/blink
+- Hit target ≥ 36px；圓形控制 ≥ 36px square
+- 響應式至 ~360px 寬
+
+## 14. Do / Don't
+
+**Do**
+- Round generously, shadow softly, space loosely
+- 單一暖 accent 承載個性
+- 陰影染棕/clay，非灰
+- Focus 與 press 可感知但不喧嘩
+
+**Don't**
+- ❌ 純黑/白大面積、neon accent、第二亮色
+- ❌ 硬 1px 灰邊框作主要分隔
+- ❌ 尖角（< 6px）
+- ❌ Spinner、bouncy/elastic easing、競爭動畫
+- ❌ ALL-CAPS label 或 700+ weight
+- ❌ 擁擠間距 — 不確定時加空間
+
+## 15. Quick Token Block（copy-paste）
+
+```css
+:root {
+  --cream:#FBF7F0; --surface:#FFFFFF; --sand:#F1E8DA; --sand-deep:#E8DECE;
+  --clay:#C97B5A; --clay-soft:#D08A66; --clay-deep:#B26544;
+  --ink:#4A4039; --muted:#9B8E80; --success:#7FB069;
+  --r-card:28px; --r-control:22px; --r-bubble:20px;
+  --ease-in:cubic-bezier(0.22,1,0.36,1);
+  --shadow-card:0 12px 40px -12px rgba(120,90,60,0.18), 0 0 0 1px rgba(120,90,60,0.04);
+  --shadow-accent:0 4px 14px -6px rgba(201,123,90,0.45);
+}
+```
+
+暖色表面用 `--cream`/`--clay` 等；chrome / 終端機用 `--color-chrome-*`（Part I）。
