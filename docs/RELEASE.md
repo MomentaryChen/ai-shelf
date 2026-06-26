@@ -17,11 +17,30 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 
 1. [ ] All changes committed and pushed to `main`
 2. [ ] Root and `packages/cli` `version` fields match the intended release
-3. [ ] `pnpm lint` (optional: `pnpm test:e2e`)
-4. [ ] Local smoke test: `pnpm dist:win` → install `release/AI-Shelf-Setup-<version>.exe`
-5. [ ] [CHANGELOG.md](../CHANGELOG.md) updated for user-facing changes
-6. [ ] README / GitHub Release notes updated if needed
-7. [ ] Release workflow reports **Authenticode signature present** (self-signed; SmartScreen may still warn — see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md))
+3. [ ] `pnpm lint`
+4. [ ] **Docs visuals** — if this release changes the desktop UI, refresh README / pages screenshots **before** tagging:
+
+   **Option A — GitHub Actions (recommended)**
+
+   1. Push UI changes to `main` (or open a PR and merge).
+   2. **Actions → Docs assets → Run workflow** on that branch (Windows runner; ~15–30 min).
+   3. When the job commits `docs: refresh README screenshots [skip ci]`, pull on your machine if needed.
+
+   **Option B — Local (Windows with display)**
+
+   ```powershell
+   pnpm gen:docs-assets
+   ```
+
+   Both refresh `tests/screenshots/*.png` and `docs/assets/terminal-demo.gif`. Locale is pinned to **zh** (`AISHELF_DOCS_LOCALE`) so CI and local output match [pages.zh-TW.md](pages.zh-TW.md).
+
+   - Individual targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
+   - Skip only when the release has **no** UI/visual changes
+   - PRs that touch `src/renderer/**` run a **stale-screenshot check**; merge only after images are current
+5. [ ] Local smoke test: `pnpm dist:win` → install `release/AI-Shelf-Setup-<version>.exe`
+6. [ ] [CHANGELOG.md](../CHANGELOG.md) updated for user-facing changes
+7. [ ] README version badge (`**vX.Y.Z**`) matches the release
+8. [ ] Release workflow reports **Authenticode signature present** (self-signed; SmartScreen may still warn — see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md))
 
 ### Publish via GitHub Actions (recommended)
 

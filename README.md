@@ -244,6 +244,8 @@ pnpm rebuild:native:all      # all installed Electron versions
 
 # Quality & packaging
 pnpm test:e2e                # Playwright screenshot tests
+pnpm gen:docs-assets         # refresh README/docs PNGs + terminal-demo.gif (before release)
+                             # or: GitHub Actions → Docs assets (windows-latest)
 pnpm lint
 pnpm format / pnpm format:check
 pnpm package:win             # standalone CLI exe (pkg)

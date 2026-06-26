@@ -1,0 +1,82 @@
+name: Docs assets
+
+# Regenerate README / docs screenshots on a Windows runner (Electron + display).
+# Prefer workflow_dispatch before release; PRs only verify assets are up to date.
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit updated PNG/GIF to the checked-out branch
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - "src/renderer/**"
+      - "src/electron/**"
+      - "tests/e2e/**"
+      - "tests/screenshots/**"
+      - "docs/assets/terminal-demo.gif"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-assets-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    name: Refresh README docs images
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate docs assets
+        env:
+          AISHELF_DOCS_LOCALE: zh
+        run: pnpm gen:docs-assets
+
+      - name: Verify assets changed (PR)
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          git add tests/screenshots docs/assets/terminal-demo.gif
+          $diff = git diff --cached --stat
+          if ($diff) {
+            Write-Host $diff
+            throw "Docs images are stale. Run 'pnpm gen:docs-assets' locally or trigger Actions → Docs assets on this branch."
+          }
+          Write-Host "Docs images are up to date."
+
+      - name: Commit updated assets
+        if: github.event_name == 'workflow_dispatch' && inputs.commit
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/screenshots docs/assets/terminal-demo.gif
+          $diff = git diff --cached --stat
+          if (-not $diff) {
+            Write-Host "No image changes — nothing to commit."
+            exit 0
+          }
+          git commit -m "docs: refresh README screenshots [skip ci]"
+          git push
