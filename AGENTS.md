@@ -26,6 +26,7 @@ AI Shelf is a pnpm monorepo with two workspaces:
 | Format check | `pnpm format:check` (Prettier) |
 | Run Electron | `pnpm electron` (builds first) or `pnpm electron:dev` (skips build) |
 | E2E tests | `pnpm test:e2e` (Playwright + Electron; requires display server) |
+| Docs screenshots | `pnpm gen:docs-assets` (Windows + ffmpeg; before release — see `docs/RELEASE.md`) |
 
 ### Non-obvious caveats
 
@@ -33,8 +34,10 @@ AI Shelf is a pnpm monorepo with two workspaces:
 
 2. **E2E tests require a display server**: On headless Linux, use `xvfb-run --auto-servernum pnpm exec playwright test`. The tests launch Electron, navigate tabs, and take screenshots.
 
-3. **E2E test locale dependency**: The screenshot test (`tests/e2e/screenshot.spec.ts`) asserts Chinese-language text (e.g. "已安裝 / 偵測總數"). Tests may fail in environments without the expected locale/content state.
+3. **Docs screenshot workspace**: `tests/e2e/screenshot.spec.ts` and `terminal-demo-gif.spec.ts` set `AISHELF_APP_DATA_DIR` to an isolated folder and seed a **Demo** profile group — not the developer's real `%APPDATA%/ai-shelf` data.
 
-4. **Inventory CLI works standalone**: `node dist/cli.js` (after build) runs the `ai` inventory commands without native module issues — it does not use `better-sqlite3`.
+4. **E2E test locale dependency**: The screenshot test asserts Chinese-language text (e.g. "已安裝 / 偵測總數"). Locale is pinned via `AISHELF_DOCS_LOCALE=zh` in docs helpers.
 
-5. **`pnpm.onlyBuiltDependencies`** in `pnpm-workspace.yaml` handles native build approvals non-interactively — no need for `pnpm approve-builds`.
+5. **Inventory CLI works standalone**: `node dist/cli.js` (after build) runs the `ai` inventory commands without native module issues — it does not use `better-sqlite3`.
+
+6. **`pnpm.onlyBuiltDependencies`** in `pnpm-workspace.yaml` handles native build approvals non-interactively — no need for `pnpm approve-builds`.

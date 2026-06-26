@@ -10,6 +10,7 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 
 - Node.js ≥ 22, pnpm ≥ 10.12.1
 - Windows machine (or rely on CI) for `pnpm dist:win`
+- **ffmpeg** on `PATH` when running `pnpm gen:docs-assets` locally (GIF step; Windows: `choco install ffmpeg` or [ffmpeg builds](https://www.gyan.dev/ffmpeg/builds/))
 - Git tag `vX.Y.Z` must match the release version (e.g. tag `v2.0.0` ↔ `2.0.0`). CI runs [scripts/sync-version-from-tag.mjs](../scripts/sync-version-from-tag.mjs) so root and `packages/cli` `version` fields align with the tag before build/publish.
 - **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; the Windows installer job still runs.
 
@@ -17,11 +18,25 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 
 1. [ ] All changes committed and pushed to `main`
 2. [ ] Root and `packages/cli` `version` fields match the intended release
-3. [ ] `pnpm lint` (optional: `pnpm test:e2e`)
-4. [ ] Local smoke test: `pnpm dist:win` → install `release/AI-Shelf-Setup-<version>.exe`
-5. [ ] [CHANGELOG.md](../CHANGELOG.md) updated for user-facing changes
-6. [ ] README / GitHub Release notes updated if needed
-7. [ ] Release workflow reports **Authenticode signature present** (self-signed; SmartScreen may still warn — see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md))
+3. [ ] `pnpm lint`
+4. [ ] **Docs visuals** — if this release changes the desktop UI, refresh README / pages screenshots **locally on Windows before** tagging:
+
+   ```powershell
+   pnpm gen:docs-assets
+   ```
+
+   - Regenerates `tests/screenshots/*.png` and `docs/assets/terminal-demo.gif`
+   - Requires a **Windows desktop** (Electron display) and **ffmpeg** on `PATH`
+   - Terminal screenshots use an isolated **Demo** profile group (`tests/e2e/helpers/docs-demo-workspace.ts`), not your real workspace
+   - Locale is pinned to **zh** (`AISHELF_DOCS_LOCALE`) to match [pages.zh-TW.md](pages.zh-TW.md)
+   - Inventory tabs still reflect CLIs installed on your machine — review before committing
+   - Individual targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
+   - Skip only when the release has **no** UI/visual changes
+   - Commit the updated image files with the release
+5. [ ] Local smoke test: `pnpm dist:win` → install `release/AI-Shelf-Setup-<version>.exe`
+6. [ ] [CHANGELOG.md](../CHANGELOG.md) updated for user-facing changes
+7. [ ] README version badge (`**vX.Y.Z**`) matches the release
+8. [ ] Release workflow reports **Authenticode signature present** (self-signed; SmartScreen may still warn — see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md))
 
 ### Publish via GitHub Actions (recommended)
 

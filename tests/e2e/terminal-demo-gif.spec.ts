@@ -1,12 +1,14 @@
-import { test, expect, _electron as electron } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { waitForTerminalPane } from "./helpers/docs-locale.js";
+import { prepareDocsSession } from "./helpers/docs-demo-workspace.js";
+import { launchDocsElectron } from "./helpers/launch-docs-electron.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN = join(__dirname, "../../dist/electron/main.js");
 const FRAMES_DIR = join(__dirname, "../artifacts/terminal-demo-frames");
 const OUT_GIF = join(__dirname, "../../docs/assets/terminal-demo.gif");
 const DEMO_PROFILE = "Broadcast demo";
@@ -114,9 +116,7 @@ async function waitForAppReady(page: Page) {
 
 async function switchToTerminal(page: Page) {
   await page.getByRole("tab", { name: /Terminal|終端/i }).click();
-  await expect(page.getByText("Profiles", { exact: true })).toBeVisible({
-    timeout: CONTENT_TIMEOUT,
-  });
+  await waitForTerminalPane(page, CONTENT_TIMEOUT);
 }
 
 async function resizeMainWindow(app: ElectronApplication) {
@@ -144,20 +144,6 @@ async function cleanupDemoProfile(page: Page) {
   }, DEMO_PROFILE);
 }
 
-async function ensureProfileGroup(page: Page) {
-  const created = await page.evaluate(async () => {
-    const forest = await window.api.profileGroupGetForest();
-    if (!forest.success || !forest.forest) return false;
-    if (forest.forest.groups.length > 0) return false;
-    const r = await window.api.profileGroupCreate("Work");
-    return Boolean(r.success);
-  });
-  if (created) {
-    await page.reload();
-    await waitForAppReady(page);
-  }
-}
-
 async function waitForShellPanes(page: Page, count: number) {
   await expect(page.locator(".xterm")).toHaveCount(count, { timeout: SHELL_READY_TIMEOUT });
   await page.waitForTimeout(1200);
@@ -166,7 +152,7 @@ async function waitForShellPanes(page: Page, count: number) {
 async function addShellPane(page: Page) {
   await page.getByRole("button", { name: /\+ Pane|\+ 窗格/i }).click();
   await page
-    .getByRole("menuitem", { name: /Shell only|純 Shell|no AI/i })
+    .getByRole("menuitem", { name: /Shell only|純終端機|no AI|不開 AI/i })
     .click();
 }
 
@@ -183,12 +169,11 @@ test("terminal mode demo GIF for README", async () => {
   let page: Page | undefined;
 
   try {
-    app = await electron.launch({ args: [MAIN] });
+    app = await launchDocsElectron();
     page = await app.firstWindow();
     await resizeMainWindow(app);
-    await waitForAppReady(page);
+    await prepareDocsSession(page, waitForAppReady);
     await cleanupDemoProfile(page);
-    await ensureProfileGroup(page);
 
     const frames = new FrameCapture(page);
     await switchToTerminal(page);
