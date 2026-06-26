@@ -20,6 +20,7 @@ import {
   exportTerminalOutput,
 } from "../terminal/terminal-output-export";
 import { getXtermTheme } from "../app-theme";
+import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -270,10 +271,7 @@ function EmbeddedTerminalInner({
     const el = containerRef.current;
     if (!el) return;
 
-    const background =
-      bg ||
-      getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() ||
-      "#0f172a";
+    const background = bg ?? getAppBg();
 
     const term = new Terminal({
       theme: getXtermTheme(background),
@@ -510,10 +508,7 @@ function EmbeddedTerminalInner({
     const term = termRef.current;
     if (!term) return;
     const applyTheme = () => {
-      const background =
-        bg ||
-        getComputedStyle(document.documentElement).getPropertyValue("--color-bg-primary").trim() ||
-        "#0f172a";
+      const background = bg ?? getAppBg();
       term.options.theme = getXtermTheme(background);
     };
     applyTheme();

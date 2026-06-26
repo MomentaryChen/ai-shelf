@@ -78,9 +78,22 @@ export const TERMINAL_OPTIONS: { value: ExternalTerminal; label: string }[] = [
   { value: "cmd", label: "⬛ Command Prompt" },
 ];
 
+/** Stored in settings when terminal background should follow the active app theme. */
+export const APP_THEME_TERMINAL_BG = "@app-theme";
+
+export function isAppThemeTerminalBg(terminalBg: string): boolean {
+  return terminalBg === APP_THEME_TERMINAL_BG || terminalBg === "";
+}
+
+function normalizeTerminalBg(raw: unknown): string {
+  if (isAppThemeTerminalBg(typeof raw === "string" ? raw : "")) return APP_THEME_TERMINAL_BG;
+  if (typeof raw === "string" && raw.trim()) return raw;
+  return "#2c2420";
+}
+
 export const BG_PRESETS = [
   { label: "Warm ink", value: "#2c2420", preview: "#2c2420" },
-  { label: "App theme", value: "", preview: "var(--color-terminal-bg)" },
+  { label: "App theme", value: APP_THEME_TERMINAL_BG, preview: "var(--color-terminal-bg)" },
   { label: "Windows Terminal", value: "#0c0c0c", preview: "#0c0c0c" },
   { label: "Pure black", value: "#000000", preview: "#000000" },
   { label: "PowerShell blue", value: "#012456", preview: "#012456" },
@@ -176,6 +189,7 @@ export function loadSettings(): ChatSettings {
       ...stored,
       locale: resolveLocale(stored.locale ?? DEFAULTS.locale),
       appTheme: normalizeAppTheme(stored.appTheme),
+      terminalBg: normalizeTerminalBg(stored.terminalBg),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),
       terminalFontSize: clampInt(
         stored.terminalFontSize,

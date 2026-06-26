@@ -8,6 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { APP_THEME_OPTIONS, applyAppTheme } from "../app-theme";
 import { applyImportedLocalStorage, collectLocalStorageForBackup } from "../backup-storage";
 import {
+  APP_THEME_TERMINAL_BG,
   BG_PRESETS,
   DEFAULT_TERMINAL_FONT_FAMILY,
   DEFAULT_TERMINAL_FONT_SIZE,
@@ -15,6 +16,7 @@ import {
   SCROLLBACK_PRESETS,
   TERMINAL_OPTIONS,
   getAppBg,
+  isAppThemeTerminalBg,
   bumpDirHistory,
   loadSettings,
   saveSettings,
@@ -339,10 +341,12 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           <ToggleGroup
             type="single"
             value={
-              BG_PRESETS.some((p) => p.value === settings.terminalBg) ? settings.terminalBg : ""
+              BG_PRESETS.some((p) => p.value === settings.terminalBg)
+                ? settings.terminalBg
+                : undefined
             }
             onValueChange={(value) => {
-              if (value) updateSettings({ terminalBg: value });
+              if (value !== undefined) updateSettings({ terminalBg: value });
             }}
           >
             {BG_PRESETS.map((p) => {
@@ -365,14 +369,17 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           </ToggleGroup>
           <Label
             className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-[13px] font-normal transition-all duration-150 ${
-              !BG_PRESETS.some((p) => p.value === settings.terminalBg) && settings.terminalBg
+              !BG_PRESETS.some((p) => p.value === settings.terminalBg) &&
+              !isAppThemeTerminalBg(settings.terminalBg)
                 ? "border-accent/60 bg-accent/10 font-medium text-accent"
                 : "border-border text-text-secondary hover:border-accent/40 hover:text-text-primary"
             }`}
           >
             <input
               type="color"
-              value={settings.terminalBg || getAppBg()}
+              value={
+                isAppThemeTerminalBg(settings.terminalBg) ? getAppBg() : settings.terminalBg
+              }
               onChange={(e) => updateSettings({ terminalBg: e.target.value })}
               className="h-3.5 w-3.5 cursor-pointer rounded-sm border-0 bg-transparent p-0 outline-none"
             />

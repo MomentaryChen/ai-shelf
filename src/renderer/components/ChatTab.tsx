@@ -61,6 +61,7 @@ import {
 import {
   TERMINAL_OPTIONS,
   getAppBg,
+  isAppThemeTerminalBg,
   bumpDirHistory,
   loadSettings,
   saveSettings,
@@ -201,7 +202,8 @@ function ChatTabInner({
       profileCyclePrev: profile.profileCyclePrev,
     };
   }, [settings.paneShortcuts]);
-  const bg = settings.terminalBg || getAppBg();
+  const useAppThemeBg = isAppThemeTerminalBg(settings.terminalBg);
+  const bg = useAppThemeBg ? getAppBg() : settings.terminalBg;
   const terminalFontFamily = settings.terminalFontFamily;
   const terminalFontSize = settings.terminalFontSize;
   const terminalScrollback = settings.terminalScrollback;
@@ -1312,7 +1314,7 @@ function ChatTabInner({
           <EmbeddedTerminal
             key={pane.sessionId}
             sessionId={pane.sessionId}
-            bg={bg}
+            bg={useAppThemeBg ? undefined : settings.terminalBg}
             fontFamily={terminalFontFamily}
             fontSize={terminalFontSize}
             scrollback={terminalScrollback}
