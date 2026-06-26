@@ -145,7 +145,7 @@ export function useProfileWorkspace(
     await saveGroupSnapshot(profile.workspaceId, profile.id, snapshot);
   }, []);
 
-  const persistTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const persistTimerRef = useRef<number | null>(null);
   const persistInFlightRef = useRef<Promise<void> | null>(null);
 
   const runPersist = useCallback(async () => {
@@ -252,7 +252,8 @@ export function useProfileWorkspace(
       }
       if (!next) next = buildHorizontalLayout(spawned);
 
-      const reconciled = await reconcileLayoutPtys(next, spawnPane);
+      // spawned is non-empty (guarded above), so next is always a layout here.
+      const reconciled = await reconcileLayoutPtys(next!, spawnPane);
       const focusId = collectPanes(reconciled)[0]?.id ?? null;
       applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
       // Restore full layout visibility from snapshot; do not auto-minimize sibling panes.
@@ -402,7 +403,7 @@ export function useProfileWorkspace(
         forest.groups.find((g) => g.id === forest.lastActiveGroupId) ?? forest.groups[0];
       if (!group || group.profiles.length === 0) return;
       const profile =
-        group.profiles.find((p) => p.id === forest.lastActiveProfileId) ?? group.profiles[0];
+        group.profiles.find((p) => p.id === forest.lastActiveProfileId) ?? group.profiles[0]!;
       const r = await activateProfile(profile);
       return { profile, ...r };
     },
