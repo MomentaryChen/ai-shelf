@@ -121,7 +121,7 @@ export function OverviewTab({
       )}
 
       {/* Summary grid */}
-      <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+      <div className="ui-stagger-children mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         <StatCard value={`${available}/${data.length}`} label={t("inventory.overview.available")} />
         <StatCard value={notInstalled.length} label={t("inventory.notInstalled")} valueClassName={notInstalled.length > 0 ? "text-text-tertiary" : "text-ok"} />
         <StatCard value={totalMcp} label={t("inventory.overview.mcpServers")} />

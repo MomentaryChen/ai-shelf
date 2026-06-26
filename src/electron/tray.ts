@@ -9,6 +9,7 @@ let trayDeps: TrayDeps | null = null;
 let minimizeToTrayEnabled = true;
 let baseTrayIcon: NativeImage | null = null;
 let trayHealthAlert = false;
+let trayAttentionCount = 0;
 
 export function isSystemTrayEnabled(): boolean {
   return minimizeToTrayEnabled;
@@ -54,17 +55,25 @@ function iconWithHealthBadge(base: NativeImage, alert: boolean): NativeImage {
   return nativeImage.createFromBuffer(buf, { width: w, height: size.height });
 }
 
-function applyTrayIcon(): void {
+function applyTrayPresentation(): void {
   if (!tray || !baseTrayIcon) return;
   tray.setImage(iconWithHealthBadge(baseTrayIcon, trayHealthAlert));
-  tray.setToolTip(
-    trayHealthAlert ? "AI Shelf — health attention needed" : "AI Shelf",
-  );
+
+  const count = trayAttentionCount;
+  if (process.platform === "darwin") {
+    tray.setTitle(count > 0 ? String(count) : "");
+  }
+
+  const hints: string[] = [];
+  if (trayHealthAlert) hints.push("health attention needed");
+  if (count > 0) hints.push(`${count} need attention`);
+  const suffix = hints.length > 0 ? ` — ${hints.join(", ")}` : "";
+  tray.setToolTip(`AI Shelf${suffix}`);
 }
 
 export function setTrayHealthAlert(alert: boolean): void {
   trayHealthAlert = alert;
-  applyTrayIcon();
+  applyTrayPresentation();
 }
 
 function getTerminalWindow(deps: TrayDeps): BrowserWindow | null {
@@ -76,19 +85,34 @@ function getTerminalWindow(deps: TrayDeps): BrowserWindow | null {
 }
 
 function showTerminalWindow(deps: TrayDeps): void {
+  showTerminalFromNotification(deps);
+}
+
+/** Focus terminal when user clicks a pane-agent notification. */
+export function showTerminalFromNotification(deps: TrayDeps, paneId?: string): void {
   const chat = deps.getChatWindow();
   if (chat && !chat.isDestroyed()) {
     if (!chat.isVisible()) chat.show();
     chat.focus();
+    if (paneId) sendPaneAgentFocus(chat, paneId);
     return;
   }
   const main = deps.getMainWindow();
   if (main && !main.isDestroyed()) {
     if (!main.isVisible()) main.show();
     main.focus();
+    if (paneId) sendPaneAgentFocus(main, paneId);
     return;
   }
   deps.createChatWindow();
+}
+
+function sendPaneAgentFocus(win: BrowserWindow, paneId: string): void {
+  const send = () => {
+    if (!win.isDestroyed()) win.webContents.send("pane-agent-focus", paneId);
+  };
+  if (win.webContents.isLoading()) win.webContents.once("did-finish-load", send);
+  else send();
 }
 
 function hideTerminalWindows(deps: TrayDeps): void {
@@ -180,6 +204,17 @@ export function refreshTrayMenu(deps?: TrayDeps): void {
   const d = deps ?? trayDeps;
   if (!tray || !d) return;
   tray.setContextMenu(buildTrayMenu(d));
+  applyTrayPresentation();
+}
+
+export function setTrayAttentionCount(count: number, deps?: TrayDeps): void {
+  trayAttentionCount = Math.max(0, Math.round(count));
+  if (deps) trayDeps = deps;
+  applyTrayPresentation();
+}
+
+export function getTrayAttentionCount(): number {
+  return trayAttentionCount;
 }
 
 export function initTray(deps: TrayDeps): Tray {
@@ -187,7 +222,7 @@ export function initTray(deps: TrayDeps): Tray {
   const icon = nativeImage.createFromPath(deps.iconPath);
   baseTrayIcon = icon.resize({ width: 16, height: 16 });
   tray = new Tray(iconWithHealthBadge(baseTrayIcon, trayHealthAlert));
-  tray.setToolTip("AI Shelf");
+  applyTrayPresentation();
   refreshTrayMenu(deps);
 
   tray.on("click", () => {
@@ -202,6 +237,8 @@ export function initTray(deps: TrayDeps): Tray {
 export function destroyTray(): void {
   tray?.destroy();
   tray = null;
+  trayAttentionCount = 0;
+  trayHealthAlert = false;
 }
 
 function showHiddenAppWindows(deps: TrayDeps): void {

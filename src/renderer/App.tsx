@@ -13,6 +13,7 @@ import { ChatTab } from "./components/ChatTab";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
 import { InventoryNav, type NavItem } from "./components/InventoryNav";
 import { CommandPalette, type Command } from "./components/CommandPalette";
+import { ViewTransition } from "./components/ViewTransition";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
@@ -119,7 +120,11 @@ export function App() {
 
   const goTo = (tab: TabId) => {
     handleModeChange("inventory");
-    setActiveTab(tab);
+    startTransition(() => setActiveTab(tab));
+  };
+
+  const selectTab = (tab: TabId) => {
+    startTransition(() => setActiveTab(tab));
   };
 
   const inventoryCommands = useMemo<Command[]>(() => {
@@ -281,7 +286,7 @@ export function App() {
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
 
       <header
-        className={`flex h-9 shrink-0 items-center gap-1 border-b px-2 ${
+        className={`flex h-9 shrink-0 items-center gap-1 border-b px-2 transition-colors duration-300 ${
           appMode === "terminal"
             ? "border-chrome-border bg-chrome-bg text-chrome-text"
             : "border-border bg-bg-primary text-text-primary"
@@ -347,9 +352,8 @@ export function App() {
 
         {ready && (
           <main
-            className={`absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden ${
-              appMode === "terminal" ? "" : "hidden"
-            }`}
+            data-active={appMode === "terminal"}
+            className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
           >
             <ChatTab
               data={data}
@@ -360,46 +364,51 @@ export function App() {
           </main>
         )}
 
-        {appMode === "inventory" && (
-          <div className="absolute inset-0 flex overflow-hidden">
+        {ready && (
+          <div
+            data-active={appMode === "inventory"}
+            className="ui-mode-panel absolute inset-0 flex overflow-hidden"
+          >
             <InventoryNav
-                items={TABS}
-                active={activeTab}
-                onSelect={setActiveTab}
-                disabled={!tabsEnabled && activeTab !== "usage"}
-                badges={navBadges}
-              />
+              items={TABS}
+              active={activeTab}
+              onSelect={selectTab}
+              disabled={!tabsEnabled && activeTab !== "usage"}
+              badges={navBadges}
+            />
             <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
               <div className="mx-auto w-full max-w-[1400px]">
-                {showSpinner && <Spinner label={t("app.detecting")} />}
-                {error && !hasData && (
-                  <p className="py-10 text-center text-text-secondary">
-                    {t("app.loadInventoryFailed")}
-                  </p>
-                )}
-                {hasData && (
-                  <>
-                    {activeTab === "overview" && (
-                      <OverviewTab
-                        data={data}
-                        modelOverrides={modelOverrides}
-                        healthState={healthState}
-                        onGoDoctor={() => goTo("doctor")}
-                        onGoUpdate={() => goTo("update")}
-                        onRefreshHealth={refreshHealth}
-                      />
-                    )}
-                    {activeTab === "models" && <ModelsTab data={data} />}
-                    {activeTab === "skills" && (
-                      <SkillsTab data={data} onOpenMcpSync={() => setActiveTab("mcp")} />
-                    )}
-                    {activeTab === "mcp" && <McpTab data={data} />}
-                    {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
-                    {activeTab === "doctor" && <DoctorTab data={data} />}
-                    {activeTab === "update" && <UpdateTab data={data} />}
-                  </>
-                )}
-                {activeTab === "usage" && <UsageTab />}
+                <ViewTransition viewKey={activeTab}>
+                  {showSpinner && <Spinner label={t("app.detecting")} />}
+                  {error && !hasData && (
+                    <p className="py-10 text-center text-text-secondary">
+                      {t("app.loadInventoryFailed")}
+                    </p>
+                  )}
+                  {hasData && (
+                    <>
+                      {activeTab === "overview" && (
+                        <OverviewTab
+                          data={data}
+                          modelOverrides={modelOverrides}
+                          healthState={healthState}
+                          onGoDoctor={() => goTo("doctor")}
+                          onGoUpdate={() => goTo("update")}
+                          onRefreshHealth={refreshHealth}
+                        />
+                      )}
+                      {activeTab === "models" && <ModelsTab data={data} />}
+                      {activeTab === "skills" && (
+                        <SkillsTab data={data} onOpenMcpSync={() => selectTab("mcp")} />
+                      )}
+                      {activeTab === "mcp" && <McpTab data={data} />}
+                      {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
+                      {activeTab === "doctor" && <DoctorTab data={data} />}
+                      {activeTab === "update" && <UpdateTab data={data} />}
+                    </>
+                  )}
+                  {activeTab === "usage" && <UsageTab />}
+                </ViewTransition>
               </div>
             </main>
           </div>

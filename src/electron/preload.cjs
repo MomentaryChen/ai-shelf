@@ -149,6 +149,8 @@ contextBridge.exposeInMainWorld("api", {
   getSystemTrayEnabled: () => ipcRenderer.invoke("get-system-tray-enabled"),
   setPtyBufferMaxChars: (chars) => ipcRenderer.invoke("set-pty-buffer-max-chars", chars),
   getPtyBufferMaxChars: () => ipcRenderer.invoke("get-pty-buffer-max-chars"),
+  showPaneAgentNotification: (payload) => ipcRenderer.invoke("show-pane-agent-notification", payload),
+  setTrayPaneAttention: (count) => ipcRenderer.invoke("set-tray-pane-attention", count),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),
@@ -156,6 +158,11 @@ contextBridge.exposeInMainWorld("api", {
     const handler = (_e, profileId) => cb(profileId);
     ipcRenderer.on("tray-activate-profile", handler);
     return () => ipcRenderer.off("tray-activate-profile", handler);
+  },
+  onPaneAgentFocus: (cb) => {
+    const handler = (_e, paneId) => cb(paneId);
+    ipcRenderer.on("pane-agent-focus", handler);
+    return () => ipcRenderer.off("pane-agent-focus", handler);
   },
   onProfileLayoutFlush: (cb) => {
     const handler = () => cb();

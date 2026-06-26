@@ -17,6 +17,8 @@ import {
   profilePaneHeaderDotStyle,
   profilePaneHeaderStyle,
 } from "../utils/profile-colors";
+import { PaneAgentStatusDot } from "./PaneAgentStatusDot";
+import type { PaneAgentStatus } from "../../shared/pane-agent-state.js";
 
 const DIVIDER_PX = 10;
 
@@ -43,6 +45,7 @@ interface Props {
   profileAccentColor?: string | null;
   broadcastActive?: boolean;
   broadcastPaneCount?: number;
+  paneAgentStates?: Record<string, PaneAgentStatus>;
 }
 
 type ProfileDragOver = { targetPaneId: string; zone: PaneDropZone };
@@ -106,6 +109,7 @@ function SplitPaneLayoutInner({
   profileAccentColor = null,
   broadcastActive = false,
   broadcastPaneCount = 0,
+  paneAgentStates,
   drag,
 }: Props & { drag: PaneDragState }) {
   if (node.kind === "pane") {
@@ -120,6 +124,7 @@ function SplitPaneLayoutInner({
           profileAccentColor={profileAccentColor}
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
+          paneAgentStatus={paneAgentStates?.[node.pane.id]}
           drag={drag}
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
@@ -167,6 +172,7 @@ function SplitPaneLayoutInner({
           profileAccentColor={profileAccentColor}
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
+          paneAgentStates={paneAgentStates}
           drag={drag}
         />
       </div>
@@ -202,6 +208,7 @@ function SplitPaneLayoutInner({
           profileAccentColor={profileAccentColor}
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
+          paneAgentStates={paneAgentStates}
           drag={drag}
         />
       </div>
@@ -216,6 +223,7 @@ function WarpPaneShell({
   profileAccentColor,
   broadcastActive = false,
   broadcastPaneCount = 0,
+  paneAgentStatus,
   drag,
   onFocus,
   onClose,
@@ -232,6 +240,7 @@ function WarpPaneShell({
   profileAccentColor?: string | null;
   broadcastActive?: boolean;
   broadcastPaneCount?: number;
+  paneAgentStatus?: PaneAgentStatus;
   sidebarPaneDragActive?: boolean;
   drag: PaneDragState;
   onFocus: () => void;
@@ -390,6 +399,7 @@ function WarpPaneShell({
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-chrome-border-subtle bg-chrome-surface-raised">
           <ToolLogo tool={pane.tool} size={14} />
         </span>
+        {paneAgentStatus && <PaneAgentStatusDot status={paneAgentStatus} />}
         {onRename ? (
           <EditablePaneTitle
             label={paneDisplayLabel(pane)}
