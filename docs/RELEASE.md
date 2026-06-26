@@ -10,6 +10,7 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 
 - Node.js ≥ 22, pnpm ≥ 10.12.1
 - Windows machine (or rely on CI) for `pnpm dist:win`
+- **ffmpeg** on `PATH` when running `pnpm gen:docs-assets` locally (GIF step; Windows: `choco install ffmpeg` or [ffmpeg builds](https://www.gyan.dev/ffmpeg/builds/))
 - Git tag `vX.Y.Z` must match the release version (e.g. tag `v2.0.0` ↔ `2.0.0`). CI runs [scripts/sync-version-from-tag.mjs](../scripts/sync-version-from-tag.mjs) so root and `packages/cli` `version` fields align with the tag before build/publish.
 - **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; the Windows installer job still runs.
 

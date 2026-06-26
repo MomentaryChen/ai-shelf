@@ -49,6 +49,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install FFmpeg
+        run: choco install ffmpeg -y --no-progress
+        shell: pwsh
+
       - name: Generate docs assets
         env:
           AISHELF_DOCS_LOCALE: zh

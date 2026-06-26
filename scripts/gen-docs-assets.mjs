@@ -6,6 +6,7 @@
  *
  * Run before release when the desktop UI changed. Requires a display (Windows desktop).
  * CI: GitHub Actions → Docs assets (windows-latest). Locale: AISHELF_DOCS_LOCALE=zh (default).
+ * Local GIF step needs ffmpeg on PATH (see docs/RELEASE.md).
  */
 import { spawnSync } from "node:child_process";
 
