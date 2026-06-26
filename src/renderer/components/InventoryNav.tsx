@@ -40,7 +40,7 @@ export function InventoryNav<T extends string>({
             disabled={disabled}
             aria-current={isActive ? "page" : undefined}
             onClick={() => onSelect(it.id)}
-            className={`relative flex items-center gap-2.5 rounded-lg py-2 pr-2.5 pl-3 text-left text-[13px] transition-colors duration-150 ${
+            className={`relative flex items-center gap-2.5 rounded-lg py-2 pr-2.5 pl-3 text-left text-[13px] transition-[color,background-color,transform] duration-200 ${
               disabled
                 ? "cursor-not-allowed text-text-tertiary opacity-50"
                 : isActive
@@ -48,12 +48,12 @@ export function InventoryNav<T extends string>({
                   : "cursor-pointer text-text-secondary hover:bg-bg-secondary hover:text-text-primary"
             }`}
           >
-            {isActive && (
-              <span
-                aria-hidden
-                className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-accent"
-              />
-            )}
+            <span
+              aria-hidden
+              className={`absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-accent transition-[opacity,transform] duration-200 ${
+                isActive ? "scale-y-100 opacity-100" : "scale-y-75 opacity-0"
+              }`}
+            />
             <span aria-hidden className="w-4 text-center text-[15px]">
               {it.icon}
             </span>
