@@ -26,6 +26,13 @@ import {
   writeMcpServers,
 } from "../utils/mcp-sync.js";
 import {
+  collectAllSkills,
+  getSkillWriteRoot,
+  readSkillsForTool,
+  SYNC_SKILL_TOOLS,
+  writeSkillsToTool,
+} from "../utils/skills-sync.js";
+import {
   deleteMcpServer,
   listMcpServersDetailed,
   setMcpServerEnabled,
@@ -855,6 +862,37 @@ ipcMain.handle("sync-mcp", async (_event, opts: {
 
   for (const tool of targetTools) {
     results.push({ tool, ...writeMcpServers(tool, serverNames, allServers) });
+  }
+
+  return results;
+});
+
+// --- Skills Sync ---
+
+ipcMain.handle("get-skills-raw", async () => {
+  const rows = await Promise.all(
+    SYNC_SKILL_TOOLS.map(async (tool) => ({
+      tool,
+      skills: readSkillsForTool(tool),
+      writeRoot: getSkillWriteRoot(tool),
+    })),
+  );
+  return Object.fromEntries(
+    rows.map(({ tool, skills, writeRoot }) => [tool, { skills, writeRoot }]),
+  );
+});
+
+ipcMain.handle("sync-skills", async (_event, opts: {
+  skillNames: string[];
+  targetTools: string[];
+}) => {
+  const { skillNames, targetTools } = opts;
+  const allSkills = collectAllSkills();
+
+  const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+
+  for (const tool of targetTools) {
+    results.push({ tool, ...writeSkillsToTool(tool, skillNames, allSkills) });
   }
 
   return results;

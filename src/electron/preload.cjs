@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld("api", {
   },
   getMcpRaw: () => ipcRenderer.invoke("get-mcp-raw"),
   syncMcp: (opts) => ipcRenderer.invoke("sync-mcp", opts),
+  getSkillsRaw: () => ipcRenderer.invoke("get-skills-raw"),
+  syncSkills: (opts) => ipcRenderer.invoke("sync-skills", opts),
   readConfigFile: (filePath) => ipcRenderer.invoke("read-config-file", filePath),
   writeConfigFile: (filePath, content) => ipcRenderer.invoke("write-config-file", filePath, content),
   mcpListServers: (tool) => ipcRenderer.invoke("mcp-list-servers", tool),

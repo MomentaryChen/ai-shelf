@@ -114,6 +114,15 @@ export interface McpSyncResult {
   error?: string;
 }
 
+export interface SkillsRawData {
+  [tool: string]: {
+    skills: Record<string, { name: string; description?: string; path: string; scope: string }>;
+    writeRoot: string | null;
+  };
+}
+
+export type SkillSyncResult = McpSyncResult;
+
 export type McpConfigFormat = "json" | "toml" | "unknown";
 
 export interface McpServerRecord {
@@ -326,6 +335,8 @@ export interface ElectronAPI {
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
+  getSkillsRaw: () => Promise<SkillsRawData>;
+  syncSkills: (opts: { skillNames: string[]; targetTools: string[] }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
   mcpListServers: (tool: string) => Promise<McpListResult>;
