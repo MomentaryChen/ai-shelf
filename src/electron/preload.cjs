@@ -147,4 +147,11 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.off("profile-layout-flush", handler);
   },
   sendProfileLayoutFlushDone: () => ipcRenderer.send("profile-layout-flush-done"),
+  usageGetProviders: () => ipcRenderer.invoke("usage-get-providers"),
+  usageGetCredentialStatus: () => ipcRenderer.invoke("usage-get-credential-status"),
+  usageSetCredential: (tool, fieldKey, value) =>
+    ipcRenderer.invoke("usage-set-credential", tool, fieldKey, value),
+  usageClearCredential: (tool) => ipcRenderer.invoke("usage-clear-credential", tool),
+  usageTestCredential: (tool, fieldKey) => ipcRenderer.invoke("usage-test-credential", tool, fieldKey),
+  usageFetchDashboard: (opts) => ipcRenderer.invoke("usage-fetch-dashboard", opts),
 });

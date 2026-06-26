@@ -7,6 +7,7 @@ import { McpTab } from "./components/McpTab";
 import { ConfigTab } from "./components/ConfigTab";
 import { DoctorTab } from "./components/DoctorTab";
 import { UpdateTab } from "./components/UpdateTab";
+import { UsageTab } from "./components/UsageTab";
 import { AppUpdateModal } from "./components/AppUpdateModal";
 import { ChatTab } from "./components/ChatTab";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
@@ -16,7 +17,7 @@ import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
 
-type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update";
+type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update" | "usage";
 
 const TAB_ICONS: Record<TabId, string> = {
   overview: "📋",
@@ -26,6 +27,7 @@ const TAB_ICONS: Record<TabId, string> = {
   config: "⚙️",
   doctor: "🩺",
   update: "🔄",
+  usage: "📊",
 };
 
 const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
@@ -36,6 +38,7 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
   config: "app.tab.config",
   doctor: "app.tab.doctor",
   update: "app.tab.update",
+  usage: "app.tab.usage",
 };
 
 const TAB_IDS = Object.keys(TAB_LABEL_KEYS) as TabId[];
@@ -256,14 +259,12 @@ export function App() {
 
         {appMode === "inventory" && (
           <div className="absolute inset-0 flex overflow-hidden">
-            {hasData && (
-              <InventoryNav
+            <InventoryNav
                 items={TABS}
                 active={activeTab}
                 onSelect={setActiveTab}
-                disabled={!tabsEnabled}
+                disabled={!tabsEnabled && activeTab !== "usage"}
               />
-            )}
             <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
               <div className="mx-auto w-full max-w-[1400px]">
                 {showSpinner && <Spinner label={t("app.detecting")} />}
@@ -287,6 +288,7 @@ export function App() {
                     {activeTab === "update" && <UpdateTab data={data} />}
                   </>
                 )}
+                {activeTab === "usage" && <UsageTab />}
               </div>
             </main>
           </div>

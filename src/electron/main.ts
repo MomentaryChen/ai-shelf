@@ -82,6 +82,9 @@ import {
   type TrayDeps,
 } from "./tray.js";
 import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
+import { registerUsageHandlers } from "./usage-handlers.js";
+
+registerUsageHandlers();
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
