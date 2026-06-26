@@ -13,6 +13,7 @@ on:
         default: true
   pull_request:
     paths:
+      - ".github/workflows/docs-assets.yml"
       - "src/renderer/**"
       - "src/electron/**"
       - "tests/e2e/**"
