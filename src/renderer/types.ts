@@ -170,6 +170,39 @@ export interface ConfigFileReadResult {
   error?: string;
 }
 
+export interface ConfigSnapshotSummary {
+  id: string;
+  label: string;
+  createdAt: string;
+  appVersion: string;
+  fileCount: number;
+  skillCount: number;
+}
+
+export type ConfigSnapshotDiffStatus = "added" | "removed" | "modified" | "unchanged";
+
+export interface ConfigSnapshotDiffItem {
+  archiveKey: string;
+  kind: "file" | "skill";
+  status: ConfigSnapshotDiffStatus;
+  absolutePathA?: string;
+  absolutePathB?: string;
+  skillName?: string;
+  preview?: string;
+}
+
+export interface ConfigSnapshotDiffResult {
+  snapshotA: ConfigSnapshotSummary;
+  snapshotB: ConfigSnapshotSummary;
+  items: ConfigSnapshotDiffItem[];
+}
+
+export interface ConfigSnapshotManifest extends ConfigSnapshotSummary {
+  formatVersion: number;
+  sourceHome?: string;
+  entries: unknown[];
+}
+
 export interface EnvVar {
   key: string;
   set: boolean;
@@ -539,6 +572,37 @@ export interface ElectronAPI {
         appVersion: string;
       }
     | { success: false; canceled?: true; error?: string }
+  >;
+  configSnapshotList: () => Promise<
+    { success: true; snapshots: ConfigSnapshotSummary[] } | { success: false; error?: string; snapshots: [] }
+  >;
+  configSnapshotCreate: (
+    label: string,
+  ) => Promise<
+    { success: true; snapshot: ConfigSnapshotManifest } | { success: false; error?: string }
+  >;
+  configSnapshotRestore: (
+    id: string,
+  ) => Promise<
+    { success: true; snapshot: ConfigSnapshotManifest } | { success: false; error?: string }
+  >;
+  configSnapshotDelete: (id: string) => Promise<{ success: boolean; error?: string }>;
+  configSnapshotDiff: (
+    idA: string,
+    idB: string,
+  ) => Promise<
+    { success: true; diff: ConfigSnapshotDiffResult } | { success: false; error?: string }
+  >;
+  configSnapshotExport: (
+    id: string,
+  ) => Promise<
+    | { success: true; path: string }
+    | { success: false; canceled?: true; error?: string }
+  >;
+  configSnapshotImport: (
+    label?: string,
+  ) => Promise<
+    { success: true; snapshot: ConfigSnapshotManifest } | { success: false; canceled?: true; error?: string }
   >;
   relaunchApp: () => Promise<{ ok: boolean }>;
   setSystemTrayEnabled: (enabled: boolean) => Promise<{ ok: boolean; systemTrayEnabled: boolean }>;

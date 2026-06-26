@@ -283,7 +283,7 @@ export function App() {
                       <SkillsTab data={data} onOpenMcpSync={() => setActiveTab("mcp")} />
                     )}
                     {activeTab === "mcp" && <McpTab data={data} />}
-                    {activeTab === "config" && <ConfigTab data={data} />}
+                    {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
                     {activeTab === "doctor" && <DoctorTab data={data} />}
                     {activeTab === "update" && <UpdateTab data={data} />}
                   </>
