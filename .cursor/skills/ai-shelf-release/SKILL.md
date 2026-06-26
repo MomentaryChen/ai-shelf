@@ -3,7 +3,8 @@ name: ai-shelf-release
 description: >-
   Ships an AI Shelf release when the user gives a version tag. Bumps root and
   packages/cli package.json, adds a Keep-a-Changelog English section to
-  CHANGELOG.md from git history (or user bullets), commits, pushes main, and
+  CHANGELOG.md from git history (or user bullets), refreshes README/docs screenshots
+  via pnpm gen:docs-assets when UI changed, commits, pushes main, and
   pushes an annotated tag to trigger the Windows setup GitHub Release workflow.
   Use when the user says release, ship, tag, CHANGELOG for a version, push v1.x,
   or publishes ai-shelf on GitHub.
@@ -24,8 +25,33 @@ When the user names a **semver** (with or without leading `v`), run this workflo
 1. `git status` — if unrelated uncommitted work exists, stop and ask whether to stash, discard, or include it before releasing.
 2. Prefer **`main`** on **`origin/main`**. If on another branch, confirm merge strategy or switch to `main` after merge.
 3. Read current version from root [package.json](../../../package.json). New version must be **strictly greater** than current (semver). If equal or lower, stop and ask.
+4. **Windows + display** required when refreshing docs images (step 1 below). **ffmpeg** on `PATH` for the terminal demo GIF.
 
-## 1. [CHANGELOG.md](../../../CHANGELOG.md) (canonical; drives GitHub Release body)
+## 1. Docs visuals (when desktop UI changed)
+
+Skip this section only when the release has **no** UI/visual changes.
+
+On **Windows** (local desktop — not CI):
+
+```powershell
+pnpm gen:docs-assets
+```
+
+This runs one build, then Playwright captures:
+
+- `tests/screenshots/*.png` — README and [docs/pages.md](../../../docs/pages.md) / [docs/pages.zh-TW.md](../../../docs/pages.zh-TW.md)
+- `docs/assets/terminal-demo.gif` — README hero
+
+Details ([docs/RELEASE.md](../../../docs/RELEASE.md)):
+
+- Locale pinned to **zh** (`AISHELF_DOCS_LOCALE`, default) for [pages.zh-TW.md](../../../docs/pages.zh-TW.md)
+- Terminal shots use an isolated **Demo** profile group via `AISHELF_APP_DATA_DIR` — not the developer's real `%APPDATA%/ai-shelf` workspace
+- Inventory tabs still reflect CLIs on the machine running the command — review screenshots before committing
+- Lighter targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
+
+Include updated PNG/GIF files in the **release prep commit** (step 5). If `gen:docs-assets` fails (missing ffmpeg, no display), stop and report — do not tag.
+
+## 2. [CHANGELOG.md](../../../CHANGELOG.md) (canonical; drives GitHub Release body)
 
 - Format: [Keep a Changelog](https://keepachangelog.com/) English, new block **at the top** (after intro paragraphs), **newest first**:
 
@@ -48,7 +74,7 @@ Short one-line summary for humans.
 
 CI reads CHANGELOG via [scripts/release-notes.mjs](../../../scripts/release-notes.mjs); relative links inside that section become absolute on the Release page.
 
-## 2. Version bumps (must stay aligned)
+## 3. Version bumps (must stay aligned)
 
 - Root [package.json](../../../package.json): `"version": "X.Y.Z"`.
 - [packages/cli/package.json](../../../packages/cli/package.json): `"version": "X.Y.Z"`.
@@ -56,16 +82,16 @@ CI reads CHANGELOG via [scripts/release-notes.mjs](../../../scripts/release-note
 
 Do **not** hardcode semver in `src/cli.ts`, `packages/cli/src/cli/main.ts`, or renderer footer — those already read package/build metadata.
 
-## 3. Quick sanity check (optional but recommended)
+## 4. Quick sanity check (optional but recommended)
 
 - `pnpm lint`
 - `pnpm build`
 
 Fix failures or stop and report.
 
-## 4. Commit
+## 5. Commit
 
-Single release prep commit (unless user prefers split commits):
+Single release prep commit (unless user prefers split commits). Stage version files, CHANGELOG, and any refreshed `tests/screenshots/*.png` + `docs/assets/terminal-demo.gif` from step 1:
 
 ```text
 chore(release): vX.Y.Z
@@ -73,7 +99,7 @@ chore(release): vX.Y.Z
 
 Body: one line pointing to CHANGELOG section if helpful.
 
-## 5. Push branch, then tag
+## 6. Push branch, then tag
 
 Order matters:
 
@@ -92,7 +118,7 @@ Pushing **`v*`** triggers [.github/workflows/release.yml](../../../.github/workf
 
 See [docs/RELEASE.md](../../../docs/RELEASE.md).
 
-## 6. After push
+## 7. After push
 
 Tell the user to open **Actions → Release** and then **Releases**. Confirm:
 
@@ -114,4 +140,4 @@ GITHUB_REF_NAME=vX.Y.Z GITHUB_REPOSITORY=Owner/repo node scripts/release-notes.m
 
 ## If the user only wants CHANGELOG text
 
-Perform sections **Parse version**, **CHANGELOG**, and **Version bumps** without commit/push/tag unless they explicitly ask to continue.
+Perform sections **Parse version**, **Docs visuals** (if applicable), **CHANGELOG**, and **Version bumps** without commit/push/tag unless they explicitly ask to continue.

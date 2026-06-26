@@ -52,11 +52,11 @@ export interface ChatSettings {
   systemTrayEnabled: boolean;
   /** Show per-pane agent status and completion alerts in multi-pane layouts. */
   paneAgentAwarenessEnabled: boolean;
-  /** Desktop notification when an unfocused pane needs attention or finishes. */
+  /** Desktop notification when an unfocused pane needs attention or finishes. Uncheck "Disable notifications" to turn off. */
   paneAgentNotifySystem: boolean;
   /** Tray tooltip / badge count for panes needing attention. */
   paneAgentNotifyTrayBadge: boolean;
-  /** Play a short sound with pane-agent notifications. */
+  /** In-app chime and system notification sound. Uncheck "Mute sound" to turn off. */
   paneAgentNotifySound: boolean;
   /** Only alert for panes that are not currently focused. */
   paneAgentNotifyUnfocusedOnly: boolean;

@@ -71,15 +71,16 @@ export function usePaneAgentAwareness(
       if (!settings.paneAgentAwarenessEnabled) return;
       const title = t(titleKey, { pane: paneDisplayLabel(pane) });
       const body = t(bodyKey, { pane: paneDisplayLabel(pane) });
+      const playSound = settings.paneAgentNotifySound && !silent;
       if (settings.paneAgentNotifySystem) {
         await window.api.showPaneAgentNotification({
           title,
           body,
           paneId: pane.id,
-          silent,
+          silent: !playSound,
         });
       }
-      if (settings.paneAgentNotifySound && !silent) playAttentionSound();
+      if (playSound) playAttentionSound();
     },
     [settings, t],
   );

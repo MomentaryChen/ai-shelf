@@ -652,11 +652,33 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
             <>
               <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
                 <Checkbox
-                  checked={settings.paneAgentNotifySystem}
-                  onCheckedChange={(v) => updateSettings({ paneAgentNotifySystem: v === true })}
+                  checked={!settings.paneAgentNotifySound}
+                  onCheckedChange={(v) => updateSettings({ paneAgentNotifySound: v !== true })}
                   className="mt-0.5"
                 />
-                <span className="text-[13px] text-text-primary">{t("settings.paneAgentNotifySystem")}</span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[13px] text-text-primary">
+                    {t("settings.paneAgentNotifySound")}
+                  </span>
+                  <span className="text-[11px] leading-snug text-text-tertiary">
+                    {t("settings.paneAgentNotifySoundHint")}
+                  </span>
+                </span>
+              </Label>
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+                <Checkbox
+                  checked={!settings.paneAgentNotifySystem}
+                  onCheckedChange={(v) => updateSettings({ paneAgentNotifySystem: v !== true })}
+                  className="mt-0.5"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[13px] text-text-primary">
+                    {t("settings.paneAgentNotifySystem")}
+                  </span>
+                  <span className="text-[11px] leading-snug text-text-tertiary">
+                    {t("settings.paneAgentNotifySystemHint")}
+                  </span>
+                </span>
               </Label>
               <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
                 <Checkbox
@@ -665,14 +687,6 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
                   className="mt-0.5"
                 />
                 <span className="text-[13px] text-text-primary">{t("settings.paneAgentNotifyTrayBadge")}</span>
-              </Label>
-              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
-                <Checkbox
-                  checked={settings.paneAgentNotifySound}
-                  onCheckedChange={(v) => updateSettings({ paneAgentNotifySound: v === true })}
-                  className="mt-0.5"
-                />
-                <span className="text-[13px] text-text-primary">{t("settings.paneAgentNotifySound")}</span>
               </Label>
               <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
                 <Checkbox
