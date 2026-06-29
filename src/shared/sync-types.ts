@@ -67,6 +67,16 @@ export interface SyncUserRegistryDoc {
   users: Record<string, string>;
 }
 
+export type CloudSyncCompareState =
+  | "unknown"
+  | "checking"
+  | "in_sync"
+  | "local_ahead"
+  | "remote_ahead"
+  | "diverged";
+
 export interface SyncStatus extends SyncMeta {
   syncing: boolean;
+  compareState: CloudSyncCompareState;
+  compareCheckedAt: string | null;
 }

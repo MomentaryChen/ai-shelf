@@ -197,6 +197,12 @@ export const zh: Record<MessageKey, string> = {
   "settings.accountNeverSyncedShort": "尚未備份",
   "settings.accountSyncLimitation":
     "僅手動備份。若兩台裝置同時同步，以最後寫入為準—請一次只在一台裝置上同步。",
+  "settings.accountSyncAlreadyInSync": "已與雲端一致，無需備份。",
+  "settings.accountSyncCompareChecking": "正在比對雲端…",
+  "settings.accountSyncCompareInSync": "已與雲端一致",
+  "settings.accountSyncCompareLocalAhead": "本機有變更尚未備份",
+  "settings.accountSyncCompareRemoteAhead": "雲端有較新資料，備份以還原",
+  "settings.accountSyncCompareDiverged": "本機與雲端皆有變更，備份以合併",
   "settings.accountSyncSuccessTitle": "雲端備份完成",
   "settings.accountSyncSuccess": "已於 {time} 備份",
   "settings.accountSyncFailed": "備份失敗：{error}",

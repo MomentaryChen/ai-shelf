@@ -11,7 +11,11 @@ export interface SyncToast {
 const DEFAULT_STATUS: SyncStatus = {
   lastSyncAt: null,
   lastError: null,
+  syncDay: null,
+  syncCountToday: 0,
   syncing: false,
+  compareState: "unknown",
+  compareCheckedAt: null,
 };
 
 type StatusListener = (status: SyncStatus) => void;
