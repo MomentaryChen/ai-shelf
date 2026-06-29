@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { app } from "electron";
 import type { CloudSyncStateDoc, SyncBundle } from "../shared/sync-types.js";
-import { getAuthIdToken, getAuthUid } from "./auth-service.js";
+import { getAuthUid } from "./auth-service.js";
+import { ensureFreshIdToken } from "./auth-token-refresh.js";
 
 function loadEnvValue(key: string): string {
   const roots = [process.cwd(), app.isPackaged ? app.getAppPath() : process.cwd()];
@@ -102,7 +103,7 @@ function formatFirestoreError(status: number, body: string): Error {
 }
 
 export async function pullRemoteSyncStateMain(uid: string): Promise<CloudSyncStateDoc | null> {
-  const token = getAuthIdToken();
+  const token = await ensureFreshIdToken();
   if (!token) throw new Error("not_signed_in");
 
   const res = await fetch(syncDocUrl(uid), {
@@ -124,7 +125,7 @@ export async function pushRemoteSyncStateMain(
   bundle: SyncBundle,
   revision: number,
 ): Promise<void> {
-  const token = getAuthIdToken();
+  const token = await ensureFreshIdToken();
   if (!token) throw new Error("not_signed_in");
 
   const sessionUid = getAuthUid();

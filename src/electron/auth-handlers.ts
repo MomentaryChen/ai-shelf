@@ -4,9 +4,9 @@ import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js
 import {
   applyAuthSessionReport,
   clearAuthSession,
-  getAuthIdToken,
   getAuthStatePublic,
 } from "./auth-service.js";
+import { ensureFreshIdToken } from "./auth-token-refresh.js";
 import { finishGoogleAuthWindow, openGoogleAuthWindow, type GoogleAuthWindowResult } from "./auth-google-window.js";
 
 function broadcastAuthState(state: AuthStatePublic): void {
@@ -51,8 +51,8 @@ export function registerAuthHandlers(): void {
     return getAuthStatePublic(isConfigured);
   });
 
-  ipcMain.handle("auth-get-id-token", () => {
-    const token = getAuthIdToken();
+  ipcMain.handle("auth-get-id-token", async () => {
+    const token = await ensureFreshIdToken();
     return { ok: Boolean(token), token: token ?? null };
   });
 

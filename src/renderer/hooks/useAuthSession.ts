@@ -21,6 +21,7 @@ import {
   setAuthSessionSnapshot,
   subscribeAuthSessionSnapshot,
 } from "../auth-session-store.js";
+import { runCloudSyncAfterSignIn } from "../cloud-sync-runner.js";
 
 export interface AuthErrorState {
   reason: AuthErrorReason;
@@ -120,6 +121,7 @@ export function useAuthSession() {
           if (caughtUp) {
             await syncSessionToMain(await buildSessionReport(caughtUp));
           }
+          runCloudSyncAfterSignIn();
         } else if (!popup.ok && popup.error && popup.error !== "window_closed") {
           setAuthError({ reason: "unknown", detail: popup.error });
         }
@@ -132,6 +134,7 @@ export function useAuthSession() {
       if (!result.ok) {
         const user = await waitForAuthReady();
         if (user) {
+          runCloudSyncAfterSignIn();
           setBusy(false);
           return;
         }
@@ -145,6 +148,7 @@ export function useAuthSession() {
         return;
       }
       if (!result.redirecting) {
+        runCloudSyncAfterSignIn();
         setBusy(false);
       }
     } catch (err) {

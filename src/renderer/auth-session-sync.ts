@@ -1,4 +1,5 @@
 import { isFirebaseConfigured } from "./firebase/config.js";
+import { refreshAuthSessionForMain } from "./firebase/auth.js";
 import {
   CONFIGURED_SIGNED_OUT_STATE,
   NOT_CONFIGURED_STATE,
@@ -22,6 +23,10 @@ export function ensureAuthSessionSync(): void {
 
   window.api.onAuthStateChanged((state) => {
     setAuthSessionSnapshot(state);
+  });
+
+  window.api.onAuthRefreshTokenRequest(() => {
+    void refreshAuthSessionForMain();
   });
 }
 

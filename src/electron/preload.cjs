@@ -188,6 +188,11 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("auth-state-changed", handler);
     return () => ipcRenderer.off("auth-state-changed", handler);
   },
+  onAuthRefreshTokenRequest: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("auth-refresh-token-request", handler);
+    return () => ipcRenderer.off("auth-refresh-token-request", handler);
+  },
   onAuthOAuthNavigated: (cb) => {
     const handler = (_e, url) => cb(url);
     ipcRenderer.on("auth-oauth-navigated", handler);

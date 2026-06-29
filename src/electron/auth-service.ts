@@ -12,6 +12,9 @@ interface StoredSession {
 let session: StoredSession | null = null;
 let diskHydrated = false;
 
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+const tokenRefreshWaiters: Array<(token: string | null) => void> = [];
+
 function sessionFilePath(): string {
   return join(app.getPath("userData"), "auth-session.json");
 }
@@ -37,6 +40,28 @@ function hydrateFromDisk(): void {
   }
 }
 
+export function hydrateAuthSession(): void {
+  hydrateFromDisk();
+}
+
+export function noteTokenRefreshWaiters(resolve: (token: string | null) => void): void {
+  tokenRefreshWaiters.push(resolve);
+}
+
+export function resolveTokenRefreshWaiters(token: string | null): void {
+  const waiters = tokenRefreshWaiters.splice(0);
+  for (const resolve of waiters) {
+    resolve(token);
+  }
+}
+
+export function isIdTokenFresh(): boolean {
+  hydrateFromDisk();
+  if (!session?.idToken) return false;
+  if (!session.idTokenExpiresAt) return true;
+  return session.idTokenExpiresAt - Date.now() > TOKEN_REFRESH_BUFFER_MS;
+}
+
 function persistToDisk(next: StoredSession | null): void {
   const path = sessionFilePath();
   if (!next) {
@@ -60,6 +85,9 @@ export function applyAuthSessionReport(report: AuthSessionReport): AuthStatePubl
     idTokenExpiresAt: report.idTokenExpiresAt,
   };
   persistToDisk(session);
+  if (report.idToken) {
+    resolveTokenRefreshWaiters(report.idToken);
+  }
   return { configured: true, signedIn: true, user: report.user };
 }
 

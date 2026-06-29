@@ -708,6 +708,7 @@ export interface ElectronAPI {
     state?: AuthStatePublic;
   }) => Promise<{ ok: true }>;
   onAuthStateChanged: (cb: (state: AuthStatePublic) => void) => () => void;
+  onAuthRefreshTokenRequest: (cb: () => void) => () => void;
   onAuthOAuthNavigated: (cb: (url: string) => void) => () => void;
   syncExportLocal: () => Promise<{ ok: true; bundle: SyncBundle } | { ok: false; error: string }>;
   syncApplyBundle: (bundle: SyncBundle) => Promise<{ ok: true } | { ok: false; error: string }>;

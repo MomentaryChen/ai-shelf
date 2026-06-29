@@ -147,11 +147,14 @@ function toPublicUser(user: User): AuthUserPublic {
   };
 }
 
-export async function buildSessionReport(user: User | null): Promise<AuthSessionReport> {
+export async function buildSessionReport(
+  user: User | null,
+  opts?: { forceRefresh?: boolean },
+): Promise<AuthSessionReport> {
   if (!user) {
     return { signedIn: false, user: null, idToken: null, idTokenExpiresAt: null };
   }
-  const idToken = await user.getIdToken();
+  const idToken = await user.getIdToken(opts?.forceRefresh === true);
   const tokenResult = await user.getIdTokenResult();
   return {
     signedIn: true,
@@ -365,4 +368,20 @@ export async function ensureFirebaseAuthForSync(): Promise<User | null> {
   }
 
   return waitForAuthReady();
+}
+
+/** Refresh Firebase ID token and push an updated session report to the main process. */
+export async function refreshAuthSessionForMain(): Promise<boolean> {
+  if (!isFirebaseConfigured()) return false;
+
+  const firebaseAuth = getFirebaseAuth();
+  let user = firebaseAuth?.currentUser ?? null;
+  if (!user) {
+    user = await ensureFirebaseAuthForSync();
+  }
+  if (!user) return false;
+
+  const report = await buildSessionReport(user, { forceRefresh: true });
+  const result = await window.api.authReportSession(report);
+  return result.ok;
 }
