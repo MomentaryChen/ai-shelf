@@ -5,6 +5,7 @@ import {
   applyAuthSessionReport,
   clearAuthSession,
   getAuthStatePublic,
+  resolveTokenRefreshWaiters,
 } from "./auth-service.js";
 import { ensureFreshIdToken } from "./auth-token-refresh.js";
 import { finishGoogleAuthWindow, openGoogleAuthWindow, type GoogleAuthWindowResult } from "./auth-google-window.js";
@@ -54,6 +55,11 @@ export function registerAuthHandlers(): void {
   ipcMain.handle("auth-get-id-token", async () => {
     const token = await ensureFreshIdToken();
     return { ok: Boolean(token), token: token ?? null };
+  });
+
+  ipcMain.handle("auth-notify-token-refresh-failed", () => {
+    resolveTokenRefreshWaiters(null);
+    return { ok: true as const };
   });
 
   ipcMain.handle("auth-open-google-window", (event) => {

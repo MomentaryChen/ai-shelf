@@ -379,9 +379,15 @@ export async function refreshAuthSessionForMain(): Promise<boolean> {
   if (!user) {
     user = await ensureFirebaseAuthForSync();
   }
-  if (!user) return false;
+  if (!user) {
+    await window.api.authNotifyTokenRefreshFailed();
+    return false;
+  }
 
   const report = await buildSessionReport(user, { forceRefresh: true });
   const result = await window.api.authReportSession(report);
+  if (!result.ok) {
+    await window.api.authNotifyTokenRefreshFailed();
+  }
   return result.ok;
 }

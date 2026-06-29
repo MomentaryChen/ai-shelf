@@ -701,6 +701,7 @@ export interface ElectronAPI {
   authClearSession: () => Promise<{ ok: true; state: AuthStatePublic }>;
   authGetState: (configured: boolean) => Promise<AuthStatePublic>;
   authGetIdToken: () => Promise<{ ok: boolean; token: string | null }>;
+  authNotifyTokenRefreshFailed: () => Promise<{ ok: true }>;
   authOpenGoogleWindow: () => Promise<{ ok: boolean; error?: string; state?: AuthStatePublic }>;
   authFinishGoogleWindow: (result: {
     ok: boolean;

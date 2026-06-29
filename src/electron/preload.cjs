@@ -181,6 +181,7 @@ contextBridge.exposeInMainWorld("api", {
   authClearSession: () => ipcRenderer.invoke("auth-clear-session"),
   authGetState: (configured) => ipcRenderer.invoke("auth-get-state", configured),
   authGetIdToken: () => ipcRenderer.invoke("auth-get-id-token"),
+  authNotifyTokenRefreshFailed: () => ipcRenderer.invoke("auth-notify-token-refresh-failed"),
   authOpenGoogleWindow: () => ipcRenderer.invoke("auth-open-google-window"),
   authFinishGoogleWindow: (result) => ipcRenderer.invoke("auth-finish-google-window", result),
   onAuthStateChanged: (cb) => {
