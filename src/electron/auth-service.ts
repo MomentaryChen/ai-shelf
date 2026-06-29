@@ -55,6 +55,11 @@ export function resolveTokenRefreshWaiters(token: string | null): void {
   }
 }
 
+/** Drop pending refresh waiters without resolving (e.g. on timeout). */
+export function clearTokenRefreshWaiters(): void {
+  tokenRefreshWaiters.splice(0);
+}
+
 export function isIdTokenFresh(): boolean {
   hydrateFromDisk();
   if (!session?.idToken) return false;
