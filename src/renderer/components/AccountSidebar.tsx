@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Check, Cloud, Loader2, LogIn } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Cloud, GitMerge, Loader2, LogIn } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import type { AuthErrorReason } from "../firebase/auth-errors";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { useCloudSync } from "../hooks/useCloudSync";
 import { syncLimitsSummary } from "../firebase/sync-limit-messages";
+import type { CloudSyncCompareState } from "../../shared/sync-types.js";
 import type { MessageKey } from "../i18n/messages/en";
 import { formatSyncDateTime } from "../utils/format-sync-time.js";
 
@@ -81,25 +82,54 @@ function AccountRowContent({
   );
 }
 
-function SyncStatusIcon({ syncing, synced }: { syncing: boolean; synced: boolean }) {
-  if (syncing) {
+function SyncStatusIcon({
+  syncing,
+  compareState,
+}: {
+  syncing: boolean;
+  compareState: CloudSyncCompareState;
+}) {
+  const className = "mt-0.5 size-3.5 shrink-0";
+  if (syncing || compareState === "checking") {
     return (
-      <Loader2
-        className="mt-0.5 size-3.5 shrink-0 animate-spin text-chrome-text-muted"
-        aria-hidden
-      />
+      <Loader2 className={`${className} animate-spin text-chrome-text-muted`} aria-hidden />
     );
   }
-  if (synced) {
-    return <Check className="mt-0.5 size-3.5 shrink-0 text-chrome-ui-accent" aria-hidden />;
+  switch (compareState) {
+    case "in_sync":
+      return <Check className={`${className} text-chrome-ui-accent`} aria-hidden />;
+    case "local_ahead":
+      return <ArrowUp className={`${className} text-chrome-ui-accent`} aria-hidden />;
+    case "remote_ahead":
+      return <ArrowDown className={`${className} text-chrome-ui-accent`} aria-hidden />;
+    case "diverged":
+      return <GitMerge className={`${className} text-warn`} aria-hidden />;
+    default:
+      return <Cloud className={`${className} text-chrome-text-faint`} aria-hidden />;
   }
-  return <Cloud className="mt-0.5 size-3.5 shrink-0 text-chrome-text-faint" aria-hidden />;
+}
+
+function compareStateMessageKey(state: CloudSyncCompareState): MessageKey | null {
+  switch (state) {
+    case "in_sync":
+      return "settings.accountSyncCompareInSync";
+    case "local_ahead":
+      return "settings.accountSyncCompareLocalAhead";
+    case "remote_ahead":
+      return "settings.accountSyncCompareRemoteAhead";
+    case "diverged":
+      return "settings.accountSyncCompareDiverged";
+    case "checking":
+      return "settings.accountSyncCompareChecking";
+    default:
+      return null;
+  }
 }
 
 export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
   const { t, locale } = useLocale();
   const { state, busy, authError, signIn, signOut } = useAuthSession();
-  const { status: syncStatus, runSync } = useCloudSync();
+  const { status: syncStatus, runSync, refreshCompare } = useCloudSync();
   const [syncBusy, setSyncBusy] = useState(false);
 
   if (!state.configured) return null;
@@ -111,6 +141,9 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
           time: formatSyncDateTime(syncStatus.lastSyncAt, locale),
         })
       : t("settings.accountNeverSynced");
+
+  const compareKey = compareStateMessageKey(syncStatus.compareState);
+  const compareText = compareKey ? t(compareKey) : null;
 
   async function handleSyncNow() {
     setSyncBusy(true);
@@ -169,7 +202,7 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
   const collapsedTitle = outerSubtitle ? `${displayName}\n${outerSubtitle}` : displayName;
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => { if (open) void refreshCompare(); }}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -200,9 +233,16 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <div className="flex items-start gap-2 px-2 py-1.5">
-          <SyncStatusIcon syncing={syncing} synced={syncStatus.lastSyncAt != null} />
+          <SyncStatusIcon syncing={syncing} compareState={syncStatus.compareState} />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] leading-snug text-chrome-text-subtle">{lastSyncText}</p>
+            {compareText ? (
+              <p className="text-[11px] leading-snug text-chrome-text-subtle">{compareText}</p>
+            ) : null}
+            <p
+              className={`text-[11px] leading-snug text-chrome-text-subtle${compareText ? " mt-0.5" : ""}`}
+            >
+              {lastSyncText}
+            </p>
             <p className="mt-1 text-[10px] leading-snug text-chrome-text-faint">
               {syncLimitsSummary(t)}
             </p>

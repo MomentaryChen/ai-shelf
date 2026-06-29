@@ -5,6 +5,7 @@ import {
   nextSyncDailyMeta,
   validateSyncBundle,
 } from "../shared/sync-limits.js";
+import { planSyncAction } from "../shared/sync-compare.js";
 import type { SyncStatus } from "../shared/sync-types.js";
 import { loadSettings } from "./chat-settings.js";
 import {
@@ -12,7 +13,6 @@ import {
   isElectronRenderer,
   isFirebaseConfigured,
 } from "./firebase/auth.js";
-import { mergeSyncBundles } from "./firebase/sync-merge.js";
 import { ensureSyncUserRegistered } from "./firebase/sync-registry.js";
 import { pullRemoteSyncState, pushRemoteSyncState } from "./firebase/sync-remote.js";
 import { formatStoredSyncLimitError } from "./firebase/sync-limit-messages.js";
@@ -23,6 +23,11 @@ import {
   showSyncToast,
 } from "./sync-status-store.js";
 import { formatSyncDateTime } from "./utils/format-sync-time.js";
+
+export interface RunCloudSyncOptions {
+  /** Skip success/no-op toasts (e.g. sign-in background sync). */
+  silent?: boolean;
+}
 
 async function loadMeta(): Promise<Pick<SyncStatus, "lastSyncAt" | "lastError" | "syncDay" | "syncCountToday">> {
   return window.api.syncGetMeta();
@@ -73,12 +78,19 @@ function notifySyncSuccess(syncedAt: string): void {
   });
 }
 
+function notifySyncAlreadyInSync(): void {
+  const message = getStoredT("settings.accountSyncAlreadyInSync" satisfies MessageKey);
+  showSyncToast(message, "success");
+}
+
 function notifySyncFailure(message: string): void {
   const body = getStoredT("settings.accountSyncFailed", { error: message });
   showSyncToast(body, "error");
 }
 
-export async function runCloudSync(): Promise<{ ok: boolean; error?: string }> {
+export async function runCloudSync(
+  options: RunCloudSyncOptions = {},
+): Promise<{ ok: boolean; error?: string; skipped?: boolean }> {
   if (!isFirebaseConfigured()) {
     return { ok: false, error: "not_configured" };
   }
@@ -92,6 +104,30 @@ export async function runCloudSync(): Promise<{ ok: boolean; error?: string }> {
 
   setSyncStatus({ syncing: true, lastError: null });
   try {
+    const exported = await window.api.syncExportLocal();
+    if (!exported.ok) {
+      throw new Error("Failed to export local data");
+    }
+    const local = exported.bundle;
+
+    const localLimit = validateSyncBundle(local);
+    if (!localLimit.ok) {
+      throw new Error(encodeSyncLimitError(localLimit.code, localLimit.detail));
+    }
+
+    const remoteState = await pullRemoteSyncState(uid);
+    const plan = planSyncAction(local, remoteState?.bundle ?? null);
+    const checkedAt = new Date().toISOString();
+    setSyncStatus({ compareState: plan.compareState, compareCheckedAt: checkedAt });
+
+    if (plan.action === "noop") {
+      if (!options.silent) {
+        notifySyncAlreadyInSync();
+      }
+      setSyncStatus({ syncing: false });
+      return { ok: true, skipped: true };
+    }
+
     const meta = await loadMeta();
     const dailyLimit = checkSyncDailyLimit({
       syncDay: meta.syncDay ?? null,
@@ -106,18 +142,6 @@ export async function runCloudSync(): Promise<{ ok: boolean; error?: string }> {
       throw new Error(encodeSyncLimitError(rateLimit.code, rateLimit.detail));
     }
 
-    const exported = await window.api.syncExportLocal();
-    if (!exported.ok) {
-      throw new Error("Failed to export local data");
-    }
-    const local = exported.bundle;
-
-    const localLimit = validateSyncBundle(local);
-    if (!localLimit.ok) {
-      throw new Error(encodeSyncLimitError(localLimit.code, localLimit.detail));
-    }
-
-    const remoteState = await pullRemoteSyncState(uid);
     await ensureSyncUserRegistered(uid, {
       hasExistingRemoteSync: remoteState != null,
     });
@@ -129,29 +153,30 @@ export async function runCloudSync(): Promise<{ ok: boolean; error?: string }> {
       }
     }
 
-    const merged = remoteState ? mergeSyncBundles(local, remoteState.bundle) : local;
-
-    const mergedLimit = validateSyncBundle(merged);
+    const mergedLimit = validateSyncBundle(plan.merged);
     if (!mergedLimit.ok) {
       throw new Error(encodeSyncLimitError(mergedLimit.code, mergedLimit.detail));
     }
 
-    const applied = await window.api.syncApplyBundle(merged);
-    if (!applied.ok) {
-      throw new Error(applied.error ?? "Failed to apply sync bundle");
+    if (plan.action === "apply_only" || plan.action === "apply_and_push") {
+      const applied = await window.api.syncApplyBundle(plan.merged);
+      if (!applied.ok) {
+        throw new Error(applied.error ?? "Failed to apply sync bundle");
+      }
     }
 
-    // Revision is bookkeeping only (not CAS). Concurrent pushes are last-write-wins.
-    const nextRevision = (remoteState?.revision ?? 0) + 1;
-    const refreshed = await window.api.syncExportLocal();
-    const toPush = refreshed.ok ? refreshed.bundle : merged;
+    if (plan.action === "push_only" || plan.action === "apply_and_push") {
+      const nextRevision = (remoteState?.revision ?? 0) + 1;
+      const refreshed = await window.api.syncExportLocal();
+      const toPush = refreshed.ok ? refreshed.bundle : plan.merged;
 
-    const pushLimit = validateSyncBundle(toPush);
-    if (!pushLimit.ok) {
-      throw new Error(encodeSyncLimitError(pushLimit.code, pushLimit.detail));
+      const pushLimit = validateSyncBundle(toPush);
+      if (!pushLimit.ok) {
+        throw new Error(encodeSyncLimitError(pushLimit.code, pushLimit.detail));
+      }
+
+      await pushRemoteSyncState(uid, toPush, nextRevision);
     }
-
-    await pushRemoteSyncState(uid, toPush, nextRevision);
 
     const now = new Date().toISOString();
     const dailyMeta = nextSyncDailyMeta({
@@ -164,8 +189,18 @@ export async function runCloudSync(): Promise<{ ok: boolean; error?: string }> {
       syncDay: dailyMeta.syncDay,
       syncCountToday: dailyMeta.syncCountToday,
     });
-    setSyncStatus({ lastSyncAt: now, lastError: null, syncing: false });
-    notifySyncSuccess(now);
+    setSyncStatus({
+      lastSyncAt: now,
+      lastError: null,
+      syncing: false,
+      compareState: "in_sync",
+      compareCheckedAt: now,
+      syncDay: dailyMeta.syncDay,
+      syncCountToday: dailyMeta.syncCountToday,
+    });
+    if (!options.silent) {
+      notifySyncSuccess(now);
+    }
     return { ok: true };
   } catch (err) {
     const message = formatSyncError(err);
@@ -178,5 +213,5 @@ export async function runCloudSync(): Promise<{ ok: boolean; error?: string }> {
 
 /** Run once after the user completes a fresh Google sign-in. */
 export function runCloudSyncAfterSignIn(): void {
-  void runCloudSync();
+  void runCloudSync({ silent: true });
 }

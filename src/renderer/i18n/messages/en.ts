@@ -197,6 +197,12 @@ export const en = {
   "settings.accountNeverSyncedShort": "Not backed up",
   "settings.accountSyncLimitation":
     "Manual backup only. If two devices sync at once, the latest save wins—sync one device at a time.",
+  "settings.accountSyncAlreadyInSync": "Already matches cloud—no backup needed.",
+  "settings.accountSyncCompareChecking": "Checking cloud…",
+  "settings.accountSyncCompareInSync": "Matches cloud",
+  "settings.accountSyncCompareLocalAhead": "Local changes not backed up yet",
+  "settings.accountSyncCompareRemoteAhead": "Cloud has newer data—back up to restore",
+  "settings.accountSyncCompareDiverged": "Local and cloud both changed—back up to merge",
   "settings.accountSyncSuccessTitle": "Cloud backup complete",
   "settings.accountSyncSuccess": "Backed up at {time}",
   "settings.accountSyncFailed": "Backup failed: {error}",
