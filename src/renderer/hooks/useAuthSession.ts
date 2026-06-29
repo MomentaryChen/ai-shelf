@@ -56,12 +56,16 @@ export function useAuthSessionBridge(): void {
     let cancelled = false;
 
     void (async () => {
-      if (shouldHandleAuthRedirectOnLoad()) {
+      const fromRedirect = shouldHandleAuthRedirectOnLoad();
+      if (fromRedirect) {
         await completeGoogleRedirectSignIn();
       }
       const user = await waitForAuthReady();
       if (cancelled || !user) return;
       await syncSessionToMain(await buildSessionReport(user));
+      if (fromRedirect) {
+        runCloudSyncAfterSignIn();
+      }
     })();
 
     const unsub = subscribeAuthState((user) => {
