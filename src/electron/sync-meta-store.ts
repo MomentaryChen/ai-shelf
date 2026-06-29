@@ -8,6 +8,8 @@ const FILE = "sync-meta.json";
 const DEFAULT_META: SyncMeta = {
   lastSyncAt: null,
   lastError: null,
+  syncDay: null,
+  syncCountToday: 0,
 };
 
 function metaPath(): string {
@@ -22,6 +24,8 @@ export function readSyncMeta(): SyncMeta {
     return {
       lastSyncAt: typeof parsed.lastSyncAt === "string" ? parsed.lastSyncAt : null,
       lastError: typeof parsed.lastError === "string" ? parsed.lastError : null,
+      syncDay: typeof parsed.syncDay === "string" ? parsed.syncDay : null,
+      syncCountToday: typeof parsed.syncCountToday === "number" ? parsed.syncCountToday : 0,
     };
   } catch {
     return { ...DEFAULT_META };
