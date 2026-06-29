@@ -1,3 +1,8 @@
+// Deploy in Firebase Console → Firestore Database → Rules → Publish
+// (Create a Firestore database first if you have not already.)
+//
+// Path used by the app: users/{uid}/sync/state
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

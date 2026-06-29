@@ -1,4 +1,5 @@
 import type { CloudSyncStateDoc, SyncBundle } from "../../shared/sync-types.js";
+import { isElectronRenderer } from "./auth.js";
 import { getFirebaseApp, isFirebaseConfigured } from "./auth.js";
 
 async function stateRef(uid: string) {
@@ -11,6 +12,13 @@ async function stateRef(uid: string) {
 
 export async function pullRemoteSyncState(uid: string): Promise<CloudSyncStateDoc | null> {
   if (!isFirebaseConfigured()) return null;
+
+  if (isElectronRenderer()) {
+    const result = await window.api.syncPullRemote();
+    if (!result.ok) throw new Error(result.error);
+    return result.state;
+  }
+
   const { getDoc } = await import("firebase/firestore");
   const snap = await getDoc(await stateRef(uid));
   if (!snap.exists()) return null;
@@ -25,6 +33,13 @@ export async function pushRemoteSyncState(
   revision: number,
 ): Promise<void> {
   if (!isFirebaseConfigured()) return;
+
+  if (isElectronRenderer()) {
+    const result = await window.api.syncPushRemote({ bundle, revision });
+    if (!result.ok) throw new Error(result.error);
+    return;
+  }
+
   const { setDoc } = await import("firebase/firestore");
   const payload: CloudSyncStateDoc = {
     version: bundle.version,

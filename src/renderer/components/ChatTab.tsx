@@ -991,12 +991,6 @@ function ChatTabInner({
         profiles={sidebarProfiles}
         activeProfileId={activeProfile?.id ?? null}
         activeTerminalId={focusedPaneId}
-        profile={{
-          name: activeProfile?.name ?? "AI Shelf User",
-          email: `${activeProfile?.name ?? "profile"}@local`,
-        }}
-        terminalOnline={!profileBusy && !restoring}
-        terminalLabel={t("terminal.label")}
         collapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
         onGroupChange={(groupId) => {
@@ -1126,13 +1120,6 @@ function ChatTabInner({
             return;
           }
           void handleActivateProfile(profile);
-        }}
-        onTerminalClick={() => {
-          if (activeProfile) {
-            void handleNewTerminal(activeProfile);
-          } else {
-            void addPane("shell");
-          }
         }}
       />
     </div>

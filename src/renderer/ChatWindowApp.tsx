@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { ChatTab } from "./components/ChatTab";
+import { SyncToastHost } from "./components/SyncToastHost";
 import { Spinner } from "./components/Spinner";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useLocale } from "./i18n/LocaleProvider";
@@ -32,6 +33,7 @@ export function ChatWindowApp() {
         </p>
       )}
       {ready && <ChatTab data={data} inventoryScanning={inventoryScanning} />}
+      <SyncToastHost />
     </div>
   );
 }

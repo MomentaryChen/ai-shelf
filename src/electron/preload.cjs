@@ -180,10 +180,25 @@ contextBridge.exposeInMainWorld("api", {
   authReportSession: (report) => ipcRenderer.invoke("auth-report-session", report),
   authClearSession: () => ipcRenderer.invoke("auth-clear-session"),
   authGetState: (configured) => ipcRenderer.invoke("auth-get-state", configured),
+  authGetIdToken: () => ipcRenderer.invoke("auth-get-id-token"),
+  authOpenGoogleWindow: () => ipcRenderer.invoke("auth-open-google-window"),
+  authFinishGoogleWindow: (result) => ipcRenderer.invoke("auth-finish-google-window", result),
+  onAuthStateChanged: (cb) => {
+    const handler = (_e, state) => cb(state);
+    ipcRenderer.on("auth-state-changed", handler);
+    return () => ipcRenderer.off("auth-state-changed", handler);
+  },
+  onAuthOAuthNavigated: (cb) => {
+    const handler = (_e, url) => cb(url);
+    ipcRenderer.on("auth-oauth-navigated", handler);
+    return () => ipcRenderer.off("auth-oauth-navigated", handler);
+  },
   syncExportLocal: () => ipcRenderer.invoke("sync-export-local"),
   syncApplyBundle: (bundle) => ipcRenderer.invoke("sync-apply-bundle", bundle),
   syncGetMeta: () => ipcRenderer.invoke("sync-get-meta"),
   syncSetMeta: (partial) => ipcRenderer.invoke("sync-set-meta", partial),
+  syncPullRemote: () => ipcRenderer.invoke("sync-pull-remote"),
+  syncPushRemote: (payload) => ipcRenderer.invoke("sync-push-remote", payload),
   onSyncDataApplied: (cb) => {
     const handler = () => cb();
     ipcRenderer.on("sync-data-applied", handler);
