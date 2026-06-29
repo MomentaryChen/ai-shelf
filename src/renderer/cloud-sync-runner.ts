@@ -97,6 +97,7 @@ export async function runCloudSync(): Promise<{ ok: boolean; error?: string }> {
       throw new Error(applied.error ?? "Failed to apply sync bundle");
     }
 
+    // Revision is bookkeeping only (not CAS). Concurrent pushes are last-write-wins.
     const nextRevision = (remoteState?.revision ?? 0) + 1;
     const refreshed = await window.api.syncExportLocal();
     const toPush = refreshed.ok ? refreshed.bundle : merged;

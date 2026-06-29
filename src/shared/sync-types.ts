@@ -51,6 +51,7 @@ export interface SyncMeta {
 
 export interface CloudSyncStateDoc {
   version: typeof SYNC_BUNDLE_VERSION;
+  /** Monotonic counter for bookkeeping; push does not compare-and-swap on this value. */
   revision: number;
   updatedAt: string;
   bundle: SyncBundle;

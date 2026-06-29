@@ -109,7 +109,7 @@ export function getAuthStatePublic(configured: boolean): AuthStatePublic {
   return { configured: true, signedIn: true, user: session.user };
 }
 
-/** For cloud sync — returns a valid ID token when signed in. */
+/** For cloud backup/sync — returns a valid ID token when signed in. */
 export function getAuthIdToken(): string | null {
   hydrateFromDisk();
   return session?.idToken ?? null;

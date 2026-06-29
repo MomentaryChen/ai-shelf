@@ -200,9 +200,12 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
         <DropdownMenuSeparator />
         <div className="flex items-start gap-2 px-2 py-1.5">
           <SyncStatusIcon syncing={syncing} synced={syncStatus.lastSyncAt != null} />
-          <p className="min-w-0 flex-1 text-[11px] leading-snug text-chrome-text-subtle">
-            {lastSyncText}
-          </p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] leading-snug text-chrome-text-subtle">{lastSyncText}</p>
+            <p className="mt-1 text-[10px] leading-snug text-chrome-text-faint">
+              {t("settings.accountSyncLimitation")}
+            </p>
+          </div>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={busy || syncing} onSelect={() => void handleSyncNow()}>
