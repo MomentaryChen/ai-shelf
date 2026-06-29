@@ -1,5 +1,6 @@
 import type { SyncBundle, SyncProfile, SyncProfileGroup, SyncLayout, SyncPreferences } from "../../shared/sync-types.js";
 
+/** Per-item merge by updatedAt; whole-bundle push is still last-write-wins (no revision CAS). */
 function pickNewer<T extends { id?: string; profileId?: string; updatedAt?: string; snapshot?: { updatedAt: string } }>(
   localItems: T[],
   remoteItems: T[],
