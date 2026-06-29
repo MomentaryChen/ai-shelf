@@ -9,6 +9,37 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-06-29
+
+Google sign-in, cloud profile backup, health monitoring, and multi-pane agent awareness.
+
+### Added
+
+- **Google sign-in** — Firebase authentication in the desktop app for cloud sync.
+- **Cloud profile backup** — Firestore sync after sign-in; compare local vs cloud before upload to skip no-op backups.
+- **Free tier sync limits** — Spark plan capped at 300 accounts.
+- **Follow-system theme and language** — Settings can mirror OS appearance and locale.
+- **Proactive health monitoring** — Environment checks with MCP sync preview in Doctor.
+- **Multi-pane agent awareness** — Per-pane status, tray notifications, and separate mute vs disable controls.
+- **Config snapshot and restore** — Snapshot, diff, restore, and bundle export for AI tool configs.
+- **View transitions** — Gentle transitions when switching modes and tabs.
+
+### Changed
+
+- **Renderer bundles** — Lazy routes and deferred Firebase loading for faster startup.
+- **Cloud sync UX** — Labeled as manual backup; last-write-wins behavior documented.
+
+### Fixed
+
+- **Auth token refresh** — Deduplicated refresh, timeout handling, and logout clears pending waiters.
+- **Electron Google sign-in** — Reliable sign-in flow and post-redirect session sync.
+- **Terminal command palette** — No longer crashes or flickers xterm on open.
+- **Terminal App theme** — Restored correct terminal background preset.
+- **Config snapshot security** — Path traversal validation and restore writes contained to home tree.
+- **In-app updates** — Re-check all no longer leaves a stale up-to-date status.
+
+[3.3.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.3.0
+
 ## [3.2.0] - 2026-06-26
 
 Desktop UI/UX design guidelines for Cursor agents.
