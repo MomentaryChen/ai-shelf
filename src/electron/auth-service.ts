@@ -95,6 +95,7 @@ export function clearAuthSession(): AuthStatePublic {
   hydrateFromDisk();
   session = null;
   persistToDisk(null);
+  resolveTokenRefreshWaiters(null);
   return { configured: true, signedIn: false, user: null };
 }
 
