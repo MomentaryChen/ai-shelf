@@ -12,6 +12,7 @@ import { useLocale } from "../i18n/LocaleProvider";
 import type { AuthErrorReason } from "../firebase/auth-errors";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { useCloudSync } from "../hooks/useCloudSync";
+import { syncLimitsSummary } from "../firebase/sync-limit-messages";
 import type { MessageKey } from "../i18n/messages/en";
 import { formatSyncDateTime } from "../utils/format-sync-time.js";
 
@@ -203,7 +204,7 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
           <div className="min-w-0 flex-1">
             <p className="text-[11px] leading-snug text-chrome-text-subtle">{lastSyncText}</p>
             <p className="mt-1 text-[10px] leading-snug text-chrome-text-faint">
-              {t("settings.accountSyncLimitation")}
+              {syncLimitsSummary(t)}
             </p>
           </div>
         </div>

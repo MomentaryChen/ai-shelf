@@ -154,6 +154,23 @@ export const en = {
   "settings.account": "Account & cloud backup",
   "settings.accountHint":
     "Sign in with Google to back up and restore profiles and layouts across devices. This is manual backup/sync—not live multi-device collaboration. Data is stored under your account in Firestore.",
+  "settings.accountSyncLimits":
+    "Free-tier sync caps (~80% headroom): {maxUsers} accounts, {workspaces} workspaces, {profiles} profiles, {panes} panes each, {size} max, {dailyOps} syncs/day, {intervalMinutes} min apart.",
+  "settings.accountSyncLimitBundleTooLarge":
+    "Sync data is too large ({size}, max {max}). Remove profiles or panes and try again.",
+  "settings.accountSyncLimitTooManyWorkspaces":
+    "Too many workspaces to sync ({count}, max {max}). Remove unused workspaces and try again.",
+  "settings.accountSyncLimitTooManyProfiles":
+    "Too many profiles to sync ({count}, max {max}). Remove unused profiles and try again.",
+  "settings.accountSyncLimitTooManyLayouts":
+    "Too many layouts to sync ({count}, max {max}).",
+  "settings.accountSyncLimitTooManyPanes":
+    "Profile {profileId} has too many panes to sync ({count}, max {max}).",
+  "settings.accountSyncLimitRateLimited": "Please wait {seconds}s before syncing again.",
+  "settings.accountSyncLimitDailyReached":
+    "Daily sync limit reached ({max} per day on this device). Try again tomorrow.",
+  "settings.accountSyncLimitUserCapReached":
+    "Cloud sync is full ({max} accounts). An existing account may sign in, but new accounts cannot sync yet.",
   "settings.accountNotConfigured":
     "Google sign-in is not configured. Add Firebase settings to .env.local (see .env.example).",
   "settings.accountSignInGoogle": "Sign in with Google",

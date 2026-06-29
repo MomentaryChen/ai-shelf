@@ -47,6 +47,9 @@ export interface SyncBundle {
 export interface SyncMeta {
   lastSyncAt: string | null;
   lastError: string | null;
+  /** UTC date (YYYY-MM-DD) for daily sync op counting. */
+  syncDay: string | null;
+  syncCountToday: number;
 }
 
 export interface CloudSyncStateDoc {
@@ -55,6 +58,13 @@ export interface CloudSyncStateDoc {
   revision: number;
   updatedAt: string;
   bundle: SyncBundle;
+}
+
+/** Global registry: `_meta/sync-registry` in Firestore. */
+export interface SyncUserRegistryDoc {
+  count: number;
+  /** uid → registeredAt (ISO) */
+  users: Record<string, string>;
 }
 
 export interface SyncStatus extends SyncMeta {

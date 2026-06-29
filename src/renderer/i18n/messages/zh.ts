@@ -154,6 +154,23 @@ export const zh: Record<MessageKey, string> = {
   "settings.account": "帳號與雲端備份",
   "settings.accountHint":
     "使用 Google 登入，在裝置間備份與還原 Profile 與版面。這是手動備份／同步，不是即時多裝置協作。資料儲存在你的 Firestore 帳號下。",
+  "settings.accountSyncLimits":
+    "免費方案同步上限（約 80% 餘裕）：{maxUsers} 個帳號、{workspaces} 個工作區、{profiles} 個 Profile、每個 {panes} 窗格、總大小 {size}、每日 {dailyOps} 次、間隔至少 {intervalMinutes} 分鐘。",
+  "settings.accountSyncLimitBundleTooLarge":
+    "同步資料過大（{size}，上限 {max}）。請刪除多餘的 Profile 或窗格後再試。",
+  "settings.accountSyncLimitTooManyWorkspaces":
+    "工作區數量超過同步上限（{count}，上限 {max}）。請刪除未使用的工作區後再試。",
+  "settings.accountSyncLimitTooManyProfiles":
+    "Profile 數量超過同步上限（{count}，上限 {max}）。請刪除未使用的 Profile 後再試。",
+  "settings.accountSyncLimitTooManyLayouts":
+    "版面配置數量超過同步上限（{count}，上限 {max}）。",
+  "settings.accountSyncLimitTooManyPanes":
+    "Profile {profileId} 的窗格數超過同步上限（{count}，上限 {max}）。",
+  "settings.accountSyncLimitRateLimited": "請等待 {seconds} 秒後再同步。",
+  "settings.accountSyncLimitDailyReached":
+    "已達本裝置每日同步上限（每天 {max} 次）。請明天再試。",
+  "settings.accountSyncLimitUserCapReached":
+    "雲端同步名額已滿（{max} 個帳號）。已註冊帳號可繼續同步，新帳號暫時無法加入。",
   "settings.accountNotConfigured":
     "尚未設定 Google 登入。請在 .env.local 填入 Firebase 設定（參考 .env.example）。",
   "settings.accountSignInGoogle": "使用 Google 登入",
