@@ -1,7 +1,7 @@
 /** Types mirroring the inventory data from the main process. */
 
 import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
-import type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
+import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
@@ -700,10 +700,27 @@ export interface ElectronAPI {
   ) => Promise<{ ok: true; state: AuthStatePublic } | { ok: false; error: string }>;
   authClearSession: () => Promise<{ ok: true; state: AuthStatePublic }>;
   authGetState: (configured: boolean) => Promise<AuthStatePublic>;
+  authGetIdToken: () => Promise<{ ok: boolean; token: string | null }>;
+  authOpenGoogleWindow: () => Promise<{ ok: boolean; error?: string; state?: AuthStatePublic }>;
+  authFinishGoogleWindow: (result: {
+    ok: boolean;
+    error?: string;
+    state?: AuthStatePublic;
+  }) => Promise<{ ok: true }>;
+  onAuthStateChanged: (cb: (state: AuthStatePublic) => void) => () => void;
+  onAuthRefreshTokenRequest: (cb: () => void) => () => void;
+  onAuthOAuthNavigated: (cb: (url: string) => void) => () => void;
   syncExportLocal: () => Promise<{ ok: true; bundle: SyncBundle } | { ok: false; error: string }>;
   syncApplyBundle: (bundle: SyncBundle) => Promise<{ ok: true } | { ok: false; error: string }>;
   syncGetMeta: () => Promise<SyncMeta>;
   syncSetMeta: (partial: Partial<SyncMeta>) => Promise<{ ok: true; meta: SyncMeta } | { ok: false; error: string }>;
+  syncPullRemote: () => Promise<
+    { ok: true; state: CloudSyncStateDoc | null } | { ok: false; error: string }
+  >;
+  syncPushRemote: (payload: {
+    bundle: SyncBundle;
+    revision: number;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
   onSyncDataApplied: (cb: () => void) => () => void;
 }
 

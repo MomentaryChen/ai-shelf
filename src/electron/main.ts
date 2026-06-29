@@ -95,7 +95,15 @@ import { showPaneAgentNotification, syncTrayPaneAttention } from "./agent-notify
 import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
 import { registerAuthHandlers } from "./auth-handlers.js";
 import { registerSyncHandlers } from "./sync-handlers.js";
+import { getRendererPageUrl, startRendererServer, stopRendererServer } from "./renderer-server.js";
+import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
+
+/** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
+app.commandLine.appendSwitch(
+  "disable-features",
+  "BlockThirdPartyCookies,ThirdPartyStoragePartitioning,PartitionedCookies",
+);
 import { runChecksForEntry } from "./doctor-checks.js";
 import {
   applyHealthMonitorPrefs,
@@ -136,13 +144,14 @@ function getTrayDeps(): TrayDeps {
   };
 }
 
-const RENDERER_HTML = join(import.meta.dirname, "..", "renderer", "index.html");
+const RENDERER_DIR = join(import.meta.dirname, "..", "renderer");
 const APP_ICON = join(import.meta.dirname, "..", "assets", "icon.ico");
 
 const sharedWebPreferences = {
   preload: join(import.meta.dirname, "preload.cjs"),
   contextIsolation: true,
   nodeIntegration: false,
+  partition: RENDERER_SESSION_PARTITION,
   /** Required for Firebase Google sign-in popup windows. */
   nativeWindowOpen: true,
 } as const;
@@ -288,6 +297,53 @@ function setupAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function isOAuthNavigationUrl(url: string): boolean {
+  try {
+    const { hostname, protocol } = new URL(url);
+    if (protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1")) return true;
+    if (hostname.endsWith(".firebaseapp.com")) return true;
+    if (hostname.endsWith(".google.com") || hostname === "google.com") return true;
+    if (hostname.endsWith(".googleapis.com")) return true;
+    if (hostname.endsWith(".gstatic.com")) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function allowOAuthPopupWindows(win: BrowserWindow): void {
+  const popupOptions = {
+    width: 520,
+    height: 700,
+    autoHideMenuBar: true,
+    webPreferences: { ...sharedWebPreferences },
+  } as const;
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // Firebase opens about:blank before navigating to Google.
+    if (!url || url === "about:blank") {
+      return { action: "allow" as const, overrideBrowserWindowOptions: popupOptions };
+    }
+    if (!isOAuthNavigationUrl(url)) return { action: "deny" as const };
+    return { action: "allow" as const, overrideBrowserWindowOptions: popupOptions };
+  });
+}
+
+function allowOAuthNavigation(win: BrowserWindow): void {
+  const onNavigate = (event: Electron.Event, url: string) => {
+    if (isOAuthNavigationUrl(url)) return;
+    event.preventDefault();
+    void shell.openExternal(url);
+  };
+  win.webContents.on("will-navigate", onNavigate);
+  win.webContents.on("will-redirect", onNavigate);
+}
+
+app.on("browser-window-created", (_event, win) => {
+  allowOAuthPopupWindows(win);
+  allowOAuthNavigation(win);
+});
+
 /** Keep formatted title; renderer index.html <title> would otherwise reset it to "AI Shelf". */
 function bindWindowTitle(win: BrowserWindow, base: string): void {
   const apply = () => {
@@ -318,7 +374,7 @@ function createWindow() {
     backgroundColor: "#0f172a",
   });
 
-  mainWindow.loadFile(RENDERER_HTML);
+  mainWindow.loadURL(getRendererPageUrl());
   attachWindow(mainWindow, "AI Shelf");
   bindMinimizeToTray(mainWindow);
 
@@ -343,7 +399,7 @@ function createChatWindow() {
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
-  chatWindow.loadFile(RENDERER_HTML, { hash: "chat" });
+  chatWindow.loadURL(getRendererPageUrl("chat"));
   attachWindow(chatWindow, "AI Terminal");
   bindMinimizeToTray(chatWindow);
   chatWindow.on("closed", () => {
@@ -367,7 +423,7 @@ function createSettingsWindow() {
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
-  settingsWindow.loadFile(RENDERER_HTML, { hash: "settings" });
+  settingsWindow.loadURL(getRendererPageUrl("settings"));
   attachWindow(settingsWindow, "Terminal Settings");
   settingsWindow.on("closed", () => {
     settingsWindow = null;
@@ -1864,8 +1920,10 @@ ipcMain.handle("set-tray-pane-attention", (_event, count: unknown) => {
   return { ok: true, count: n };
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
+  await startRendererServer(RENDERER_DIR);
+
   const trayEnabled = readSystemTrayEnabledFromDisk();
   applySystemTrayEnabled(trayEnabled, getTrayDeps());
 
@@ -1875,6 +1933,10 @@ app.whenReady().then(() => {
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
   onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
+});
+
+app.on("will-quit", () => {
+  stopRendererServer();
 });
 
 // Kill all active PTY sessions before the app exits

@@ -157,13 +157,33 @@ export const en = {
   "settings.accountNotConfigured":
     "Google sign-in is not configured. Add Firebase settings to .env.local (see .env.example).",
   "settings.accountSignInGoogle": "Sign in with Google",
+  "settings.accountSigningIn": "Opening Google sign-in…",
+  "settings.accountSigningInRedirect": "Continuing sign-in in browser…",
+  "settings.accountSigningInHint": "Complete sign-in in the window that opens. It will close automatically when done.",
+  "settings.accountSignInSuccess": "Signed in. Returning to settings…",
   "settings.accountSignOut": "Sign out",
   "settings.accountSignInFailed": "Sign-in failed: {error}",
+  "settings.accountAuthNotEnabled":
+    "Firebase Authentication is not enabled. In Firebase Console open Build → Authentication → Get started, then enable Google under Sign-in method. Also enable Firestore if you use sync.",
+  "settings.accountAuthNetworkFailed":
+    "Cannot reach Firebase (network/CSP). Rebuild the app after changing .env, and check firewall or proxy.",
+  "settings.accountAuthUnauthorizedDomain":
+    "This origin is not authorized. In Firebase Console → Authentication → Settings → Authorized domains, ensure localhost is listed.",
+  "settings.accountAuthInvalidApiKey":
+    "Invalid Firebase API key. Copy the Web app config from Project settings (not Google Cloud Credentials).",
+  "settings.accountAuthInternalError":
+    "Google sign-in could not finish in the app window. Close and reopen Settings, or restart the app. If you already picked an account, check whether you are signed in.",
   "settings.accountSyncNow": "Sync now",
   "settings.accountSyncing": "Syncing…",
   "settings.accountLastSync": "Last synced: {time}",
   "settings.accountNeverSynced": "Not synced yet on this device",
+  "settings.accountNeverSyncedShort": "Not synced",
+  "settings.accountSyncSuccessTitle": "Cloud sync complete",
+  "settings.accountSyncSuccess": "Synced at {time}",
   "settings.accountSyncFailed": "Sync failed: {error}",
+  "settings.accountSyncNotSignedIn": "Sign in with Google before syncing",
+  "settings.accountSyncFirestoreDenied":
+    "Firestore denied access. In Firebase Console → Firestore → Rules, paste docs/firestore.rules.example and publish.",
   "settings.backup": "Data backup & restore",
   "settings.backupHint":
     "Export profiles, layouts, workspaces, and app settings to a file. Use when migrating devices, reinstalling, or upgrading.",
@@ -197,6 +217,7 @@ export const en = {
   "ptyBuffer.16m": "16 MB",
   "ptyBuffer.64m": "64 MB",
   "sidebar.settings": "Settings",
+  "sidebar.accountSignInSubtitle": "Sync profiles across devices",
   "sidebar.collapse": "Collapse sidebar",
   "sidebar.expand": "Expand sidebar",
   "sidebar.searchTabs": "Search tabs…",

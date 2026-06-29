@@ -157,13 +157,33 @@ export const zh: Record<MessageKey, string> = {
   "settings.accountNotConfigured":
     "尚未設定 Google 登入。請在 .env.local 填入 Firebase 設定（參考 .env.example）。",
   "settings.accountSignInGoogle": "使用 Google 登入",
+  "settings.accountSigningIn": "正在開啟 Google 登入…",
+  "settings.accountSigningInRedirect": "正在瀏覽器完成登入…",
+  "settings.accountSigningInHint": "請在彈出的視窗完成登入，成功後會自動關閉並回到設定。",
+  "settings.accountSignInSuccess": "登入成功，正在回到設定…",
   "settings.accountSignOut": "登出",
   "settings.accountSignInFailed": "登入失敗：{error}",
+  "settings.accountAuthNotEnabled":
+    "Firebase Authentication 尚未啟用。請到 Firebase Console → Build → Authentication → 開始使用，並在 Sign-in method 啟用 Google；若要用同步，也需建立 Firestore。",
+  "settings.accountAuthNetworkFailed":
+    "無法連線 Firebase（網路或 CSP）。修改 .env 後請重新 pnpm build，並檢查防火牆或代理。",
+  "settings.accountAuthUnauthorizedDomain":
+    "此網域未授權。請到 Firebase Console → Authentication → Settings → Authorized domains，確認有 localhost。",
+  "settings.accountAuthInvalidApiKey":
+    "Firebase API key 無效。請從 Project settings 的 Web app 設定複製（不是 Google Cloud 憑證頁）。",
+  "settings.accountAuthInternalError":
+    "Google 登入視窗無法完成驗證。請關閉後重新開啟設定，或重啟 App。若已選過帳號，請確認是否其實已登入。",
   "settings.accountSyncNow": "立即同步",
   "settings.accountSyncing": "同步中…",
   "settings.accountLastSync": "上次同步：{time}",
   "settings.accountNeverSynced": "此裝置尚未同步",
+  "settings.accountNeverSyncedShort": "尚未同步",
+  "settings.accountSyncSuccessTitle": "雲端同步完成",
+  "settings.accountSyncSuccess": "已於 {time} 同步",
   "settings.accountSyncFailed": "同步失敗：{error}",
+  "settings.accountSyncNotSignedIn": "請先使用 Google 登入再同步",
+  "settings.accountSyncFirestoreDenied":
+    "Firestore 拒絕存取。請到 Firebase Console → Firestore → 規則，貼上 docs/firestore.rules.example 並發布。",
   "settings.backup": "資料備份與還原",
   "settings.backupHint":
     "將 Profile、版面、工作區與 App 設定匯出成檔案。換機、重裝或升級時可還原資料。",
@@ -197,6 +217,7 @@ export const zh: Record<MessageKey, string> = {
   "ptyBuffer.16m": "16 MB",
   "ptyBuffer.64m": "64 MB",
   "sidebar.settings": "設定",
+  "sidebar.accountSignInSubtitle": "跨裝置同步 Profile 與版面",
   "sidebar.collapse": "收合側欄",
   "sidebar.expand": "展開側欄",
   "sidebar.searchTabs": "搜尋分頁…",

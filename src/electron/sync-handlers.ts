@@ -1,5 +1,7 @@
 import { BrowserWindow, ipcMain } from "electron";
-import type { SyncMeta } from "../shared/sync-types.js";
+import type { CloudSyncStateDoc, SyncBundle, SyncMeta } from "../shared/sync-types.js";
+import { getAuthStatePublic } from "./auth-service.js";
+import { pullRemoteSyncStateMain, pushRemoteSyncStateMain } from "./firestore-sync.js";
 import { applySyncBundle } from "./sync-apply.js";
 import { getSyncDeviceId } from "./sync-device.js";
 import { exportLocalSyncBundle } from "./sync-export.js";
@@ -34,5 +36,37 @@ export function registerSyncHandlers(): void {
     }
     const meta = writeSyncMeta(partial as Partial<SyncMeta>);
     return { ok: true as const, meta };
+  });
+
+  ipcMain.handle("sync-pull-remote", async () => {
+    try {
+      const auth = getAuthStatePublic(true);
+      if (!auth.signedIn || !auth.user) {
+        return { ok: false as const, error: "not_signed_in" };
+      }
+      const state = await pullRemoteSyncStateMain(auth.user.uid);
+      return { ok: true as const, state: state as CloudSyncStateDoc | null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false as const, error: message };
+    }
+  });
+
+  ipcMain.handle("sync-push-remote", async (_event, payload: unknown) => {
+    try {
+      const row = payload as { bundle?: SyncBundle; revision?: number };
+      const auth = getAuthStatePublic(true);
+      if (!auth.signedIn || !auth.user) {
+        return { ok: false as const, error: "not_signed_in" };
+      }
+      if (!row?.bundle || typeof row.revision !== "number") {
+        return { ok: false as const, error: "Invalid sync payload" };
+      }
+      await pushRemoteSyncStateMain(auth.user.uid, row.bundle, row.revision);
+      return { ok: true as const };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false as const, error: message };
+    }
   });
 }
