@@ -94,6 +94,7 @@ import {
 import { showPaneAgentNotification, syncTrayPaneAttention } from "./agent-notify.js";
 import { readSystemTrayEnabledFromDisk, writeSystemTrayEnabledToDisk } from "./tray-pref.js";
 import { registerAuthHandlers } from "./auth-handlers.js";
+import { registerSettingsHandlers } from "./settings-handlers.js";
 import { registerSyncHandlers } from "./sync-handlers.js";
 import { getRendererPageUrl, startRendererServer, stopRendererServer } from "./renderer-server.js";
 import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
@@ -115,6 +116,7 @@ import {
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerAuthHandlers();
+registerSettingsHandlers();
 registerSyncHandlers();
 registerUsageHandlers();
 

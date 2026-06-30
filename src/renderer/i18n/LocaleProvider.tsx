@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { applyAppTheme } from "../app-theme.js";
-import { loadSettings, saveSettings, SETTINGS_KEY } from "../chat-settings.js";
+import { loadSettings, saveSettings, subscribeSettingsChanges } from "../chat-settings.js";
 import { subscribeSystemAppearance } from "../system-appearance.js";
 import {
   DEFAULT_LOCALE,
@@ -68,15 +68,12 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY) syncFromStorage();
-    };
     const onLocaleChange = () => syncFromStorage();
-    window.addEventListener("storage", onStorage);
     window.addEventListener(LOCALE_CHANGE_EVENT, onLocaleChange);
+    const offSettings = subscribeSettingsChanges(syncFromStorage);
     return () => {
-      window.removeEventListener("storage", onStorage);
       window.removeEventListener(LOCALE_CHANGE_EVENT, onLocaleChange);
+      offSettings();
     };
   }, [syncFromStorage]);
 

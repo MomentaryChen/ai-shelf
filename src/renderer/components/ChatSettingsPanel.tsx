@@ -20,8 +20,8 @@ import {
   bumpDirHistory,
   loadSettings,
   saveSettings,
+  subscribeSettingsChanges,
   type ChatSettings,
-  SETTINGS_KEY,
   type ExternalTerminal,
 } from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -130,16 +130,12 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   }, []);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY) {
-        const next = loadSettings();
-        setSettings(next);
-        applyAppTheme(next.appTheme);
-        syncMainProcessFromSettings();
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return subscribeSettingsChanges(() => {
+      const next = loadSettings();
+      setSettings(next);
+      applyAppTheme(next.appTheme);
+      syncMainProcessFromSettings();
+    });
   }, []);
 
   async function browsePath() {
