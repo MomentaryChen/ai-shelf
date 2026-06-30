@@ -372,7 +372,10 @@ export function bindTerminalClipboard(
    * per-pane copy guard can't drop the final selection mid-drag.
    */
   const onSelectionChange = () => {
-    if (!(options.getCopyOnSelect?.() ?? false)) return;
+    if (!(options.getCopyOnSelect?.() ?? false)) {
+      cancelPendingAutoCopy();
+      return;
+    }
     const text = term.getSelection();
     // Selection cleared (e.g. focus moved to another pane). Leave any pending
     // copy of the previous selection alone — cancelling it here is what made a
@@ -384,6 +387,7 @@ export function bindTerminalClipboard(
     window.clearTimeout(selCopyTimer);
     selCopyTimer = window.setTimeout(() => {
       if (gen !== selCopyGeneration) return;
+      if (!(options.getCopyOnSelect?.() ?? false)) return;
       lastAutoCopied = text;
       void writeClipboardText(text);
     }, 50);

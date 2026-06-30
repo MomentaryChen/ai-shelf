@@ -65,9 +65,9 @@ import {
   bumpDirHistory,
   loadSettings,
   saveSettings,
+  subscribeSettingsChanges,
   type ChatSettings,
   type ExternalTerminal,
-  SETTINGS_KEY,
 } from "../chat-settings";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 import {
@@ -328,15 +328,11 @@ function ChatTabInner({
   }, [recordPaneAgentInput]);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY) {
-        const next = loadSettings();
-        setSettings(next);
-        applyAppTheme(next.appTheme);
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return subscribeSettingsChanges(() => {
+      const next = loadSettings();
+      setSettings(next);
+      applyAppTheme(next.appTheme);
+    });
   }, []);
 
   useEffect(() => {

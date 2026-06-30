@@ -671,6 +671,7 @@ export interface ElectronAPI {
   setTrayPaneAttention: (count: number) => Promise<{ ok: boolean; count: number }>;
   openChatWindow: () => Promise<void>;
   openSettingsWindow: () => Promise<void>;
+  notifySettingsChanged: () => Promise<{ ok: true }>;
   toggleDevTools: () => Promise<void>;
   onTrayActivateProfile: (cb: (profileId: string) => void) => () => void;
   onPaneAgentFocus: (cb: (paneId: string) => void) => () => void;
@@ -723,6 +724,7 @@ export interface ElectronAPI {
     revision: number;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
   onSyncDataApplied: (cb: () => void) => () => void;
+  onSettingsChanged: (cb: () => void) => () => void;
 }
 
 declare global {

@@ -75,6 +75,9 @@ export type { PaneShortcutBindings, ToolLaunchArgs };
 
 export const SETTINGS_KEY = "ai-inventory-chat-settings";
 
+/** Same-window notification when saveSettings runs (see subscribeSettingsChanges). */
+export const SETTINGS_CHANGE_EVENT = "ai-shelf-settings-change";
+
 export const TERMINAL_OPTIONS: { value: ExternalTerminal; label: string }[] = [
   { value: "auto", label: "🔍 Auto detect" },
   { value: "wt", label: "🪟 Windows Terminal" },
@@ -233,6 +236,24 @@ export function loadSettings(): ChatSettings {
 
 export function saveSettings(s: ChatSettings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  window.dispatchEvent(new CustomEvent(SETTINGS_CHANGE_EVENT));
+  void window.api?.notifySettingsChanged?.();
+}
+
+/** Reload when settings change in this window, another BrowserWindow, or via IPC. */
+export function subscribeSettingsChanges(onChange: () => void): () => void {
+  const onCustom = () => onChange();
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === SETTINGS_KEY) onChange();
+  };
+  const offIpc = window.api?.onSettingsChanged?.(onChange) ?? (() => {});
+  window.addEventListener(SETTINGS_CHANGE_EVENT, onCustom);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(SETTINGS_CHANGE_EVENT, onCustom);
+    window.removeEventListener("storage", onStorage);
+    offIpc();
+  };
 }
 
 export function bumpDirHistory(history: string[], dir: string, max = 12): string[] {

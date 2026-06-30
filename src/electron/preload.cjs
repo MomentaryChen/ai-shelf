@@ -153,6 +153,7 @@ contextBridge.exposeInMainWorld("api", {
   setTrayPaneAttention: (count) => ipcRenderer.invoke("set-tray-pane-attention", count),
   openChatWindow: () => ipcRenderer.invoke("open-chat-window"),
   openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
+  notifySettingsChanged: () => ipcRenderer.invoke("notify-settings-changed"),
   toggleDevTools: () => ipcRenderer.invoke("toggle-devtools"),
   onTrayActivateProfile: (cb) => {
     const handler = (_e, profileId) => cb(profileId);
@@ -209,5 +210,10 @@ contextBridge.exposeInMainWorld("api", {
     const handler = () => cb();
     ipcRenderer.on("sync-data-applied", handler);
     return () => ipcRenderer.off("sync-data-applied", handler);
+  },
+  onSettingsChanged: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("settings-changed", handler);
+    return () => ipcRenderer.off("settings-changed", handler);
   },
 });
