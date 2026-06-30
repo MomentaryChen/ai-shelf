@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
+import { app } from "electron";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -17,17 +18,37 @@ const MIME: Record<string, string> = {
 let server: Server | null = null;
 let baseUrl: string | null = null;
 
-/** Stable origin so Firebase Auth persistence (IndexedDB) survives app restarts. */
-const DEFAULT_RENDERER_PORT = 47_832;
+/** Packaged app: stable origin for Firebase Auth persistence (IndexedDB). */
+const PROD_RENDERER_PORT = 47_832;
+/** Dev default — avoids colliding with an installed / other dev instance on 47832. */
+const DEV_RENDERER_PORT = 47_833;
 
 function resolveRendererPort(): number {
   const raw = process.env.AI_SHELF_RENDERER_PORT?.trim();
-  if (!raw) return DEFAULT_RENDERER_PORT;
-  const port = Number(raw);
-  if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
-    throw new Error(`Invalid AI_SHELF_RENDERER_PORT: ${raw}`);
+  if (raw) {
+    const port = Number(raw);
+    if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
+      throw new Error(`Invalid AI_SHELF_RENDERER_PORT: ${raw}`);
+    }
+    return port;
   }
-  return port;
+  return app.isPackaged ? PROD_RENDERER_PORT : DEV_RENDERER_PORT;
+}
+
+function listenOnPort(httpServer: Server, port: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onError = (err: NodeJS.ErrnoException) => {
+      httpServer.off("listening", onListening);
+      reject(err);
+    };
+    const onListening = () => {
+      httpServer.off("error", onError);
+      resolve();
+    };
+    httpServer.once("error", onError);
+    httpServer.once("listening", onListening);
+    httpServer.listen(port, "127.0.0.1");
+  });
 }
 
 /**
@@ -71,18 +92,30 @@ export async function startRendererServer(rendererRoot: string): Promise<string>
     }
   });
 
-  await new Promise<void>((resolve, reject) => {
-    const port = resolveRendererPort();
-    server!.once("error", reject);
-    server!.listen(port, "127.0.0.1", () => resolve());
-  });
+  const preferred = resolveRendererPort();
+  try {
+    await listenOnPort(server, preferred);
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (!app.isPackaged && code === "EADDRINUSE") {
+      console.warn(
+        `[renderer-server] Port ${preferred} in use — dev mode falling back to an ephemeral port`,
+      );
+      await listenOnPort(server, 0);
+    } else {
+      throw err;
+    }
+  }
 
   const addr = server.address();
   if (!addr || typeof addr === "string") {
     throw new Error("Failed to start renderer HTTP server");
   }
 
-  // Use localhost hostname — matches Firebase default authorized domain.
+  if (!app.isPackaged) {
+    console.info(`[renderer-server] Dev renderer at http://localhost:${addr.port}`);
+  }
+
   baseUrl = `http://localhost:${addr.port}`;
   return baseUrl;
 }

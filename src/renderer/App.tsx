@@ -45,6 +45,7 @@ const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
 const ChatTab = lazy(() => import("./components/ChatTab").then((m) => ({ default: m.ChatTab })));
+const FlowTab = lazy(() => import("./components/FlowTab").then((m) => ({ default: m.FlowTab })));
 const CommandPalette = lazy(() =>
   import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
 );
@@ -268,6 +269,13 @@ export function App() {
         run: () => handleModeChange("inventory"),
       },
       {
+        id: "mode-flow",
+        title: t("cmd.action.flow"),
+        group: t("cmd.group.actions"),
+        icon: "🧭",
+        run: () => handleModeChange("flow"),
+      },
+      {
         id: "refresh",
         title: t("cmd.action.refresh"),
         group: t("cmd.group.actions"),
@@ -311,11 +319,18 @@ export function App() {
         icon: "📦",
         run: () => handleModeChange("inventory"),
       },
+      {
+        id: "mode-flow",
+        title: t("cmd.action.flow"),
+        group: t("cmd.group.actions"),
+        icon: "🧭",
+        run: () => handleModeChange("flow"),
+      },
     ],
     [t],
   );
 
-  // Built only while the palette is open — avoids re-merging commands on every inventory tick.
+  // Built only while the palette is open
   const commands = useMemo<Command[]>(() => {
     if (!paletteOpen) return EMPTY_COMMANDS;
 
@@ -478,6 +493,17 @@ export function App() {
                 </ViewTransition>
               </div>
             </main>
+          </div>
+        )}
+
+        {ready && (
+          <div
+            data-active={appMode === "flow"}
+            className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
+          >
+            <Suspense fallback={<Spinner label={t("flow.loading")} />}>
+              <FlowTab />
+            </Suspense>
           </div>
         )}
       </div>

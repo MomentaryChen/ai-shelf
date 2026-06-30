@@ -3,8 +3,11 @@
 import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
+import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
+
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
+export type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -725,6 +728,15 @@ export interface ElectronAPI {
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
   onSyncDataApplied: (cb: () => void) => () => void;
   onSettingsChanged: (cb: () => void) => () => void;
+  flowList: () => Promise<FlowListItem[]>;
+  flowReadFile: (flowId: string) => Promise<{ content: string; path: string } | null>;
+  flowRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
+  flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
+  flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;
+  flowOpenFlowsDir: () => Promise<void>;
+  flowDelete: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
+  flowOpenFile: (flowId: string) => Promise<{ ok: boolean; error?: string; path?: string }>;
+  onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
 }
 
 declare global {

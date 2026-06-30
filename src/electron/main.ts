@@ -113,6 +113,18 @@ import {
   onAppUpdateStateChanged,
   runHealthCheck,
 } from "./health-monitor.js";
+import {
+  deleteFlow,
+  getFlowFilePath,
+  getFlowRunState,
+  getFlowsDir,
+  initFlowService,
+  listFlows,
+  listRecentRuns,
+  onFlowRunState,
+  readFlowFile,
+  runFlow,
+} from "./flow-service.js";
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerAuthHandlers();
@@ -1922,6 +1934,44 @@ ipcMain.handle("set-tray-pane-attention", (_event, count: unknown) => {
   return { ok: true, count: n };
 });
 
+ipcMain.handle("flow-list", () => listFlows());
+ipcMain.handle("flow-read-file", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return null;
+  return readFlowFile(flowId.trim());
+});
+ipcMain.handle("flow-run", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return runFlow(flowId.trim());
+});
+ipcMain.handle("flow-get-run-state", (_event, runId: unknown) => {
+  if (typeof runId !== "string" || !runId.trim()) return null;
+  return getFlowRunState(runId.trim());
+});
+ipcMain.handle("flow-list-recent-runs", (_event, limit: unknown) => {
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 20;
+  return listRecentRuns(n);
+});
+ipcMain.handle("flow-open-flows-dir", () => {
+  void shell.openPath(getFlowsDir());
+});
+
+ipcMain.handle("flow-delete", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return deleteFlow(flowId.trim());
+});
+
+ipcMain.handle("flow-open-file", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return { ok: false };
+  const filePath = getFlowFilePath(flowId.trim());
+  if (!filePath) return { ok: false, error: "Flow not found" };
+  void shell.openPath(filePath);
+  return { ok: true, path: filePath };
+});
+
 app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
   await startRendererServer(RENDERER_DIR);
@@ -1934,6 +1984,12 @@ app.whenReady().then(async () => {
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
+  initFlowService();
+  onFlowRunState((state) => {
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    win.webContents.send("flow-run-state", state);
+  });
   onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
 });
 

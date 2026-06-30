@@ -2,7 +2,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 
-export type AppMode = "terminal" | "inventory";
+export type AppMode = "terminal" | "inventory" | "flow";
 
 interface AppModeSwitchProps {
   mode: AppMode;
@@ -13,6 +13,7 @@ interface AppModeSwitchProps {
 const MODES: { id: AppMode; labelKey: MessageKey }[] = [
   { id: "terminal", labelKey: "app.mode.terminal" },
   { id: "inventory", labelKey: "app.mode.inventory" },
+  { id: "flow", labelKey: "app.mode.flow" },
 ];
 
 export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitchProps) {

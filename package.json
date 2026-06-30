@@ -12,7 +12,7 @@
     "ai": "dist/cli.js"
   },
   "scripts": {
-    "build": "pnpm build:cli && tsc && tsc -p src/renderer/tsconfig.json && vite build && node -e \"const fs=require('fs');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');\"",
+    "build": "pnpm build:cli && tsc && tsc -p src/renderer/tsconfig.json && vite build && node -e \"const fs=require('fs');const path=require('path');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');fs.mkdirSync('dist/assets/flows',{recursive:true});fs.copyFileSync('src/assets/flows/example-google-check.flow.md','dist/assets/flows/example-google-check.flow.md');\"",
     "build:cli": "pnpm --filter ai-shelf run build",
     "build:desktop": "pnpm run build",
     "typecheck": "tsc --noEmit && tsc -p src/renderer/tsconfig.json",
