@@ -378,7 +378,11 @@ function EmbeddedTerminalInner({
       const target = containerRef.current;
       if (!target || target.clientWidth === 0 || target.clientHeight === 0) return;
       try {
-        fitAddon.fit();
+        // Always resize from proposeDimensions — FitAddon.fit() skips when cols/rows
+        // are unchanged, which leaves stale canvas metrics after font load or flex settle.
+        const dims = fitAddon.proposeDimensions();
+        if (dims) term.resize(dims.cols, dims.rows);
+        else fitAddon.fit();
       } catch {
         /* mid-layout */
       }
@@ -387,9 +391,13 @@ function EmbeddedTerminalInner({
 
     fitRef.current = fit;
 
+    let rafId2 = 0;
     const scheduleFit = () => {
       cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(fit);
+      cancelAnimationFrame(rafId2);
+      rafId = requestAnimationFrame(() => {
+        rafId2 = requestAnimationFrame(fit);
+      });
     };
 
     scheduleFit();
@@ -475,6 +483,18 @@ function EmbeddedTerminalInner({
     const ro = new ResizeObserver(scheduleFit);
     ro.observe(el);
 
+    const onWindowResize = () => scheduleFit();
+    window.addEventListener("resize", onWindowResize);
+
+    void document.fonts.ready.then(() => {
+      if (!cancelled) scheduleFit();
+    });
+    const onFontsLoadingDone = () => {
+      if (cancelled) return;
+      scheduleFit();
+    };
+    document.fonts.addEventListener("loadingdone", onFontsLoadingDone);
+
     const onPointerDown = () => {
       if (!findOpenRef.current) term.focus();
     };
@@ -486,6 +506,7 @@ function EmbeddedTerminalInner({
       window.clearTimeout(wakeTimer);
       window.clearTimeout(statusTimer);
       cancelAnimationFrame(rafId);
+      cancelAnimationFrame(rafId2);
       fitRef.current = null;
       scrollToBottomRef.current = null;
       termRef.current = null;
@@ -495,6 +516,8 @@ function EmbeddedTerminalInner({
       offExit();
       el.removeEventListener("wheel", onWheel, { capture: true });
       el.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("resize", onWindowResize);
+      document.fonts.removeEventListener("loadingdone", onFontsLoadingDone);
       unregisterClear();
       unbindClipboard();
       unbindLinks();
@@ -540,17 +563,29 @@ function EmbeddedTerminalInner({
 
   useEffect(() => {
     if (!active) return;
-    const id = requestAnimationFrame(() => fitRef.current?.());
-    return () => cancelAnimationFrame(id);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => fitRef.current?.());
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
   }, [active]);
 
   useEffect(() => {
     if (!focused || findOpen) return;
-    const id = requestAnimationFrame(() => {
-      fitRef.current?.();
-      termRef.current?.focus();
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        fitRef.current?.();
+        termRef.current?.focus();
+      });
     });
-    return () => cancelAnimationFrame(id);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
   }, [focused, sessionId, findOpen]);
 
   return (
