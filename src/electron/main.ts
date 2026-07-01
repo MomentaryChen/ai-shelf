@@ -113,6 +113,25 @@ import {
   onAppUpdateStateChanged,
   runHealthCheck,
 } from "./health-monitor.js";
+import {
+  deleteFlow,
+  getFlowFilePath,
+  getFlowRunState,
+  getFlowsDir,
+  initFlowService,
+  listFlows,
+  listRecentRuns,
+  onFlowRunState,
+  readFlowFile,
+  runDueFlows,
+  runFlow,
+  saveFlowSchedule,
+} from "./flow-service.js";
+import { initFlowScheduler, stopFlowScheduler } from "./flow-scheduler.js";
+import {
+  readFlowSchedulePrefs,
+  writeFlowSchedulePrefs,
+} from "../shared/flow-schedule-pref.js";
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerAuthHandlers();
@@ -1922,6 +1941,91 @@ ipcMain.handle("set-tray-pane-attention", (_event, count: unknown) => {
   return { ok: true, count: n };
 });
 
+ipcMain.handle("flow-list", () => listFlows());
+ipcMain.handle("flow-read-file", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return null;
+  return readFlowFile(flowId.trim());
+});
+ipcMain.handle("flow-run", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return runFlow(flowId.trim());
+});
+ipcMain.handle("flow-get-run-state", (_event, runId: unknown) => {
+  if (typeof runId !== "string" || !runId.trim()) return null;
+  return getFlowRunState(runId.trim());
+});
+ipcMain.handle("flow-list-recent-runs", (_event, limit: unknown) => {
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 20;
+  return listRecentRuns(n);
+});
+ipcMain.handle("flow-open-flows-dir", () => {
+  void shell.openPath(getFlowsDir());
+});
+
+ipcMain.handle("flow-delete", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return deleteFlow(flowId.trim());
+});
+
+ipcMain.handle("flow-open-file", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return { ok: false };
+  const filePath = getFlowFilePath(flowId.trim());
+  if (!filePath) return { ok: false, error: "Flow not found" };
+  void shell.openPath(filePath);
+  return { ok: true, path: filePath };
+});
+
+ipcMain.handle("flow-get-schedule-prefs", () => readFlowSchedulePrefs());
+
+ipcMain.handle("flow-set-schedule-prefs", (_event, partial: unknown) => {
+  if (!partial || typeof partial !== "object") {
+    return { ok: false, error: "Invalid prefs" };
+  }
+  const p = partial as { schedulerEnabled?: unknown };
+  const next = writeFlowSchedulePrefs({
+    schedulerEnabled:
+      typeof p.schedulerEnabled === "boolean" ? p.schedulerEnabled : undefined,
+  });
+  return { ok: true, prefs: next };
+});
+
+ipcMain.handle("flow-run-due", async () => {
+  const result = await runDueFlows();
+  return { ok: true, result };
+});
+
+ipcMain.handle("flow-save-schedule", (_event, flowId: unknown, patch: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  if (!patch || typeof patch !== "object") {
+    return { ok: false, error: "Invalid schedule patch" };
+  }
+  const p = patch as { schedule?: unknown; timezone?: unknown };
+  const schedule =
+    p.schedule === null
+      ? null
+      : typeof p.schedule === "string"
+        ? p.schedule
+        : undefined;
+  if (schedule === undefined) {
+    return { ok: false, error: "schedule is required (string or null)" };
+  }
+  const timezone =
+    p.timezone === null || p.timezone === undefined
+      ? p.timezone === null
+        ? null
+        : undefined
+      : typeof p.timezone === "string"
+        ? p.timezone
+        : undefined;
+  return saveFlowSchedule(flowId.trim(), { schedule, timezone });
+});
+
 app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
   await startRendererServer(RENDERER_DIR);
@@ -1934,10 +2038,18 @@ app.whenReady().then(async () => {
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
+  initFlowService();
+  initFlowScheduler(() => mainWindow);
+  onFlowRunState((state) => {
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    win.webContents.send("flow-run-state", state);
+  });
   onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
 });
 
 app.on("will-quit", () => {
+  stopFlowScheduler();
   stopRendererServer();
 });
 

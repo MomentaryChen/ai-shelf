@@ -216,4 +216,21 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("settings-changed", handler);
     return () => ipcRenderer.off("settings-changed", handler);
   },
+  flowList: () => ipcRenderer.invoke("flow-list"),
+  flowReadFile: (flowId) => ipcRenderer.invoke("flow-read-file", flowId),
+  flowRun: (flowId) => ipcRenderer.invoke("flow-run", flowId),
+  flowGetRunState: (runId) => ipcRenderer.invoke("flow-get-run-state", runId),
+  flowListRecentRuns: (limit) => ipcRenderer.invoke("flow-list-recent-runs", limit),
+  flowOpenFlowsDir: () => ipcRenderer.invoke("flow-open-flows-dir"),
+  flowDelete: (flowId) => ipcRenderer.invoke("flow-delete", flowId),
+  flowOpenFile: (flowId) => ipcRenderer.invoke("flow-open-file", flowId),
+  flowGetSchedulePrefs: () => ipcRenderer.invoke("flow-get-schedule-prefs"),
+  flowSetSchedulePrefs: (partial) => ipcRenderer.invoke("flow-set-schedule-prefs", partial),
+  flowRunDue: () => ipcRenderer.invoke("flow-run-due"),
+  flowSaveSchedule: (flowId, patch) => ipcRenderer.invoke("flow-save-schedule", flowId, patch),
+  onFlowRunState: (cb) => {
+    const handler = (_e, state) => cb(state);
+    ipcRenderer.on("flow-run-state", handler);
+    return () => ipcRenderer.off("flow-run-state", handler);
+  },
 });
