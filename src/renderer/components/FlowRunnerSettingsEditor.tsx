@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  applyFlowClaudeDefaultModel,
   buildToolArgsWithClaudeModel,
+  FLOW_CLAUDE_DEFAULT_MODEL,
+  normalizeFlowClaudeToolArgs,
   parseClaudeModelFromToolArgs,
 } from "../../shared/claude-tool-args.js";
 import { flowAgentSupportsMcp, flowRunnerPickerToolIds } from "../../shared/flow-runner-tools.js";
@@ -94,15 +97,22 @@ export function FlowRunnerSettingsEditor({
         return flowDef.toolArgs.trim();
       }
 
-      return resolveToolLaunchExtraArgs(globalToolLaunchArgs, toolId) ?? "";
+      return canonicalToolId(toolId) === "claude"
+        ? applyFlowClaudeDefaultModel(
+            resolveToolLaunchExtraArgs(globalToolLaunchArgs, toolId) ?? "",
+          )
+        : (resolveToolLaunchExtraArgs(globalToolLaunchArgs, toolId) ?? "");
     },
     [flowDef.agentTool, flowDef.toolArgs, globalToolLaunchArgs],
   );
 
   const resolvedToolArgs = useMemo(() => {
-    if (showModelPicker) return buildToolArgsWithClaudeModel(claudeModel, extraToolArgs);
+    if (showModelPicker) {
+      const raw = buildToolArgsWithClaudeModel(claudeModel, extraToolArgs);
+      return canonicalTool === "claude" ? applyFlowClaudeDefaultModel(raw) : raw;
+    }
     return toolArgs;
-  }, [showModelPicker, claudeModel, extraToolArgs, toolArgs]);
+  }, [showModelPicker, canonicalTool, claudeModel, extraToolArgs, toolArgs]);
 
   const switchTool = useCallback(
     (nextTool: string) => {
@@ -151,7 +161,8 @@ export function FlowRunnerSettingsEditor({
     const baseTool = flowDef.agentTool || "claude";
     return (
       tool !== baseTool ||
-      resolvedToolArgs.trim() !== (flowDef.toolArgs ?? "").trim() ||
+      normalizeFlowClaudeToolArgs(canonicalToolId(tool), resolvedToolArgs) !==
+        normalizeFlowClaudeToolArgs(canonicalToolId(baseTool), flowDef.toolArgs ?? "") ||
       cwd.trim() !== (flowDef.cwd ?? "").trim() ||
       profileId.trim() !== (flowDef.profileId ?? "").trim()
     );
@@ -228,6 +239,7 @@ export function FlowRunnerSettingsEditor({
             onModelChange={setClaudeModel}
             onExtraArgsChange={setExtraToolArgs}
             detectedModels={detectedModels}
+            implicitDefault={canonicalTool === "claude" ? FLOW_CLAUDE_DEFAULT_MODEL : undefined}
             surface="warm"
           />
           <p className="mt-2 text-[11px] text-text-secondary">{t("flow.runner.toolArgsHint")}</p>
