@@ -7,19 +7,49 @@ import {
 } from "@/components/ui/dialog";
 import { parseFlowDocument } from "../../shared/flow-parse.js";
 import type { FlowDefinition } from "../../shared/flow-types.js";
-import type { ProfileInfo } from "../types";
+import type { FlowListItem, ProfileInfo } from "../types";
 import { FlowRunnerSettingsEditor } from "./FlowRunnerSettingsEditor";
+import { FlowScheduleEditor } from "./FlowScheduleEditor";
+import { FlowSchedulerPanel } from "./FlowSchedulerPanel";
 import { useLocale } from "../i18n/LocaleProvider";
+
+type TaskSchedulerStatus = {
+  supported: boolean;
+  installed: boolean;
+  taskName: string;
+};
 
 type Props = {
   flowId: string;
+  listItem?: FlowListItem | null;
+  schedulerEnabled: boolean;
+  schedulerSaving: boolean;
+  onSchedulerToggle: () => void;
+  taskScheduler: TaskSchedulerStatus | null;
+  taskSchedulerBusy: boolean;
+  onInstallTaskScheduler: () => void;
+  onRemoveTaskScheduler: () => void;
   onClose: () => void;
   onSaved: () => void;
 };
 
-export function FlowRunnerSettingsDialog({ flowId, onClose, onSaved }: Props) {
+export function FlowSettingsDialog({
+  flowId,
+  listItem,
+  schedulerEnabled,
+  schedulerSaving,
+  onSchedulerToggle,
+  taskScheduler,
+  taskSchedulerBusy,
+  onInstallTaskScheduler,
+  onRemoveTaskScheduler,
+  onClose,
+  onSaved,
+}: Props) {
   const { t } = useLocale();
   const [flowDef, setFlowDef] = useState<FlowDefinition | null>(null);
+  const [schedule, setSchedule] = useState<string | undefined>(listItem?.schedule);
+  const [timezone, setTimezone] = useState<string | undefined>();
   const [claudeModels, setClaudeModels] = useState<string[]>([]);
   const [cursorModels, setCursorModels] = useState<string[]>([]);
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
@@ -48,6 +78,8 @@ export function FlowRunnerSettingsDialog({ flowId, onClose, onSaved }: Props) {
           return;
         }
         setFlowDef(parsed);
+        setSchedule(parsed.schedule);
+        setTimezone(parsed.timezone);
       })
       .catch((e: unknown) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e));
@@ -93,36 +125,65 @@ export function FlowRunnerSettingsDialog({ flowId, onClose, onSaved }: Props) {
     };
   }, [flowId]);
 
-  const title = useMemo(() => t("flow.runner.dialogTitle", { id: flowId }), [flowId, t]);
+  const title = useMemo(() => t("flow.settings.dialogTitle", { id: flowId }), [flowId, t]);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[min(88vh,760px)] max-w-lg flex-col gap-0 overflow-hidden border-border bg-bg-secondary p-0 text-text-primary"
+        className="flex max-h-[min(88vh,800px)] max-w-lg flex-col gap-0 overflow-hidden border-border bg-bg-secondary p-0 text-text-primary"
       >
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
           <DialogTitle className="text-[15px] font-semibold">{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-4">
           {loading ? (
             <p className="py-8 text-center text-[13px] text-text-secondary">{t("flow.source.loading")}</p>
           ) : loadError ? (
             <p className="py-8 text-center text-[13px] text-fail">{loadError}</p>
           ) : flowDef ? (
-            <FlowRunnerSettingsEditor
-              flowId={flowId}
-              flowDef={flowDef}
-              claudeModels={claudeModels}
-              cursorModels={cursorModels}
-              profiles={profiles}
-              onSaved={() => {
-                onSaved();
-                onClose();
-              }}
-              embedded
-              stickyFooter
-            />
+            <div className="flex flex-col gap-6">
+              <FlowSchedulerPanel
+                schedulerEnabled={schedulerEnabled}
+                schedulerSaving={schedulerSaving}
+                onSchedulerToggle={onSchedulerToggle}
+                taskScheduler={taskScheduler}
+                taskSchedulerBusy={taskSchedulerBusy}
+                onInstallTaskScheduler={onInstallTaskScheduler}
+                onRemoveTaskScheduler={onRemoveTaskScheduler}
+              />
+
+              <section className="border-t border-border pt-6">
+                <h3 className="text-[13px] font-medium text-text-primary">{t("flow.schedule.title")}</h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-text-secondary">{t("flow.schedule.hint")}</p>
+                <FlowScheduleEditor
+                  flowId={flowId}
+                  schedule={schedule}
+                  timezone={timezone}
+                  nextRunAt={listItem?.nextRunAt}
+                  onSaved={() => {
+                    onSaved();
+                  }}
+                  embedded
+                />
+              </section>
+
+              <section className="border-t border-border pt-6">
+                <h3 className="text-[13px] font-medium text-text-primary">{t("flow.runner.title")}</h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-text-secondary">{t("flow.runner.hint")}</p>
+                <FlowRunnerSettingsEditor
+                  flowId={flowId}
+                  flowDef={flowDef}
+                  claudeModels={claudeModels}
+                  cursorModels={cursorModels}
+                  profiles={profiles}
+                  onSaved={() => {
+                    onSaved();
+                  }}
+                  embedded
+                />
+              </section>
+            </div>
           ) : null}
         </div>
       </DialogContent>

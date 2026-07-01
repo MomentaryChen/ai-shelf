@@ -855,7 +855,7 @@ export const en = {
   "flow.schedule.dialogTitle": "Schedule: {id}",
   "flow.schedule.open": "Edit schedule",
   "flow.schedule.hint":
-    "Each flow has its own cron. Scheduled runs and headless setup are in the sidebar scheduling panel.",
+    "Each flow has its own cron. Enable scheduled runs and headless setup in Flow settings.",
   "flow.schedule.enabled": "Run on schedule",
   "flow.schedule.cron": "Cron expression",
   "flow.schedule.timezone": "Timezone",
@@ -882,6 +882,8 @@ export const en = {
   "flow.runner.saving": "Saving…",
   "flow.runner.saveFailed": "Could not save runner settings",
   "flow.runner.httpOnly": "HTTP flows do not use an agent runner.",
+  "flow.settings.open": "Flow settings",
+  "flow.settings.dialogTitle": "Settings: {id}",
   "flow.nextRun": "Next run {time}",
   "flow.create.title": "Create a flow",
   "flow.create.subtitle": "Describe the job in plain language — Claude will draft a .flow.md for you.",
