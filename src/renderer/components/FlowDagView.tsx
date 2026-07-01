@@ -37,15 +37,15 @@ function phaseStatusLabel(status: FlowPhaseStatus, t: (key: MessageKey) => strin
 function nodeStyles(status: FlowPhaseStatus = "pending"): string {
   switch (status) {
     case "running":
-      return "border-[var(--clay)] bg-[var(--surface)] shadow-[0_0_0_2px_rgba(201,123,90,0.35),0_4px_16px_-6px_rgba(201,123,90,0.25)]";
+      return "border-accent bg-bg-secondary ring-2 ring-accent/35";
     case "done":
-      return "border-[var(--success)]/50 bg-[var(--surface)]";
+      return "border-ok/50 bg-bg-secondary";
     case "failed":
-      return "border-red-400/70 bg-red-50/50";
+      return "border-fail/70 bg-fail/10";
     case "skipped":
-      return "border-[var(--sand-deep)] bg-[var(--sand-deep)]/40 opacity-80";
+      return "border-border-subtle bg-bg-elevated/40 opacity-80";
     default:
-      return "border-[var(--sand)] bg-[var(--surface)]";
+      return "border-border bg-bg-secondary";
   }
 }
 
@@ -66,21 +66,21 @@ function DagNode({
       className={`min-w-[140px] max-w-[200px] rounded-[20px] border px-4 py-3 transition-all duration-300 ${nodeStyles(status)}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-[var(--muted)]">{phaseStatusLabel(status, t)}</span>
+        <span className="text-[11px] text-text-secondary">{phaseStatusLabel(status, t)}</span>
         {status === "running" && (
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--clay)]" aria-hidden />
+          <span className="h-2 w-2 animate-pulse rounded-full bg-accent" aria-hidden />
         )}
         {status === "done" && (
-          <span className="h-2 w-2 rounded-full bg-[var(--success)]" aria-hidden />
+          <span className="h-2 w-2 rounded-full bg-ok" aria-hidden />
         )}
       </div>
       <div
-        className={`mt-1 text-[13px] font-medium leading-snug text-[var(--ink)] ${mono ? "font-mono text-[12px] break-all" : ""}`}
+        className={`mt-1 text-[13px] font-medium leading-snug text-text-primary ${mono ? "font-mono text-[12px] break-all" : ""}`}
       >
         {title}
       </div>
       {subtitle && (
-        <div className="mt-1 text-[11px] leading-snug text-[var(--muted)] break-all">{subtitle}</div>
+        <div className="mt-1 text-[11px] leading-snug text-text-secondary break-all">{subtitle}</div>
       )}
     </div>
   );
@@ -134,17 +134,17 @@ export function FlowDagView({
         : undefined;
 
   return (
-    <div className="rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)]">
+    <div className="rounded-[28px] border border-border bg-bg-secondary p-6 shadow-card">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[13px] font-medium text-[var(--ink)]">{t("flow.dag.title")}</h2>
+        <h2 className="text-[13px] font-medium text-text-primary">{t("flow.dag.title")}</h2>
         {runStatus && runStatus !== "pending" && (
           <span
             className={`text-[12px] font-medium ${
               runStatus === "completed"
-                ? "text-[var(--success)]"
+                ? "text-ok"
                 : runStatus === "failed" || runStatus === "cancelled"
-                  ? "text-red-600"
-                  : "text-[var(--clay)]"
+                  ? "text-fail"
+                  : "text-accent"
             }`}
           >
             {progressStatus}
@@ -162,7 +162,7 @@ export function FlowDagView({
       )}
 
       {progressMessage && runStatus === "running" && (
-        <p className="-mt-4 mb-4 text-[12px] leading-relaxed text-[var(--muted)]">{progressMessage}</p>
+        <p className="-mt-4 mb-4 text-[12px] leading-relaxed text-text-secondary">{progressMessage}</p>
       )}
 
       <div className="flex flex-col items-center gap-4 overflow-x-auto py-2">
@@ -173,7 +173,7 @@ export function FlowDagView({
             status={runStatus === "running" ? "running" : runStatus === "completed" || runStatus === "failed" ? "done" : "pending"}
             mono={!!triggerSubtitle}
           />
-          <ChevronRight className="h-5 w-5 shrink-0 text-[var(--muted)]" aria-hidden />
+          <ChevronRight className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
 
           {phases.length === 0 ? (
             <DagNode title={t("flow.dag.empty")} status="pending" />
@@ -186,13 +186,13 @@ export function FlowDagView({
                   status={phase.status ?? "pending"}
                 />
                 {index < phases.length - 1 && (
-                  <ChevronRight className="h-5 w-5 shrink-0 text-[var(--muted)]" aria-hidden />
+                  <ChevronRight className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
                 )}
               </div>
             ))
           )}
 
-          <ChevronRight className="h-5 w-5 shrink-0 text-[var(--muted)]" aria-hidden />
+          <ChevronRight className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
           <DagNode
             title={t("flow.dag.output")}
             status={
@@ -202,14 +202,14 @@ export function FlowDagView({
         </div>
       </div>
 
-      {error && <p className="mt-4 text-[13px] text-red-700">{error}</p>}
+      {error && <p className="mt-4 text-[13px] text-fail">{error}</p>}
 
       {outputPath && runStatus === "completed" && onOpenOutput && (
         <div className="mt-4 flex justify-center">
           <button
             type="button"
             onClick={onOpenOutput}
-            className="cursor-pointer rounded-[22px] border border-[var(--sand)] bg-[var(--cream)] px-4 py-2 text-[13px] text-[var(--ink)] transition-colors hover:border-[var(--clay)]"
+            className="cursor-pointer rounded-[22px] border border-border bg-bg-primary px-4 py-2 text-[13px] text-text-primary transition-colors hover:border-accent"
           >
             {t("flow.viewOutput")}
           </button>

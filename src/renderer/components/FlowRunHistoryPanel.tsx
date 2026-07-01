@@ -32,26 +32,26 @@ export function FlowRunHistoryPanel({ flowId, refreshKey = 0, onSelectRun }: Pro
 
   if (loading && runs.length === 0) {
     return (
-      <section className="rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
-        <h2 className="text-[13px] font-medium text-[var(--ink)]">{t("flow.history.title")}</h2>
-        <p className="mt-3 text-[13px] text-[var(--muted)]">{t("flow.history.loading")}</p>
+      <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card">
+        <h2 className="text-[13px] font-medium text-text-primary">{t("flow.history.title")}</h2>
+        <p className="mt-3 text-[13px] text-text-secondary">{t("flow.history.loading")}</p>
       </section>
     );
   }
 
   if (runs.length === 0) {
     return (
-      <section className="rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
-        <h2 className="text-[13px] font-medium text-[var(--ink)]">{t("flow.history.title")}</h2>
-        <p className="mt-3 text-[13px] text-[var(--muted)]">{t("flow.history.empty")}</p>
+      <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card">
+        <h2 className="text-[13px] font-medium text-text-primary">{t("flow.history.title")}</h2>
+        <p className="mt-3 text-[13px] text-text-secondary">{t("flow.history.empty")}</p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
-      <h2 className="mb-3 text-[13px] font-medium text-[var(--ink)]">{t("flow.history.title")}</h2>
-      <ul className="divide-y divide-[var(--sand)]">
+    <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card">
+      <h2 className="mb-3 text-[13px] font-medium text-text-primary">{t("flow.history.title")}</h2>
+      <ul className="divide-y divide-border">
         {runs.map((run) => {
           const tone = runStatusTone(run.status);
           const duration = formatRunDuration(run.startedAt, run.updatedAt, run.status);
@@ -60,31 +60,31 @@ export function FlowRunHistoryPanel({ flowId, refreshKey = 0, onSelectRun }: Pro
               <button
                 type="button"
                 onClick={() => onSelectRun(run)}
-                className="flex w-full cursor-pointer items-center gap-3 rounded-[16px] px-2 py-2.5 text-left transition-colors hover:bg-[var(--sand-deep)]/50"
+                className="flex w-full cursor-pointer items-center gap-3 rounded-[16px] px-2 py-2.5 text-left transition-colors hover:bg-bg-elevated/50"
               >
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                     tone === "success"
                       ? "bg-[#7FB069]/20 text-[#3d6b32]"
                       : tone === "failed"
-                        ? "bg-red-100 text-red-800"
+                        ? "bg-fail/15 text-fail"
                         : tone === "running"
-                          ? "bg-[var(--sand)] text-[var(--clay-deep)]"
-                          : "bg-[var(--sand-deep)] text-[var(--muted)]"
+                          ? "bg-bg-card text-accent"
+                          : "bg-bg-elevated text-text-secondary"
                   }`}
                 >
                   {t(`flow.status.${run.status}` as "flow.status.completed")}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--ink)]">
+                <span className="min-w-0 flex-1 truncate text-[13px] text-text-primary">
                   {formatRunTimestamp(run.startedAt)}
                 </span>
-                <span className="shrink-0 text-[12px] tabular-nums text-[var(--muted)]">{duration}</span>
-                <span className="shrink-0 text-[11px] tabular-nums text-[var(--muted)]">
+                <span className="shrink-0 text-[12px] tabular-nums text-text-secondary">{duration}</span>
+                <span className="shrink-0 text-[11px] tabular-nums text-text-secondary">
                   {run.progress.total > 0
                     ? formatPhaseSteps(t, run.progress.completed, run.progress.total)
                     : "—"}
                 </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
+                <ChevronRight className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
               </button>
             </li>
           );

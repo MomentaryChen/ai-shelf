@@ -59,10 +59,9 @@ export function FlowScheduleDialog({ flowId, listItem, onClose, onSaved }: Props
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[min(88vh,640px)] max-w-lg flex-col gap-0 overflow-hidden border-[var(--sand)] bg-[var(--surface)] p-0 text-[var(--ink)]"
-        data-surface="warm"
+        className="flex max-h-[min(88vh,640px)] max-w-lg flex-col gap-0 overflow-hidden border-border bg-bg-secondary p-0 text-text-primary"
       >
-        <DialogHeader className="shrink-0 border-b border-[var(--sand)] px-5 py-4 pr-12">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
           <DialogTitle className="text-[15px] font-semibold">
             {t("flow.schedule.dialogTitle", { id: flowId })}
           </DialogTitle>
@@ -70,9 +69,9 @@ export function FlowScheduleDialog({ flowId, listItem, onClose, onSaved }: Props
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-4">
         {loading ? (
-          <p className="py-8 text-center text-[13px] text-[var(--muted)]">{t("flow.source.loading")}</p>
+          <p className="py-8 text-center text-[13px] text-text-secondary">{t("flow.source.loading")}</p>
         ) : loadError ? (
-          <p className="py-8 text-center text-[13px] text-red-700">{loadError}</p>
+          <p className="py-8 text-center text-[13px] text-fail">{loadError}</p>
         ) : (
           <FlowScheduleEditor
             flowId={flowId}

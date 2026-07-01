@@ -74,12 +74,12 @@ export function FlowOutputPanel({
   const displayDate = runStartedAt ?? loadedStartedAt;
 
   return (
-    <section className="rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]">
+    <section className="rounded-[28px] border border-border bg-bg-secondary p-5 shadow-card">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-[13px] font-medium text-[var(--ink)]">{t("flow.output.panelTitle")}</h2>
+          <h2 className="text-[13px] font-medium text-text-primary">{t("flow.output.panelTitle")}</h2>
           {displayDate && hasContent && (
-            <p className="mt-1 text-[12px] text-[var(--muted)]">
+            <p className="mt-1 text-[12px] text-text-secondary">
               {t("flow.output.generatedAt", { date: formatOutputDate(displayDate) })}
             </p>
           )}
@@ -101,7 +101,7 @@ export function FlowOutputPanel({
               type="button"
               variant="ghost"
               size="sm"
-              className="rounded-[22px] text-[12px] text-[var(--muted)]"
+              className="rounded-[22px] text-[12px] text-text-primary"
               onClick={() => void window.api.openPath(outputPath)}
             >
               <ExternalLink className="mr-1 h-3.5 w-3.5" aria-hidden />
@@ -112,25 +112,25 @@ export function FlowOutputPanel({
       </div>
 
       {inProgress && (
-        <p className="mb-3 rounded-[16px] border border-[var(--sand)] bg-[var(--cream)] px-3 py-2 text-[12px] text-[var(--muted)]">
+        <p className="mb-3 rounded-[16px] border border-border bg-bg-primary px-3 py-2 text-[12px] text-text-secondary">
           {t("flow.output.inProgress")}
         </p>
       )}
 
       {loading ? (
-        <p className="py-8 text-center text-[13px] text-[var(--muted)]">{t("flow.output.loading")}</p>
+        <p className="py-8 text-center text-[13px] text-text-secondary">{t("flow.output.loading")}</p>
       ) : waiting && !hasContent ? (
-        <div className="rounded-[20px] border border-dashed border-[var(--sand)] bg-[var(--cream)] px-4 py-8 text-center">
-          <p className="text-[13px] text-[var(--muted)]">{t("flow.output.waiting")}</p>
+        <div className="rounded-[20px] border border-dashed border-border bg-bg-primary px-4 py-8 text-center">
+          <p className="text-[13px] text-text-secondary">{t("flow.output.waiting")}</p>
         </div>
       ) : error && !hasContent ? (
-        <p className="py-6 text-center text-[13px] text-red-700">{error}</p>
+        <p className="py-6 text-center text-[13px] text-fail">{error}</p>
       ) : hasContent ? (
-        <div className="max-h-[min(520px,55vh)] overflow-y-auto rounded-[20px] border border-[var(--sand)] bg-[var(--cream)] px-5 py-4">
+        <div className="max-h-[min(520px,55vh)] overflow-y-auto rounded-[20px] border border-border bg-bg-primary px-5 py-4">
           <FlowMarkdownContent content={content!} />
         </div>
       ) : (
-        <p className="py-6 text-center text-[13px] text-[var(--muted)]">{t("flow.output.noOutput")}</p>
+        <p className="py-6 text-center text-[13px] text-text-secondary">{t("flow.output.noOutput")}</p>
       )}
     </section>
   );

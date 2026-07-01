@@ -62,24 +62,23 @@ export function FlowOutputDialog({ filePath, runId, onClose }: Props) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[85vh] max-w-3xl flex-col border-[var(--sand)] bg-[var(--surface)] text-[var(--ink)]"
-        data-surface="warm"
+        className="flex max-h-[85vh] max-w-3xl flex-col border-border bg-bg-secondary text-text-primary"
       >
         <DialogHeader>
           <DialogTitle className="text-[15px] font-semibold">{t("flow.output.title")}</DialogTitle>
         </DialogHeader>
-        <p className="break-all font-mono text-[11px] text-[var(--muted)]">{filePath}</p>
+        <p className="break-all font-mono text-[11px] text-text-secondary">{filePath}</p>
 
         {loading ? (
-          <div className="py-16 text-center text-[13px] text-[var(--muted)]">{t("flow.output.loading")}</div>
+          <div className="py-16 text-center text-[13px] text-text-secondary">{t("flow.output.loading")}</div>
         ) : error ? (
-          <div className="py-12 text-center text-[13px] text-red-700">{error}</div>
+          <div className="py-12 text-center text-[13px] text-fail">{error}</div>
         ) : (
-          <div className="min-h-[280px] flex-1 overflow-auto rounded-[20px] border border-[var(--sand)] bg-[var(--cream)] px-5 py-4">
+          <div className="min-h-[280px] flex-1 overflow-auto rounded-[20px] border border-border bg-bg-primary px-5 py-4">
             {content.trim() ? (
               <FlowMarkdownContent content={content} />
             ) : (
-              <p className="text-[13px] text-[var(--muted)]">{t("flow.output.empty")}</p>
+              <p className="text-[13px] text-text-secondary">{t("flow.output.empty")}</p>
             )}
           </div>
         )}

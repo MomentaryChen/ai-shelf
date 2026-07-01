@@ -31,7 +31,7 @@ function TypingDots() {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="inline-block h-1.5 w-1.5 rounded-full bg-[#C0A98D] motion-safe:animate-[warm-dot-blink_1.2s_ease-in-out_infinite]"
+          className="inline-block h-1.5 w-1.5 rounded-full bg-text-tertiary motion-safe:animate-[warm-dot-blink_1.2s_ease-in-out_infinite]"
           style={{ animationDelay: `${i * 0.2}s` }}
         />
       ))}
@@ -195,15 +195,15 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4" data-surface="warm">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-2 px-1">
         <div>
-          <h1 className="text-[17px] font-semibold text-[var(--ink)]">
+          <h1 className="text-[17px] font-semibold text-text-primary">
             {isExisting ? t("flow.create.editTitle", { id: flowId! }) : t("flow.create.title")}
           </h1>
-          <p className="mt-1 text-[13px] text-[var(--muted)]">{t("flow.create.subtitle")}</p>
+          <p className="mt-1 text-[13px] text-text-secondary">{t("flow.create.subtitle")}</p>
           {promptLogCount > 0 && (
-            <p className="mt-1 text-[11px] text-[var(--muted)]">
+            <p className="mt-1 text-[11px] text-text-secondary">
               {t("flow.chat.promptLogCount", { count: promptLogCount })}
             </p>
           )}
@@ -217,10 +217,10 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-[28px] border border-border bg-bg-secondary p-5 shadow-card"
       >
         {loadingChat ? (
-          <p className="py-8 text-center text-[13px] text-[var(--muted)]">{t("flow.chat.loading")}</p>
+          <p className="py-8 text-center text-[13px] text-text-secondary">{t("flow.chat.loading")}</p>
         ) : (
           messages.map((msg) => {
             const isUser = msg.role === "user";
@@ -232,15 +232,15 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
                 <div
                   className={`max-w-[78%] px-4 py-3 text-[15px] leading-relaxed ${
                     isUser
-                      ? "rounded-[20px] rounded-br-[6px] bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white shadow-[var(--shadow-accent)]"
+                      ? "rounded-[20px] rounded-br-[6px] bg-primary text-primary-foreground shadow-card"
                       : msg.error
-                        ? "rounded-[20px] rounded-bl-[6px] border border-red-200 bg-red-50 text-red-800"
-                        : "rounded-[20px] rounded-bl-[6px] bg-[var(--sand)] text-[var(--ink)]"
+                        ? "rounded-[20px] rounded-bl-[6px] border border-fail/30 bg-fail/10 text-fail"
+                        : "rounded-[20px] rounded-bl-[6px] bg-bg-card text-text-primary"
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                   {msg.draft && (
-                    <pre className="mt-3 max-h-48 overflow-auto rounded-[16px] bg-[var(--cream)] p-3 font-mono text-[11px] leading-relaxed text-[var(--ink)]">
+                    <pre className="mt-3 max-h-48 overflow-auto rounded-[16px] bg-bg-primary p-3 font-mono text-[11px] leading-relaxed text-text-primary">
                       {msg.draft}
                     </pre>
                   )}
@@ -251,7 +251,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
         )}
         {generating && (
           <div className="flex justify-start">
-            <div className="rounded-[20px] rounded-bl-[6px] bg-[var(--sand)] px-4 py-3 text-[var(--ink)]">
+            <div className="rounded-[20px] rounded-bl-[6px] bg-bg-card px-4 py-3 text-text-primary">
               <TypingDots />
             </div>
           </div>
@@ -259,8 +259,8 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
       </div>
 
       {draft && (
-        <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-[var(--sand)] bg-[var(--surface)] px-4 py-3">
-          <span className="text-[13px] text-[var(--muted)]">{t("flow.create.previewHint")}</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-border bg-bg-secondary px-4 py-3">
+          <span className="text-[13px] text-text-secondary">{t("flow.create.previewHint")}</span>
           <div className="ml-auto flex flex-wrap gap-2">
             {!isExisting && (
               <Button
@@ -277,7 +277,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
             <Button
               type="button"
               size="sm"
-              className="rounded-[22px] bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white"
+              className="rounded-[22px]"
               disabled={saving}
               onClick={() => void saveDraft(isExisting)}
             >
@@ -287,7 +287,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
         </div>
       )}
       {saveError && (
-        <p className="rounded-[20px] border border-red-200 bg-red-50/80 px-4 py-2 text-[13px] text-red-800">
+        <p className="rounded-[20px] border border-fail/30 bg-fail/10 px-4 py-2 text-[13px] text-fail">
           {saveError}
         </p>
       )}
@@ -300,7 +300,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
           placeholder={t("flow.create.placeholder")}
           disabled={generating || loadingChat}
           rows={2}
-          className="min-h-[52px] max-h-40 flex-1 resize-none rounded-[22px] border-[var(--sand)] bg-[var(--cream)] text-[15px] text-[var(--ink)] placeholder:text-[var(--muted)] focus-visible:ring-[var(--clay)]/35"
+          className="min-h-[52px] max-h-40 flex-1 resize-none rounded-[22px] border-border bg-bg-primary text-[15px] text-text-primary placeholder:text-text-secondary focus-visible:ring-accent/35"
         />
         <Button
           type="button"
@@ -308,7 +308,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
           aria-label={t("flow.create.send")}
           disabled={generating || loadingChat || !input.trim()}
           onClick={() => void send()}
-          className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white shadow-[var(--shadow-accent)] active:scale-90"
+          className="h-11 w-11 shrink-0 rounded-full active:scale-90"
         >
           <Send className="h-4 w-4" />
         </Button>
