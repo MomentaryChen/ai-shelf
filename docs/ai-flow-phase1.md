@@ -67,7 +67,7 @@ flow-scheduler.ts (Electron main, 60s interval)
   → runDueFlows() when schedulerEnabled
 
 ai-shelf flow due (CLI / Task Scheduler)
-  → runDueFlows() (ignores schedulerEnabled toggle)
+  → runDueFlows() when schedulerEnabled
 
 src/flow/core.ts
   → parse .flow.md, run http/claude, state.json, notify on fail
