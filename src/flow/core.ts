@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { getAppDataDir } from "ai-shelf";
 import { cronNextRun, shouldRunFlowNow } from "../shared/flow-cron.js";
 import { parseFlowDocument } from "../shared/flow-parse.js";
-import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX, buildRunnerPrompt } from "../shared/flow-protocol.js";
+import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX } from "../shared/flow-protocol.js";
 import {
   readFlowLastSlot,
   readFlowSchedulePrefs,
@@ -33,6 +33,8 @@ import { notifyFlowRunFailed, notifyFlowRunCompleted } from "./flow-notify.js";
 import { patchFlowScheduleInContent, patchFlowRunnerInContent } from "../shared/flow-frontmatter-patch.js";
 import { prepareFlowAgentSpawn } from "./mcp-config.js";
 import { resolveFlowRunner } from "./flow-runner-resolve.js";
+import { buildFallbackOutputMarkdown, writeRunOutputIfMissing } from "./flow-output.js";
+import { buildFlowRunPrompt } from "./flow-system-skills.js";
 import { spawnAgentPrint } from "./claude-spawn.js";
 import {
   deleteFlowChatData,
@@ -472,6 +474,10 @@ async function executeHttpFlow(
   if (!url) {
     state.status = "failed";
     state.error = "HTTP runner requires frontmatter url";
+    ensureRunOutput(flow, state, outputPath, runDir, {
+      status: "failed",
+      error: state.error,
+    });
     appendEvent(runDir, { type: "run.failed", error: state.error });
     writeState(runDir, state);
     return;
@@ -543,10 +549,14 @@ async function executeHttpFlow(
     }
     state.status = "failed";
     state.error = message;
+    ensureRunOutput(flow, state, outputPath, runDir, { status: "failed", error: message });
     appendEvent(runDir, { type: "run.failed", error: message });
   }
 
   if (ctx.cancelled) return;
+  if (state.status === "failed") {
+    ensureRunOutput(flow, state, outputPath, runDir, { status: "failed", error: state.error });
+  }
   ensureOutputPathOnState(state, runDir);
   writeState(runDir, state);
 }
@@ -577,7 +587,7 @@ async function executeFlowRun(
     return;
   }
 
-  const prompt = buildRunnerPrompt(flow.body, flow.phases.map((p) => p.id));
+  const prompt = buildFlowRunPrompt(flow.body, flow.phases.map((p) => p.id));
 
   writeFileSync(join(runDir, "prompt.md"), prompt, "utf8");
 
@@ -628,6 +638,7 @@ async function executeFlowRun(
       const message = err instanceof Error ? err.message : String(err);
       state.status = "failed";
       state.error = message;
+      ensureRunOutput(flow, state, outputPath, runDir, { status: "failed", error: message });
       appendEvent(runDir, { type: "run.failed", error: message });
       writeState(runDir, state);
       finish();
@@ -640,6 +651,12 @@ async function executeFlowRun(
       killRunChild(child);
       state.status = "failed";
       state.error = `Timed out after ${flow.timeoutSec}s`;
+      ensureRunOutput(flow, state, outputPath, runDir, {
+        status: "failed",
+        error: state.error,
+        stderr,
+        partialStdout: outputChunks.join("\n").trim() || stdoutBuf.trim(),
+      });
       appendEvent(runDir, { type: "run.failed", error: state.error });
       writeState(runDir, state);
       finish();
@@ -684,6 +701,12 @@ async function executeFlowRun(
           state.status = "failed";
           state.error = stderr.trim() || `claude exited with code ${code ?? "unknown"}`;
         }
+        ensureRunOutput(flow, state, outputPath, runDir, {
+          status: "failed",
+          error: state.error,
+          stderr,
+          partialStdout: body || stdoutBuf.trim(),
+        });
         appendEvent(runDir, { type: "run.failed", error: state.error });
       } else {
         for (const phase of state.phases) {
@@ -695,6 +718,20 @@ async function executeFlowRun(
         recomputeRunProgress(state);
         state.status = "completed";
         state.currentPhaseId = null;
+        if (!state.outputPath) {
+          const captured = body || stdoutBuf.trim();
+          writeRunOutputIfMissing(
+            state,
+            outputPath,
+            captured ||
+              buildFallbackOutputMarkdown({
+                flowId: flow.id,
+                runId: state.runId,
+                status: "failed",
+                error: "Agent completed without flow_output",
+              }),
+          );
+        }
         appendEvent(runDir, { type: "run.completed", outputPath: state.outputPath });
       }
 
@@ -710,6 +747,12 @@ async function executeFlowRun(
       }
       state.status = "failed";
       state.error = err.message;
+      ensureRunOutput(flow, state, outputPath, runDir, {
+        status: "failed",
+        error: err.message,
+        stderr,
+        partialStdout: outputChunks.join("\n").trim() || stdoutBuf.trim(),
+      });
       appendEvent(runDir, { type: "run.failed", error: state.error });
       writeState(runDir, state);
       finish();
@@ -757,6 +800,38 @@ function ensureOutputPathOnState(state: FlowRunState, runDir: string): void {
   const fallback = join(runDir, "output.md");
   if (existsSync(fallback)) {
     state.outputPath = fallback;
+  }
+}
+
+function ensureRunOutput(
+  flow: FlowDefinition,
+  state: FlowRunState,
+  outputPath: string,
+  runDir: string,
+  details: {
+    status: "failed" | "cancelled";
+    error?: string | null;
+    stderr?: string;
+    partialStdout?: string;
+  },
+): void {
+  if (writeRunOutputIfMissing(
+    state,
+    outputPath,
+    buildFallbackOutputMarkdown({
+      flowId: flow.id,
+      runId: state.runId,
+      status: details.status,
+      error: details.error ?? state.error,
+      stderr: details.stderr,
+      partialStdout: details.partialStdout,
+    }),
+  )) {
+    appendEvent(runDir, {
+      type: "flow.output",
+      outputPath: state.outputPath,
+      source: "runner",
+    });
   }
 }
 

@@ -12,7 +12,7 @@
     "ai": "dist/cli.js"
   },
   "scripts": {
-    "build": "pnpm build:cli && tsc && tsc -p src/renderer/tsconfig.json && vite build && node -e \"const fs=require('fs');const path=require('path');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');const flowSrc='src/assets/flows';const flowDest='dist/assets/flows';fs.mkdirSync(flowDest,{recursive:true});for(const f of fs.readdirSync(flowSrc).filter(n=>n.endsWith('.flow.md'))){fs.copyFileSync(path.join(flowSrc,f),path.join(flowDest,f));}\"",
+    "build": "pnpm build:cli && tsc && tsc -p src/renderer/tsconfig.json && vite build && node -e \"const fs=require('fs');const path=require('path');function copyDir(s,d){fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const a=path.join(s,e.name),b=path.join(d,e.name);e.isDirectory()?copyDir(a,b):fs.copyFileSync(a,b);}}fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');const flowSrc='src/assets/flows';const flowDest='dist/assets/flows';fs.mkdirSync(flowDest,{recursive:true});for(const f of fs.readdirSync(flowSrc).filter(n=>n.endsWith('.flow.md'))){fs.copyFileSync(path.join(flowSrc,f),path.join(flowDest,f));}const sysSrc='src/flow/system-skills';const sysDest='dist/flow/system-skills';if(fs.existsSync(sysSrc))copyDir(sysSrc,sysDest);\"",
     "build:cli": "pnpm --filter ai-shelf run build",
     "build:desktop": "pnpm run build",
     "typecheck": "tsc --noEmit && tsc -p src/renderer/tsconfig.json",

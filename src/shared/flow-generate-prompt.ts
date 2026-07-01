@@ -26,6 +26,7 @@ Body rules:
 - Markdown prompt for the Claude agent when runner is claude
 - Mark steps with 【phase-id】 matching phases[].id
 - Instruct the agent to use MCP tools flow_progress and flow_output (not stdout FLOW_PROGRESS)
+- System skills (e.g. mandatory output) are injected by the runner — do not duplicate in frontmatter
 
 Output format:
 - Reply with ONLY the complete .flow.md inside a \`\`\`markdown fenced block
