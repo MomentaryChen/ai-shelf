@@ -816,9 +816,14 @@ export const en = {
   "flow.progress.noPhases": "No phases",
   "flow.progress.starting": "Starting agent…",
   "flow.progress.finishing": "Writing output…",
-  "flow.scheduler.enabled": "Global scheduler master switch",
+  "flow.scheduler.title": "Scheduled runs",
+  "flow.scheduler.hint":
+    "Turn off to pause all cron runs while the app is open or closed. Each flow still keeps its own cron.",
+  "flow.scheduler.enabled": "Enable scheduled runs",
+  "flow.scheduler.paused": "Paused — in-app checks and the Windows due job will not start flows.",
   "flow.taskScheduler.title": "Run when app is closed",
-  "flow.taskScheduler.hint": "Create a Windows Task Scheduler job that runs flow due every minute while the app is closed.",
+  "flow.taskScheduler.hint":
+    "Optional Windows Task Scheduler job that runs flow due every minute. Requires scheduled runs enabled above.",
   "flow.taskScheduler.installed": "Configured: {name}",
   "flow.taskScheduler.notInstalled": "Not configured",
   "flow.taskScheduler.install": "Set up Task Scheduler",
@@ -833,7 +838,8 @@ export const en = {
   "flow.schedule.title": "Schedule for this flow",
   "flow.schedule.dialogTitle": "Schedule: {id}",
   "flow.schedule.open": "Edit schedule",
-  "flow.schedule.hint": "Each flow has its own cron. The sidebar switch only enables in-app due checks.",
+  "flow.schedule.hint":
+    "Each flow has its own cron. Scheduled runs and headless setup are in the sidebar scheduling panel.",
   "flow.schedule.enabled": "Run on schedule",
   "flow.schedule.cron": "Cron expression",
   "flow.schedule.timezone": "Timezone",

@@ -15,7 +15,11 @@ import { getAppDataDir } from "ai-shelf";
 import { cronNextRun, shouldRunFlowNow } from "../shared/flow-cron.js";
 import { parseFlowDocument } from "../shared/flow-parse.js";
 import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX, buildRunnerPrompt } from "../shared/flow-protocol.js";
-import { readFlowLastSlot, writeFlowLastSlot } from "../shared/flow-schedule-pref.js";
+import {
+  readFlowLastSlot,
+  readFlowSchedulePrefs,
+  writeFlowLastSlot,
+} from "../shared/flow-schedule-pref.js";
 import {
   FLOW_RUN_STATE_SCHEMA,
   type FlowDefinition,
@@ -415,8 +419,12 @@ export type RunDueFlowsResult = {
 };
 
 export async function runDueFlows(now = new Date()): Promise<RunDueFlowsResult> {
-  initFlowDirs();
   const result: RunDueFlowsResult = { checked: 0, started: [], skipped: [], errors: [] };
+  if (!readFlowSchedulePrefs().schedulerEnabled) {
+    return result;
+  }
+
+  initFlowDirs();
   const files = readdirSync(flowsDir()).filter((f) => f.endsWith(".flow.md"));
 
   for (const fileName of files.sort()) {

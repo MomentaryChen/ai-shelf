@@ -20,6 +20,7 @@ import { FlowRunDetailDialog } from "./FlowRunDetailDialog";
 import { FlowRunHistoryPanel } from "./FlowRunHistoryPanel";
 import { FlowRunnerSettingsDialog } from "./FlowRunnerSettingsDialog";
 import { FlowScheduleDialog } from "./FlowScheduleDialog";
+import { FlowSchedulerPanel } from "./FlowSchedulerPanel";
 import { FlowSourceDialog } from "./FlowSourceDialog";
 import { Spinner } from "./Spinner";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -472,54 +473,15 @@ export function FlowTab() {
         })}
         </div>
         <div className="mt-auto flex shrink-0 flex-col gap-2 border-t border-border pt-2">
-          <label className="flex cursor-pointer items-center gap-2 rounded-[22px] px-2 py-2 text-[12px] text-text-secondary hover:bg-bg-elevated">
-            <input
-              type="checkbox"
-              className="size-4 rounded accent-accent"
-              checked={schedulerEnabled}
-              disabled={schedulerSaving}
-              onChange={() => void handleSchedulerToggle()}
-            />
-            <span>{t("flow.scheduler.enabled")}</span>
-          </label>
-          {taskScheduler?.supported && (
-            <div className="rounded-[20px] border border-border bg-bg-primary px-3 py-2.5">
-              <div className="text-[12px] font-medium text-text-primary">{t("flow.taskScheduler.title")}</div>
-              <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">
-                {t("flow.taskScheduler.hint")}
-              </p>
-              <p className="mt-2 text-[11px] text-text-secondary">
-                {taskScheduler.installed
-                  ? t("flow.taskScheduler.installed", { name: taskScheduler.taskName })
-                  : t("flow.taskScheduler.notInstalled")}
-              </p>
-              <div className="mt-2 flex flex-col gap-1.5">
-                {!taskScheduler.installed ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full rounded-[22px] border-border text-[12px]"
-                    disabled={taskSchedulerBusy}
-                    onClick={() => void handleInstallTaskScheduler()}
-                  >
-                    {taskSchedulerBusy ? t("flow.taskScheduler.installing") : t("flow.taskScheduler.install")}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full rounded-[22px] border-border text-[12px]"
-                    disabled={taskSchedulerBusy}
-                    onClick={() => void handleRemoveTaskScheduler()}
-                  >
-                    {taskSchedulerBusy ? t("flow.taskScheduler.removing") : t("flow.taskScheduler.remove")}
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
+          <FlowSchedulerPanel
+            schedulerEnabled={schedulerEnabled}
+            schedulerSaving={schedulerSaving}
+            onSchedulerToggle={() => void handleSchedulerToggle()}
+            taskScheduler={taskScheduler}
+            taskSchedulerBusy={taskSchedulerBusy}
+            onInstallTaskScheduler={() => void handleInstallTaskScheduler()}
+            onRemoveTaskScheduler={() => void handleRemoveTaskScheduler()}
+          />
           <Button type="button" variant="outline" size="sm" className="w-full" onClick={openFlowsFolder}>
             {t("flow.openFolder")}
           </Button>
