@@ -396,16 +396,15 @@ export function FlowTab() {
 
   return (
     <div
-      className="flex h-full min-h-0 overflow-hidden bg-[var(--cream)] text-[var(--ink)]"
-      data-surface="warm"
+      className="flex h-full min-h-0 overflow-hidden bg-bg-primary text-text-primary"
     >
-      <aside className="flex w-60 min-h-0 shrink-0 flex-col gap-1 border-r border-[var(--sand)] bg-[var(--surface)] p-3">
-        <div className="shrink-0 px-1 pb-2 text-[13px] font-medium text-[var(--ink)]">{t("flow.sidebar.title")}</div>
+      <aside className="flex w-60 min-h-0 shrink-0 flex-col gap-1 border-r border-border bg-bg-secondary p-3">
+        <div className="shrink-0 px-1 pb-2 text-[13px] font-medium text-text-primary">{t("flow.sidebar.title")}</div>
         <Button
           type="button"
           size="sm"
           variant="outline"
-          className="mb-1 w-full shrink-0 rounded-[22px] border-[var(--sand)] text-[13px]"
+          className="mb-1 w-full shrink-0 rounded-[22px] border-border text-[13px]"
           onClick={() => {
             setChatFlowId(undefined);
             setCreateOpen(true);
@@ -417,7 +416,7 @@ export function FlowTab() {
         {loading && <Spinner label={t("flow.loading")} />}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         {!loading && flows.length === 0 && (
-          <p className="px-1 text-[13px] text-[var(--muted)]">{t("flow.empty")}</p>
+          <p className="px-1 text-[13px] text-text-secondary">{t("flow.empty")}</p>
         )}
         {flows.map((flow) => {
           const isSelected = selectedId === flow.id;
@@ -426,27 +425,27 @@ export function FlowTab() {
             <div
               key={flow.id}
               className={`flex items-stretch gap-0.5 rounded-[22px] ${
-                isSelected ? "bg-[var(--sand)]" : "hover:bg-[var(--sand-deep)]/60"
+                isSelected ? "bg-bg-card" : "hover:bg-bg-elevated/60"
               }`}
             >
               <button
                 type="button"
                 onClick={() => setSelectedId(flow.id)}
                 className={`min-w-0 flex-1 cursor-pointer px-3 py-2 text-left text-[13px] transition-colors duration-200 ${
-                  isSelected ? "font-medium text-[var(--ink)]" : "text-[var(--muted)] hover:text-[var(--ink)]"
+                  isSelected ? "font-medium text-text-primary" : "text-text-secondary hover:text-text-primary"
                 }`}
               >
                 <div className="flex items-center gap-1.5 truncate">
                   {flowLive && (
                     <span
-                      className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[var(--clay)]"
+                      className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent"
                       title={t("flow.running")}
                       aria-hidden
                     />
                   )}
                   <span className="truncate">{flow.id}</span>
                 </div>
-                <div className="mt-0.5 truncate text-[11px] text-[var(--muted)]">
+                <div className="mt-0.5 truncate text-[11px] text-text-secondary">
                   {flow.schedule ?? t("flow.manualOnly")}
                 </div>
               </button>
@@ -455,7 +454,7 @@ export function FlowTab() {
                 title={t("flow.runner.open")}
                 aria-label={t("flow.runner.open")}
                 onClick={() => setRunnerFlowId(flow.id)}
-                className="flex shrink-0 cursor-pointer items-center justify-center rounded-[18px] px-2 text-[var(--muted)] transition-colors hover:bg-[var(--sand-deep)] hover:text-[var(--clay)]"
+                className="flex shrink-0 cursor-pointer items-center justify-center rounded-[18px] px-2 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-accent"
               >
                 <Terminal className="h-4 w-4" aria-hidden />
               </button>
@@ -464,7 +463,7 @@ export function FlowTab() {
                 title={t("flow.schedule.open")}
                 aria-label={t("flow.schedule.open")}
                 onClick={() => setScheduleFlowId(flow.id)}
-                className="flex shrink-0 cursor-pointer items-center justify-center rounded-[18px] px-2 text-[var(--muted)] transition-colors hover:bg-[var(--sand-deep)] hover:text-[var(--clay)]"
+                className="flex shrink-0 cursor-pointer items-center justify-center rounded-[18px] px-2 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-accent"
               >
                 <Clock className="h-4 w-4" aria-hidden />
               </button>
@@ -472,11 +471,11 @@ export function FlowTab() {
           );
         })}
         </div>
-        <div className="mt-auto flex shrink-0 flex-col gap-2 border-t border-[var(--sand)] pt-2">
-          <label className="flex cursor-pointer items-center gap-2 rounded-[22px] px-2 py-2 text-[12px] text-[var(--muted)] hover:bg-[var(--sand-deep)]">
+        <div className="mt-auto flex shrink-0 flex-col gap-2 border-t border-border pt-2">
+          <label className="flex cursor-pointer items-center gap-2 rounded-[22px] px-2 py-2 text-[12px] text-text-secondary hover:bg-bg-elevated">
             <input
               type="checkbox"
-              className="size-4 rounded accent-[var(--clay)]"
+              className="size-4 rounded accent-accent"
               checked={schedulerEnabled}
               disabled={schedulerSaving}
               onChange={() => void handleSchedulerToggle()}
@@ -484,12 +483,12 @@ export function FlowTab() {
             <span>{t("flow.scheduler.enabled")}</span>
           </label>
           {taskScheduler?.supported && (
-            <div className="rounded-[20px] border border-[var(--sand)] bg-[var(--cream)] px-3 py-2.5">
-              <div className="text-[12px] font-medium text-[var(--ink)]">{t("flow.taskScheduler.title")}</div>
-              <p className="mt-1 text-[11px] leading-relaxed text-[var(--muted)]">
+            <div className="rounded-[20px] border border-border bg-bg-primary px-3 py-2.5">
+              <div className="text-[12px] font-medium text-text-primary">{t("flow.taskScheduler.title")}</div>
+              <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">
                 {t("flow.taskScheduler.hint")}
               </p>
-              <p className="mt-2 text-[11px] text-[var(--muted)]">
+              <p className="mt-2 text-[11px] text-text-secondary">
                 {taskScheduler.installed
                   ? t("flow.taskScheduler.installed", { name: taskScheduler.taskName })
                   : t("flow.taskScheduler.notInstalled")}
@@ -500,7 +499,7 @@ export function FlowTab() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full rounded-[22px] border-[var(--sand)] text-[12px]"
+                    className="w-full rounded-[22px] border-border text-[12px]"
                     disabled={taskSchedulerBusy}
                     onClick={() => void handleInstallTaskScheduler()}
                   >
@@ -511,7 +510,7 @@ export function FlowTab() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full rounded-[22px] border-[var(--sand)] text-[12px]"
+                    className="w-full rounded-[22px] border-border text-[12px]"
                     disabled={taskSchedulerBusy}
                     onClick={() => void handleRemoveTaskScheduler()}
                   >
@@ -555,7 +554,7 @@ export function FlowTab() {
           {!showCreate && selected && flowDef && (
             <>
               <header className="flex flex-wrap items-center justify-between gap-2 px-1">
-                <h1 className="truncate text-[15px] font-semibold text-[var(--ink)]">{selected.id}</h1>
+                <h1 className="truncate text-[15px] font-semibold text-text-primary">{selected.id}</h1>
                 <div className="flex flex-wrap items-center gap-2">
                   {panelOutputRunId && (
                     <Button
@@ -601,7 +600,7 @@ export function FlowTab() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="rounded-[22px] text-red-700 hover:border-red-300 hover:bg-red-50"
+                    className="rounded-[22px] text-fail hover:border-fail/40 hover:bg-fail/10"
                     disabled={selectedRunning}
                     onClick={() => setDeleteOpen(true)}
                   >
@@ -611,7 +610,7 @@ export function FlowTab() {
                     type="button"
                     disabled={selectedRunning || !selected.enabled}
                     onClick={() => void handleRun()}
-                    className="rounded-[22px] bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white shadow-[var(--shadow-accent)]"
+                    className="rounded-[22px]"
                   >
                     {selectedRunning ? t("flow.running") : t("flow.run")}
                   </Button>
@@ -622,7 +621,7 @@ export function FlowTab() {
                       size="sm"
                       disabled={selectedCancelling}
                       onClick={() => void handleCancel()}
-                      className="rounded-[22px] border-red-300 text-red-700 hover:bg-red-50"
+                      className="rounded-[22px] border-fail/40 text-fail hover:bg-fail/10"
                     >
                       {selectedCancelling ? t("flow.cancelling") : t("flow.cancel")}
                     </Button>
@@ -631,7 +630,7 @@ export function FlowTab() {
               </header>
 
               {selectedError && !showLiveRun && (
-                <p className="rounded-[20px] border border-red-200 bg-red-50/80 px-4 py-3 text-[13px] text-red-800">
+                <p className="rounded-[20px] border border-fail/30 bg-fail/10 px-4 py-3 text-[13px] text-fail">
                   {selectedError}
                 </p>
               )}
@@ -740,13 +739,12 @@ export function FlowTab() {
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent
-          className="max-w-md border-[var(--sand)] bg-[var(--surface)] text-[var(--ink)]"
-          data-surface="warm"
+          className="max-w-md border-border bg-bg-secondary text-text-primary"
         >
           <DialogHeader>
             <DialogTitle className="text-[15px] font-semibold">{t("flow.delete.title")}</DialogTitle>
           </DialogHeader>
-          <p className="text-[13px] leading-relaxed text-[var(--muted)]">
+          <p className="text-[13px] leading-relaxed text-text-secondary">
             {t("flow.delete.body", { id: selected?.id ?? "" })}
           </p>
           <DialogFooter className="gap-2">
@@ -761,8 +759,9 @@ export function FlowTab() {
             </Button>
             <Button
               type="button"
+              variant="destructive"
               size="sm"
-              className="rounded-[22px] bg-red-600 text-white hover:bg-red-700"
+              className="rounded-[22px]"
               disabled={deleting}
               onClick={() => void handleDelete()}
             >

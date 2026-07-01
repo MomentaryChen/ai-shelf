@@ -98,18 +98,17 @@ export function FlowRunnerSettingsDialog({ flowId, onClose, onSaved }: Props) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[min(88vh,760px)] max-w-lg flex-col gap-0 overflow-hidden border-[var(--sand)] bg-[var(--surface)] p-0 text-[var(--ink)]"
-        data-surface="warm"
+        className="flex max-h-[min(88vh,760px)] max-w-lg flex-col gap-0 overflow-hidden border-border bg-bg-secondary p-0 text-text-primary"
       >
-        <DialogHeader className="shrink-0 border-b border-[var(--sand)] px-5 py-4 pr-12">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
           <DialogTitle className="text-[15px] font-semibold">{title}</DialogTitle>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col px-5 py-4">
           {loading ? (
-            <p className="py-8 text-center text-[13px] text-[var(--muted)]">{t("flow.source.loading")}</p>
+            <p className="py-8 text-center text-[13px] text-text-secondary">{t("flow.source.loading")}</p>
           ) : loadError ? (
-            <p className="py-8 text-center text-[13px] text-red-700">{loadError}</p>
+            <p className="py-8 text-center text-[13px] text-fail">{loadError}</p>
           ) : flowDef ? (
             <FlowRunnerSettingsEditor
               flowId={flowId}

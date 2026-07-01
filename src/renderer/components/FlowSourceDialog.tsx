@@ -74,31 +74,30 @@ export function FlowSourceDialog({ flowId, onClose, onSaved }: Props) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[85vh] max-w-3xl flex-col border-[var(--sand)] bg-[var(--surface)] text-[var(--ink)]"
-        data-surface="warm"
+        className="flex max-h-[85vh] max-w-3xl flex-col border-border bg-bg-secondary text-text-primary"
       >
         <DialogHeader>
-          <DialogTitle className="text-[15px] font-semibold text-[var(--ink)]">
+          <DialogTitle className="text-[15px] font-semibold text-text-primary">
             {t("flow.source.title")}
           </DialogTitle>
         </DialogHeader>
         {path && (
-          <p className="break-all font-mono text-[11px] text-[var(--muted)]">{path}</p>
+          <p className="break-all font-mono text-[11px] text-text-secondary">{path}</p>
         )}
 
         {loading ? (
-          <div className="py-12 text-center text-[13px] text-[var(--muted)]">{t("flow.source.loading")}</div>
+          <div className="py-12 text-center text-[13px] text-text-secondary">{t("flow.source.loading")}</div>
         ) : loadError ? (
-          <div className="py-12 text-center text-[13px] text-red-700">{loadError}</div>
+          <div className="py-12 text-center text-[13px] text-fail">{loadError}</div>
         ) : (
           <>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               spellCheck={false}
-              className="min-h-[360px] flex-1 resize-none rounded-[20px] border-[var(--sand)] bg-[var(--cream)] font-mono text-[12px] leading-relaxed text-[var(--ink)]"
+              className="min-h-[360px] flex-1 resize-none rounded-[20px] border-border bg-bg-primary font-mono text-[12px] leading-relaxed text-text-primary"
             />
-            {saveError && <p className="break-all text-[12px] text-red-700">{saveError}</p>}
+            {saveError && <p className="break-all text-[12px] text-fail">{saveError}</p>}
             <DialogFooter className="gap-2 sm:justify-between">
               <Button
                 type="button"
@@ -116,7 +115,7 @@ export function FlowSourceDialog({ flowId, onClose, onSaved }: Props) {
                 <Button
                   type="button"
                   size="sm"
-                  className="rounded-[22px] bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white"
+                  className="rounded-[22px]"
                   onClick={() => void save()}
                   disabled={saving || !dirty}
                 >
