@@ -2,6 +2,7 @@ import type { FlowDefinition, FlowRunState } from "../shared/flow-types.js";
 
 export type FlowNotifyHooks = {
   onRunFailed?: (flow: FlowDefinition, state: FlowRunState) => void | Promise<void>;
+  onRunCompleted?: (flow: FlowDefinition, state: FlowRunState) => void | Promise<void>;
 };
 
 let hooks: FlowNotifyHooks = {};
@@ -18,6 +19,13 @@ export async function notifyFlowRunFailed(
     await postSlackWebhook(flow, state);
   }
   await hooks.onRunFailed?.(flow, state);
+}
+
+export async function notifyFlowRunCompleted(
+  flow: FlowDefinition,
+  state: FlowRunState,
+): Promise<void> {
+  await hooks.onRunCompleted?.(flow, state);
 }
 
 async function postSlackWebhook(flow: FlowDefinition, state: FlowRunState): Promise<void> {

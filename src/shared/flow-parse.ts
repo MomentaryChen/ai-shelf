@@ -132,6 +132,14 @@ export function parseFlowDocument(
     typeof fm.timeout_sec === "number" && fm.timeout_sec > 0 ? fm.timeout_sec : 600;
   const onFail = fm.on_fail === "slack" ? "slack" : "none";
   const runner = fm.runner === "http" ? "http" : "claude";
+  const agentTool =
+    typeof fm.tool === "string" && fm.tool.trim() ? fm.tool.trim() : "claude";
+  const profileInheritsTool = !(typeof fm.tool === "string" && fm.tool.trim());
+  const toolArgs =
+    typeof fm.tool_args === "string" && fm.tool_args.trim() ? fm.tool_args.trim() : undefined;
+  const cwd = typeof fm.cwd === "string" && fm.cwd.trim() ? fm.cwd.trim() : undefined;
+  const profileId =
+    typeof fm.profile === "string" && fm.profile.trim() ? fm.profile.trim() : undefined;
   const httpUrl = typeof fm.url === "string" ? fm.url.trim() : undefined;
   const httpMethod = fm.method === "GET" ? "GET" : "HEAD";
 
@@ -149,6 +157,11 @@ export function parseFlowDocument(
     timeoutSec,
     outputTemplate: typeof fm.output === "string" ? fm.output : undefined,
     onFail,
+    agentTool,
+    profileInheritsTool,
+    toolArgs,
+    cwd,
+    profileId,
     phases,
     body: split.body,
   };

@@ -20,9 +20,9 @@ Phase 0 validates the **Chat → `.flow.md` → cron (later) → `claude -p` + M
 | Capability | Target |
 |------------|--------|
 | In-app cron / `flow due` scheduler | Phase 1 |
-| Chat UI to generate flows | Phase 1 (Cursor rule) |
+| Chat UI to generate flows | Phase 2 ✅ (AI Flow tab) |
 | Edit flow in UI | Phase 1 |
-| MCP `flow-progress` tool (stdout protocol only for now) | Phase 2 |
+| MCP `flow-progress` tool (stdout protocol only for now) | Phase 2 ✅ |
 | Run when app is closed (OS Task Scheduler + CLI) | Phase 1 |
 | Inventory sub-nav duplicate tab | Use top-level mode instead |
 

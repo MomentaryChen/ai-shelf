@@ -217,10 +217,20 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.off("settings-changed", handler);
   },
   flowList: () => ipcRenderer.invoke("flow-list"),
+  flowListActiveRuns: () => ipcRenderer.invoke("flow-list-active-runs"),
   flowReadFile: (flowId) => ipcRenderer.invoke("flow-read-file", flowId),
-  flowRun: (flowId) => ipcRenderer.invoke("flow-run", flowId),
+  flowReadRunOutput: (runId) => ipcRenderer.invoke("flow-read-run-output", runId),
+  flowGetLatestRunOutput: (flowId) => ipcRenderer.invoke("flow-get-latest-run-output", flowId),
+  flowRun: (flowId, options) => ipcRenderer.invoke("flow-run", flowId, options),
+  flowCancelRun: (flowId) => ipcRenderer.invoke("flow-cancel-run", flowId),
+  flowGetTaskSchedulerStatus: () => ipcRenderer.invoke("flow-get-task-scheduler-status"),
+  flowInstallTaskScheduler: () => ipcRenderer.invoke("flow-install-task-scheduler"),
+  flowRemoveTaskScheduler: () => ipcRenderer.invoke("flow-remove-task-scheduler"),
   flowGetRunState: (runId) => ipcRenderer.invoke("flow-get-run-state", runId),
   flowListRecentRuns: (limit) => ipcRenderer.invoke("flow-list-recent-runs", limit),
+  flowListRunsForFlow: (flowId, limit) => ipcRenderer.invoke("flow-list-runs-for-flow", flowId, limit),
+  flowGetRunEvents: (runId) => ipcRenderer.invoke("flow-get-run-events", runId),
+  flowOpenRunArtifact: (runId, artifact) => ipcRenderer.invoke("flow-open-run-artifact", runId, artifact),
   flowOpenFlowsDir: () => ipcRenderer.invoke("flow-open-flows-dir"),
   flowDelete: (flowId) => ipcRenderer.invoke("flow-delete", flowId),
   flowOpenFile: (flowId) => ipcRenderer.invoke("flow-open-file", flowId),
@@ -228,6 +238,13 @@ contextBridge.exposeInMainWorld("api", {
   flowSetSchedulePrefs: (partial) => ipcRenderer.invoke("flow-set-schedule-prefs", partial),
   flowRunDue: () => ipcRenderer.invoke("flow-run-due"),
   flowSaveSchedule: (flowId, patch) => ipcRenderer.invoke("flow-save-schedule", flowId, patch),
+  flowSaveRunnerSettings: (flowId, patch) =>
+    ipcRenderer.invoke("flow-save-runner-settings", flowId, patch),
+  flowGenerate: (turns, flowId) => ipcRenderer.invoke("flow-generate", { turns, flowId }),
+  flowGetChat: (flowId) => ipcRenderer.invoke("flow-get-chat", flowId),
+  flowSaveChat: (flowId, messages) => ipcRenderer.invoke("flow-save-chat", flowId, messages),
+  flowListPromptLogs: (flowId, limit) => ipcRenderer.invoke("flow-list-prompt-logs", flowId, limit),
+  flowCreate: (content, overwrite) => ipcRenderer.invoke("flow-create", content, overwrite),
   onFlowRunState: (cb) => {
     const handler = (_e, state) => cb(state);
     ipcRenderer.on("flow-run-state", handler);

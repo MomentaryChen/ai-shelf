@@ -26,6 +26,16 @@ export interface FlowDefinition {
   timeoutSec: number;
   outputTemplate?: string;
   onFail: "slack" | "none";
+  /** CLI tool id when runner is `claude` (default `claude`). */
+  agentTool: string;
+  /** When true, `profile` may supply the tool if frontmatter omits `tool`. */
+  profileInheritsTool: boolean;
+  /** Extra CLI flags for the agent tool, e.g. `--model opus`. */
+  toolArgs?: string;
+  /** Working directory for the agent process. */
+  cwd?: string;
+  /** Profile id/name — fills `cwd` / `tool` when omitted. */
+  profileId?: string;
   phases: FlowPhaseDef[];
   body: string;
 }

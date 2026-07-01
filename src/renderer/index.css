@@ -286,6 +286,47 @@ input:focus-visible,
   animation: pane-agent-pulse 2s ease-in-out infinite;
 }
 
+@keyframes flow-phase-segment-shimmer {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(200%);
+    opacity: 0.35;
+  }
+}
+
+.flow-phase-segment-active {
+  position: relative;
+  overflow: hidden;
+}
+
+.flow-phase-segment-active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 55%, transparent),
+    transparent
+  );
+  animation: flow-phase-segment-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-phase-segment-active::after {
+    animation: none;
+    opacity: 0.25;
+    transform: none;
+    background: color-mix(in srgb, white 30%, transparent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pane-agent-dot-running,
   .pane-agent-dot-attention,
