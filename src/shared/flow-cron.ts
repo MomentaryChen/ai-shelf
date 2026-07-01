@@ -10,40 +10,48 @@ export function flowTimezone(tz?: string): string {
   return trimmed || DEFAULT_TIMEZONE;
 }
 
-/** Minute-precision slot id for idempotent scheduled runs. */
-export function cronSlotKey(expression: string, timezone: string, date = new Date()): string | null {
+/** Start/end of the local calendar minute containing `date`. */
+function localMinuteBounds(date: Date): { start: Date; end: Date } {
+  const start = new Date(date);
+  start.setSeconds(0, 0);
+  start.setMilliseconds(0);
+  const end = new Date(start.getTime() + 59_999);
+  return { start, end };
+}
+
+/**
+ * Previous cron fire for the minute containing `date`.
+ * Uses the minute end as `currentDate` so `prev()` includes a fire at :00.000
+ * (cron-parser excludes the current instant from `prev()`).
+ */
+function cronPrevInMinute(expression: string, timezone: string, date: Date): Date | null {
   try {
+    const { end } = localMinuteBounds(date);
     const iter = CronExpressionParser.parse(expression, {
       tz: flowTimezone(timezone),
-      currentDate: date,
+      currentDate: end,
     });
-    const prev = iter.prev();
-    const iso = prev.toISOString();
-    return iso ? iso.slice(0, 16) : null;
+    return iter.prev().toDate();
   } catch {
     return null;
   }
 }
 
+/** Minute-precision slot id for idempotent scheduled runs. */
+export function cronSlotKey(expression: string, timezone: string, date = new Date()): string | null {
+  const prev = cronPrevInMinute(expression, timezone, date);
+  if (!prev) return null;
+  const iso = prev.toISOString();
+  return iso ? iso.slice(0, 16) : null;
+}
+
 /** True when `date` falls on a cron tick (same minute as prev fire). */
 export function cronMatchesMinute(expression: string, timezone: string, date = new Date()): boolean {
-  try {
-    const tz = flowTimezone(timezone);
-    const minuteStart = new Date(date);
-    minuteStart.setSeconds(0, 0);
-    minuteStart.setMilliseconds(0);
-    const minuteEnd = new Date(minuteStart.getTime() + 59_999);
-
-    const iter = CronExpressionParser.parse(expression, {
-      tz,
-      currentDate: date,
-    });
-    const prev = iter.prev();
-    const t = prev.getTime();
-    return t >= minuteStart.getTime() && t <= minuteEnd.getTime();
-  } catch {
-    return false;
-  }
+  const prev = cronPrevInMinute(expression, timezone, date);
+  if (!prev) return false;
+  const { start, end } = localMinuteBounds(date);
+  const t = prev.getTime();
+  return t >= start.getTime() && t <= end.getTime();
 }
 
 export function cronNextRun(expression: string, timezone: string, from = new Date()): string | null {

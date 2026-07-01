@@ -6,21 +6,32 @@ const TICK_MS = 60_000;
 
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 let intervalTimer: ReturnType<typeof setInterval> | null = null;
+let alignTimer: ReturnType<typeof setTimeout> | null = null;
 let tickInFlight = false;
 
 export function initFlowScheduler(getWindow: () => BrowserWindow | null): void {
   getMainWindow = getWindow;
-  if (intervalTimer) return;
+  if (intervalTimer || alignTimer) return;
 
   const tick = () => {
     void runSchedulerTick();
   };
 
-  intervalTimer = setInterval(tick, TICK_MS);
+  // Run once immediately, then align to clock minutes so we don't drift past a fire time.
   void runSchedulerTick();
+  const msToNextMinute = TICK_MS - (Date.now() % TICK_MS);
+  alignTimer = setTimeout(() => {
+    alignTimer = null;
+    void runSchedulerTick();
+    intervalTimer = setInterval(tick, TICK_MS);
+  }, msToNextMinute);
 }
 
 export function stopFlowScheduler(): void {
+  if (alignTimer) {
+    clearTimeout(alignTimer);
+    alignTimer = null;
+  }
   if (intervalTimer) {
     clearInterval(intervalTimer);
     intervalTimer = null;
