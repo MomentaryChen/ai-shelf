@@ -2,10 +2,10 @@ import type { FlowPhaseStatus, FlowRunStatus } from "../../shared/flow-types.js"
 import type { FlowPhaseProgressSlice } from "../utils/flow-run-progress";
 
 function segmentClass(status: FlowPhaseStatus | undefined, runStatus?: FlowRunStatus | null): string {
-  if (status === "done") return "bg-[var(--success)]";
-  if (status === "skipped") return "bg-[var(--sand-deep)]";
-  if (status === "failed") return "bg-red-400";
-  if (status === "running") return "flow-phase-segment-active bg-[var(--clay)]";
+  if (status === "done") return "bg-ok";
+  if (status === "skipped") return "bg-bg-elevated";
+  if (status === "failed") return "bg-fail";
+  if (status === "running") return "flow-phase-segment-active bg-accent";
   if (runStatus === "running" || runStatus === "pending") return "bg-transparent";
   return "bg-transparent";
 }
@@ -25,8 +25,8 @@ export function FlowPhaseProgressBar({ phases, runStatus, finishing = false, sta
   if (phases.length === 0) {
     if (!isLive) return null;
     return (
-      <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-[var(--sand-deep)]">
-        <div className="flow-phase-segment-active h-full w-1/3 rounded-full bg-[var(--clay)]" />
+      <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-bg-elevated">
+        <div className="flow-phase-segment-active h-full w-1/3 rounded-full bg-accent" />
       </div>
     );
   }
@@ -49,7 +49,7 @@ export function FlowPhaseProgressBar({ phases, runStatus, finishing = false, sta
         return (
           <div
             key={phase.id}
-            className="h-full min-w-[10px] flex-1 overflow-hidden rounded-full bg-[var(--sand-deep)]"
+            className="h-full min-w-[10px] flex-1 overflow-hidden rounded-full bg-bg-elevated"
             title={phase.label}
           >
             <div

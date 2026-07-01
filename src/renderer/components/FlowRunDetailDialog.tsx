@@ -97,49 +97,48 @@ export function FlowRunDetailDialog({ run, onClose, onOpenOutput }: Props) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[88vh] max-w-2xl flex-col border-[var(--sand)] bg-[var(--surface)] text-[var(--ink)]"
-        data-surface="warm"
+        className="flex max-h-[88vh] max-w-2xl flex-col border-border bg-bg-secondary text-text-primary"
       >
         <DialogHeader>
           <DialogTitle className="text-[15px] font-semibold">{t("flow.history.detailTitle")}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 rounded-[20px] border border-[var(--sand)] bg-[var(--cream)] px-4 py-3 text-[13px]">
+        <div className="space-y-3 rounded-[20px] border border-border bg-bg-primary px-4 py-3 text-[13px]">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                 tone === "success"
                   ? "bg-[#7FB069]/20 text-[#3d6b32]"
                   : tone === "failed"
-                    ? "bg-red-100 text-red-800"
+                    ? "bg-fail/15 text-fail"
                     : tone === "running"
-                      ? "bg-[var(--sand)] text-[var(--clay-deep)]"
-                      : "bg-[var(--sand-deep)] text-[var(--muted)]"
+                      ? "bg-bg-card text-accent"
+                      : "bg-bg-elevated text-text-secondary"
               }`}
             >
               {statusLabel(run.status, t)}
             </span>
-            <span className="text-[var(--muted)]">{duration}</span>
+            <span className="text-text-secondary">{duration}</span>
             {run.progress.total > 0 && (
-              <span className="text-[var(--muted)]">
+              <span className="text-text-secondary">
                 {formatPhaseSteps(t, run.progress.completed, run.progress.total)}
               </span>
             )}
           </div>
-          <p className="font-mono text-[11px] text-[var(--muted)]">{run.runId}</p>
-          <p className="text-[12px] text-[var(--muted)]">
+          <p className="font-mono text-[11px] text-text-secondary">{run.runId}</p>
+          <p className="text-[12px] text-text-secondary">
             {formatRunTimestamp(run.startedAt)}
             {run.error && (
-              <span className="mt-1 block text-red-700">{run.error}</span>
+              <span className="mt-1 block text-fail">{run.error}</span>
             )}
           </p>
         </div>
 
         {(outputLoading || outputContent) && (
-          <div className="rounded-[20px] border border-[var(--sand)] bg-[var(--cream)] p-4">
-            <h3 className="mb-3 text-[12px] font-medium text-[var(--ink)]">{t("flow.output.panelTitle")}</h3>
+          <div className="rounded-[20px] border border-border bg-bg-primary p-4">
+            <h3 className="mb-3 text-[12px] font-medium text-text-primary">{t("flow.output.panelTitle")}</h3>
             {outputLoading ? (
-              <p className="py-4 text-center text-[13px] text-[var(--muted)]">{t("flow.output.loading")}</p>
+              <p className="py-4 text-center text-[13px] text-text-secondary">{t("flow.output.loading")}</p>
             ) : outputContent ? (
               <div className="max-h-[240px] overflow-y-auto">
                 <FlowMarkdownContent content={outputContent} />
@@ -148,22 +147,22 @@ export function FlowRunDetailDialog({ run, onClose, onOpenOutput }: Props) {
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-[20px] border border-[var(--sand)] bg-[var(--surface)] p-4">
-          <h3 className="mb-3 text-[12px] font-medium uppercase tracking-wide text-[var(--muted)]">
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-[20px] border border-border bg-bg-secondary p-4">
+          <h3 className="mb-3 text-[12px] font-medium uppercase tracking-wide text-text-secondary">
             {t("flow.history.timeline")}
           </h3>
           {loading ? (
-            <p className="py-6 text-center text-[13px] text-[var(--muted)]">{t("flow.history.loadingEvents")}</p>
+            <p className="py-6 text-center text-[13px] text-text-secondary">{t("flow.history.loadingEvents")}</p>
           ) : events.length === 0 ? (
-            <p className="py-6 text-center text-[13px] text-[var(--muted)]">{t("flow.history.noEvents")}</p>
+            <p className="py-6 text-center text-[13px] text-text-secondary">{t("flow.history.noEvents")}</p>
           ) : (
             <ol className="space-y-3">
               {events.map((event, idx) => (
                 <li key={`${event.t}-${idx}`} className="flex gap-3 text-[13px]">
-                  <span className="w-[4.5rem] shrink-0 font-mono text-[10px] leading-relaxed text-[var(--muted)]">
+                  <span className="w-[4.5rem] shrink-0 font-mono text-[10px] leading-relaxed text-text-secondary">
                     {formatRunTimestamp(event.t).split(", ").pop()}
                   </span>
-                  <span className="min-w-0 flex-1 leading-relaxed text-[var(--ink)]">
+                  <span className="min-w-0 flex-1 leading-relaxed text-text-primary">
                     {eventSummary(event, t)}
                   </span>
                 </li>
