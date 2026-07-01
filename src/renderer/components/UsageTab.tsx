@@ -353,21 +353,26 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
   }
 
   const quotaMode = (snapshot.quotas?.length ?? 0) > 0 && snapshot.daily.length === 0;
+  const showCursorSpending =
+    snapshot.toolId === "cursor" && (snapshot.quotas?.length ?? 0) > 0;
   const quotaHintKey =
-    snapshot.toolId === "gemini"
-      ? "usage.gemini.quota.hint"
-      : snapshot.toolId === "claude"
-        ? "usage.claude.quota.hint"
-        : "usage.claude.quota.hint";
+    snapshot.toolId === "cursor"
+      ? "usage.cursor.quota.hint"
+      : snapshot.toolId === "gemini"
+        ? "usage.gemini.quota.hint"
+        : snapshot.toolId === "claude"
+          ? "usage.claude.quota.hint"
+          : "usage.claude.quota.hint";
   const showCostGrid =
     !quotaMode ||
+    showCursorSpending ||
     (snapshot.totalCostUsd ?? 0) > 0 ||
     (snapshot.totalInputTokens ?? 0) > 0 ||
     (snapshot.totalOutputTokens ?? 0) > 0;
 
   return (
     <>
-      {quotaMode && snapshot.quotas && snapshot.quotas.length > 0 && (
+      {(quotaMode || showCursorSpending) && snapshot.quotas && snapshot.quotas.length > 0 && (
         <div className="mb-4">
           <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">
             {t(quotaHintKey as MessageKey)}
@@ -389,6 +394,14 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
                     style={{ width: `${Math.min(100, q.usedPercent)}%` }}
                   />
                 </div>
+                {q.remainingUsd != null && q.limitUsd != null && (
+                  <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+                    {t("usage.cursor.quota.remaining", {
+                      remaining: formatUsd(q.remainingUsd),
+                      limit: formatUsd(q.limitUsd),
+                    })}
+                  </p>
+                )}
                 {q.resetAt && (
                   <p className="mt-1.5 text-[11px] text-[var(--muted)]">
                     {t("usage.claude.quota.resetsAt", { time: formatResetAt(q.resetAt) })}

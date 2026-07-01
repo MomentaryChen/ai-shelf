@@ -51,6 +51,10 @@ export interface UsageQuotaWindow {
   label?: string;
   usedPercent: number;
   resetAt?: string;
+  /** Dollar budget fields from providers like Cursor spending summary. */
+  usedUsd?: number;
+  limitUsd?: number;
+  remainingUsd?: number;
 }
 
 export interface UsageToolSnapshot {

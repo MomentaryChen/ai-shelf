@@ -422,6 +422,9 @@ export interface UsageQuotaWindow {
   label?: string;
   usedPercent: number;
   resetAt?: string;
+  usedUsd?: number;
+  limitUsd?: number;
+  remainingUsd?: number;
 }
 
 export interface UsageToolSnapshot {
