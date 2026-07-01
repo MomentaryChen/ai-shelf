@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, MessageSquare, Plus, Terminal } from "lucide-react";
+import { MessageSquare, Plus, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,9 +18,7 @@ import { FlowOutputDialog } from "./FlowOutputDialog";
 import { FlowOutputPanel } from "./FlowOutputPanel";
 import { FlowRunDetailDialog } from "./FlowRunDetailDialog";
 import { FlowRunHistoryPanel } from "./FlowRunHistoryPanel";
-import { FlowRunnerSettingsDialog } from "./FlowRunnerSettingsDialog";
-import { FlowScheduleDialog } from "./FlowScheduleDialog";
-import { FlowSchedulerPanel } from "./FlowSchedulerPanel";
+import { FlowSettingsDialog } from "./FlowSettingsDialog";
 import { FlowSourceDialog } from "./FlowSourceDialog";
 import { Spinner } from "./Spinner";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -57,8 +55,7 @@ export function FlowTab() {
   const [deleting, setDeleting] = useState(false);
   const [schedulerEnabled, setSchedulerEnabled] = useState(true);
   const [schedulerSaving, setSchedulerSaving] = useState(false);
-  const [scheduleFlowId, setScheduleFlowId] = useState<string | null>(null);
-  const [runnerFlowId, setRunnerFlowId] = useState<string | null>(null);
+  const [settingsFlowId, setSettingsFlowId] = useState<string | null>(null);
   const [expandedOutputPath, setExpandedOutputPath] = useState<string | null>(null);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -203,7 +200,7 @@ export function FlowTab() {
   );
 
   const selected = flows.find((f) => f.id === selectedId) ?? null;
-  const scheduleFlow = flows.find((f) => f.id === scheduleFlowId) ?? null;
+  const settingsFlow = flows.find((f) => f.id === settingsFlowId) ?? null;
   const selectedRunning = selectedId ? isFlowLive(selectedId) : false;
   const selectedCancelling = selectedId ? cancellingFlowIds.has(selectedId) : false;
   const selectedError = selectedId ? errorsByFlowId[selectedId] : errorsByFlowId.__global__;
@@ -452,36 +449,18 @@ export function FlowTab() {
               </button>
               <button
                 type="button"
-                title={t("flow.runner.open")}
-                aria-label={t("flow.runner.open")}
-                onClick={() => setRunnerFlowId(flow.id)}
+                title={t("flow.settings.open")}
+                aria-label={t("flow.settings.open")}
+                onClick={() => setSettingsFlowId(flow.id)}
                 className="flex shrink-0 cursor-pointer items-center justify-center rounded-[18px] px-2 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-accent"
               >
-                <Terminal className="h-4 w-4" aria-hidden />
-              </button>
-              <button
-                type="button"
-                title={t("flow.schedule.open")}
-                aria-label={t("flow.schedule.open")}
-                onClick={() => setScheduleFlowId(flow.id)}
-                className="flex shrink-0 cursor-pointer items-center justify-center rounded-[18px] px-2 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-accent"
-              >
-                <Clock className="h-4 w-4" aria-hidden />
+                <Settings className="h-4 w-4" aria-hidden />
               </button>
             </div>
           );
         })}
         </div>
         <div className="mt-auto flex shrink-0 flex-col gap-2 border-t border-border pt-2">
-          <FlowSchedulerPanel
-            schedulerEnabled={schedulerEnabled}
-            schedulerSaving={schedulerSaving}
-            onSchedulerToggle={() => void handleSchedulerToggle()}
-            taskScheduler={taskScheduler}
-            taskSchedulerBusy={taskSchedulerBusy}
-            onInstallTaskScheduler={() => void handleInstallTaskScheduler()}
-            onRemoveTaskScheduler={() => void handleRemoveTaskScheduler()}
-          />
           <Button type="button" variant="outline" size="sm" className="w-full" onClick={openFlowsFolder}>
             {t("flow.openFolder")}
           </Button>
@@ -650,27 +629,22 @@ export function FlowTab() {
         />
       )}
 
-      {runnerFlowId && (
-        <FlowRunnerSettingsDialog
-          flowId={runnerFlowId}
-          onClose={() => setRunnerFlowId(null)}
-          onSaved={() => {
-            if (selectedId === runnerFlowId) {
-              void loadDefinition(runnerFlowId);
-            }
-          }}
-        />
-      )}
-
-      {scheduleFlowId && (
-        <FlowScheduleDialog
-          flowId={scheduleFlowId}
-          listItem={scheduleFlow}
-          onClose={() => setScheduleFlowId(null)}
+      {settingsFlowId && (
+        <FlowSettingsDialog
+          flowId={settingsFlowId}
+          listItem={settingsFlow}
+          schedulerEnabled={schedulerEnabled}
+          schedulerSaving={schedulerSaving}
+          onSchedulerToggle={() => void handleSchedulerToggle()}
+          taskScheduler={taskScheduler}
+          taskSchedulerBusy={taskSchedulerBusy}
+          onInstallTaskScheduler={() => void handleInstallTaskScheduler()}
+          onRemoveTaskScheduler={() => void handleRemoveTaskScheduler()}
+          onClose={() => setSettingsFlowId(null)}
           onSaved={() => {
             void refreshList();
-            if (selectedId === scheduleFlowId) {
-              void loadDefinition(scheduleFlowId);
+            if (selectedId === settingsFlowId) {
+              void loadDefinition(settingsFlowId);
             }
           }}
         />
