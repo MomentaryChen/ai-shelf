@@ -670,6 +670,16 @@ export const zh: Record<MessageKey, string> = {
   "usage.cursor.auth.personal.field": "Session cookie（WorkosCursorSessionToken）",
   "usage.cursor.auth.personal.openDashboard": "開啟用量 dashboard",
   "usage.cursor.dataSource": "資料來源：{source}",
+  "usage.cursor.quota.hint":
+    "來自 Cursor dashboard 的帳單週期用量 — 這才是每月實際剩餘額度，與下方事件成本加總不同。",
+  "usage.cursor.quota.total": "整體含額度用量",
+  "usage.cursor.quota.api": "API 用量",
+  "usage.cursor.quota.auto": "Auto 模型用量",
+  "usage.cursor.quota.included": "含額度用量",
+  "usage.cursor.quota.onDemand": "超額按需用量",
+  "usage.cursor.quota.teamOnDemand": "團隊超額按需",
+  "usage.cursor.quota.teamSpend": "本週期團隊支出",
+  "usage.cursor.quota.remaining": "剩餘 {remaining} / {limit}",
   "usage.credential.clearField": "移除",
   "usage.claude.intro":
     "Claude 提供兩種載入方式，擇一即可：Console Admin API 顯示成本歷史；claude.ai session 顯示 Pro/Max 訂閱額度。",

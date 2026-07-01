@@ -9,6 +9,17 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-06-30
+
+Terminal layout reliability and copy-on-select setting sync.
+
+### Fixed
+
+- **Terminal refit** — xterm refits reliably after layout settle and font changes; removed CSS override that fought FitAddon.
+- **Copy-on-select sync** — Settings saved in Terminal Settings now propagate to all Electron windows via IPC.
+
+[3.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.4.0
+
 ## [3.3.0] - 2026-06-29
 
 Google sign-in, cloud profile backup, health monitoring, and multi-pane agent awareness.

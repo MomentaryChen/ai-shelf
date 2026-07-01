@@ -3,6 +3,11 @@ import {
   chunkDateRanges,
   type CursorUsageEvent,
 } from "./cursor-shared.js";
+import {
+  quotasFromUsageSummary,
+  type CursorUsageSummaryResponse,
+} from "./cursor-spending.js";
+import type { UsageQuotaWindow } from "../types.js";
 
 const DASHBOARD_BASE = "https://cursor.com";
 
@@ -98,7 +103,33 @@ async function fetchDashboardEventsInRange(
 
 /** Verify session works (optional lightweight check). */
 export async function testCursorDashboardSession(sessionToken: string): Promise<void> {
-  await dashboardGet(sessionToken, "/api/usage-summary");
+  await fetchCursorDashboardSpending(sessionToken);
+}
+
+async function fetchUsageSummary(sessionToken: string): Promise<CursorUsageSummaryResponse> {
+  const endpoints = ["/api/usage-summary", "/api/dashboard/usage-summary"];
+  let lastError: unknown;
+  for (const path of endpoints) {
+    try {
+      return (await dashboardGet(sessionToken, path)) as CursorUsageSummaryResponse;
+    } catch (err: unknown) {
+      lastError = err;
+      const message = (err as Error).message ?? "";
+      if (!/\b404\b/.test(message) && !/not found/i.test(message)) throw err;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Failed to load Cursor spending summary");
+}
+
+export async function fetchCursorDashboardSpending(
+  sessionToken: string,
+): Promise<{ quotas: UsageQuotaWindow[] }> {
+  const summary = await fetchUsageSummary(sessionToken);
+  const quotas = quotasFromUsageSummary(summary);
+  if (quotas.length === 0) {
+    throw new Error("No Cursor spending data in usage summary");
+  }
+  return { quotas };
 }
 
 export async function fetchCursorDashboardUsage(
@@ -107,7 +138,7 @@ export async function fetchCursorDashboardUsage(
 ): Promise<
   Pick<
     import("../types.js").UsageToolSnapshot,
-    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens"
+    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens" | "quotas"
   >
 > {
   const ranges = chunkDateRanges(days);
@@ -116,5 +147,15 @@ export async function fetchCursorDashboardUsage(
     const batch = await fetchDashboardEventsInRange(sessionToken, range.startDate, range.endDate);
     events.push(...batch);
   }
-  return aggregateCursorEvents(events);
+  const usage = aggregateCursorEvents(events);
+
+  let quotas: UsageQuotaWindow[] = [];
+  try {
+    const summary = await fetchUsageSummary(sessionToken);
+    quotas = quotasFromUsageSummary(summary);
+  } catch {
+    // Event history still useful when spending summary is unavailable.
+  }
+
+  return { ...usage, quotas: quotas.length > 0 ? quotas : undefined };
 }

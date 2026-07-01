@@ -680,6 +680,16 @@ export const en = {
   "usage.cursor.auth.personal.field": "Session cookie (WorkosCursorSessionToken)",
   "usage.cursor.auth.personal.openDashboard": "Open usage dashboard",
   "usage.cursor.dataSource": "Data source: {source}",
+  "usage.cursor.quota.hint":
+    "Billing-cycle spending from Cursor dashboard — this is your real monthly allowance, not the event cost rollup below.",
+  "usage.cursor.quota.total": "Total included usage",
+  "usage.cursor.quota.api": "API usage",
+  "usage.cursor.quota.auto": "Auto model usage",
+  "usage.cursor.quota.included": "Included usage",
+  "usage.cursor.quota.onDemand": "On-demand usage",
+  "usage.cursor.quota.teamOnDemand": "Team on-demand",
+  "usage.cursor.quota.teamSpend": "Team spend this cycle",
+  "usage.cursor.quota.remaining": "{remaining} remaining of {limit}",
   "usage.credential.clearField": "Remove",
   "usage.claude.intro":
     "Claude supports two ways to load usage. Pick one — Console Admin API shows cost history; claude.ai session shows subscription quota for Pro/Max.",
