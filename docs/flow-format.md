@@ -12,6 +12,10 @@ schedule: "0 9 * * 1"
 timezone: Asia/Taipei
 enabled: true
 timeout_sec: 600
+tool_args: --model haiku
+extra_mcp_servers:
+  - amplitude
+  - atlassian
 output: ~/automations/output/{date}-{id}.md
 on_fail: slack
 phases:
@@ -45,6 +49,9 @@ phases:
 | `url` | when `runner: http` | Request URL |
 | `method` | no | `HEAD` (default) or `GET` when `runner: http` |
 | `phases` | no | UI checklist; auto-derived from `【phase-id】` in body if omitted |
+| `tool_args` | no | CLI flags for the agent; default `--model haiku` when omitted |
+| `extra_mcp_servers` | no | MCP server names merged from Claude config (strict scope — only these + `ai-shelf-flow`) |
+| `allowed_tools` | no | Extra `--allowedTools` patterns for external MCP |
 
 ## Run state (`runs/{runId}/state.json`)
 
@@ -68,7 +75,7 @@ Schema: `ai-shelf.flow/run-state/v1`
 - `flow_progress` — `{ type, phaseId, message? }` updates `runs/{runId}/state.json`
 - `flow_output` — `{ content }` writes the final markdown report (required on success **and** failure)
 
-The runner passes `--mcp-config` and `--allowedTools mcp__ai-shelf-flow__*` to `claude -p`.
+The runner passes `--strict-mcp-config`, `--mcp-config`, `--tools ""`, and `--allowedTools` to `claude -p`. Only the `ai-shelf-flow` MCP server is loaded unless `extra_mcp_servers` lists additional servers from your Claude config. Built-in tools (Bash, Read, etc.) are disabled.
 
 Bundled system skills live in `src/flow/system-skills/*/SKILL.md` and are inlined into every agent run prompt. The runner also writes a fallback `output.md` when the agent exits without calling `flow_output`.
 

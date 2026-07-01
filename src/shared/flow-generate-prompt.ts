@@ -12,11 +12,13 @@ Required frontmatter:
 - phases: list of { id, label }
 
 Optional frontmatter:
-- schedule: cron expression (omit for manual-only)
+- schedule: cron expression (omit for manual-only; minimum interval 1 hour between fires)
 - timezone: IANA e.g. Asia/Taipei
 - runner: claude (default) or http
 - tool: claude or agent (Cursor) when runner is claude — only these agents are supported
-- tool_args: CLI flags e.g. --model sonnet
+- tool_args: CLI flags — default \`--model haiku\` for claude runner (use sonnet/opus only when needed)
+- extra_mcp_servers: list of MCP server names from Claude config (e.g. atlassian) when the flow needs external MCP
+- allowed_tools: optional extra \`--allowedTools\` patterns (e.g. mcp__atlassian__jira_search)
 - cwd / profile: optional runner environment
 - url / method: when runner is http
 - on_fail: slack

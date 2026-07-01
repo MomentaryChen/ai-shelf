@@ -36,6 +36,10 @@ export interface FlowDefinition {
   cwd?: string;
   /** Profile id/name — fills `cwd` / `tool` when omitted. */
   profileId?: string;
+  /** MCP server names from Claude config to merge at run time (`extra_mcp_servers`). */
+  extraMcpServers?: string[];
+  /** Extra tool permission patterns for `--allowedTools` (`allowed_tools`). */
+  agentAllowedTools?: string[];
   phases: FlowPhaseDef[];
   body: string;
 }

@@ -8,7 +8,7 @@ Phase 2 makes **MCP automation reliable**: progress via MCP tools (not stdout), 
 |------------|--------|
 | MCP server `ai-shelf-flow` with `flow_progress` tool | ✅ |
 | MCP `flow_output` tool (writes final report) | ✅ |
-| Runner injects `--mcp-config` + `--allowedTools` on `claude -p` | ✅ |
+| Runner injects `--strict-mcp-config` + `--tools ""` + `--allowedTools` on `claude -p` | ✅ |
 | `state.json` updated by MCP; UI sync via file watch | ✅ |
 | Stdout `FLOW_PROGRESS` kept as fallback | ✅ |
 | Seed `weekly-digest.flow.md` (Amplitude + Jira) | ✅ |
@@ -59,8 +59,9 @@ Same as Phase 1 — `ai-shelf flow due` or `node dist/flow/cli.js due` runs flow
 |-------|---------|
 | `cwd` | Working directory for `claude -p` |
 | `profile` | Bind Terminal profile (env, shell) |
-| `allowed_tools` | Restrict MCP tool scope per flow |
-| `mcp_config` | Optional extra MCP config path |
+| `extra_mcp_servers` | Merge named MCP servers from Claude config (strict scope) |
+| `allowed_tools` | Extra `--allowedTools` patterns for external MCP |
+| `tool_args` | CLI flags; default `--model haiku` |
 
 ## Phase 2c — History UI
 
@@ -76,7 +77,7 @@ Same as Phase 1 — `ai-shelf flow due` or `node dist/flow/cli.js due` runs flow
 ```
 runFlow()
   → write state.json, prompt.md
-  → spawn claude -p --mcp-config (ai-shelf-flow server)
+  → spawn claude -p --strict-mcp-config --tools "" --allowedTools (flow MCP + extra_mcp_servers)
        → flow_progress / flow_output → state.json on disk
   → watchFile(state.json) → broadcast to FlowTab
 ```

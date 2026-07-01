@@ -1,6 +1,8 @@
 import { CronExpressionParser } from "cron-parser";
-import { flowTimezone } from "./flow-cron.js";
-import { splitFlowDocument } from "./flow-parse.js";
+import { canonicalToolId } from "../tools.js";
+import { normalizeFlowClaudeToolArgs } from "./claude-tool-args.js";
+import { flowTimezone, validateFlowCronMinInterval } from "./flow-cron.js";
+import { parseFlowDocument, splitFlowDocument } from "./flow-parse.js";
 
 function formatYamlScalar(value: string): string {
   if (/[:#\s'"*|]/.test(value) || value === "") {
@@ -24,12 +26,35 @@ function upsertTopLevelField(lines: string[], key: string, value: string | undef
 export function validateFlowCron(expression: string, timezone?: string): string | null {
   const trimmed = expression.trim();
   if (!trimmed) return "Cron expression is required";
+  const tz = flowTimezone(timezone);
   try {
-    CronExpressionParser.parse(trimmed, { tz: flowTimezone(timezone) });
-    return null;
+    CronExpressionParser.parse(trimmed, { tz });
   } catch (err: unknown) {
     return err instanceof Error ? err.message : "Invalid cron expression";
   }
+  return validateFlowCronMinInterval(trimmed, tz);
+}
+
+/** Ensure claude runner defaults (`tool_args: --model haiku`) and validate schedule before save. */
+export function ensureFlowDefaultsInContent(content: string): { content: string } | { error: string } {
+  const parsed = parseFlowDocument(content, "draft.flow.md", "");
+  if ("error" in parsed) return { error: parsed.error };
+
+  let next = content;
+
+  if (parsed.runner === "claude" && canonicalToolId(parsed.agentTool) === "claude") {
+    const toolArgs = normalizeFlowClaudeToolArgs("claude", parsed.toolArgs ?? "");
+    const patched = patchFlowRunnerInContent(next, { toolArgs });
+    if ("error" in patched) return patched;
+    next = patched.content;
+  }
+
+  if (parsed.schedule?.trim()) {
+    const cronError = validateFlowCron(parsed.schedule, parsed.timezone);
+    if (cronError) return { error: cronError };
+  }
+
+  return { content: next };
 }
 
 export type FlowSchedulePatch = {
