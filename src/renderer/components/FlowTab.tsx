@@ -598,6 +598,9 @@ export function FlowTab() {
               )}
 
               <FlowDagView
+                flowId={selected.id}
+                runId={selectedActiveRun?.runId ?? lastOutput?.runId ?? null}
+                globalToolLaunchArgs={loadSettings().toolLaunchArgs}
                 phases={dagPhases}
                 runner={flowDef.runner}
                 httpUrl={flowDef.httpUrl}
@@ -615,6 +618,7 @@ export function FlowTab() {
                       : null
                 }
                 error={showLiveRun && selectedActiveRun ? selectedActiveRun.error : selectedError}
+                outputPath={selectedActiveRun?.outputPath ?? lastOutput?.outputPath ?? null}
               />
 
               <FlowOutputPanel

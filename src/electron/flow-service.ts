@@ -6,6 +6,7 @@ import { getAppDataDir } from "ai-shelf";
 import {
   deleteFlow,
   createFlowFromContent,
+  getFlowDagNodeCommand,
   getFlowFilePath,
   getFlowRunState,
   getRunArtifactPath,
@@ -38,6 +39,7 @@ export {
   createFlowFromContent,
   deleteFlow,
   FLOW_CHAT_DRAFT_ID,
+  getFlowDagNodeCommand,
   getFlowFilePath,
   getFlowRunState,
   getRunArtifactPath,

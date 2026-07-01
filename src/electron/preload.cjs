@@ -244,6 +244,8 @@ contextBridge.exposeInMainWorld("api", {
   flowGetChat: (flowId) => ipcRenderer.invoke("flow-get-chat", flowId),
   flowSaveChat: (flowId, messages) => ipcRenderer.invoke("flow-save-chat", flowId, messages),
   flowListPromptLogs: (flowId, limit) => ipcRenderer.invoke("flow-list-prompt-logs", flowId, limit),
+  flowGetDagNodeCommand: (flowId, node, options) =>
+    ipcRenderer.invoke("flow-get-dag-node-command", flowId, node, options),
   flowCreate: (content, overwrite) => ipcRenderer.invoke("flow-create", content, overwrite),
   onFlowRunState: (cb) => {
     const handler = (_e, state) => cb(state);
