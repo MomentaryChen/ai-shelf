@@ -47,6 +47,8 @@ output: ~/reports/{id}-{date}.md
 
 The body must instruct the agent to report progress with MCP tools `flow_progress` and `flow_output` (spawned by the runner). Fallback: stdout `FLOW_PROGRESS` lines.
 
+The runner also injects bundled **system skills** from `src/flow/system-skills/` into every agent run (e.g. mandatory `flow_output` on success and failure).
+
 Mark each major step in the body with a heading that includes the phase id:
 
 ```markdown

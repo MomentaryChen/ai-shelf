@@ -66,9 +66,11 @@ Schema: `ai-shelf.flow/run-state/v1`
 **Primary (Phase 2+):** MCP tools on server `ai-shelf-flow`:
 
 - `flow_progress` — `{ type, phaseId, message? }` updates `runs/{runId}/state.json`
-- `flow_output` — `{ content }` writes the final markdown report
+- `flow_output` — `{ content }` writes the final markdown report (required on success **and** failure)
 
 The runner passes `--mcp-config` and `--allowedTools mcp__ai-shelf-flow__*` to `claude -p`.
+
+Bundled system skills live in `src/flow/system-skills/*/SKILL.md` and are inlined into every agent run prompt. The runner also writes a fallback `output.md` when the agent exits without calling `flow_output`.
 
 **Fallback:** stdout lines (legacy / when MCP unavailable):
 
