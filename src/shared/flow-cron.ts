@@ -33,11 +33,11 @@ export function cronMatchesMinute(expression: string, timezone: string, date = n
 
     const iter = CronExpressionParser.parse(expression, {
       tz,
-      currentDate: minuteStart,
-      endDate: minuteEnd,
+      currentDate: date,
     });
-    iter.next();
-    return true;
+    const prev = iter.prev();
+    const t = prev.getTime();
+    return t >= minuteStart.getTime() && t <= minuteEnd.getTime();
   } catch {
     return false;
   }
