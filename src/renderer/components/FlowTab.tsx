@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,6 +13,8 @@ import { parseFlowDocument } from "../../shared/flow-parse.js";
 import type { FlowDefinition } from "../../shared/flow-types.js";
 import { EmptyState } from "./EmptyState";
 import { FlowDagView, type FlowDagPhase } from "./FlowDagView";
+import { FlowOutputDialog } from "./FlowOutputDialog";
+import { FlowScheduleDialog } from "./FlowScheduleDialog";
 import { FlowSourceDialog } from "./FlowSourceDialog";
 import { Spinner } from "./Spinner";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -28,6 +31,11 @@ export function FlowTab() {
   const [sourceOpen, setSourceOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [schedulerEnabled, setSchedulerEnabled] = useState(true);
+  const [schedulerSaving, setSchedulerSaving] = useState(false);
+  const [scheduleFlowId, setScheduleFlowId] = useState<string | null>(null);
+  const [outputPath, setOutputPath] = useState<string | null>(null);
+  const lastAutoOpenedRunId = useRef<string | null>(null);
 
   const refreshList = useCallback(async () => {
     setLoading(true);
@@ -64,6 +72,9 @@ export function FlowTab() {
 
   useEffect(() => {
     void refreshList();
+    void window.api.flowGetSchedulePrefs().then((prefs) => {
+      setSchedulerEnabled(prefs.schedulerEnabled);
+    });
   }, [refreshList]);
 
   useEffect(() => {
@@ -86,7 +97,20 @@ export function FlowTab() {
     return unsub;
   }, [selectedId]);
 
+  useEffect(() => {
+    if (
+      activeRun?.status === "completed" &&
+      activeRun.outputPath &&
+      activeRun.flowId === selectedId &&
+      lastAutoOpenedRunId.current !== activeRun.runId
+    ) {
+      lastAutoOpenedRunId.current = activeRun.runId;
+      setOutputPath(activeRun.outputPath);
+    }
+  }, [activeRun, selectedId]);
+
   const selected = flows.find((f) => f.id === selectedId) ?? null;
+  const scheduleFlow = flows.find((f) => f.id === scheduleFlowId) ?? null;
 
   const dagPhases = useMemo((): FlowDagPhase[] => {
     const base = flowDef?.phases ?? [];
@@ -109,6 +133,7 @@ export function FlowTab() {
     setError(null);
     setRunning(true);
     setActiveRun(null);
+    lastAutoOpenedRunId.current = null;
     const res = await window.api.flowRun(selectedId);
     if (!res.ok) {
       setRunning(false);
@@ -141,60 +166,102 @@ export function FlowTab() {
     void window.api.flowOpenFlowsDir();
   };
 
+  const handleSchedulerToggle = async () => {
+    setSchedulerSaving(true);
+    const next = !schedulerEnabled;
+    const res = await window.api.flowSetSchedulePrefs({ schedulerEnabled: next });
+    setSchedulerSaving(false);
+    if (res.ok && res.prefs) {
+      setSchedulerEnabled(res.prefs.schedulerEnabled);
+    }
+  };
+
   const showRun = activeRun && activeRun.flowId === selectedId;
+  const viewableOutput = showRun && activeRun?.outputPath ? activeRun.outputPath : null;
 
   return (
     <div
       className="flex h-full min-h-0 overflow-hidden bg-[var(--cream)] text-[var(--ink)]"
       data-surface="warm"
     >
-      <aside className="flex w-56 shrink-0 flex-col gap-1 border-r border-[var(--sand)] bg-[var(--surface)] p-3">
+      <aside className="flex w-60 shrink-0 flex-col gap-1 border-r border-[var(--sand)] bg-[var(--surface)] p-3">
         <div className="px-1 pb-2 text-[13px] font-medium text-[var(--ink)]">{t("flow.sidebar.title")}</div>
         {loading && <Spinner label={t("flow.loading")} />}
         {!loading && flows.length === 0 && (
           <p className="px-1 text-[13px] text-[var(--muted)]">{t("flow.empty")}</p>
         )}
-        {flows.map((flow) => (
-          <button
-            key={flow.id}
-            type="button"
-            onClick={() => setSelectedId(flow.id)}
-            className={`cursor-pointer rounded-[22px] px-3 py-2 text-left text-[13px] transition-colors duration-200 ${
-              selectedId === flow.id
-                ? "bg-[var(--sand)] font-medium text-[var(--ink)]"
-                : "text-[var(--muted)] hover:bg-[var(--sand-deep)] hover:text-[var(--ink)]"
-            }`}
-          >
-            <div>{flow.id}</div>
-            {flow.schedule && (
-              <div className="mt-0.5 text-[11px] text-[var(--muted)]">{flow.schedule}</div>
-            )}
-          </button>
-        ))}
-        <div className="mt-auto pt-2">
+        {flows.map((flow) => {
+          const isSelected = selectedId === flow.id;
+          return (
+            <div
+              key={flow.id}
+              className={`flex items-stretch gap-0.5 rounded-[22px] ${
+                isSelected ? "bg-[var(--sand)]" : "hover:bg-[var(--sand-deep)]/60"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedId(flow.id)}
+                className={`min-w-0 flex-1 cursor-pointer px-3 py-2 text-left text-[13px] transition-colors duration-200 ${
+                  isSelected ? "font-medium text-[var(--ink)]" : "text-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+              >
+                <div className="truncate">{flow.id}</div>
+                <div className="mt-0.5 truncate text-[11px] text-[var(--muted)]">
+                  {flow.schedule ?? t("flow.manualOnly")}
+                </div>
+              </button>
+              <button
+                type="button"
+                title={t("flow.schedule.open")}
+                aria-label={t("flow.schedule.open")}
+                onClick={() => setScheduleFlowId(flow.id)}
+                className="flex shrink-0 cursor-pointer items-center justify-center rounded-[18px] px-2 text-[var(--muted)] transition-colors hover:bg-[var(--sand-deep)] hover:text-[var(--clay)]"
+              >
+                <Clock className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          );
+        })}
+        <div className="mt-auto flex flex-col gap-2 pt-2">
+          <label className="flex cursor-pointer items-center gap-2 rounded-[22px] px-2 py-2 text-[12px] text-[var(--muted)] hover:bg-[var(--sand-deep)]">
+            <input
+              type="checkbox"
+              className="size-4 rounded accent-[var(--clay)]"
+              checked={schedulerEnabled}
+              disabled={schedulerSaving}
+              onChange={() => void handleSchedulerToggle()}
+            />
+            <span>{t("flow.scheduler.enabled")}</span>
+          </label>
           <Button type="button" variant="outline" size="sm" className="w-full" onClick={openFlowsFolder}>
             {t("flow.openFolder")}
           </Button>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto p-6">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      <main className="min-w-0 flex-1 overflow-y-auto p-4">
+        <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
           {!selected && !loading && (
             <EmptyState title={t("flow.emptyTitle")} description={t("flow.emptyDesc")} />
           )}
 
           {selected && flowDef && (
             <>
-              <header className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h1 className="text-lg font-semibold text-[var(--ink)]">{selected.id}</h1>
-                  <p className="mt-1 text-[13px] text-[var(--muted)]">
-                    {selected.phaseCount} {t("flow.phases")}
-                    {selected.schedule ? ` · ${selected.schedule}` : ` · ${t("flow.manualOnly")}`}
-                  </p>
-                </div>
+              <header className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <h1 className="truncate text-[15px] font-semibold text-[var(--ink)]">{selected.id}</h1>
                 <div className="flex flex-wrap items-center gap-2">
+                  {viewableOutput && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-[22px]"
+                      onClick={() => setOutputPath(viewableOutput)}
+                    >
+                      {t("flow.viewOutput")}
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
@@ -238,12 +305,8 @@ export function FlowTab() {
                 runStatus={showRun ? activeRun!.status : running ? "running" : null}
                 runPercent={showRun ? activeRun!.progress.percent : running ? 0 : undefined}
                 error={showRun ? activeRun!.error : error}
-                outputPath={showRun ? activeRun!.outputPath : null}
-                onOpenOutput={
-                  showRun && activeRun?.outputPath
-                    ? () => void window.api.openPath(activeRun.outputPath!)
-                    : undefined
-                }
+                outputPath={viewableOutput}
+                onOpenOutput={viewableOutput ? () => setOutputPath(viewableOutput) : undefined}
               />
             </>
           )}
@@ -259,6 +322,24 @@ export function FlowTab() {
             void refreshList();
           }}
         />
+      )}
+
+      {scheduleFlowId && (
+        <FlowScheduleDialog
+          flowId={scheduleFlowId}
+          listItem={scheduleFlow}
+          onClose={() => setScheduleFlowId(null)}
+          onSaved={() => {
+            void refreshList();
+            if (selectedId === scheduleFlowId) {
+              void loadDefinition(scheduleFlowId);
+            }
+          }}
+        />
+      )}
+
+      {outputPath && (
+        <FlowOutputDialog filePath={outputPath} onClose={() => setOutputPath(null)} />
       )}
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

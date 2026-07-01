@@ -736,6 +736,23 @@ export interface ElectronAPI {
   flowOpenFlowsDir: () => Promise<void>;
   flowDelete: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowOpenFile: (flowId: string) => Promise<{ ok: boolean; error?: string; path?: string }>;
+  flowGetSchedulePrefs: () => Promise<{ schedulerEnabled: boolean }>;
+  flowSetSchedulePrefs: (partial: {
+    schedulerEnabled?: boolean;
+  }) => Promise<{ ok: boolean; prefs?: { schedulerEnabled: boolean }; error?: string }>;
+  flowRunDue: () => Promise<{
+    ok: boolean;
+    result?: {
+      checked: number;
+      started: string[];
+      skipped: string[];
+      errors: { flowId: string; error: string }[];
+    };
+  }>;
+  flowSaveSchedule: (
+    flowId: string,
+    patch: { schedule: string | null; timezone?: string | null },
+  ) => Promise<{ ok: boolean; error?: string }>;
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
 }
 

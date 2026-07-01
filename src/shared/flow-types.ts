@@ -71,4 +71,6 @@ export interface FlowListItem {
   enabled: boolean;
   schedule?: string;
   phaseCount: number;
+  /** ISO timestamp of next cron fire, when scheduled. */
+  nextRunAt?: string | null;
 }

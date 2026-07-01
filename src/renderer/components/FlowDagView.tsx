@@ -179,7 +179,7 @@ export function FlowDagView({
             onClick={onOpenOutput}
             className="cursor-pointer rounded-[22px] border border-[var(--sand)] bg-[var(--cream)] px-4 py-2 text-[13px] text-[var(--ink)] transition-colors hover:border-[var(--clay)]"
           >
-            {t("flow.openOutput")}
+            {t("flow.viewOutput")}
           </button>
         </div>
       )}

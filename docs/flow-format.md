@@ -37,8 +37,8 @@ phases:
 |-------|----------|-------------|
 | `id` | yes | Stable identifier (filename without extension should match) |
 | `enabled` | no | Default `true` |
-| `schedule` | no | Cron expression; omit for manual-only |
-| `timezone` | no | IANA timezone for schedule (Phase 1) |
+| `schedule` | no | **Per-flow** cron expression; omit for manual-only |
+| `timezone` | no | IANA timezone for this flow's schedule (default `Asia/Taipei`) |
 | `timeout_sec` | no | Default `600` |
 | `output` | no | Output path template; `{date}`, `{id}`, `{time}` |
 | `runner` | no | `claude` (default) or `http` for direct fetch checks |
