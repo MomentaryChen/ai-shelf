@@ -2,6 +2,9 @@ import { CronExpressionParser } from "cron-parser";
 
 const DEFAULT_TIMEZONE = "Asia/Taipei";
 
+/** Minimum gap between consecutive cron fires (reject `* * * * *` etc.). */
+export const FLOW_CRON_MIN_INTERVAL_MS = 60 * 60 * 1000;
+
 export function flowTimezone(tz?: string): string {
   const trimmed = tz?.trim();
   return trimmed || DEFAULT_TIMEZONE;
@@ -52,6 +55,31 @@ export function cronNextRun(expression: string, timezone: string, from = new Dat
     const next = iter.next();
     const iso = next.toISOString();
     return iso ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function validateFlowCronMinInterval(
+  expression: string,
+  timezone: string,
+  minMs = FLOW_CRON_MIN_INTERVAL_MS,
+  from = new Date(),
+): string | null {
+  try {
+    const iter = CronExpressionParser.parse(expression, {
+      tz: flowTimezone(timezone),
+      currentDate: from,
+    });
+    const first = iter.next();
+    const second = iter.next();
+    const gapMs = second.getTime() - first.getTime();
+    if (gapMs < minMs) {
+      const gapMin = Math.max(1, Math.round(gapMs / 60_000));
+      const minHours = minMs / 3_600_000;
+      return `Schedule fires every ${gapMin} minute(s); minimum interval is ${minHours} hour(s)`;
+    }
+    return null;
   } catch {
     return null;
   }

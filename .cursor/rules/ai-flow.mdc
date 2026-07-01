@@ -34,13 +34,12 @@ phases:
 ## Optional frontmatter
 
 ```yaml
-schedule: "0 9 * * 1-5"   # cron, Asia/Taipei unless timezone set
+schedule: "0 9 * * 1-5"   # cron, Asia/Taipei unless timezone set (min 1h between fires)
 timezone: Asia/Taipei
 runner: claude            # default | http for simple checks
-url: https://example.com  # when runner: http
-method: HEAD
-on_fail: slack            # requires AISHELF_FLOW_SLACK_WEBHOOK
-output: ~/reports/{id}-{date}.md
+tool_args: --model haiku  # default for claude runner when omitted
+extra_mcp_servers:        # optional — external MCP from Claude config
+  - atlassian
 ```
 
 ## Claude runner protocol

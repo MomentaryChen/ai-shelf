@@ -12,7 +12,7 @@ import {
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getAppDataDir } from "ai-shelf";
-import { cronNextRun, shouldRunFlowNow } from "../shared/flow-cron.js";
+import { cronNextRun, shouldRunFlowNow, validateFlowCronMinInterval } from "../shared/flow-cron.js";
 import { parseFlowDocument } from "../shared/flow-parse.js";
 import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX, buildRunnerPrompt } from "../shared/flow-protocol.js";
 import {
@@ -30,7 +30,7 @@ import {
 import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 import type { ToolLaunchArgs } from "../tool-launch.js";
 import { notifyFlowRunFailed, notifyFlowRunCompleted } from "./flow-notify.js";
-import { patchFlowScheduleInContent, patchFlowRunnerInContent } from "../shared/flow-frontmatter-patch.js";
+import { patchFlowScheduleInContent, patchFlowRunnerInContent, ensureFlowDefaultsInContent } from "../shared/flow-frontmatter-patch.js";
 import { prepareFlowAgentSpawn } from "./mcp-config.js";
 import { resolveFlowRunner } from "./flow-runner-resolve.js";
 import { spawnAgentPrint } from "./claude-spawn.js";
@@ -195,7 +195,10 @@ function spawnAgentPrompt(
     throw new Error(resolved.error);
   }
 
-  const prep = prepareFlowAgentSpawn(resolved.tool, runId, outputPath, resolved.cwd);
+  const prep = prepareFlowAgentSpawn(resolved.tool, runId, outputPath, resolved.cwd, {
+    extraMcpServers: flow.extraMcpServers,
+    agentAllowedTools: flow.agentAllowedTools,
+  });
   const env = {
     ...process.env,
     AISHELF_RUN_ID: runId,
@@ -433,8 +436,14 @@ export async function runDueFlows(now = new Date()): Promise<RunDueFlowsResult> 
     const parsed = parseFlowDocument(content, fileName, filePath);
     if ("error" in parsed || !parsed.schedule || !parsed.enabled) continue;
 
-    result.checked += 1;
     const tz = parsed.timezone ?? "Asia/Taipei";
+    const intervalError = validateFlowCronMinInterval(parsed.schedule, tz);
+    if (intervalError) {
+      result.errors.push({ flowId: parsed.id, error: intervalError });
+      continue;
+    }
+
+    result.checked += 1;
     const lastSlot = readFlowLastSlot(parsed.id);
     const { due, slotKey } = shouldRunFlowNow(parsed.schedule, tz, lastSlot, now);
     if (!due || !slotKey) {
@@ -741,7 +750,12 @@ export function createFlowFromContent(
   }
 
   try {
-    writeFileSync(destPath, content.endsWith("\n") ? content : `${content}\n`, "utf8");
+    const normalized = ensureFlowDefaultsInContent(content);
+    if ("error" in normalized) {
+      return { ok: false, error: normalized.error };
+    }
+    const toWrite = normalized.content.endsWith("\n") ? normalized.content : `${normalized.content}\n`;
+    writeFileSync(destPath, toWrite, "utf8");
     if (options.migrateChatFromDraft !== false) {
       migrateFlowChat(FLOW_CHAT_DRAFT_ID, parsed.id);
     }
@@ -858,11 +872,13 @@ export function saveFlowRunner(
   }
 
   const content = readFileSync(flow.filePath, "utf8");
-  const updated = patchFlowRunnerInContent(content, patch);
-  if ("error" in updated) return { ok: false, error: updated.error };
+  const patched = patchFlowRunnerInContent(content, patch);
+  if ("error" in patched) return { ok: false, error: patched.error };
+  const normalized = ensureFlowDefaultsInContent(patched.content);
+  if ("error" in normalized) return { ok: false, error: normalized.error };
 
   try {
-    writeFileSync(flow.filePath, updated.content, "utf8");
+    writeFileSync(flow.filePath, normalized.content, "utf8");
     return { ok: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

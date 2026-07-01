@@ -42,6 +42,29 @@ function parsePhasesFromFrontmatter(raw: unknown): FlowPhaseDef[] {
   return phases;
 }
 
+function parseYamlStringList(lines: string[], startIndex: number): { items: string[]; nextIndex: number } {
+  const items: string[] = [];
+  let i = startIndex;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (!line.startsWith("  ")) break;
+    const itemMatch = /^\s+-\s+(.+)$/.exec(line);
+    if (itemMatch) {
+      items.push(itemMatch[1]!.trim().replace(/^["']|["']$/g, ""));
+    }
+    i += 1;
+  }
+  return { items, nextIndex: i };
+}
+
+function parseStringListField(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const items = raw
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean);
+  return items.length > 0 ? items : undefined;
+}
+
 function parseSimpleFrontmatter(yaml: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   const lines = yaml.split(/\r?\n/);
@@ -78,6 +101,13 @@ function parseSimpleFrontmatter(yaml: string): Record<string, unknown> {
         i += 1;
       }
       result.phases = phases;
+      continue;
+    }
+
+    if ((key === "extra_mcp_servers" || key === "allowed_tools") && rest === "") {
+      const { items, nextIndex } = parseYamlStringList(lines, i + 1);
+      result[key] = items;
+      i = nextIndex;
       continue;
     }
 
@@ -140,6 +170,8 @@ export function parseFlowDocument(
   const cwd = typeof fm.cwd === "string" && fm.cwd.trim() ? fm.cwd.trim() : undefined;
   const profileId =
     typeof fm.profile === "string" && fm.profile.trim() ? fm.profile.trim() : undefined;
+  const extraMcpServers = parseStringListField(fm.extra_mcp_servers);
+  const agentAllowedTools = parseStringListField(fm.allowed_tools);
   const httpUrl = typeof fm.url === "string" ? fm.url.trim() : undefined;
   const httpMethod = fm.method === "GET" ? "GET" : "HEAD";
 
@@ -162,6 +194,8 @@ export function parseFlowDocument(
     toolArgs,
     cwd,
     profileId,
+    extraMcpServers,
+    agentAllowedTools,
     phases,
     body: split.body,
   };
