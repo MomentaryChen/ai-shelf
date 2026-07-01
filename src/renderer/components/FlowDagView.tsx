@@ -1,7 +1,14 @@
 import { ChevronRight } from "lucide-react";
-import type { FlowPhaseStatus } from "../../shared/flow-types.js";
+import type { FlowPhaseStatus, FlowRunStatus } from "../../shared/flow-types.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
+import { profileToolLabel } from "../utils/available-tools";
+import {
+  flowProgressActiveMessage,
+  formatFlowProgressStatus,
+  summarizeFlowPhaseProgress,
+} from "../utils/flow-run-progress";
+import { FlowPhaseProgressBar } from "./FlowPhaseProgressBar";
 
 export interface FlowDagPhase {
   id: string;
@@ -83,8 +90,11 @@ export function FlowDagView({
   phases,
   runner,
   httpUrl,
+  agentTool,
+  toolArgs,
+  cwd,
+  profileId,
   runStatus,
-  runPercent,
   error,
   outputPath,
   onOpenOutput,
@@ -92,17 +102,36 @@ export function FlowDagView({
   phases: FlowDagPhase[];
   runner?: "claude" | "http";
   httpUrl?: string;
-  runStatus?: "pending" | "running" | "completed" | "failed" | "cancelled" | null;
-  runPercent?: number;
+  agentTool?: string;
+  toolArgs?: string;
+  cwd?: string;
+  profileId?: string;
+  runStatus?: FlowRunStatus | null;
   error?: string | null;
   outputPath?: string | null;
   onOpenOutput?: () => void;
 }) {
   const { t } = useLocale();
+  const progress = summarizeFlowPhaseProgress(phases, runStatus);
+  const progressStatus = formatFlowProgressStatus(t, runStatus, progress);
+  const progressMessage = flowProgressActiveMessage(progress);
 
-  const triggerLabel = runner === "http" ? t("flow.dag.triggerHttp") : t("flow.dag.triggerClaude");
+  const triggerLabel =
+    runner === "http"
+      ? t("flow.dag.triggerHttp")
+      : t("flow.dag.triggerAgent", { tool: profileToolLabel(agentTool || "claude") });
+
+  const agentSubtitleParts: string[] = [];
+  if (toolArgs?.trim()) agentSubtitleParts.push(toolArgs.trim());
+  if (cwd?.trim()) agentSubtitleParts.push(cwd.trim());
+  if (profileId?.trim()) agentSubtitleParts.push(`@${profileId.trim()}`);
+
   const triggerSubtitle =
-    runner === "http" && httpUrl ? httpUrl.replace(/^https?:\/\//, "") : undefined;
+    runner === "http" && httpUrl
+      ? httpUrl.replace(/^https?:\/\//, "")
+      : agentSubtitleParts.length > 0
+        ? agentSubtitleParts.join(" · ")
+        : undefined;
 
   return (
     <div className="rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)]">
@@ -113,24 +142,27 @@ export function FlowDagView({
             className={`text-[12px] font-medium ${
               runStatus === "completed"
                 ? "text-[var(--success)]"
-                : runStatus === "failed"
+                : runStatus === "failed" || runStatus === "cancelled"
                   ? "text-red-600"
                   : "text-[var(--clay)]"
             }`}
           >
-            {t(`flow.status.${runStatus}` as MessageKey)}
-            {typeof runPercent === "number" ? ` · ${runPercent}%` : ""}
+            {progressStatus}
           </span>
         )}
       </div>
 
-      {typeof runPercent === "number" && runStatus === "running" && (
-        <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-[var(--sand-deep)]">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-[var(--clay-soft)] to-[var(--clay)] transition-all duration-300"
-            style={{ width: `${runPercent}%` }}
-          />
-        </div>
+      {(runStatus === "running" || runStatus === "pending") && (
+        <FlowPhaseProgressBar
+          phases={phases}
+          runStatus={runStatus}
+          starting={progress.starting}
+          finishing={progress.finishing}
+        />
+      )}
+
+      {progressMessage && runStatus === "running" && (
+        <p className="-mt-4 mb-4 text-[12px] leading-relaxed text-[var(--muted)]">{progressMessage}</p>
       )}
 
       <div className="flex flex-col items-center gap-4 overflow-x-auto py-2">

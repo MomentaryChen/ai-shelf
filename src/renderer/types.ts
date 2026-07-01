@@ -3,10 +3,14 @@
 import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
+import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
+import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
+export type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
+export type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 export type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
@@ -732,10 +736,46 @@ export interface ElectronAPI {
   onSyncDataApplied: (cb: () => void) => () => void;
   onSettingsChanged: (cb: () => void) => () => void;
   flowList: () => Promise<FlowListItem[]>;
+  flowListActiveRuns: () => Promise<FlowRunState[]>;
   flowReadFile: (flowId: string) => Promise<{ content: string; path: string } | null>;
-  flowRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
+  flowReadRunOutput: (
+    runId: string,
+  ) => Promise<{ ok: boolean; content?: string; outputPath?: string; startedAt?: string; error?: string }>;
+  flowGetLatestRunOutput: (flowId: string) => Promise<{
+    runId: string;
+    outputPath: string;
+    startedAt: string;
+    status: import("../shared/flow-types.js").FlowRunStatus;
+  } | null>;
+  flowRun: (
+    flowId: string,
+    options?: { globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs },
+  ) => Promise<{ ok: boolean; runId?: string; error?: string }>;
+  flowCancelRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
+  flowGetTaskSchedulerStatus: () => Promise<{
+    supported: boolean;
+    installed: boolean;
+    taskName: string;
+    launcherPath?: string;
+  }>;
+  flowInstallTaskScheduler: () => Promise<{
+    ok: boolean;
+    error?: string;
+    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+  }>;
+  flowRemoveTaskScheduler: () => Promise<{
+    ok: boolean;
+    error?: string;
+    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+  }>;
   flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
   flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;
+  flowListRunsForFlow: (flowId: string, limit?: number) => Promise<FlowRunState[]>;
+  flowGetRunEvents: (runId: string) => Promise<FlowRunEvent[]>;
+  flowOpenRunArtifact: (
+    runId: string,
+    artifact: FlowRunArtifact,
+  ) => Promise<{ ok: boolean; path?: string; error?: string }>;
   flowOpenFlowsDir: () => Promise<void>;
   flowDelete: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowOpenFile: (flowId: string) => Promise<{ ok: boolean; error?: string; path?: string }>;
@@ -756,6 +796,32 @@ export interface ElectronAPI {
     flowId: string,
     patch: { schedule: string | null; timezone?: string | null },
   ) => Promise<{ ok: boolean; error?: string }>;
+  flowSaveRunnerSettings: (
+    flowId: string,
+    patch: {
+      tool: string;
+      toolArgs: string | null;
+      cwd: string | null;
+      profile: string | null;
+    },
+  ) => Promise<{ ok: boolean; error?: string }>;
+  flowGenerate: (
+    turns: { role: "user" | "assistant"; content: string }[],
+    flowId?: string,
+  ) => Promise<{ ok: boolean; content?: string; error?: string }>;
+  flowGetChat: (flowId: string) => Promise<FlowChatMessage[] | null>;
+  flowSaveChat: (
+    flowId: string,
+    messages: FlowChatMessage[],
+  ) => Promise<{ ok: boolean; error?: string }>;
+  flowListPromptLogs: (
+    flowId: string,
+    limit?: number,
+  ) => Promise<FlowPromptLogEntry[]>;
+  flowCreate: (
+    content: string,
+    overwrite?: boolean,
+  ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
 }
 

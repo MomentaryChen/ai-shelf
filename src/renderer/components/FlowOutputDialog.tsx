@@ -7,14 +7,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FlowMarkdownContent } from "./FlowMarkdownContent";
 import { useLocale } from "../i18n/LocaleProvider";
 
 type Props = {
   filePath: string;
+  runId?: string;
   onClose: () => void;
 };
 
-export function FlowOutputDialog({ filePath, onClose }: Props) {
+export function FlowOutputDialog({ filePath, runId, onClose }: Props) {
   const { t } = useLocale();
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -24,8 +26,19 @@ export function FlowOutputDialog({ filePath, onClose }: Props) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void window.api
-      .readConfigFile(filePath)
+
+    const load = runId
+      ? window.api.flowReadRunOutput(runId).then((res) => {
+          if (!res.ok) return { success: false as const, error: res.error, content: "" };
+          return { success: true as const, content: res.content ?? "" };
+        })
+      : window.api.readConfigFile(filePath).then((res) => ({
+          success: res.success,
+          error: res.error,
+          content: res.content,
+        }));
+
+    void load
       .then((res) => {
         if (cancelled) return;
         if (!res.success) {
@@ -40,10 +53,11 @@ export function FlowOutputDialog({ filePath, onClose }: Props) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [filePath, t]);
+  }, [filePath, runId, t]);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -61,9 +75,13 @@ export function FlowOutputDialog({ filePath, onClose }: Props) {
         ) : error ? (
           <div className="py-12 text-center text-[13px] text-red-700">{error}</div>
         ) : (
-          <pre className="min-h-[280px] flex-1 overflow-auto rounded-[20px] border border-[var(--sand)] bg-[var(--cream)] p-4 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--ink)]">
-            {content || t("flow.output.empty")}
-          </pre>
+          <div className="min-h-[280px] flex-1 overflow-auto rounded-[20px] border border-[var(--sand)] bg-[var(--cream)] px-5 py-4">
+            {content.trim() ? (
+              <FlowMarkdownContent content={content} />
+            ) : (
+              <p className="text-[13px] text-[var(--muted)]">{t("flow.output.empty")}</p>
+            )}
+          </div>
         )}
 
         <DialogFooter className="gap-2 sm:justify-between">

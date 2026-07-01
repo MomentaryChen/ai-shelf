@@ -37,6 +37,40 @@ export type FlowSchedulePatch = {
   timezone?: string | null;
 };
 
+export type FlowRunnerPatch = {
+  tool?: string | null;
+  toolArgs?: string | null;
+  cwd?: string | null;
+  profile?: string | null;
+};
+
+export function patchFlowRunnerInContent(
+  content: string,
+  patch: FlowRunnerPatch,
+): { content: string } | { error: string } {
+  const split = splitFlowDocument(content);
+  if (!split) return { error: "Missing YAML frontmatter" };
+
+  let fmLines = split.frontmatter.split(/\r?\n/);
+
+  const tool = patch.tool?.trim();
+  fmLines = upsertTopLevelField(fmLines, "tool", tool || undefined);
+
+  const toolArgs = patch.toolArgs?.trim();
+  fmLines = upsertTopLevelField(fmLines, "tool_args", toolArgs || undefined);
+
+  const cwd = patch.cwd?.trim();
+  fmLines = upsertTopLevelField(fmLines, "cwd", cwd || undefined);
+
+  const profile = patch.profile?.trim();
+  fmLines = upsertTopLevelField(fmLines, "profile", profile || undefined);
+
+  const body = split.body.length > 0 ? `${split.body}\n` : "";
+  return {
+    content: `---\n${fmLines.join("\n")}\n---\n\n${body}`,
+  };
+}
+
 export function patchFlowScheduleInContent(
   content: string,
   patch: FlowSchedulePatch,

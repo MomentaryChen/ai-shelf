@@ -15,13 +15,12 @@ export function buildRunnerPrompt(body: string, phaseIds: string[]): string {
 已知 phase id：
 ${phaseList}
 
-進行中請在 stdout 輸出進度行（不計入最終報告）：
-FLOW_PROGRESS {"type":"phase.started","phaseId":"<id>"}
-FLOW_PROGRESS {"type":"phase.done","phaseId":"<id>"}
-FLOW_PROGRESS {"type":"phase.message","phaseId":"<id>","message":"簡短狀態"}
-FLOW_PROGRESS {"type":"phase.failed","phaseId":"<id>","message":"原因"}
+**進度回報**：請使用 MCP 工具 \`flow_progress\`（不要用 stdout 印進度行）：
+- 開始某 phase：\`flow_progress({ type: "phase.started", phaseId: "<id>" })\`
+- 完成：\`flow_progress({ type: "phase.done", phaseId: "<id>" })\`
+- 失敗：\`flow_progress({ type: "phase.failed", phaseId: "<id>", message: "原因" })\`
+- 狀態訊息：\`flow_progress({ type: "phase.message", phaseId: "<id>", message: "..." })\`
 
-最終產出前請單獨輸出一行：
-FLOW_OUTPUT_BEGIN
-（報告從下一行開始；進度行與協議文字不要出現在報告內）`;
+**最終產出**：完成所有 phase 後，用 \`flow_output({ content: "..." })\` 寫入完整報告（Markdown）。
+若 \`flow_output\` 不可用，可改在 stdout 輸出 \`FLOW_OUTPUT_BEGIN\` 後接報告正文。`;
 }

@@ -61,13 +61,19 @@ Schema: `ai-shelf.flow/run-state/v1`
 }
 ```
 
-## Progress protocol (injected by runner)
+## Progress protocol
 
-During execution the runner appends a protocol block to the prompt. The model emits lines:
+**Primary (Phase 2+):** MCP tools on server `ai-shelf-flow`:
+
+- `flow_progress` — `{ type, phaseId, message? }` updates `runs/{runId}/state.json`
+- `flow_output` — `{ content }` writes the final markdown report
+
+The runner passes `--mcp-config` and `--allowedTools mcp__ai-shelf-flow__*` to `claude -p`.
+
+**Fallback:** stdout lines (legacy / when MCP unavailable):
 
 ```
 FLOW_PROGRESS {"type":"phase.started","phaseId":"fetch-amplitude"}
-FLOW_PROGRESS {"type":"phase.done","phaseId":"fetch-amplitude"}
 FLOW_OUTPUT_BEGIN
 (report body follows)
 ```

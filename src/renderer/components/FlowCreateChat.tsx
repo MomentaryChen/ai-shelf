@@ -1,0 +1,318 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { FLOW_CHAT_DRAFT_ID } from "../../shared/flow-chat-types.js";
+import type { FlowChatMessage } from "../../shared/flow-chat-types.js";
+import { parseFlowDocument } from "../../shared/flow-parse.js";
+import { useLocale } from "../i18n/LocaleProvider";
+
+type UiMessage = FlowChatMessage & { draft?: string; error?: boolean };
+
+interface Props {
+  /** Existing flow id, or omit for new draft (`__draft__`). */
+  flowId?: string;
+  onSaved: (flowId: string) => void;
+  onCancel?: () => void;
+}
+
+function welcomeMessage(welcomeText: string): UiMessage {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: welcomeText,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1 px-1" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="inline-block h-1.5 w-1.5 rounded-full bg-[#C0A98D] motion-safe:animate-[warm-dot-blink_1.2s_ease-in-out_infinite]"
+          style={{ animationDelay: `${i * 0.2}s` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
+  const { t } = useLocale();
+  const chatKey = flowId?.trim() || FLOW_CHAT_DRAFT_ID;
+  const isExisting = Boolean(flowId?.trim());
+
+  const [messages, setMessages] = useState<UiMessage[]>([welcomeMessage(t("flow.create.welcome"))]);
+  const [loadingChat, setLoadingChat] = useState(true);
+  const [promptLogCount, setPromptLogCount] = useState(0);
+  const [input, setInput] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const persistChat = useCallback(
+    async (next: UiMessage[]) => {
+      const toSave = next
+        .filter((m) => m.id !== "welcome")
+        .map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          draft: m.draft,
+          error: m.error,
+          createdAt: m.createdAt ?? new Date().toISOString(),
+        }));
+      await window.api.flowSaveChat(chatKey, toSave);
+    },
+    [chatKey],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingChat(true);
+    void Promise.all([
+      window.api.flowGetChat(chatKey),
+      window.api.flowListPromptLogs(chatKey, 200),
+    ])
+      .then(([stored, logs]) => {
+        if (cancelled) return;
+        if (stored && stored.length > 0) {
+          setMessages([welcomeMessage(t("flow.create.welcome")), ...stored]);
+          const lastDraft = [...stored].reverse().find((m) => m.draft)?.draft;
+          if (lastDraft) setDraft(lastDraft);
+        }
+        setPromptLogCount(logs.length);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingChat(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chatKey, t]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, generating, draft]);
+
+  const turnsForApi = useCallback(
+    () =>
+      messages
+        .filter((m) => m.id !== "welcome" && !m.error)
+        .map((m) => ({
+          role: m.role,
+          content: m.role === "assistant" && m.draft ? m.draft : m.content,
+        })),
+    [messages],
+  );
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || generating || loadingChat) return;
+
+    const userMsg: UiMessage = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      content: text,
+      createdAt: new Date().toISOString(),
+    };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
+    void persistChat(nextMessages);
+    setInput("");
+    setGenerating(true);
+    setSaveError(null);
+    setDraft(null);
+
+    const turns = [...turnsForApi(), { role: "user" as const, content: text }];
+    const res = await window.api.flowGenerate(turns, chatKey);
+    setGenerating(false);
+
+    if (!res.ok || !res.content) {
+      const withErr: UiMessage[] = [
+        ...nextMessages,
+        {
+          id: `a-err-${Date.now()}`,
+          role: "assistant",
+          content: res.error ?? t("flow.create.generateFailed"),
+          error: true,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      setMessages(withErr);
+      void persistChat(withErr);
+      return;
+    }
+
+    setDraft(res.content);
+    setPromptLogCount((c) => c + 1);
+    const parsed = parseFlowDocument(res.content, "draft.flow.md", "");
+    const summary =
+      "error" in parsed
+        ? t("flow.create.draftReady")
+        : t("flow.create.draftSummary", { id: parsed.id, phases: parsed.phases.length });
+
+    const withAssistant: UiMessage[] = [
+      ...nextMessages,
+      {
+        id: `a-${Date.now()}`,
+        role: "assistant",
+        content: summary,
+        draft: res.content,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    setMessages(withAssistant);
+    void persistChat(withAssistant);
+  };
+
+  const saveDraft = async (overwrite = false) => {
+    if (!draft) return;
+    setSaving(true);
+    setSaveError(null);
+    const res = await window.api.flowCreate(draft, overwrite || isExisting);
+    setSaving(false);
+    if (!res.ok) {
+      if (!overwrite && res.error?.includes("already exists")) {
+        setSaveError(t("flow.create.existsHint"));
+        return;
+      }
+      setSaveError(res.error ?? t("flow.create.saveFailed"));
+      return;
+    }
+    if (res.flowId) onSaved(res.flowId);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void send();
+    }
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-4" data-surface="warm">
+      <header className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div>
+          <h1 className="text-[17px] font-semibold text-[var(--ink)]">
+            {isExisting ? t("flow.create.editTitle", { id: flowId! }) : t("flow.create.title")}
+          </h1>
+          <p className="mt-1 text-[13px] text-[var(--muted)]">{t("flow.create.subtitle")}</p>
+          {promptLogCount > 0 && (
+            <p className="mt-1 text-[11px] text-[var(--muted)]">
+              {t("flow.chat.promptLogCount", { count: promptLogCount })}
+            </p>
+          )}
+        </div>
+        {onCancel && (
+          <Button type="button" variant="ghost" size="sm" className="rounded-[22px]" onClick={onCancel}>
+            {t("flow.create.cancel")}
+          </Button>
+        )}
+      </header>
+
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-[28px] border border-[var(--sand)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]"
+      >
+        {loadingChat ? (
+          <p className="py-8 text-center text-[13px] text-[var(--muted)]">{t("flow.chat.loading")}</p>
+        ) : (
+          messages.map((msg) => {
+            const isUser = msg.role === "user";
+            return (
+              <div
+                key={msg.id}
+                className={`warm-rise flex ${isUser ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[78%] px-4 py-3 text-[15px] leading-relaxed ${
+                    isUser
+                      ? "rounded-[20px] rounded-br-[6px] bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white shadow-[var(--shadow-accent)]"
+                      : msg.error
+                        ? "rounded-[20px] rounded-bl-[6px] border border-red-200 bg-red-50 text-red-800"
+                        : "rounded-[20px] rounded-bl-[6px] bg-[var(--sand)] text-[var(--ink)]"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.draft && (
+                    <pre className="mt-3 max-h-48 overflow-auto rounded-[16px] bg-[var(--cream)] p-3 font-mono text-[11px] leading-relaxed text-[var(--ink)]">
+                      {msg.draft}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+        {generating && (
+          <div className="flex justify-start">
+            <div className="rounded-[20px] rounded-bl-[6px] bg-[var(--sand)] px-4 py-3 text-[var(--ink)]">
+              <TypingDots />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {draft && (
+        <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-[var(--sand)] bg-[var(--surface)] px-4 py-3">
+          <span className="text-[13px] text-[var(--muted)]">{t("flow.create.previewHint")}</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {!isExisting && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-[22px]"
+                disabled={saving}
+                onClick={() => void saveDraft(true)}
+              >
+                {t("flow.create.overwrite")}
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              className="rounded-[22px] bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white"
+              disabled={saving}
+              onClick={() => void saveDraft(isExisting)}
+            >
+              {saving ? t("flow.create.saving") : isExisting ? t("flow.create.update") : t("flow.create.save")}
+            </Button>
+          </div>
+        </div>
+      )}
+      {saveError && (
+        <p className="rounded-[20px] border border-red-200 bg-red-50/80 px-4 py-2 text-[13px] text-red-800">
+          {saveError}
+        </p>
+      )}
+
+      <div className="flex shrink-0 items-end gap-2">
+        <Textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={t("flow.create.placeholder")}
+          disabled={generating || loadingChat}
+          rows={2}
+          className="min-h-[52px] max-h-40 flex-1 resize-none rounded-[22px] border-[var(--sand)] bg-[var(--cream)] text-[15px] text-[var(--ink)] placeholder:text-[var(--muted)] focus-visible:ring-[var(--clay)]/35"
+        />
+        <Button
+          type="button"
+          size="icon"
+          aria-label={t("flow.create.send")}
+          disabled={generating || loadingChat || !input.trim()}
+          onClick={() => void send()}
+          className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-br from-[var(--clay-soft)] to-[var(--clay)] text-white shadow-[var(--shadow-accent)] active:scale-90"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}

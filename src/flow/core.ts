@@ -1,11 +1,12 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, execFile } from "node:child_process";
 import {
-  appendFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   unlinkSync,
+  watchFile,
+  unwatchFile,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -22,8 +23,30 @@ import {
   type FlowProgressEvent,
   type FlowRunState,
 } from "../shared/flow-types.js";
-import { notifyFlowRunFailed } from "./flow-notify.js";
-import { patchFlowScheduleInContent } from "../shared/flow-frontmatter-patch.js";
+import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
+import type { ToolLaunchArgs } from "../tool-launch.js";
+import { notifyFlowRunFailed, notifyFlowRunCompleted } from "./flow-notify.js";
+import { patchFlowScheduleInContent, patchFlowRunnerInContent } from "../shared/flow-frontmatter-patch.js";
+import { prepareFlowAgentSpawn } from "./mcp-config.js";
+import { resolveFlowRunner } from "./flow-runner-resolve.js";
+import { spawnAgentPrint } from "./claude-spawn.js";
+import {
+  deleteFlowChatData,
+  deleteRunsForFlow,
+  FLOW_CHAT_DRAFT_ID,
+  migrateFlowChat,
+  readFlowChat,
+  saveFlowChat,
+  listFlowPromptLogs,
+} from "./flow-chat-store.js";
+import {
+  applyProgressEventToState,
+  appendRunEvent,
+  readRunState,
+  recomputeRunProgress,
+  runsDir as flowRunsDir,
+  writeRunState,
+} from "./run-state-store.js";
 
 type RunStateListener = (state: FlowRunState) => void;
 
@@ -31,12 +54,47 @@ const activeRuns = new Map<string, FlowRunState>();
 const runListeners = new Set<RunStateListener>();
 const runsInFlight = new Set<string>();
 
+type ActiveRunContext = {
+  flowId: string;
+  runId: string;
+  runDir: string;
+  state: FlowRunState;
+  child?: ChildProcess;
+  abortHttp?: AbortController;
+  timeout?: NodeJS.Timeout;
+  stopWatching?: () => void;
+  mcpCleanup?: () => void;
+  cancelled: boolean;
+};
+
+const activeRunContexts = new Map<string, ActiveRunContext>();
+
+function killRunChild(child: ChildProcess): void {
+  if (!child.pid) {
+    try {
+      child.kill();
+    } catch {
+      /* already dead */
+    }
+    return;
+  }
+  if (process.platform === "win32") {
+    execFile("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
+    return;
+  }
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    /* already dead */
+  }
+}
+
 function flowsDir(): string {
   return join(getAppDataDir(), "flows");
 }
 
 function runsDir(): string {
-  return join(getAppDataDir(), "runs");
+  return flowRunsDir();
 }
 
 function initFlowDirs(): void {
@@ -62,14 +120,12 @@ function broadcastState(state: FlowRunState): void {
 }
 
 function writeState(runDir: string, state: FlowRunState): void {
-  state.updatedAt = new Date().toISOString();
-  writeFileSync(join(runDir, "state.json"), JSON.stringify(state, null, 2), "utf8");
+  writeRunState(runDir, state);
   broadcastState(state);
 }
 
 function appendEvent(runDir: string, event: Record<string, unknown>): void {
-  const line = JSON.stringify({ t: new Date().toISOString(), ...event });
-  appendFileSync(join(runDir, "events.jsonl"), `${line}\n`, "utf8");
+  appendRunEvent(runDir, event);
 }
 
 function initialRunState(flow: FlowDefinition, runId: string, runDir: string): FlowRunState {
@@ -97,49 +153,8 @@ function initialRunState(flow: FlowDefinition, runId: string, runDir: string): F
   };
 }
 
-function recomputeProgress(state: FlowRunState): void {
-  const total = state.phases.length;
-  const completed = state.phases.filter((p) => p.status === "done" || p.status === "skipped").length;
-  state.progress = {
-    completed,
-    total,
-    percent: total === 0 ? 100 : Math.round((completed / total) * 100),
-  };
-}
-
 function applyProgressEvent(state: FlowRunState, event: FlowProgressEvent): void {
-  if (!event.phaseId) return;
-  const phase = state.phases.find((p) => p.id === event.phaseId);
-  if (!phase) return;
-
-  const now = new Date().toISOString();
-  switch (event.type) {
-    case "phase.started":
-      phase.status = "running";
-      phase.startedAt = phase.startedAt ?? now;
-      state.currentPhaseId = event.phaseId;
-      break;
-    case "phase.done":
-      phase.status = "done";
-      phase.completedAt = now;
-      if (event.message) phase.message = event.message;
-      break;
-    case "phase.failed":
-      phase.status = "failed";
-      phase.completedAt = now;
-      phase.message = event.message ?? "failed";
-      break;
-    case "phase.skipped":
-      phase.status = "skipped";
-      phase.completedAt = now;
-      break;
-    case "phase.message":
-      phase.message = event.message ?? phase.message;
-      break;
-    default:
-      break;
-  }
-  recomputeProgress(state);
+  applyProgressEventToState(state, event);
 }
 
 function parseProgressLine(line: string): FlowProgressEvent | null {
@@ -155,19 +170,61 @@ function parseProgressLine(line: string): FlowProgressEvent | null {
   return null;
 }
 
-function spawnClaudePrompt(prompt: string): ReturnType<typeof spawn> {
-  if (process.platform === "win32") {
-    return spawn("pwsh.exe", ["-NoProfile", "-Command", "claude", "-p", prompt], {
-      windowsHide: true,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  }
-  return spawn("claude", ["-p", prompt], {
-    windowsHide: true,
-    env: process.env,
-    stdio: ["ignore", "pipe", "pipe"],
+function releaseRunMcp(ctx: ActiveRunContext): void {
+  if (!ctx.mcpCleanup) return;
+  const cleanup = ctx.mcpCleanup;
+  ctx.mcpCleanup = undefined;
+  cleanup();
+}
+
+function spawnAgentPrompt(
+  prompt: string,
+  flow: FlowDefinition,
+  runId: string,
+  outputPath: string,
+  runOptions: RunFlowOptions,
+): { child: ChildProcess; mcpCleanup: () => void } {
+  const resolved = resolveFlowRunner(flow, {
+    globalToolLaunchArgs: runOptions.globalToolLaunchArgs,
   });
+  if ("error" in resolved) {
+    throw new Error(resolved.error);
+  }
+
+  const prep = prepareFlowAgentSpawn(resolved.tool, runId, outputPath, resolved.cwd);
+  const env = {
+    ...process.env,
+    AISHELF_RUN_ID: runId,
+    AISHELF_APP_DATA_DIR: getAppDataDir(),
+    AISHELF_FLOW_OUTPUT_PATH: outputPath,
+  };
+
+  const child = spawnAgentPrint({
+    launchCommand: resolved.launchCommand,
+    cwd: resolved.cwd,
+    prompt,
+    env,
+    printPrefix: prep.printPrefix,
+    args: prep.extraArgs,
+    promptLog: { flowId: flow.id, kind: "run", runId },
+  });
+
+  return { child, mcpCleanup: prep.mcpMount.cleanup };
+}
+
+function watchRunStateFile(runId: string, state: FlowRunState): () => void {
+  const statePath = join(runsDir(), runId, "state.json");
+  let lastUpdated = state.updatedAt;
+
+  watchFile(statePath, { interval: 500 }, () => {
+    const disk = readRunState(runId);
+    if (!disk || disk.updatedAt === lastUpdated) return;
+    lastUpdated = disk.updatedAt;
+    Object.assign(state, disk);
+    broadcastState(state);
+  });
+
+  return () => unwatchFile(statePath);
 }
 
 export function initFlowCore(): void {
@@ -236,10 +293,63 @@ export function isFlowRunning(flowId: string): boolean {
   return runsInFlight.has(flowId);
 }
 
+export function listActiveFlowRuns(): FlowRunState[] {
+  const states: FlowRunState[] = [];
+  for (const flowId of runsInFlight) {
+    const ctx = activeRunContexts.get(flowId);
+    if (ctx) {
+      states.push(ctx.state);
+      continue;
+    }
+    for (const state of activeRuns.values()) {
+      if (state.flowId === flowId && (state.status === "running" || state.status === "pending")) {
+        states.push(state);
+        break;
+      }
+    }
+  }
+  return states;
+}
+
+export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; error?: string } {
+  const ctx = activeRunContexts.get(flowId);
+  if (!ctx) {
+    return { ok: false, error: "No run in progress for this flow" };
+  }
+  if (ctx.cancelled) {
+    return { ok: true, runId: ctx.runId };
+  }
+
+  ctx.cancelled = true;
+  if (ctx.timeout) clearTimeout(ctx.timeout);
+  ctx.abortHttp?.abort();
+  if (ctx.child) killRunChild(ctx.child);
+
+  for (const phase of ctx.state.phases) {
+    if (phase.status === "running") {
+      phase.status = "skipped";
+      phase.completedAt = new Date().toISOString();
+      phase.message = "Cancelled";
+    } else if (phase.status === "pending") {
+      phase.status = "skipped";
+    }
+  }
+  ctx.state.status = "cancelled";
+  ctx.state.error = "Cancelled by user";
+  ctx.state.currentPhaseId = null;
+  recomputeRunProgress(ctx.state);
+  appendEvent(ctx.runDir, { type: "run.cancelled" });
+  writeState(ctx.runDir, ctx.state);
+
+  return { ok: true, runId: ctx.runId };
+}
+
 export type RunFlowOptions = {
   wait?: boolean;
   trigger?: "manual" | "schedule";
   scheduleSlotKey?: string;
+  /** App-wide per-tool launch args (from settings), merged before flow `tool_args`. */
+  globalToolLaunchArgs?: ToolLaunchArgs;
 };
 
 export async function runFlow(
@@ -268,10 +378,14 @@ export async function runFlow(
 
   runsInFlight.add(flowId);
 
-  const runPromise = executeFlowRun(flow, runDir, state).finally(() => {
+  const runPromise = executeFlowRun(flow, runDir, state, options).finally(() => {
     runsInFlight.delete(flowId);
-    if (state.status === "failed") {
-      void notifyFlowRunFailed(flow, state);
+    activeRunContexts.delete(flowId);
+    const done = getFlowRunState(runId) ?? state;
+    if (done.status === "failed") {
+      void notifyFlowRunFailed(flow, done);
+    } else if (done.status === "completed") {
+      void notifyFlowRunCompleted(flow, done);
     }
     if (options.scheduleSlotKey) {
       writeFlowLastSlot(flow.id, options.scheduleSlotKey);
@@ -344,6 +458,7 @@ async function executeHttpFlow(
   runDir: string,
   state: FlowRunState,
   outputPath: string,
+  ctx: ActiveRunContext,
 ): Promise<void> {
   const url = flow.httpUrl;
   if (!url) {
@@ -363,10 +478,13 @@ async function executeHttpFlow(
     writeState(runDir, state);
   }
 
+  const abortHttp = new AbortController();
+  ctx.abortHttp = abortHttp;
+
   try {
     const res = await fetch(url, {
       method: flow.httpMethod,
-      signal: AbortSignal.timeout(flow.timeoutSec * 1000),
+      signal: AbortSignal.any([abortHttp.signal, AbortSignal.timeout(flow.timeoutSec * 1000)]),
     });
     const body = [
       "# Connectivity check",
@@ -396,7 +514,7 @@ async function executeHttpFlow(
         p.completedAt = new Date().toISOString();
       }
     }
-    recomputeProgress(state);
+    recomputeRunProgress(state);
     state.status = res.ok ? "completed" : "failed";
     state.error = res.ok ? null : `HTTP ${res.status}`;
     state.currentPhaseId = null;
@@ -407,6 +525,9 @@ async function executeHttpFlow(
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    if (ctx.cancelled || abortHttp.signal.aborted) {
+      return;
+    }
     if (phase) {
       phase.status = "failed";
       phase.completedAt = new Date().toISOString();
@@ -417,6 +538,8 @@ async function executeHttpFlow(
     appendEvent(runDir, { type: "run.failed", error: message });
   }
 
+  if (ctx.cancelled) return;
+  ensureOutputPathOnState(state, runDir);
   writeState(runDir, state);
 }
 
@@ -424,6 +547,7 @@ async function executeFlowRun(
   flow: FlowDefinition,
   runDir: string,
   state: FlowRunState,
+  runOptions: RunFlowOptions = {},
 ): Promise<void> {
   const outputPath = flow.outputTemplate
     ? expandPathTemplate(flow.outputTemplate, flow.id)
@@ -431,8 +555,17 @@ async function executeFlowRun(
 
   mkdirSync(dirname(outputPath), { recursive: true });
 
+  const ctx: ActiveRunContext = {
+    flowId: flow.id,
+    runId: state.runId,
+    runDir,
+    state,
+    cancelled: false,
+  };
+  activeRunContexts.set(flow.id, ctx);
+
   if (flow.runner === "http") {
-    await executeHttpFlow(flow, runDir, state, outputPath);
+    await executeHttpFlow(flow, runDir, state, outputPath, ctx);
     return;
   }
 
@@ -445,8 +578,17 @@ async function executeFlowRun(
     const outputChunks: string[] = [];
     let stderr = "";
     let stdoutBuf = "";
+    const stopWatching = watchRunStateFile(state.runId, state);
+    ctx.stopWatching = stopWatching;
+
+    const finish = () => {
+      releaseRunMcp(ctx);
+      ctx.stopWatching?.();
+      resolve();
+    };
 
     const handleLine = (line: string) => {
+      if (ctx.cancelled) return;
       if (!outputMode) {
         if (line.trim() === FLOW_OUTPUT_BEGIN) {
           outputMode = true;
@@ -469,16 +611,32 @@ async function executeFlowRun(
       }
     };
 
-    const child = spawnClaudePrompt(prompt);
+    let child: ChildProcess;
+    try {
+      const spawned = spawnAgentPrompt(prompt, flow, state.runId, outputPath, runOptions);
+      child = spawned.child;
+      ctx.mcpCleanup = spawned.mcpCleanup;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      state.status = "failed";
+      state.error = message;
+      appendEvent(runDir, { type: "run.failed", error: message });
+      writeState(runDir, state);
+      finish();
+      return;
+    }
+    ctx.child = child;
 
     const timeout = setTimeout(() => {
-      child.kill();
+      if (ctx.cancelled) return;
+      killRunChild(child);
       state.status = "failed";
       state.error = `Timed out after ${flow.timeoutSec}s`;
       appendEvent(runDir, { type: "run.failed", error: state.error });
       writeState(runDir, state);
-      resolve();
+      finish();
     }, flow.timeoutSec * 1000);
+    ctx.timeout = timeout;
 
     child.stdout?.on("data", (chunk: Buffer) => {
       stdoutBuf += chunk.toString("utf8");
@@ -495,14 +653,23 @@ async function executeFlowRun(
       clearTimeout(timeout);
       if (stdoutBuf) handleLine(stdoutBuf);
 
+      if (ctx.cancelled) {
+        finish();
+        return;
+      }
+
+      const diskState = readRunState(state.runId);
+      if (diskState) Object.assign(state, diskState);
+
       const body = outputChunks.join("\n").trim();
-      if (body) {
+      if (body && !state.outputPath) {
         writeFileSync(outputPath, `${body}\n`, "utf8");
         state.outputPath = outputPath;
-      } else if (!outputMode && stdoutBuf.trim()) {
+      } else if (!outputMode && stdoutBuf.trim() && !state.outputPath) {
         writeFileSync(outputPath, `${stdoutBuf.trim()}\n`, "utf8");
         state.outputPath = outputPath;
       }
+      ensureOutputPathOnState(state, runDir);
 
       if (code !== 0 || state.status === "failed") {
         if (state.status !== "failed") {
@@ -517,23 +684,27 @@ async function executeFlowRun(
             phase.completedAt = new Date().toISOString();
           }
         }
-        recomputeProgress(state);
+        recomputeRunProgress(state);
         state.status = "completed";
         state.currentPhaseId = null;
         appendEvent(runDir, { type: "run.completed", outputPath: state.outputPath });
       }
 
       writeState(runDir, state);
-      resolve();
+      finish();
     });
 
     child.on("error", (err) => {
       clearTimeout(timeout);
+      if (ctx.cancelled) {
+        finish();
+        return;
+      }
       state.status = "failed";
       state.error = err.message;
       appendEvent(runDir, { type: "run.failed", error: state.error });
       writeState(runDir, state);
-      resolve();
+      finish();
     });
   });
 }
@@ -544,6 +715,84 @@ export function readFlowFile(flowId: string): { content: string; path: string } 
   return { content: readFileSync(flow.filePath, "utf8"), path: flow.filePath };
 }
 
+export function createFlowFromContent(
+  content: string,
+  options: { overwrite?: boolean; migrateChatFromDraft?: boolean } = {},
+): { ok: boolean; flowId?: string; path?: string; error?: string } {
+  initFlowDirs();
+  const fileName = "draft.flow.md";
+  const parsed = parseFlowDocument(content, fileName, join(flowsDir(), fileName));
+  if ("error" in parsed) {
+    return { ok: false, error: parsed.error };
+  }
+
+  const destName = `${parsed.id}.flow.md`;
+  const destPath = join(flowsDir(), destName);
+  if (!options.overwrite && existsSync(destPath)) {
+    return { ok: false, error: `Flow already exists: ${parsed.id}` };
+  }
+
+  try {
+    writeFileSync(destPath, content.endsWith("\n") ? content : `${content}\n`, "utf8");
+    if (options.migrateChatFromDraft !== false) {
+      migrateFlowChat(FLOW_CHAT_DRAFT_ID, parsed.id);
+    }
+    return { ok: true, flowId: parsed.id, path: destPath };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+function ensureOutputPathOnState(state: FlowRunState, runDir: string): void {
+  if (state.outputPath && existsSync(state.outputPath)) return;
+  const fallback = join(runDir, "output.md");
+  if (existsSync(fallback)) {
+    state.outputPath = fallback;
+  }
+}
+
+export function readRunOutput(
+  runId: string,
+): { ok: boolean; content?: string; outputPath?: string; startedAt?: string; error?: string } {
+  const state = getFlowRunState(runId);
+  let outputPath = state?.outputPath ?? null;
+  if (!outputPath || !existsSync(outputPath)) {
+    const fallback = join(runsDir(), runId, "output.md");
+    if (existsSync(fallback)) {
+      outputPath = fallback;
+    }
+  }
+  if (!outputPath || !existsSync(outputPath)) {
+    return { ok: false, error: "Output not found for this run" };
+  }
+  try {
+    const content = readFileSync(outputPath, "utf8");
+    return { ok: true, content, outputPath, startedAt: state?.startedAt };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+export function getLatestRunWithOutput(
+  flowId: string,
+): { runId: string; outputPath: string; startedAt: string; status: FlowRunState["status"] } | null {
+  const runs = listRunsForFlow(flowId, 30);
+  for (const run of runs) {
+    const resolved = readRunOutput(run.runId);
+    if (resolved.ok && resolved.outputPath) {
+      return {
+        runId: run.runId,
+        outputPath: resolved.outputPath,
+        startedAt: run.startedAt,
+        status: run.status,
+      };
+    }
+  }
+  return null;
+}
+
 export function deleteFlow(flowId: string): { ok: boolean; error?: string } {
   if (runsInFlight.has(flowId)) {
     return { ok: false, error: "Flow is running" };
@@ -552,6 +801,8 @@ export function deleteFlow(flowId: string): { ok: boolean; error?: string } {
   if (!flow) return { ok: false, error: `Flow not found: ${flowId}` };
   try {
     unlinkSync(flow.filePath);
+    deleteFlowChatData(flowId);
+    deleteRunsForFlow(flowId);
     return { ok: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -583,6 +834,34 @@ export function saveFlowSchedule(
   }
 }
 
+export function saveFlowRunner(
+  flowId: string,
+  patch: {
+    tool?: string | null;
+    toolArgs?: string | null;
+    cwd?: string | null;
+    profile?: string | null;
+  },
+): { ok: boolean; error?: string } {
+  const flow = getFlowDefinition(flowId);
+  if (!flow) return { ok: false, error: `Flow not found: ${flowId}` };
+  if (flow.runner !== "claude") {
+    return { ok: false, error: "Runner settings apply only to agent flows" };
+  }
+
+  const content = readFileSync(flow.filePath, "utf8");
+  const updated = patchFlowRunnerInContent(content, patch);
+  if ("error" in updated) return { ok: false, error: updated.error };
+
+  try {
+    writeFileSync(flow.filePath, updated.content, "utf8");
+    return { ok: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
 export function listRecentRuns(limit = 20): FlowRunState[] {
   initFlowDirs();
   if (!existsSync(runsDir())) return [];
@@ -599,4 +878,64 @@ export function listRecentRuns(limit = 20): FlowRunState[] {
     if (state) states.push(state);
   }
   return states;
+}
+
+export function listRunsForFlow(flowId: string, limit = 30): FlowRunState[] {
+  initFlowDirs();
+  if (!existsSync(runsDir())) return [];
+  const suffix = `-${flowId}`;
+  const dirs = readdirSync(runsDir(), { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.endsWith(suffix))
+    .map((d) => d.name)
+    .sort()
+    .reverse()
+    .slice(0, limit);
+
+  const states: FlowRunState[] = [];
+  for (const runId of dirs) {
+    const state = getFlowRunState(runId);
+    if (state) states.push(state);
+  }
+  return states;
+}
+
+export function getRunEvents(runId: string): FlowRunEvent[] {
+  const path = join(runsDir(), runId, "events.jsonl");
+  if (!existsSync(path)) return [];
+  const lines = readFileSync(path, "utf8").split(/\r?\n/).filter(Boolean);
+  const events: FlowRunEvent[] = [];
+  for (const line of lines) {
+    try {
+      events.push(JSON.parse(line) as FlowRunEvent);
+    } catch {
+      /* skip malformed */
+    }
+  }
+  return events;
+}
+
+export function getRunArtifactPath(runId: string, artifact: FlowRunArtifact): string | null {
+  const runDir = join(runsDir(), runId);
+  if (!existsSync(runDir)) return null;
+
+  switch (artifact) {
+    case "prompt": {
+      const p = join(runDir, "prompt.md");
+      return existsSync(p) ? p : null;
+    }
+    case "events": {
+      const p = join(runDir, "events.jsonl");
+      return existsSync(p) ? p : null;
+    }
+    case "output": {
+      const state = getFlowRunState(runId);
+      if (state?.outputPath && existsSync(state.outputPath)) return state.outputPath;
+      const fallback = join(runDir, "output.md");
+      return existsSync(fallback) ? fallback : null;
+    }
+    case "runDir":
+      return runDir;
+    default:
+      return null;
+  }
 }
