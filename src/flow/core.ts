@@ -31,6 +31,11 @@ import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js"
 import type { ToolLaunchArgs } from "../tool-launch.js";
 import { notifyFlowRunFailed, notifyFlowRunCompleted } from "./flow-notify.js";
 import { patchFlowScheduleInContent, patchFlowRunnerInContent } from "../shared/flow-frontmatter-patch.js";
+import {
+  getFlowDagNodeCommandDetail,
+  type FlowDagNodeCommandDetail,
+  type FlowDagNodeKind,
+} from "./flow-command-preview.js";
 import { prepareFlowAgentSpawn } from "./mcp-config.js";
 import { resolveFlowRunner } from "./flow-runner-resolve.js";
 import { spawnAgentPrint } from "./claude-spawn.js";
@@ -721,6 +726,25 @@ export function readFlowFile(flowId: string): { content: string; path: string } 
   const flow = getFlowDefinition(flowId);
   if (!flow) return null;
   return { content: readFileSync(flow.filePath, "utf8"), path: flow.filePath };
+}
+
+export function getFlowDagNodeCommand(
+  flowId: string,
+  node: {
+    kind: FlowDagNodeKind;
+    phaseId?: string;
+    phaseLabel?: string;
+    phaseMessage?: string | null;
+  },
+  options: {
+    globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs;
+    runId?: string;
+    outputPath?: string | null;
+  } = {},
+): FlowDagNodeCommandDetail | { error: string } {
+  const flow = getFlowDefinition(flowId);
+  if (!flow) return { error: `Flow not found: ${flowId}` };
+  return getFlowDagNodeCommandDetail(flow, node, options);
 }
 
 export function createFlowFromContent(
