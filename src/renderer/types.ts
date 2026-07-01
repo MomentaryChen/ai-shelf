@@ -6,12 +6,14 @@ import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../sha
 import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
 import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
+import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 export type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
 export type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 export type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
+export type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -818,6 +820,20 @@ export interface ElectronAPI {
     flowId: string,
     limit?: number,
   ) => Promise<FlowPromptLogEntry[]>;
+  flowGetDagNodeCommand: (
+    flowId: string,
+    node: {
+      kind: "trigger" | "phase" | "output";
+      phaseId?: string;
+      phaseLabel?: string;
+      phaseMessage?: string | null;
+    },
+    options?: {
+      runId?: string;
+      outputPath?: string | null;
+      globalToolLaunchArgs?: Record<string, string>;
+    },
+  ) => Promise<FlowDagNodeCommandDetail | { error: string }>;
   flowCreate: (
     content: string,
     overwrite?: boolean,

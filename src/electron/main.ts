@@ -117,6 +117,7 @@ import {
   deleteFlow,
   createFlowFromContent,
   FLOW_CHAT_DRAFT_ID,
+  getFlowDagNodeCommand,
   getFlowFilePath,
   getFlowRunState,
   getRunArtifactPath,
@@ -1979,6 +1980,59 @@ ipcMain.handle("flow-read-file", (_event, flowId: unknown) => {
   if (typeof flowId !== "string" || !flowId.trim()) return null;
   return readFlowFile(flowId.trim());
 });
+
+ipcMain.handle("flow-get-dag-node-command", (_event, flowId: unknown, node: unknown, options: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { error: "Invalid flow id" };
+  }
+  if (!node || typeof node !== "object") {
+    return { error: "Invalid node" };
+  }
+  const n = node as {
+    kind?: unknown;
+    phaseId?: unknown;
+    phaseLabel?: unknown;
+    phaseMessage?: unknown;
+  };
+  if (n.kind !== "trigger" && n.kind !== "phase" && n.kind !== "output") {
+    return { error: "Invalid node kind" };
+  }
+  let runOptions: {
+    globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs;
+    runId?: string;
+    outputPath?: string | null;
+  } = {};
+  if (options && typeof options === "object") {
+    const o = options as {
+      globalToolLaunchArgs?: unknown;
+      runId?: unknown;
+      outputPath?: unknown;
+    };
+    if (o.globalToolLaunchArgs && typeof o.globalToolLaunchArgs === "object") {
+      runOptions.globalToolLaunchArgs = o.globalToolLaunchArgs as import("../tool-launch.js").ToolLaunchArgs;
+    }
+    if (typeof o.runId === "string" && o.runId.trim()) {
+      runOptions.runId = o.runId.trim();
+    }
+    if (typeof o.outputPath === "string") {
+      runOptions.outputPath = o.outputPath;
+    } else if (o.outputPath === null) {
+      runOptions.outputPath = null;
+    }
+  }
+  return getFlowDagNodeCommand(
+    flowId.trim(),
+    {
+      kind: n.kind,
+      phaseId: typeof n.phaseId === "string" ? n.phaseId : undefined,
+      phaseLabel: typeof n.phaseLabel === "string" ? n.phaseLabel : undefined,
+      phaseMessage:
+        typeof n.phaseMessage === "string" || n.phaseMessage === null ? n.phaseMessage : undefined,
+    },
+    runOptions,
+  );
+});
+
 ipcMain.handle("flow-run", (_event, flowId: unknown, options: unknown) => {
   if (typeof flowId !== "string" || !flowId.trim()) {
     return { ok: false, error: "Invalid flow id" };

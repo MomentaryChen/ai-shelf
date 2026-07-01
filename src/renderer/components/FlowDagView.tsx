@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChevronRight, Clock } from "lucide-react";
 import type { FlowPhaseStatus, FlowRunStatus } from "../../shared/flow-types.js";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -8,6 +9,7 @@ import {
   formatFlowProgressStatus,
   summarizeFlowPhaseProgress,
 } from "../utils/flow-run-progress";
+import { FlowDagNodeDetailDialog } from "./FlowDagNodeDetailDialog";
 import { FlowPhaseProgressBar } from "./FlowPhaseProgressBar";
 
 export interface FlowDagPhase {
@@ -16,6 +18,11 @@ export interface FlowDagPhase {
   status?: FlowPhaseStatus;
   message?: string | null;
 }
+
+type InspectedNode =
+  | { kind: "trigger" }
+  | { kind: "phase"; phaseId: string; phaseLabel: string; phaseMessage?: string | null }
+  | { kind: "output" };
 
 function phaseStatusLabel(status: FlowPhaseStatus, t: (key: MessageKey) => string): string {
   switch (status) {
@@ -54,25 +61,29 @@ function DagNode({
   subtitle,
   status = "pending",
   mono = false,
+  onInspect,
 }: {
   title: string;
   subtitle?: string;
   status?: FlowPhaseStatus;
   mono?: boolean;
+  onInspect?: () => void;
 }) {
   const { t } = useLocale();
-  return (
-    <div
-      className={`min-w-[140px] max-w-[200px] rounded-[20px] border px-4 py-3 transition-all duration-300 ${nodeStyles(status)}`}
-    >
+  const className = `min-w-[140px] max-w-[200px] rounded-[20px] border px-4 py-3 text-left transition-all duration-300 ${nodeStyles(status)} ${
+    onInspect
+      ? "cursor-pointer hover:border-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      : ""
+  }`;
+
+  const body = (
+    <>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] text-text-secondary">{phaseStatusLabel(status, t)}</span>
         {status === "running" && (
           <span className="h-2 w-2 animate-pulse rounded-full bg-accent" aria-hidden />
         )}
-        {status === "done" && (
-          <span className="h-2 w-2 rounded-full bg-ok" aria-hidden />
-        )}
+        {status === "done" && <span className="h-2 w-2 rounded-full bg-ok" aria-hidden />}
       </div>
       <div
         className={`mt-1 text-[13px] font-medium leading-snug text-text-primary ${mono ? "font-mono text-[12px] break-all" : ""}`}
@@ -82,8 +93,23 @@ function DagNode({
       {subtitle && (
         <div className="mt-1 text-[11px] leading-snug text-text-secondary break-all">{subtitle}</div>
       )}
-    </div>
+    </>
   );
+
+  if (onInspect) {
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={onInspect}
+        title={t("flow.dag.inspectHint")}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return <div className={className}>{body}</div>;
 }
 
 function formatNextRun(iso: string | null | undefined): string | null {
@@ -96,6 +122,9 @@ function formatNextRun(iso: string | null | undefined): string | null {
 }
 
 export function FlowDagView({
+  flowId,
+  runId,
+  globalToolLaunchArgs,
   phases,
   runner,
   httpUrl,
@@ -110,6 +139,9 @@ export function FlowDagView({
   outputPath,
   onOpenOutput,
 }: {
+  flowId: string;
+  runId?: string | null;
+  globalToolLaunchArgs?: Record<string, string>;
   phases: FlowDagPhase[];
   runner?: "claude" | "http";
   httpUrl?: string;
@@ -125,6 +157,7 @@ export function FlowDagView({
   onOpenOutput?: () => void;
 }) {
   const { t } = useLocale();
+  const [inspectedNode, setInspectedNode] = useState<InspectedNode | null>(null);
   const progress = summarizeFlowPhaseProgress(phases, runStatus);
   const progressStatus = formatFlowProgressStatus(t, runStatus, progress);
   const progressMessage = flowProgressActiveMessage(progress);
@@ -153,6 +186,7 @@ export function FlowDagView({
       <div className="mb-5 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex flex-col gap-1">
           <h2 className="text-[13px] font-medium text-text-primary">{t("flow.dag.title")}</h2>
+          <p className="text-[11px] text-text-secondary">{t("flow.dag.inspectHint")}</p>
           {schedule && (
             <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-text-secondary">
               <Clock className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
@@ -199,8 +233,15 @@ export function FlowDagView({
           <DagNode
             title={triggerLabel}
             subtitle={triggerSubtitle}
-            status={runStatus === "running" ? "running" : runStatus === "completed" || runStatus === "failed" ? "done" : "pending"}
+            status={
+              runStatus === "running"
+                ? "running"
+                : runStatus === "completed" || runStatus === "failed"
+                  ? "done"
+                  : "pending"
+            }
             mono={!!triggerSubtitle}
+            onInspect={() => setInspectedNode({ kind: "trigger" })}
           />
           <ChevronRight className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
 
@@ -213,6 +254,14 @@ export function FlowDagView({
                   title={phase.label}
                   subtitle={phase.message ?? phase.id}
                   status={phase.status ?? "pending"}
+                  onInspect={() =>
+                    setInspectedNode({
+                      kind: "phase",
+                      phaseId: phase.id,
+                      phaseLabel: phase.label,
+                      phaseMessage: phase.message,
+                    })
+                  }
                 />
                 {index < phases.length - 1 && (
                   <ChevronRight className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden />
@@ -227,6 +276,7 @@ export function FlowDagView({
             status={
               runStatus === "completed" ? "done" : runStatus === "failed" ? "failed" : "pending"
             }
+            onInspect={() => setInspectedNode({ kind: "output" })}
           />
         </div>
       </div>
@@ -243,6 +293,17 @@ export function FlowDagView({
             {t("flow.viewOutput")}
           </button>
         </div>
+      )}
+
+      {inspectedNode && (
+        <FlowDagNodeDetailDialog
+          flowId={flowId}
+          node={inspectedNode}
+          runId={runId}
+          outputPath={outputPath}
+          globalToolLaunchArgs={globalToolLaunchArgs}
+          onClose={() => setInspectedNode(null)}
+        />
       )}
     </div>
   );

@@ -1,14 +1,28 @@
 #!/usr/bin/env node
-import { initFlowCore, listFlows, runDueFlows, runFlow } from "./core.js";
+import { summarizeCompletedPhases } from "../shared/flow-completed-phases.js";
+import {
+  getFlowRunState,
+  initFlowCore,
+  listFlows,
+  listRunsForFlow,
+  runDueFlows,
+  runFlow,
+} from "./core.js";
 
-const [, , command, arg] = process.argv;
+const [, , command, ...rest] = process.argv;
+
+function printUsage(): void {
+  console.log("Usage: node dist/flow/cli.js <list|run|due|status> [args]");
+  console.log("  status <runId>           Completed phase ids for a run");
+  console.log("  status --flow <flowId>   Latest run for a flow");
+}
 
 async function main(): Promise<void> {
   initFlowCore();
 
   if (command === "list" || !command) {
     if (!command) {
-      console.log("Usage: node dist/flow/cli.js <list|run|due> [flowId]");
+      printUsage();
       process.exitCode = 1;
       return;
     }
@@ -27,12 +41,13 @@ async function main(): Promise<void> {
   }
 
   if (command === "run") {
-    if (!arg?.trim()) {
+    const flowId = rest[0]?.trim();
+    if (!flowId) {
       console.error("Usage: node dist/flow/cli.js run <flowId>");
       process.exitCode = 1;
       return;
     }
-    const res = await runFlow(arg.trim(), { wait: true, trigger: "manual" });
+    const res = await runFlow(flowId, { wait: true, trigger: "manual" });
     if (!res.ok) {
       console.error(res.error ?? "run failed");
       process.exitCode = 1;
@@ -51,6 +66,43 @@ async function main(): Promise<void> {
     if (result.errors.length > 0) {
       process.exitCode = 1;
     }
+    return;
+  }
+
+  if (command === "status") {
+    const flowFlag = rest.indexOf("--flow");
+    let state = null;
+
+    if (flowFlag >= 0) {
+      const flowId = rest[flowFlag + 1]?.trim();
+      if (!flowId) {
+        console.error("Usage: node dist/flow/cli.js status --flow <flowId>");
+        process.exitCode = 1;
+        return;
+      }
+      state = listRunsForFlow(flowId, 1)[0] ?? null;
+      if (!state) {
+        console.error(`No runs found for flow: ${flowId}`);
+        process.exitCode = 1;
+        return;
+      }
+    } else {
+      const runId = rest[0]?.trim();
+      if (!runId) {
+        console.error("Usage: node dist/flow/cli.js status <runId>");
+        console.error("       node dist/flow/cli.js status --flow <flowId>");
+        process.exitCode = 1;
+        return;
+      }
+      state = getFlowRunState(runId);
+      if (!state) {
+        console.error(`Run not found: ${runId}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+
+    console.log(JSON.stringify(summarizeCompletedPhases(state)));
     return;
   }
 
