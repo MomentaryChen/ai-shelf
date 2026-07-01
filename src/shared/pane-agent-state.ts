@@ -11,11 +11,17 @@ export interface PaneAgentState {
   /** Rolling ANSI-stripped tail used for prompt heuristics. */
   tail: string;
   wasRunning: boolean;
+  /** When the current continuous running spell started; null when not running. */
+  runningSinceAt: number | null;
+  /** Duration of the most recently finished running spell (ms). */
+  lastRunningSpellMs: number;
 }
 
 export interface PaneAgentStateOptions {
   /** Output within this window keeps status as running. */
   runningGraceMs: number;
+  /** Running tail markers only count within this window after the last output. */
+  runningIndicatorMaxAgeMs: number;
   /** No output for this long while busy → stalled; 0 disables. */
   stallTimeoutMs: number;
   /** Max chars retained in tail buffer. */
@@ -24,9 +30,16 @@ export interface PaneAgentStateOptions {
 
 export const DEFAULT_PANE_AGENT_OPTIONS: PaneAgentStateOptions = {
   runningGraceMs: 2_500,
+  runningIndicatorMaxAgeMs: 12_000,
   stallTimeoutMs: 120_000,
   tailMaxChars: 4_096,
 };
+
+/** Minimum continuous running time before a "ready" desktop notification. */
+export const PANE_AGENT_MIN_RUNNING_FOR_READY_MS = 5_000;
+
+/** Idle must stay stable this long before a "ready" notification fires. */
+export const PANE_AGENT_READY_IDLE_STABLE_MS = 8_000;
 
 const SPINNER_CHARS = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◑◒◓◴◕⣾⣽⣻⢿⡿⣟⣯⣷]/;
 
@@ -61,6 +74,8 @@ export function createPaneAgentState(now = Date.now()): PaneAgentState {
     lastUserInputAt: 0,
     tail: "",
     wasRunning: false,
+    runningSinceAt: null,
+    lastRunningSpellMs: 0,
   };
 }
 
@@ -97,9 +112,10 @@ export function classifyPaneAgentState(
   if (detectWaitingInput(state.tail)) return "waiting_input";
 
   const activeOutput = msSinceOutput < opts.runningGraceMs;
-  const busyMarkers = detectRunningIndicators(state.tail);
+  const recentBusyMarkers =
+    msSinceOutput < opts.runningIndicatorMaxAgeMs && detectRunningIndicators(state.tail);
 
-  if (activeOutput || busyMarkers) return "running";
+  if (activeOutput || recentBusyMarkers) return "running";
 
   if (
     opts.stallTimeoutMs > 0 &&
@@ -112,6 +128,46 @@ export function classifyPaneAgentState(
   return "idle";
 }
 
+function isActiveRunningStatus(status: PaneAgentStatus): boolean {
+  return status === "running" || status === "stalled";
+}
+
+function withStatus(
+  prev: PaneAgentState,
+  status: PaneAgentStatus,
+  now: number,
+): PaneAgentState {
+  const active = isActiveRunningStatus(status);
+  let runningSinceAt = prev.runningSinceAt;
+  let lastRunningSpellMs = prev.lastRunningSpellMs;
+
+  if (active && !isActiveRunningStatus(prev.status)) {
+    runningSinceAt = now;
+  } else if (!active) {
+    if (isActiveRunningStatus(prev.status) && prev.runningSinceAt !== null) {
+      lastRunningSpellMs = Math.max(0, now - prev.runningSinceAt);
+    }
+    runningSinceAt = null;
+  }
+
+  return {
+    ...prev,
+    status,
+    runningSinceAt,
+    lastRunningSpellMs,
+    wasRunning: status === "running" || (prev.wasRunning && status === "stalled"),
+  };
+}
+
+/** Continuous running duration for the current spell; 0 when not in a running spell. */
+export function paneRunningDurationMs(
+  state: Pick<PaneAgentState, "runningSinceAt" | "status">,
+  now: number,
+): number {
+  if (!state.runningSinceAt || !isActiveRunningStatus(state.status)) return 0;
+  return Math.max(0, now - state.runningSinceAt);
+}
+
 export function applyPaneAgentOutput(
   prev: PaneAgentState,
   chunk: string,
@@ -119,18 +175,13 @@ export function applyPaneAgentOutput(
   opts: PaneAgentStateOptions = DEFAULT_PANE_AGENT_OPTIONS,
 ): PaneAgentState {
   const tail = appendTail(prev.tail, chunk, opts.tailMaxChars);
-  const lastOutputAt = now;
   const interim: PaneAgentState = {
     ...prev,
     tail,
-    lastOutputAt,
+    lastOutputAt: now,
   };
   const status = classifyPaneAgentState(interim, now, opts);
-  return {
-    ...interim,
-    status,
-    wasRunning: status === "running" || (prev.wasRunning && status === "stalled"),
-  };
+  return withStatus(interim, status, now);
 }
 
 export function applyPaneAgentUserInput(
@@ -142,12 +193,12 @@ export function applyPaneAgentUserInput(
     ...prev,
     lastUserInputAt: now,
     wasRunning: false,
+    runningSinceAt: now,
+    lastRunningSpellMs: 0,
     status: "running",
   };
-  return {
-    ...next,
-    status: classifyPaneAgentState(next, now, opts),
-  };
+  const status = classifyPaneAgentState(next, now, opts);
+  return withStatus(next, status, now);
 }
 
 export function tickPaneAgentState(
@@ -156,9 +207,9 @@ export function tickPaneAgentState(
   opts: PaneAgentStateOptions = DEFAULT_PANE_AGENT_OPTIONS,
 ): PaneAgentState {
   const status = classifyPaneAgentState(prev, now, opts);
+  const next = withStatus(prev, status, now);
   return {
-    ...prev,
-    status,
+    ...next,
     wasRunning:
       status === "running" ||
       status === "stalled" ||

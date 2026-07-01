@@ -6,6 +6,8 @@ import {
   applyPaneAgentUserInput,
   createPaneAgentState,
   paneNeedsAttention,
+  PANE_AGENT_MIN_RUNNING_FOR_READY_MS,
+  PANE_AGENT_READY_IDLE_STABLE_MS,
   tickPaneAgentState,
   type PaneAgentState,
   type PaneAgentStatus,
@@ -38,6 +40,7 @@ function playAttentionSound(): void {
 function stateOptions(settings: ChatSettings) {
   return {
     runningGraceMs: 2_500,
+    runningIndicatorMaxAgeMs: 12_000,
     stallTimeoutMs: settings.paneAgentStallTimeoutSec * 1_000,
     tailMaxChars: 4_096,
   };
@@ -51,8 +54,13 @@ export function usePaneAgentAwareness(
   windowFocused: boolean,
 ) {
   const [states, setStates] = useState<Record<string, PaneAgentState>>({});
+  const statesRef = useRef(states);
+  statesRef.current = states;
+
   const prevStatusRef = useRef<Record<string, PaneAgentStatus>>({});
   const notifyCooldownRef = useRef<Record<string, number>>({});
+  const readyNotifiedRef = useRef<Record<string, boolean>>({});
+  const readyPendingRef = useRef<Record<string, number>>({});
 
   const paneBySession = useRef(new Map<string, PaneInfo>());
   useEffect(() => {
@@ -60,6 +68,26 @@ export function usePaneAgentAwareness(
     for (const p of panes) map.set(p.sessionId, p);
     paneBySession.current = map;
   }, [panes]);
+
+  const clearReadyPending = useCallback((paneId: string) => {
+    const timer = readyPendingRef.current[paneId];
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      delete readyPendingRef.current[paneId];
+    }
+  }, []);
+
+  const shouldNotifyPane = useCallback(
+    (pane: PaneInfo) => {
+      if (!settings.paneAgentAwarenessEnabled) return false;
+      return (
+        !settings.paneAgentNotifyUnfocusedOnly ||
+        focusedPaneId !== pane.id ||
+        !windowFocused
+      );
+    },
+    [focusedPaneId, settings, windowFocused],
+  );
 
   const notify = useCallback(
     async (
@@ -85,14 +113,46 @@ export function usePaneAgentAwareness(
     [settings, t],
   );
 
+  const scheduleReadyNotify = useCallback(
+    (pane: PaneInfo, runningDurationMs: number) => {
+      clearReadyPending(pane.id);
+      if (readyNotifiedRef.current[pane.id]) return;
+      if (runningDurationMs < PANE_AGENT_MIN_RUNNING_FOR_READY_MS) return;
+      if (!shouldNotifyPane(pane)) return;
+
+      readyPendingRef.current[pane.id] = window.setTimeout(() => {
+        delete readyPendingRef.current[pane.id];
+        const state = statesRef.current[pane.id];
+        if (!state || state.status !== "idle") return;
+        if (readyNotifiedRef.current[pane.id]) return;
+        if (!shouldNotifyPane(pane)) return;
+
+        readyNotifiedRef.current[pane.id] = true;
+        void notify(
+          pane,
+          "pane.agent.notify.readyTitle",
+          "pane.agent.notify.readyBody",
+          false,
+        );
+      }, PANE_AGENT_READY_IDLE_STABLE_MS);
+    },
+    [clearReadyPending, notify, shouldNotifyPane],
+  );
+
   const handleTransition = useCallback(
-    (pane: PaneInfo, prev: PaneAgentStatus, next: PaneAgentStatus) => {
+    (
+      pane: PaneInfo,
+      prev: PaneAgentStatus,
+      next: PaneAgentStatus,
+      paneState: PaneAgentState | undefined,
+    ) => {
       if (!settings.paneAgentAwarenessEnabled) return;
-      const shouldNotify =
-        !settings.paneAgentNotifyUnfocusedOnly ||
-        focusedPaneId !== pane.id ||
-        !windowFocused;
-      if (!shouldNotify) return;
+
+      if (next === "running" || next === "waiting_input") {
+        clearReadyPending(pane.id);
+      }
+
+      if (!shouldNotifyPane(pane)) return;
 
       const cooldownKey = `${pane.id}:${next}`;
       const now = Date.now();
@@ -104,31 +164,44 @@ export function usePaneAgentAwareness(
         void notify(pane, "pane.agent.notify.waitingTitle", "pane.agent.notify.waitingBody", false);
         fired = true;
       } else if (next === "idle" && prev === "running") {
-        void notify(pane, "pane.agent.notify.readyTitle", "pane.agent.notify.readyBody", false);
-        fired = true;
+        scheduleReadyNotify(pane, paneState?.lastRunningSpellMs ?? 0);
       } else if (next === "stalled" && prev !== "stalled") {
         void notify(pane, "pane.agent.notify.stalledTitle", "pane.agent.notify.stalledBody", false);
         fired = true;
       }
       if (fired) notifyCooldownRef.current[cooldownKey] = now;
     },
-    [focusedPaneId, notify, settings, windowFocused],
+    [clearReadyPending, notify, scheduleReadyNotify, settings, shouldNotifyPane],
   );
 
   useEffect(() => {
     for (const pane of panes) {
-      const status = states[pane.id]?.status;
+      const paneState = states[pane.id];
+      const status = paneState?.status;
       if (!status) continue;
       const prev = prevStatusRef.current[pane.id];
       if (prev !== undefined && prev !== status) {
-        handleTransition(pane, prev, status);
+        handleTransition(pane, prev, status, paneState);
       }
       prevStatusRef.current[pane.id] = status;
     }
     for (const id of Object.keys(prevStatusRef.current)) {
-      if (!panes.some((p) => p.id === id)) delete prevStatusRef.current[id];
+      if (!panes.some((p) => p.id === id)) {
+        delete prevStatusRef.current[id];
+        delete readyNotifiedRef.current[id];
+        clearReadyPending(id);
+      }
     }
-  }, [handleTransition, panes, states]);
+  }, [clearReadyPending, handleTransition, panes, states]);
+
+  useEffect(() => {
+    return () => {
+      for (const id of Object.keys(readyPendingRef.current)) {
+        window.clearTimeout(readyPendingRef.current[id]);
+      }
+      readyPendingRef.current = {};
+    };
+  }, []);
 
   const updateSession = useCallback(
     (sessionId: string, updater: (prev: PaneAgentState) => PaneAgentState) => {
@@ -149,6 +222,11 @@ export function usePaneAgentAwareness(
     if (!settings.paneAgentAwarenessEnabled) {
       setStates({});
       prevStatusRef.current = {};
+      readyNotifiedRef.current = {};
+      for (const id of Object.keys(readyPendingRef.current)) {
+        window.clearTimeout(readyPendingRef.current[id]);
+      }
+      readyPendingRef.current = {};
       void window.api.setTrayPaneAttention(0);
       return;
     }
@@ -179,12 +257,17 @@ export function usePaneAgentAwareness(
   const recordUserInput = useCallback(
     (sessionId: string) => {
       if (!settings.paneAgentAwarenessEnabled) return;
+      const pane = paneBySession.current.get(sessionId);
+      if (pane) {
+        readyNotifiedRef.current[pane.id] = false;
+        clearReadyPending(pane.id);
+      }
       const now = Date.now();
       updateSession(sessionId, (prev) =>
         applyPaneAgentUserInput(prev, now, stateOptions(settings)),
       );
     },
-    [settings, updateSession],
+    [clearReadyPending, settings.paneAgentAwarenessEnabled, updateSession],
   );
 
   useEffect(() => {
