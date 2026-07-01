@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { bootstrap } from "ai-shelf";
 import type { FlowDefinition } from "../shared/flow-types.js";
+import { applyFlowClaudeDefaultModel } from "../shared/claude-tool-args.js";
 import {
   buildToolLaunchCommand,
   resolveToolLaunchCommand,
@@ -82,7 +83,10 @@ export function resolveFlowRunner(
         options.globalToolLaunchArgs.agent)
     : undefined;
 
-  const mergedExtra = [globalExtra?.trim(), flow.toolArgs?.trim()].filter(Boolean).join(" ");
+  let mergedExtra = [globalExtra?.trim(), flow.toolArgs?.trim()].filter(Boolean).join(" ");
+  if (canonical === "claude") {
+    mergedExtra = applyFlowClaudeDefaultModel(mergedExtra);
+  }
   const launchCommand =
     resolveToolLaunchCommand(canonical === "cursor" ? "agent" : tool, mergedExtra) ??
     buildToolLaunchCommand(launchBase, mergedExtra);

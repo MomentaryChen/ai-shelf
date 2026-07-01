@@ -1,8 +1,11 @@
+import { applyFlowClaudeDefaultModel } from "../shared/claude-tool-args.js";
 import { extractFlowMarkdown } from "../shared/flow-extract.js";
 import {
   buildFlowGeneratePrompt,
   type FlowGenerateTurn,
 } from "../shared/flow-generate-prompt.js";
+import { buildToolLaunchCommand } from "../tool-launch.js";
+import { TOOL_LAUNCH_CMD } from "../tools.js";
 import { spawnClaudePrint } from "./claude-spawn.js";
 import { FLOW_CHAT_DRAFT_ID } from "./flow-chat-store.js";
 
@@ -32,6 +35,10 @@ export async function generateFlowFromChat(
     let stdout = "";
     let stderr = "";
     const child = spawnClaudePrint({
+      launchCommand: buildToolLaunchCommand(
+        TOOL_LAUNCH_CMD.claude,
+        applyFlowClaudeDefaultModel(""),
+      ),
       prompt,
       promptLog: { flowId: logFlowId, kind: "generate" },
     });

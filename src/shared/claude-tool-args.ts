@@ -3,6 +3,9 @@ export const CLAUDE_MODEL_SHORT_PRESETS = ["opus", "sonnet", "haiku"] as const;
 
 export type ClaudeModelShortPreset = (typeof CLAUDE_MODEL_SHORT_PRESETS)[number];
 
+/** Default Claude model for AI Flow runs when none is configured. */
+export const FLOW_CLAUDE_DEFAULT_MODEL: ClaudeModelShortPreset = "haiku";
+
 const MODEL_FLAG_RE = /--model(?:=(\S+)|\s+(\S+))/;
 
 export function parseClaudeModelFromToolArgs(toolArgs: string): {
@@ -22,6 +25,18 @@ export function parseClaudeModelFromToolArgs(toolArgs: string): {
     .trim();
 
   return { model: raw, extraArgs };
+}
+
+/** Apply AI Flow default model when `toolArgs` omits `--model`. */
+export function applyFlowClaudeDefaultModel(toolArgs: string): string {
+  const { model, extraArgs } = parseClaudeModelFromToolArgs(toolArgs);
+  if (model.trim()) return toolArgs.trim();
+  return buildToolArgsWithClaudeModel(FLOW_CLAUDE_DEFAULT_MODEL, extraArgs);
+}
+
+export function normalizeFlowClaudeToolArgs(tool: string, toolArgs: string): string {
+  if (tool !== "claude") return toolArgs.trim();
+  return applyFlowClaudeDefaultModel(toolArgs);
 }
 
 export function buildToolArgsWithClaudeModel(model: string, extraArgs: string): string {

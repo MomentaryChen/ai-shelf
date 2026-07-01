@@ -14,6 +14,8 @@ type Props = {
   onModelChange: (model: string) => void;
   onExtraArgsChange: (extraArgs: string) => void;
   detectedModels?: string[];
+  /** When set, empty model is treated as this preset (hides the CLI default chip). */
+  implicitDefault?: string;
   /** Warm surface (flow) vs chrome (settings). */
   surface?: "warm" | "chrome";
   showExtraArgs?: boolean;
@@ -31,6 +33,7 @@ export function ClaudeModelSelector({
   onModelChange,
   onExtraArgsChange,
   detectedModels,
+  implicitDefault,
   surface = "warm",
   showExtraArgs = true,
 }: Props) {
@@ -49,10 +52,12 @@ export function ClaudeModelSelector({
     [modelOptions],
   );
 
-  const presetActive = (preset: ClaudeModelShortPreset) => claudeModelMatchesPreset(model, preset);
-  const isDefault = !model.trim();
+  const effectiveModel = model.trim() || implicitDefault?.trim() || "";
+  const presetActive = (preset: ClaudeModelShortPreset) =>
+    claudeModelMatchesPreset(effectiveModel, preset);
+  const isDefault = !implicitDefault && !model.trim();
   const shortPresetSelected = CLAUDE_MODEL_SHORT_PRESETS.some((p) => presetActive(p));
-  const listSelected = extendedModels.includes(model);
+  const listSelected = extendedModels.includes(effectiveModel);
   const isCustom = !isDefault && !shortPresetSelected && !listSelected;
   const [customMode, setCustomMode] = useState(isCustom);
 
@@ -61,7 +66,7 @@ export function ClaudeModelSelector({
     if (isDefault || shortPresetSelected || listSelected) setCustomMode(false);
   }, [isCustom, isDefault, shortPresetSelected, listSelected]);
 
-  const selectValue = listSelected ? model : customMode || isCustom ? "__custom__" : "";
+  const selectValue = listSelected ? effectiveModel : customMode || isCustom ? "__custom__" : "";
 
   const chipClass = (active: boolean) =>
     warm
@@ -86,9 +91,11 @@ export function ClaudeModelSelector({
       <span className={fieldLabel}>{t("claude.model.label")}</span>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={chipClass(isDefault)} onClick={() => onModelChange("")}>
-          {t("claude.model.default")}
-        </button>
+        {!implicitDefault && (
+          <button type="button" className={chipClass(isDefault)} onClick={() => onModelChange("")}>
+            {t("claude.model.default")}
+          </button>
+        )}
         {CLAUDE_MODEL_SHORT_PRESETS.map((preset) => (
           <button
             key={preset}
@@ -96,7 +103,7 @@ export function ClaudeModelSelector({
             className={chipClass(presetActive(preset))}
             onClick={() => {
               setCustomMode(false);
-              onModelChange(preset);
+              onModelChange(preset === implicitDefault ? "" : preset);
             }}
           >
             {t(PRESET_LABEL_KEYS[preset])}
