@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Clock } from "lucide-react";
 import type { FlowPhaseStatus, FlowRunStatus } from "../../shared/flow-types.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
@@ -86,6 +86,15 @@ function DagNode({
   );
 }
 
+function formatNextRun(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
 export function FlowDagView({
   phases,
   runner,
@@ -94,6 +103,8 @@ export function FlowDagView({
   toolArgs,
   cwd,
   profileId,
+  schedule,
+  nextRunAt,
   runStatus,
   error,
   outputPath,
@@ -106,6 +117,8 @@ export function FlowDagView({
   toolArgs?: string;
   cwd?: string;
   profileId?: string;
+  schedule?: string;
+  nextRunAt?: string | null;
   runStatus?: FlowRunStatus | null;
   error?: string | null;
   outputPath?: string | null;
@@ -133,10 +146,26 @@ export function FlowDagView({
         ? agentSubtitleParts.join(" · ")
         : undefined;
 
+  const nextRunLabel = schedule ? formatNextRun(nextRunAt) : null;
+
   return (
     <div className="rounded-[28px] border border-border bg-bg-secondary p-6 shadow-card">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[13px] font-medium text-text-primary">{t("flow.dag.title")}</h2>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex flex-col gap-1">
+          <h2 className="text-[13px] font-medium text-text-primary">{t("flow.dag.title")}</h2>
+          {schedule && (
+            <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-text-secondary">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
+              <span className="font-mono text-[11px]">{schedule}</span>
+              {nextRunLabel && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{t("flow.nextRun", { time: nextRunLabel })}</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         {runStatus && runStatus !== "pending" && (
           <span
             className={`text-[12px] font-medium ${

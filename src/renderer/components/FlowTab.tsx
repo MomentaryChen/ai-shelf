@@ -643,6 +643,8 @@ export function FlowTab() {
                 toolArgs={effectiveRunnerToolArgs}
                 cwd={flowDef.cwd}
                 profileId={flowDef.profileId}
+                schedule={selected.schedule}
+                nextRunAt={selected.nextRunAt}
                 runStatus={
                   showLiveRun && selectedActiveRun
                     ? selectedActiveRun.status
