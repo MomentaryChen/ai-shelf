@@ -1,12 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { platform } from "node:os";
 import { appendFlowPromptLog } from "./flow-chat-store.js";
-
-/** Quote one argument for `cmd.exe /c` (paths with spaces stay intact). */
-function quoteCmdArg(arg: string): string {
-  if (!/[\s"]/u.test(arg)) return arg;
-  return `"${arg.replace(/"/g, '\\"')}"`;
-}
+import { quoteCmdArg } from "./cmd-quote.js";
 
 function windowsNeedsCmdShim(cmd: string): boolean {
   if (/\.exe$/iu.test(cmd)) return false;
@@ -61,14 +56,20 @@ export function spawnAgentPrint(options: SpawnAgentPrintOptions): ChildProcess {
   const bin = launchCommand.trim().split(/\s+/)[0] ?? "claude";
   let file = bin;
   let argv: string[] = [...launchCommand.trim().split(/\s+/).slice(1), ...printArgs];
+  let verbatim = false;
 
   if (platform() === "win32" && windowsNeedsCmdShim(bin)) {
     file = process.env.ComSpec ?? "cmd.exe";
-    argv = ["/d", "/s", "/c", cmdLine];
+    // Wrap in quotes that `/s` strips, and pass verbatim (like node's
+    // `shell: true`): otherwise spawn backslash-escapes the inner quotes and
+    // the .cmd shim's %* delivers them to the child as literal `"` characters.
+    argv = ["/d", "/s", "/c", `"${cmdLine}"`];
+    verbatim = true;
   }
 
   const child = spawn(file, argv, {
     windowsHide: true,
+    windowsVerbatimArguments: verbatim,
     env,
     cwd: cwd?.trim() || undefined,
     stdio: ["pipe", "pipe", "pipe"],
