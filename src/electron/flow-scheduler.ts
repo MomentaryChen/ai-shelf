@@ -45,7 +45,10 @@ async function runSchedulerTick(): Promise<void> {
 
   tickInFlight = true;
   try {
-    const result = await runDueFlows();
+    // wait:false — runs are fire-and-forget so a long flow can't hold this
+    // tick open and starve other flows' fire minutes (runsInFlight in core
+    // still prevents overlapping runs of the same flow).
+    const result = await runDueFlows(new Date(), { wait: false });
     if (result.started.length > 0) {
       const win = getMainWindow?.();
       if (win && !win.isDestroyed()) {
