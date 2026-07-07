@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import type { FlowDagNodeCommandDetail } from "../../flow/flow-command-preview.js";
 import { useLocale } from "../i18n/LocaleProvider";
+import { writeClipboardText } from "../terminal/xterm-clipboard";
 
 type Props = {
   flowId: string;
@@ -78,7 +79,7 @@ export function FlowDagNodeDetailDialog({
 
   const copyCommand = async () => {
     if (!detail?.commandLine) return;
-    await window.api.clipboardWriteText(detail.commandLine);
+    await writeClipboardText(detail.commandLine);
   };
 
   return (

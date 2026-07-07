@@ -12,6 +12,7 @@ import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
 import { EmptyInventoryHint } from "./InventorySection";
 import { toolLabel, toolInstall, formatContext } from "../utils";
+import { writeClipboardText } from "../terminal/xterm-clipboard";
 import { partitionByInstalled, sortByInstalled, installedRowClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
 
@@ -307,9 +308,10 @@ function InstallPrompt({ tool }: { tool: string }) {
   const [copied, setCopied] = useState(false);
   const info = toolInstall(tool);
 
-  const copy = () => {
+  const copy = async () => {
     if (!info) return;
-    navigator.clipboard.writeText(info.cmd);
+    const ok = await writeClipboardText(info.cmd);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

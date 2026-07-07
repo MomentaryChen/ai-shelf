@@ -1235,8 +1235,27 @@ function resolvePtyWorkDir(cwd?: string): { ok: true; dir: string } | { ok: fals
 
 ipcMain.handle("clipboard-read-text", () => clipboard.readText());
 
-ipcMain.handle("clipboard-write-text", (_event, text: string) => {
-  clipboard.writeText(text ?? "");
+// Windows converts LF to CRLF on the clipboard; normalize before verifying.
+function clipboardTextMatches(expected: string): boolean {
+  const normalize = (s: string) => s.replace(/\r\n/g, "\n");
+  return normalize(clipboard.readText()) === normalize(expected);
+}
+
+// On Windows, clipboard.writeText fails silently while another process holds
+// the clipboard open (clipboard history managers, RDP, Office). Verify the
+// write landed and retry with backoff; report failure so the renderer can
+// fall back instead of assuming the copy succeeded.
+ipcMain.handle("clipboard-write-text", async (_event, text: string) => {
+  const value = text ?? "";
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    clipboard.writeText(value);
+    if (clipboardTextMatches(value)) return true;
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 30 * attempt));
+    }
+  }
+  return false;
 });
 
 ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
