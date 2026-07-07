@@ -2208,7 +2208,9 @@ ipcMain.handle("flow-save-runner-settings", (_event, flowId: unknown, patch: unk
 });
 
 ipcMain.handle("flow-run-due", async () => {
-  const result = await runDueFlows();
+  // wait:false so a long-running flow doesn't hold the renderer invoke open;
+  // run progress is delivered through flow run-state events.
+  const result = await runDueFlows(new Date(), { wait: false });
   return { ok: true, result };
 });
 

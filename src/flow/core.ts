@@ -428,7 +428,20 @@ export type RunDueFlowsResult = {
   errors: { flowId: string; error: string }[];
 };
 
-export async function runDueFlows(now = new Date()): Promise<RunDueFlowsResult> {
+export type RunDueFlowsOptions = {
+  /**
+   * Await each scheduled run to completion (default). The app scheduler passes
+   * false: a long run must not block this loop, or every other flow's fire
+   * minute is silently missed while it waits (cron has no catch-up).
+   */
+  wait?: boolean;
+};
+
+export async function runDueFlows(
+  now = new Date(),
+  options: RunDueFlowsOptions = {},
+): Promise<RunDueFlowsResult> {
+  const wait = options.wait ?? true;
   const result: RunDueFlowsResult = { checked: 0, started: [], skipped: [], errors: [] };
   if (!readFlowSchedulePrefs().schedulerEnabled) {
     return result;
@@ -470,7 +483,7 @@ export async function runDueFlows(now = new Date()): Promise<RunDueFlowsResult> 
     writeFlowLastSlot(parsed.id, slotKey);
 
     const run = await runFlow(parsed.id, {
-      wait: true,
+      wait,
       trigger: "schedule",
     });
     if (run.ok) {
