@@ -16,6 +16,7 @@ import { cronNextRun, shouldRunFlowNow, validateFlowCronMinInterval } from "../s
 import { parseFlowDocument } from "../shared/flow-parse.js";
 import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX } from "../shared/flow-protocol.js";
 import {
+  claimFlowScheduleSlot,
   readFlowLastSlot,
   readFlowSchedulePrefs,
   writeFlowLastSlot,
@@ -361,7 +362,6 @@ export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; er
 export type RunFlowOptions = {
   wait?: boolean;
   trigger?: "manual" | "schedule";
-  scheduleSlotKey?: string;
   /** App-wide per-tool launch args (from settings), merged before flow `tool_args`. */
   globalToolLaunchArgs?: ToolLaunchArgs;
 };
@@ -381,7 +381,10 @@ export async function runFlow(
 
   const stamp = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  const runId = `${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}-${pad(stamp.getHours())}${pad(stamp.getMinutes())}${pad(stamp.getSeconds())}-${flow.id}`;
+  // Random segment keeps run dirs unique when two processes start the same flow
+  // in the same second (e.g. a manual run racing a scheduled one).
+  const uniq = Math.random().toString(36).slice(2, 6).padEnd(4, "0");
+  const runId = `${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}-${pad(stamp.getHours())}${pad(stamp.getMinutes())}${pad(stamp.getSeconds())}-${uniq}-${flow.id}`;
   const runDir = join(runsDir(), runId);
   mkdirSync(runDir, { recursive: true });
 
@@ -400,9 +403,6 @@ export async function runFlow(
       void notifyFlowRunFailed(flow, done);
     } else if (done.status === "completed") {
       void notifyFlowRunCompleted(flow, done);
-    }
-    if (options.scheduleSlotKey) {
-      writeFlowLastSlot(flow.id, options.scheduleSlotKey);
     }
   });
 
@@ -461,11 +461,17 @@ export async function runDueFlows(now = new Date()): Promise<RunDueFlowsResult> 
       result.skipped.push(parsed.id);
       continue;
     }
+    // Claim the slot across processes (in-app scheduler vs headless `cli.js due`)
+    // and record it before the run starts, so the same cron fire never starts twice.
+    if (!claimFlowScheduleSlot(parsed.id, slotKey)) {
+      result.skipped.push(parsed.id);
+      continue;
+    }
+    writeFlowLastSlot(parsed.id, slotKey);
 
     const run = await runFlow(parsed.id, {
       wait: true,
       trigger: "schedule",
-      scheduleSlotKey: slotKey,
     });
     if (run.ok) {
       result.started.push(parsed.id);
