@@ -6,11 +6,7 @@ import type { FlowPromptLogEntry } from "../shared/flow-chat-types.js";
 import { resolveFlowRunner } from "./flow-runner-resolve.js";
 import { prepareFlowAgentSpawn } from "./mcp-config.js";
 import { listFlowPromptLogs } from "./flow-chat-store.js";
-
-function quoteCmdArg(arg: string): string {
-  if (!/[\s"]/u.test(arg)) return arg;
-  return `"${arg.replace(/"/g, '\\"')}"`;
-}
+import { quoteCmdArg } from "./cmd-quote.js";
 
 export function formatCliArgsCommandLine(cliArgs: string[]): string {
   return cliArgs.map(quoteCmdArg).join(" ");
@@ -27,7 +23,8 @@ function windowsCmdShimLine(commandLine: string): string | undefined {
   const bin = commandLine.trim().split(/\s+/)[0] ?? "";
   if (!windowsNeedsCmdShim(bin)) return undefined;
   const comspec = process.env.ComSpec ?? "cmd.exe";
-  return `${comspec} /d /s /c ${quoteCmdArg(commandLine)}`;
+  // Matches spawnAgentPrint: outer quotes stripped by /s, inner quotes verbatim.
+  return `${comspec} /d /s /c "${commandLine}"`;
 }
 
 export type FlowDagNodeKind = "trigger" | "phase" | "output";
