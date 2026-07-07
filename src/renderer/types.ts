@@ -556,7 +556,7 @@ export interface ElectronAPI {
   ptyGetLogPath: (sessionId: string)                                => Promise<{ path: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;
   clipboardReadText: ()                                             => Promise<string>;
-  clipboardWriteText: (text: string)                                => Promise<void>;
+  clipboardWriteText: (text: string)                                => Promise<boolean>;
   ptyWrite:  (sessionId: string, data: string)             => void;
   ptyResize: (sessionId: string, cols: number, rows: number) => void;
   ptyKill:   (sessionId: string)                           => void;
