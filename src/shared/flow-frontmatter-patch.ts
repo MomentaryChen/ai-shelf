@@ -1,0 +1,126 @@
+import { CronExpressionParser } from "cron-parser";
+import { canonicalToolId } from "../tools.js";
+import { normalizeFlowClaudeToolArgs } from "./claude-tool-args.js";
+import { flowTimezone, validateFlowCronMinInterval } from "./flow-cron.js";
+import { parseFlowDocument, splitFlowDocument } from "./flow-parse.js";
+
+function formatYamlScalar(value: string): string {
+  if (/[:#\s'"*|]/.test(value) || value === "") {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
+  return value;
+}
+
+function upsertTopLevelField(lines: string[], key: string, value: string | undefined): string[] {
+  const keyRe = new RegExp(`^${key}:\\s*`);
+  const filtered = lines.filter((line) => !keyRe.test(line));
+  if (value === undefined || value.trim() === "") return filtered;
+
+  const insertAfter = filtered.findIndex((line) => /^enabled:/.test(line));
+  const insertIdx = insertAfter >= 0 ? insertAfter + 1 : filtered.findIndex((line) => /^id:/.test(line)) + 1;
+  const next = [...filtered];
+  next.splice(Math.max(insertIdx, 0), 0, `${key}: ${formatYamlScalar(value.trim())}`);
+  return next;
+}
+
+export function validateFlowCron(expression: string, timezone?: string): string | null {
+  const trimmed = expression.trim();
+  if (!trimmed) return "Cron expression is required";
+  const tz = flowTimezone(timezone);
+  try {
+    CronExpressionParser.parse(trimmed, { tz });
+  } catch (err: unknown) {
+    return err instanceof Error ? err.message : "Invalid cron expression";
+  }
+  return validateFlowCronMinInterval(trimmed, tz);
+}
+
+/** Ensure claude runner defaults (`tool_args: --model haiku`) and validate schedule before save. */
+export function ensureFlowDefaultsInContent(content: string): { content: string } | { error: string } {
+  const parsed = parseFlowDocument(content, "draft.flow.md", "");
+  if ("error" in parsed) return { error: parsed.error };
+
+  let next = content;
+
+  if (parsed.runner === "claude" && canonicalToolId(parsed.agentTool) === "claude") {
+    const toolArgs = normalizeFlowClaudeToolArgs("claude", parsed.toolArgs ?? "");
+    const patched = patchFlowRunnerInContent(next, { toolArgs });
+    if ("error" in patched) return patched;
+    next = patched.content;
+  }
+
+  if (parsed.schedule?.trim()) {
+    const cronError = validateFlowCron(parsed.schedule, parsed.timezone);
+    if (cronError) return { error: cronError };
+  }
+
+  return { content: next };
+}
+
+export type FlowSchedulePatch = {
+  schedule: string | null;
+  timezone?: string | null;
+};
+
+export type FlowRunnerPatch = {
+  tool?: string | null;
+  toolArgs?: string | null;
+  cwd?: string | null;
+  profile?: string | null;
+};
+
+export function patchFlowRunnerInContent(
+  content: string,
+  patch: FlowRunnerPatch,
+): { content: string } | { error: string } {
+  const split = splitFlowDocument(content);
+  if (!split) return { error: "Missing YAML frontmatter" };
+
+  let fmLines = split.frontmatter.split(/\r?\n/);
+
+  const tool = patch.tool?.trim();
+  fmLines = upsertTopLevelField(fmLines, "tool", tool || undefined);
+
+  const toolArgs = patch.toolArgs?.trim();
+  fmLines = upsertTopLevelField(fmLines, "tool_args", toolArgs || undefined);
+
+  const cwd = patch.cwd?.trim();
+  fmLines = upsertTopLevelField(fmLines, "cwd", cwd || undefined);
+
+  const profile = patch.profile?.trim();
+  fmLines = upsertTopLevelField(fmLines, "profile", profile || undefined);
+
+  const body = split.body.length > 0 ? `${split.body}\n` : "";
+  return {
+    content: `---\n${fmLines.join("\n")}\n---\n\n${body}`,
+  };
+}
+
+export function patchFlowScheduleInContent(
+  content: string,
+  patch: FlowSchedulePatch,
+): { content: string } | { error: string } {
+  const split = splitFlowDocument(content);
+  if (!split) return { error: "Missing YAML frontmatter" };
+
+  const schedule = patch.schedule?.trim() ?? "";
+  if (schedule) {
+    const cronError = validateFlowCron(schedule, patch.timezone ?? undefined);
+    if (cronError) return { error: cronError };
+  }
+
+  let fmLines = split.frontmatter.split(/\r?\n/);
+  if (schedule) {
+    fmLines = upsertTopLevelField(fmLines, "schedule", schedule);
+    const tz = patch.timezone?.trim();
+    fmLines = upsertTopLevelField(fmLines, "timezone", tz || undefined);
+  } else {
+    fmLines = upsertTopLevelField(fmLines, "schedule", undefined);
+    fmLines = upsertTopLevelField(fmLines, "timezone", undefined);
+  }
+
+  const body = split.body.length > 0 ? `${split.body}\n` : "";
+  return {
+    content: `---\n${fmLines.join("\n")}\n---\n\n${body}`,
+  };
+}

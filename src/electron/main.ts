@@ -113,6 +113,46 @@ import {
   onAppUpdateStateChanged,
   runHealthCheck,
 } from "./health-monitor.js";
+import {
+  deleteFlow,
+  createFlowFromContent,
+  FLOW_CHAT_DRAFT_ID,
+  getFlowDagNodeCommand,
+  getFlowFilePath,
+  getFlowRunState,
+  getRunArtifactPath,
+  getRunEvents,
+  getFlowsDir,
+  initFlowService,
+  listFlows,
+  listActiveFlowRuns,
+  listFlowPromptLogs,
+  listRecentRuns,
+  listRunsForFlow,
+  onFlowRunState,
+  readFlowFile,
+  readRunOutput,
+  getLatestRunWithOutput,
+  readFlowChat,
+  runDueFlows,
+  runFlow,
+  cancelFlowRun,
+  saveFlowSchedule,
+  saveFlowRunner,
+  saveFlowChat,
+} from "./flow-service.js";
+import {
+  getFlowTaskSchedulerStatus,
+  installFlowTaskScheduler,
+  removeFlowTaskScheduler,
+} from "./flow-task-scheduler.js";
+import { generateFlowFromChat } from "../flow/generate.js";
+import type { FlowChatMessage } from "../shared/flow-chat-types.js";
+import { initFlowScheduler, stopFlowScheduler } from "./flow-scheduler.js";
+import {
+  readFlowSchedulePrefs,
+  writeFlowSchedulePrefs,
+} from "../shared/flow-schedule-pref.js";
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerAuthHandlers();
@@ -1195,8 +1235,27 @@ function resolvePtyWorkDir(cwd?: string): { ok: true; dir: string } | { ok: fals
 
 ipcMain.handle("clipboard-read-text", () => clipboard.readText());
 
-ipcMain.handle("clipboard-write-text", (_event, text: string) => {
-  clipboard.writeText(text ?? "");
+// Windows converts LF to CRLF on the clipboard; normalize before verifying.
+function clipboardTextMatches(expected: string): boolean {
+  const normalize = (s: string) => s.replace(/\r\n/g, "\n");
+  return normalize(clipboard.readText()) === normalize(expected);
+}
+
+// On Windows, clipboard.writeText fails silently while another process holds
+// the clipboard open (clipboard history managers, RDP, Office). Verify the
+// write landed and retry with backoff; report failure so the renderer can
+// fall back instead of assuming the copy succeeded.
+ipcMain.handle("clipboard-write-text", async (_event, text: string) => {
+  const value = text ?? "";
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    clipboard.writeText(value);
+    if (clipboardTextMatches(value)) return true;
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 30 * attempt));
+    }
+  }
+  return false;
 });
 
 ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
@@ -1922,6 +1981,329 @@ ipcMain.handle("set-tray-pane-attention", (_event, count: unknown) => {
   return { ok: true, count: n };
 });
 
+ipcMain.handle("flow-list", () => listFlows());
+ipcMain.handle("flow-list-active-runs", () => listActiveFlowRuns());
+ipcMain.handle("flow-read-run-output", (_event, runId: unknown) => {
+  if (typeof runId !== "string" || !runId.trim()) {
+    return { ok: false, error: "Invalid run id" };
+  }
+  return readRunOutput(runId.trim());
+});
+ipcMain.handle("flow-get-latest-run-output", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return null;
+  }
+  return getLatestRunWithOutput(flowId.trim());
+});
+ipcMain.handle("flow-read-file", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return null;
+  return readFlowFile(flowId.trim());
+});
+
+ipcMain.handle("flow-get-dag-node-command", (_event, flowId: unknown, node: unknown, options: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { error: "Invalid flow id" };
+  }
+  if (!node || typeof node !== "object") {
+    return { error: "Invalid node" };
+  }
+  const n = node as {
+    kind?: unknown;
+    phaseId?: unknown;
+    phaseLabel?: unknown;
+    phaseMessage?: unknown;
+  };
+  if (n.kind !== "trigger" && n.kind !== "phase" && n.kind !== "output") {
+    return { error: "Invalid node kind" };
+  }
+  let runOptions: {
+    globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs;
+    runId?: string;
+    outputPath?: string | null;
+  } = {};
+  if (options && typeof options === "object") {
+    const o = options as {
+      globalToolLaunchArgs?: unknown;
+      runId?: unknown;
+      outputPath?: unknown;
+    };
+    if (o.globalToolLaunchArgs && typeof o.globalToolLaunchArgs === "object") {
+      runOptions.globalToolLaunchArgs = o.globalToolLaunchArgs as import("../tool-launch.js").ToolLaunchArgs;
+    }
+    if (typeof o.runId === "string" && o.runId.trim()) {
+      runOptions.runId = o.runId.trim();
+    }
+    if (typeof o.outputPath === "string") {
+      runOptions.outputPath = o.outputPath;
+    } else if (o.outputPath === null) {
+      runOptions.outputPath = null;
+    }
+  }
+  return getFlowDagNodeCommand(
+    flowId.trim(),
+    {
+      kind: n.kind,
+      phaseId: typeof n.phaseId === "string" ? n.phaseId : undefined,
+      phaseLabel: typeof n.phaseLabel === "string" ? n.phaseLabel : undefined,
+      phaseMessage:
+        typeof n.phaseMessage === "string" || n.phaseMessage === null ? n.phaseMessage : undefined,
+    },
+    runOptions,
+  );
+});
+
+ipcMain.handle("flow-run", (_event, flowId: unknown, options: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  let runOptions: import("../flow/core.js").RunFlowOptions = {};
+  if (options && typeof options === "object") {
+    const o = options as { globalToolLaunchArgs?: unknown };
+    if (o.globalToolLaunchArgs && typeof o.globalToolLaunchArgs === "object") {
+      runOptions = {
+        globalToolLaunchArgs: o.globalToolLaunchArgs as import("../tool-launch.js").ToolLaunchArgs,
+      };
+    }
+  }
+  return runFlow(flowId.trim(), runOptions);
+});
+ipcMain.handle("flow-cancel-run", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return cancelFlowRun(flowId.trim());
+});
+ipcMain.handle("flow-get-task-scheduler-status", () => getFlowTaskSchedulerStatus());
+ipcMain.handle("flow-install-task-scheduler", () => installFlowTaskScheduler());
+ipcMain.handle("flow-remove-task-scheduler", () => removeFlowTaskScheduler());
+ipcMain.handle("flow-get-run-state", (_event, runId: unknown) => {
+  if (typeof runId !== "string" || !runId.trim()) return null;
+  return getFlowRunState(runId.trim());
+});
+ipcMain.handle("flow-list-recent-runs", (_event, limit: unknown) => {
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 20;
+  return listRecentRuns(n);
+});
+
+ipcMain.handle("flow-list-runs-for-flow", (_event, flowId: unknown, limit: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return [];
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 30;
+  return listRunsForFlow(flowId.trim(), n);
+});
+
+ipcMain.handle("flow-get-run-events", (_event, runId: unknown) => {
+  if (typeof runId !== "string" || !runId.trim()) return [];
+  return getRunEvents(runId.trim());
+});
+
+ipcMain.handle("flow-open-run-artifact", (_event, runId: unknown, artifact: unknown) => {
+  if (typeof runId !== "string" || !runId.trim()) {
+    return { ok: false, error: "Invalid run id" };
+  }
+  const kind =
+    artifact === "prompt" || artifact === "events" || artifact === "output" || artifact === "runDir"
+      ? artifact
+      : null;
+  if (!kind) return { ok: false, error: "Invalid artifact" };
+  const path = getRunArtifactPath(runId.trim(), kind);
+  if (!path) return { ok: false, error: "File not found" };
+  void shell.openPath(path);
+  return { ok: true, path };
+});
+
+ipcMain.handle("flow-open-flows-dir", () => {
+  void shell.openPath(getFlowsDir());
+});
+
+ipcMain.handle("flow-delete", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return deleteFlow(flowId.trim());
+});
+
+ipcMain.handle("flow-open-file", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return { ok: false };
+  const filePath = getFlowFilePath(flowId.trim());
+  if (!filePath) return { ok: false, error: "Flow not found" };
+  void shell.openPath(filePath);
+  return { ok: true, path: filePath };
+});
+
+ipcMain.handle("flow-get-schedule-prefs", () => readFlowSchedulePrefs());
+
+ipcMain.handle("flow-set-schedule-prefs", (_event, partial: unknown) => {
+  if (!partial || typeof partial !== "object") {
+    return { ok: false, error: "Invalid prefs" };
+  }
+  const p = partial as { schedulerEnabled?: unknown };
+  const next = writeFlowSchedulePrefs({
+    schedulerEnabled:
+      typeof p.schedulerEnabled === "boolean" ? p.schedulerEnabled : undefined,
+  });
+  return { ok: true, prefs: next };
+});
+
+ipcMain.handle("flow-save-schedule", (_event, flowId: unknown, patch: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  if (!patch || typeof patch !== "object") {
+    return { ok: false, error: "Invalid schedule patch" };
+  }
+  const p = patch as { schedule?: unknown; timezone?: unknown };
+  const schedule =
+    p.schedule === null
+      ? null
+      : typeof p.schedule === "string"
+        ? p.schedule
+        : undefined;
+  if (schedule === undefined) {
+    return { ok: false, error: "schedule is required (string or null)" };
+  }
+  const timezone =
+    p.timezone === null || p.timezone === undefined
+      ? p.timezone === null
+        ? null
+        : undefined
+      : typeof p.timezone === "string"
+        ? p.timezone
+        : undefined;
+  return saveFlowSchedule(flowId.trim(), { schedule, timezone });
+});
+
+ipcMain.handle("flow-save-runner-settings", (_event, flowId: unknown, patch: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  if (!patch || typeof patch !== "object") {
+    return { ok: false, error: "Invalid runner patch" };
+  }
+  const p = patch as {
+    tool?: unknown;
+    toolArgs?: unknown;
+    cwd?: unknown;
+    profile?: unknown;
+  };
+  if (typeof p.tool !== "string" || !p.tool.trim()) {
+    return { ok: false, error: "tool is required" };
+  }
+  const nullableString = (v: unknown): string | null | undefined => {
+    if (v === null) return null;
+    if (typeof v === "string") return v;
+    return undefined;
+  };
+  const toolArgs = nullableString(p.toolArgs);
+  const cwd = nullableString(p.cwd);
+  const profile = nullableString(p.profile);
+  if (toolArgs === undefined || cwd === undefined || profile === undefined) {
+    return { ok: false, error: "Invalid runner patch fields" };
+  }
+  return saveFlowRunner(flowId.trim(), {
+    tool: p.tool.trim(),
+    toolArgs,
+    cwd,
+    profile,
+  });
+});
+
+ipcMain.handle("flow-run-due", async () => {
+  const result = await runDueFlows();
+  return { ok: true, result };
+});
+
+ipcMain.handle("flow-generate", async (_event, payload: unknown) => {
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, error: "Invalid request" };
+  }
+  const { turns, flowId } = payload as { turns?: unknown; flowId?: unknown };
+  if (!Array.isArray(turns)) {
+    return { ok: false, error: "Invalid conversation" };
+  }
+  const parsed = turns
+    .filter((t): t is { role: "user" | "assistant"; content: string } => {
+      if (!t || typeof t !== "object") return false;
+      const role = (t as { role?: unknown }).role;
+      const content = (t as { content?: unknown }).content;
+      return (
+        (role === "user" || role === "assistant") &&
+        typeof content === "string" &&
+        content.trim().length > 0
+      );
+    })
+    .map((t) => ({ role: t.role, content: t.content.trim() }));
+  const logFlowId =
+    typeof flowId === "string" && flowId.trim() ? flowId.trim() : FLOW_CHAT_DRAFT_ID;
+  return generateFlowFromChat(parsed, { flowId: logFlowId });
+});
+
+function normalizeChatFlowId(flowId: unknown): string | null {
+  if (typeof flowId !== "string" || !flowId.trim()) return null;
+  const id = flowId.trim();
+  if (id === FLOW_CHAT_DRAFT_ID) return id;
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(id)) return null;
+  return id;
+}
+
+function parseChatMessages(raw: unknown): FlowChatMessage[] | null {
+  if (!Array.isArray(raw)) return null;
+  const messages: FlowChatMessage[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const rec = item as Record<string, unknown>;
+    const role = rec.role;
+    const content = rec.content;
+    const id = rec.id;
+    if ((role !== "user" && role !== "assistant") || typeof content !== "string") continue;
+    if (typeof id !== "string" || !id.trim()) continue;
+    messages.push({
+      id: id.trim(),
+      role,
+      content,
+      draft: typeof rec.draft === "string" ? rec.draft : undefined,
+      error: rec.error === true,
+      createdAt:
+        typeof rec.createdAt === "string" && rec.createdAt
+          ? rec.createdAt
+          : new Date().toISOString(),
+    });
+  }
+  return messages;
+}
+
+ipcMain.handle("flow-get-chat", (_event, flowId: unknown) => {
+  const id = normalizeChatFlowId(flowId);
+  if (!id) return null;
+  const state = readFlowChat(id);
+  return state?.messages ?? [];
+});
+
+ipcMain.handle("flow-save-chat", (_event, flowId: unknown, messages: unknown) => {
+  const id = normalizeChatFlowId(flowId);
+  if (!id) return { ok: false, error: "Invalid flow id" };
+  const parsed = parseChatMessages(messages);
+  if (!parsed) return { ok: false, error: "Invalid messages" };
+  saveFlowChat(id, parsed);
+  return { ok: true };
+});
+
+ipcMain.handle("flow-list-prompt-logs", (_event, flowId: unknown, limit: unknown) => {
+  const id = normalizeChatFlowId(flowId);
+  if (!id) return [];
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 50;
+  return listFlowPromptLogs(id, n);
+});
+
+ipcMain.handle("flow-create", (_event, content: unknown, overwrite: unknown) => {
+  if (typeof content !== "string" || !content.trim()) {
+    return { ok: false, error: "Invalid flow content" };
+  }
+  return createFlowFromContent(content, {
+    overwrite: overwrite === true,
+    migrateChatFromDraft: overwrite !== true,
+  });
+});
+
 app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
   await startRendererServer(RENDERER_DIR);
@@ -1934,10 +2316,18 @@ app.whenReady().then(async () => {
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
+  initFlowService();
+  initFlowScheduler(() => mainWindow);
+  onFlowRunState((state) => {
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    win.webContents.send("flow-run-state", state);
+  });
   onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
 });
 
 app.on("will-quit", () => {
+  stopFlowScheduler();
   stopRendererServer();
 });
 

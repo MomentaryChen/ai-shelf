@@ -1,4 +1,5 @@
 import { stripAnsi } from "../utils/strip-ansi";
+import { writeClipboardText } from "./xterm-clipboard";
 
 export type TerminalOutputExportResult =
   | { success: true; path: string }
@@ -18,6 +19,5 @@ export async function copyTerminalOutputForIssue(sessionId: string): Promise<boo
   if (!buffer) return false;
   const text = stripAnsi(buffer);
   if (!text.trim()) return false;
-  await window.api.clipboardWriteText(text);
-  return true;
+  return writeClipboardText(text);
 }

@@ -1,0 +1,80 @@
+---
+description: Generate AI Shelf automation flows as .flow.md files
+globs:
+  - "**/*.flow.md"
+  - "**/flows/**"
+alwaysApply: false
+---
+
+# AI Shelf flow definitions
+
+When the user asks to create or edit an automation flow for AI Shelf, output a **`.flow.md`** file.
+
+## File format
+
+- YAML frontmatter + Markdown body (the body is the Claude agent prompt when `runner: claude`).
+- Save under `%APPDATA%/ai-shelf/flows/{id}.flow.md` (or project `flows/` folder).
+
+## Required frontmatter
+
+```yaml
+---
+schema: ai-shelf.flow/definition/v1
+id: my-flow-id
+enabled: true
+timeout_sec: 600
+phases:
+  - id: step-one
+    label: Short human label
+  - id: step-two
+    label: Another step
+---
+```
+
+## Optional frontmatter
+
+```yaml
+schedule: "0 9 * * 1-5"   # cron, Asia/Taipei unless timezone set (min 1h between fires)
+timezone: Asia/Taipei
+runner: claude            # default | http for simple checks
+tool_args: --model haiku  # default for claude runner when omitted
+extra_mcp_servers:        # optional — external MCP from Claude config
+  - atlassian
+```
+
+## Claude runner protocol
+
+The body must instruct the agent to report progress with MCP tools `flow_progress` and `flow_output` (spawned by the runner). Fallback: stdout `FLOW_PROGRESS` lines.
+
+The runner also injects bundled **system skills** from `src/flow/system-skills/` into every agent run (e.g. mandatory `flow_output` on success and failure).
+
+Mark each major step in the body with a heading that includes the phase id:
+
+```markdown
+## 【step-one】Gather data
+
+...
+```
+
+End output after the line `FLOW_OUTPUT_BEGIN` (the runner captures everything after as `output.md`).
+
+## HTTP runner
+
+For connectivity or simple API checks without Claude:
+
+```yaml
+runner: http
+url: https://www.google.com
+method: HEAD
+phases:
+  - id: check
+    label: HTTP check
+```
+
+## Examples
+
+- Daily report: `schedule: "0 8 * * *"`, multiple phases, `on_fail: slack`
+- Weekly cleanup: `schedule: "0 3 * * 0"`
+- Manual only: omit `schedule`
+
+Do not invent n8n-style nodes. One markdown file = one DAG defined by `phases` order.

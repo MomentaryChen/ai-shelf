@@ -12,7 +12,10 @@ import { fetchClaudeAdminUsage } from "../usage/providers/claude.js";
 import { fetchCopilotUsage, testCopilotPat } from "../usage/providers/copilot.js";
 import { fetchCursorAdminUsage } from "../usage/providers/cursor.js";
 import { fetchClaudeDashboardUsage, testClaudeDashboardSession } from "../usage/providers/claude-dashboard.js";
-import { fetchCursorDashboardUsage, testCursorDashboardSession } from "../usage/providers/cursor-dashboard.js";
+import {
+  fetchCursorDashboardSpending,
+  fetchCursorDashboardUsage,
+} from "../usage/providers/cursor-dashboard.js";
 import { testGeminiApiKey, testGeminiGcpCredentials } from "../usage/providers/gemini.js";
 import { USAGE_PROVIDERS } from "../usage/registry.js";
 import type { UsageToolId } from "../usage/types.js";
@@ -64,7 +67,7 @@ export function registerUsageHandlers(): void {
       try {
         if (toolId === "cursor") {
           if (fieldKey === "sessionToken") {
-            await testCursorDashboardSession(secret);
+            await fetchCursorDashboardSpending(secret);
           } else if (fieldKey === "adminApiKey") {
             await fetchCursorAdminUsage(secret, 7);
           } else {

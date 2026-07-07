@@ -56,23 +56,28 @@ async function readClipboardText(): Promise<string> {
   });
 }
 
-async function writeClipboardText(text: string): Promise<boolean> {
+export async function writeClipboardText(text: string): Promise<boolean> {
   if (!text) return false;
   const seq = ++writeSeq;
   return runClipboardOp(async () => {
+    // Main process verifies the write and reports false when the OS clipboard
+    // stayed locked; treat that the same as an IPC error and try navigator.
+    let ok = false;
     try {
-      await window.api.clipboardWriteText(text);
-      lastOurWrite = { text, at: Date.now(), seq };
-      return true;
+      ok = (await window.api.clipboardWriteText(text)) !== false;
     } catch {
+      ok = false;
+    }
+    if (!ok) {
       try {
         await navigator.clipboard.writeText(text);
-        lastOurWrite = { text, at: Date.now(), seq };
-        return true;
+        ok = true;
       } catch {
         return false;
       }
     }
+    lastOurWrite = { text, at: Date.now(), seq };
+    return true;
   });
 }
 
@@ -168,9 +173,16 @@ export function bindTerminalClipboard(
   };
 
   let lastExplicitCopy = { text: "", at: 0 };
-  let lastAutoCopied = "";
+  // Dedupe window for copy-on-select. Must expire: re-selecting the same text
+  // after copying elsewhere has to write again, or the paste is stale.
+  const AUTO_COPY_DEDUPE_MS = 500;
+  let lastAutoCopied = { text: "", at: 0 };
   let selCopyTimer = 0;
   let selCopyGeneration = 0;
+
+  const isRecentAutoCopy = (text: string) =>
+    text === lastAutoCopied.text &&
+    Date.now() - lastAutoCopied.at < AUTO_COPY_DEDUPE_MS;
 
   const cancelPendingAutoCopy = () => {
     selCopyGeneration += 1;
@@ -185,10 +197,17 @@ export function bindTerminalClipboard(
     if (text === lastExplicitCopy.text && now - lastExplicitCopy.at < GUARD_MS) {
       return true;
     }
+    // Set before the async write so a double-fired shortcut dedupes; cleared
+    // below on failure so the guard cannot mask a failed write as copied.
     lastExplicitCopy = { text, at: now };
     cancelPendingAutoCopy();
-    lastAutoCopied = text;
-    return writeClipboardText(text);
+    const ok = await writeClipboardText(text);
+    if (ok) {
+      lastAutoCopied = { text, at: Date.now() };
+    } else {
+      lastExplicitCopy = { text: "", at: 0 };
+    }
+    return ok;
   };
 
   const pasteIntoTerminal = async (): Promise<boolean> => {
@@ -380,7 +399,7 @@ export function bindTerminalClipboard(
     // Selection cleared (e.g. focus moved to another pane). Leave any pending
     // copy of the previous selection alone — cancelling it here is what made a
     // quick copy-then-switch lose the text before it reached the clipboard.
-    if (!text || text === lastAutoCopied) return;
+    if (!text || isRecentAutoCopy(text)) return;
     // Capture `text` now and write that exact value; re-reading on the timer
     // could see an already-cleared selection after the pane lost focus.
     const gen = ++selCopyGeneration;
@@ -388,8 +407,11 @@ export function bindTerminalClipboard(
     selCopyTimer = window.setTimeout(() => {
       if (gen !== selCopyGeneration) return;
       if (!(options.getCopyOnSelect?.() ?? false)) return;
-      lastAutoCopied = text;
-      void writeClipboardText(text);
+      void writeClipboardText(text).then((ok) => {
+        // Record only successful writes so a locked clipboard gets retried
+        // by the next selection event instead of being deduped away.
+        if (ok) lastAutoCopied = { text, at: Date.now() };
+      });
     }, 50);
   };
   const selectionDisposable = term.onSelectionChange(onSelectionChange);

@@ -4,6 +4,8 @@ import {
   chunkDateRanges,
   type CursorUsageEvent,
 } from "./cursor-shared.js";
+import { quotasFromTeamSpend, type CursorTeamSpendResponse } from "./cursor-spending.js";
+import type { UsageQuotaWindow } from "../types.js";
 
 const API_BASE = "https://api.cursor.com";
 
@@ -76,7 +78,7 @@ export async function fetchCursorAdminUsage(
 ): Promise<
   Pick<
     import("../types.js").UsageToolSnapshot,
-    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens"
+    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens" | "quotas"
   >
 > {
   const ranges = chunkDateRanges(days);
@@ -85,7 +87,20 @@ export async function fetchCursorAdminUsage(
     const batch = await fetchAdminEventsInRange(adminApiKey, range.startDate, range.endDate);
     events.push(...batch);
   }
-  return aggregateCursorEvents(events);
+  const usage = aggregateCursorEvents(events);
+
+  let quotas: UsageQuotaWindow[] = [];
+  try {
+    const spend = (await cursorAdminPost("/teams/spend", adminApiKey, {
+      page: 1,
+      pageSize: 100,
+    })) as CursorTeamSpendResponse;
+    quotas = quotasFromTeamSpend(spend);
+  } catch {
+    // Usage events still useful when spend endpoint is unavailable.
+  }
+
+  return { ...usage, quotas: quotas.length > 0 ? quotas : undefined };
 }
 
 export type CursorUsageAuthSource = "usage.cursor.auth.team.title" | "usage.cursor.auth.personal.title";
@@ -96,7 +111,7 @@ export async function fetchCursorUsage(
 ): Promise<
   Pick<
     import("../types.js").UsageToolSnapshot,
-    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens"
+    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens" | "quotas"
   > & { authSourceKey: CursorUsageAuthSource }
 > {
   const adminKey = creds.adminApiKey?.trim();
