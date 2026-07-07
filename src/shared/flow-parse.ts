@@ -42,6 +42,17 @@ function parsePhasesFromFrontmatter(raw: unknown): FlowPhaseDef[] {
   return phases;
 }
 
+/** Reverse of formatYamlScalar: strip matching quotes and unescape \\ and \" inside double quotes. */
+function unquoteYamlScalar(raw: string): string {
+  if (raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')) {
+    return raw.slice(1, -1).replace(/\\(["\\])/g, "$1");
+  }
+  if (raw.length >= 2 && raw.startsWith("'") && raw.endsWith("'")) {
+    return raw.slice(1, -1).replace(/''/g, "'");
+  }
+  return raw;
+}
+
 function parseYamlStringList(lines: string[], startIndex: number): { items: string[]; nextIndex: number } {
   const items: string[] = [];
   let i = startIndex;
@@ -50,7 +61,7 @@ function parseYamlStringList(lines: string[], startIndex: number): { items: stri
     if (!line.startsWith("  ")) break;
     const itemMatch = /^\s+-\s+(.+)$/.exec(line);
     if (itemMatch) {
-      items.push(itemMatch[1]!.trim().replace(/^["']|["']$/g, ""));
+      items.push(unquoteYamlScalar(itemMatch[1]!.trim()));
     }
     i += 1;
   }
@@ -88,11 +99,11 @@ function parseSimpleFrontmatter(yaml: string): Record<string, unknown> {
         if (!phaseLine.startsWith("  ")) break;
         const idMatch = /^\s+-\s+id:\s*(.+)$/.exec(phaseLine);
         if (idMatch) {
-          const phase: { id: string; label?: string } = { id: idMatch[1]!.trim().replace(/^["']|["']$/g, "") };
+          const phase: { id: string; label?: string } = { id: unquoteYamlScalar(idMatch[1]!.trim()) };
           if (i + 1 < lines.length) {
             const labelMatch = /^\s+label:\s*(.+)$/.exec(lines[i + 1]!);
             if (labelMatch) {
-              phase.label = labelMatch[1]!.trim().replace(/^["']|["']$/g, "");
+              phase.label = unquoteYamlScalar(labelMatch[1]!.trim());
               i += 1;
             }
           }
@@ -118,7 +129,7 @@ function parseSimpleFrontmatter(yaml: string): Record<string, unknown> {
     } else if (/^-?\d+$/.test(rest)) {
       result[key] = Number(rest);
     } else {
-      result[key] = rest.replace(/^["']|["']$/g, "");
+      result[key] = unquoteYamlScalar(rest);
     }
     i += 1;
   }
