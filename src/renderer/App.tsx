@@ -17,7 +17,10 @@ import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
-import type { ProviderEntry } from "./types";
+import {
+  buildGlobalSearchCommands,
+  mergePaletteCommands,
+} from "./commands/build-global-search-commands";
 
 const OverviewTab = lazy(() =>
   import("./components/OverviewTab").then((m) => ({ default: m.OverviewTab })),
@@ -53,71 +56,6 @@ const CommandPalette = lazy(() =>
 type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update" | "usage";
 
 const EMPTY_COMMANDS: Command[] = [];
-
-function buildGlobalCommands(
-  data: ProviderEntry[],
-  t: (key: MessageKey, params?: Record<string, string | number>) => string,
-  goTo: (tab: TabId) => void,
-): Command[] {
-  const basename = (p: string) => p.split(/[\\/]/).pop() || p;
-
-  const configSeen = new Set<string>();
-  const configCommands: Command[] = [];
-  for (const entry of data) {
-    const paths = [...entry.config.paths, ...entry.config.instructionFiles, ...entry.mcp.configPaths];
-    for (const path of paths) {
-      if (configSeen.has(path)) continue;
-      configSeen.add(path);
-      configCommands.push({
-        id: `open-config-${path}`,
-        title: t("cmd.openConfig", { name: basename(path) }),
-        group: t("cmd.group.config"),
-        icon: "📄",
-        keywords: `${entry.tool} config ${path}`,
-        hideWhenEmpty: true,
-        run: () => void window.api.openPath(path),
-      });
-    }
-  }
-
-  const skillSeen = new Set<string>();
-  const skillCommands: Command[] = [];
-  for (const entry of data) {
-    for (const skill of entry.skills) {
-      if (skillSeen.has(skill)) continue;
-      skillSeen.add(skill);
-      skillCommands.push({
-        id: `find-skill-${skill}`,
-        title: t("cmd.skillSearch", { name: skill }),
-        group: t("cmd.group.skills"),
-        icon: "⚡",
-        keywords: `skill ${skill}`,
-        hideWhenEmpty: true,
-        run: () => goTo("skills"),
-      });
-    }
-  }
-
-  const mcpSeen = new Set<string>();
-  const mcpCommands: Command[] = [];
-  for (const entry of data) {
-    for (const server of entry.mcp.servers) {
-      if (mcpSeen.has(server)) continue;
-      mcpSeen.add(server);
-      mcpCommands.push({
-        id: `find-mcp-${server}`,
-        title: t("cmd.mcpSearch", { name: server }),
-        group: t("cmd.group.mcp"),
-        icon: "🔌",
-        keywords: `mcp server ${server}`,
-        hideWhenEmpty: true,
-        run: () => goTo("mcp"),
-      });
-    }
-  }
-
-  return [...configCommands, ...skillCommands, ...mcpCommands];
-}
 
 const TAB_ICONS: Record<TabId, string> = {
   overview: "📋",
@@ -158,9 +96,12 @@ export function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   /** Bumped when the palette opens so `commands` re-reads the latest terminal ref. */
   const [paletteCommandsRev, setPaletteCommandsRev] = useState(0);
+  const paletteOpenRef = useRef(false);
+  paletteOpenRef.current = paletteOpen;
   const terminalCommandsRef = useRef<Command[]>([]);
   const registerTerminalCommands = useCallback((cmds: Command[]) => {
     terminalCommandsRef.current = cmds;
+    if (paletteOpenRef.current) setPaletteCommandsRev((r) => r + 1);
   }, []);
   const [, startTransition] = useTransition();
 
@@ -330,22 +271,27 @@ export function App() {
     [t],
   );
 
-  // Built only while the palette is open
+  const requestTerminalMode = useCallback(() => {
+    handleModeChange("terminal");
+  }, []);
+
+  // Built only while the palette is open — inventory search + profiles in every mode.
   const commands = useMemo<Command[]>(() => {
     if (!paletteOpen) return EMPTY_COMMANDS;
 
-    const globalCommands = buildGlobalCommands(inventoryDataRef.current, t, goTo);
-    const base =
+    const globalSearch = buildGlobalSearchCommands(inventoryDataRef.current, t, goTo);
+    const terminalCommands = terminalCommandsRef.current;
+    const modeBase =
       appMode === "terminal"
-        ? (() => {
-            const terminalCommands = terminalCommandsRef.current;
-            const terminalIds = new Set(terminalCommands.map((c) => c.id));
-            const extras = sharedModeCommands.filter((c) => !terminalIds.has(c.id));
-            return [...terminalCommands, ...extras];
-          })()
-        : inventoryCommands;
-    const baseIds = new Set(base.map((c) => c.id));
-    return [...base, ...globalCommands.filter((c) => !baseIds.has(c.id))];
+        ? mergePaletteCommands(
+            terminalCommands,
+            sharedModeCommands.filter(
+              (c) => !terminalCommands.some((tc) => tc.id === c.id),
+            ),
+          )
+        : mergePaletteCommands(inventoryCommands, terminalCommands);
+
+    return mergePaletteCommands(modeBase, globalSearch);
   }, [paletteOpen, paletteCommandsRev, appMode, sharedModeCommands, inventoryCommands, t]);
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
@@ -437,6 +383,7 @@ export function App() {
                 active={appMode === "terminal"}
                 inventoryScanning={scanning}
                 onRegisterCommands={registerTerminalCommands}
+                onRequestTerminalMode={requestTerminalMode}
               />
             </Suspense>
           </main>
