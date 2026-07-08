@@ -119,9 +119,33 @@ export function updateProfile(
     defaultTool?: string;
     broadcastInput?: boolean;
     accentColor?: string | null;
+    savedCommands?: {
+      id: string;
+      name: string;
+      command: string;
+      broadcast?: boolean;
+    }[];
   },
 ) {
-  return getWorkspaceContext().profileService.update(profileId, patch);
+  return getWorkspaceContext().profileService.update(profileId, {
+    ...patch,
+    savedCommands: patch.savedCommands?.map((s) => ({ ...s, broadcast: s.broadcast ?? false })),
+  });
+}
+
+export function setProfileSavedCommands(
+  profileId: string,
+  savedCommands: {
+    id: string;
+    name: string;
+    command: string;
+    broadcast?: boolean;
+  }[],
+) {
+  return getWorkspaceContext().profileService.setSavedCommands(
+    profileId,
+    savedCommands.map((s) => ({ ...s, broadcast: s.broadcast ?? false })),
+  );
 }
 
 export function deleteProfile(profileId: string) {

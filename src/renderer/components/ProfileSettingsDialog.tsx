@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ProfileInfo } from "../types";
+import type { ProfileInfo, SavedCommandSnippet } from "../types";
 import { ToolLogo } from "./ToolLogo";
 import {
   PLAIN_SHELL_TOOL_ID,
@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SavedCommandsEditor } from "./SavedCommandsEditor";
 
 export interface ProfileSettingsPatch {
   name: string;
@@ -25,6 +26,7 @@ export interface ProfileSettingsPatch {
   defaultTool: string;
   broadcastInput: boolean;
   accentColor: string | null;
+  savedCommands: SavedCommandSnippet[];
 }
 
 interface Props {
@@ -54,6 +56,7 @@ export function ProfileSettingsDialog({
   const [tool, setTool] = useState(PLAIN_SHELL_TOOL_ID);
   const [broadcastInput, setBroadcastInput] = useState(false);
   const [accentColor, setAccentColor] = useState<string | null>(null);
+  const [savedCommands, setSavedCommands] = useState<SavedCommandSnippet[]>([]);
 
   const tools = profileToolChoices(availableTools, profile?.defaultTool);
 
@@ -64,6 +67,7 @@ export function ProfileSettingsDialog({
     setTool(profile.defaultTool || PLAIN_SHELL_TOOL_ID);
     setBroadcastInput(profile.broadcastInput ?? false);
     setAccentColor(profile.accentColor ?? null);
+    setSavedCommands(profile.savedCommands ?? []);
   }, [open, profile]);
 
   if (!profile) return null;
@@ -85,12 +89,19 @@ export function ProfileSettingsDialog({
       defaultTool: effectiveTool,
       broadcastInput,
       accentColor,
+      savedCommands: savedCommands
+        .map((s) => ({
+          ...s,
+          name: s.name.trim(),
+          command: s.command.trim(),
+        }))
+        .filter((s) => s.name && s.command),
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm max-h-[min(90vh,720px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-[15px]">{t("profile.dialog.settingsTitle")}</DialogTitle>
         </DialogHeader>
@@ -180,6 +191,8 @@ export function ProfileSettingsDialog({
           />
           {t("profile.syncBroadcast")}
         </Label>
+
+        <SavedCommandsEditor value={savedCommands} onChange={setSavedCommands} disabled={busy} />
 
         <div className="flex items-center justify-between gap-2">
           <Button

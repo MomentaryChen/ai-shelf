@@ -347,7 +347,15 @@ export interface GroupLayoutSnapshot {
   layout: unknown;
   broadcastInput?: boolean;
   accentColor?: string | null;
+  savedCommands?: SavedCommandSnippet[];
   updatedAt: string;
+}
+
+export interface SavedCommandSnippet {
+  id: string;
+  name: string;
+  command: string;
+  broadcast?: boolean;
 }
 
 export interface ProfileTerminal {
@@ -366,6 +374,7 @@ export interface ProfileInfo {
   accentColor: string | null;
   paneCount: number;
   terminals: ProfileTerminal[];
+  savedCommands: SavedCommandSnippet[];
   updatedAt: string | null;
 }
 
@@ -691,7 +700,12 @@ export interface ElectronAPI {
       defaultTool?: string;
       broadcastInput?: boolean;
       accentColor?: string | null;
+      savedCommands?: SavedCommandSnippet[];
     },
+  ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
+  profileSetSavedCommands: (
+    profileId: string,
+    savedCommands: SavedCommandSnippet[],
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileDelete: (profileId: string) => Promise<{ success: boolean; error?: string }>;
   profileReorder: (

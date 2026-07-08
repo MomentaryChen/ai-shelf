@@ -77,9 +77,16 @@ function upsertLayout(
   const group = db.prepare(`SELECT id FROM groups WHERE id = ?`).get(row.profileId);
   if (!group) return;
   const snapshot = row.snapshot;
+  const existingLayout = db
+    .prepare(`SELECT saved_commands_json FROM group_layouts WHERE group_id = ?`)
+    .get(row.profileId) as { saved_commands_json: string } | undefined;
+  const savedCommandsJson =
+    snapshot.savedCommands !== undefined
+      ? JSON.stringify(snapshot.savedCommands)
+      : (existingLayout?.saved_commands_json ?? "[]");
   db.prepare(
-    `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, updated_at)
-     VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @updated_at)
+    `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at)
+     VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @saved_commands_json, @updated_at)
      ON CONFLICT(group_id) DO UPDATE SET
        workspace_id = excluded.workspace_id,
        default_cwd = excluded.default_cwd,
@@ -88,6 +95,7 @@ function upsertLayout(
        panes_json = excluded.panes_json,
        broadcast_input = excluded.broadcast_input,
        accent_color = excluded.accent_color,
+       saved_commands_json = excluded.saved_commands_json,
        updated_at = excluded.updated_at`,
   ).run({
     group_id: row.profileId,
@@ -98,6 +106,7 @@ function upsertLayout(
     panes_json: JSON.stringify(snapshot.panes),
     broadcast_input: snapshot.broadcastInput ? 1 : 0,
     accent_color: snapshot.accentColor ?? null,
+    saved_commands_json: savedCommandsJson,
     updated_at: snapshot.updatedAt,
   });
 }

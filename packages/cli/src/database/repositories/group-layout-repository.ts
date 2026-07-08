@@ -15,7 +15,7 @@ export class GroupLayoutRepository {
   findByGroupId(groupId: string): GroupLayoutSnapshot | null {
     const row = this.db
       .prepare(
-        `SELECT default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, updated_at
+        `SELECT default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at
          FROM group_layouts WHERE group_id = ?`,
       )
       .get(groupId) as
@@ -26,6 +26,7 @@ export class GroupLayoutRepository {
           panes_json: string;
           broadcast_input: number;
           accent_color: string | null;
+          saved_commands_json: string;
           updated_at: string;
         }
       | undefined;
@@ -48,6 +49,13 @@ export class GroupLayoutRepository {
       panes = [];
     }
 
+    let savedCommands: GroupLayoutSnapshot["savedCommands"] = [];
+    try {
+      savedCommands = JSON.parse(row.saved_commands_json ?? "[]") as GroupLayoutSnapshot["savedCommands"];
+    } catch {
+      savedCommands = [];
+    }
+
     return GroupLayoutSnapshotSchema.parse({
       defaultCwd: row.default_cwd,
       defaultTool: row.default_tool || "claude",
@@ -55,6 +63,7 @@ export class GroupLayoutRepository {
       layout,
       broadcastInput: Boolean(row.broadcast_input),
       accentColor: row.accent_color ?? null,
+      savedCommands,
       updatedAt: row.updated_at,
     });
   }
@@ -64,13 +73,15 @@ export class GroupLayoutRepository {
     const existing = this.findByGroupId(groupId);
     const accentColor =
       parsed.accentColor !== undefined ? parsed.accentColor : (existing?.accentColor ?? null);
+    const savedCommands =
+      parsed.savedCommands !== undefined ? parsed.savedCommands : (existing?.savedCommands ?? []);
     const now = parsed.updatedAt || new Date().toISOString();
-    const stored = { ...parsed, accentColor, updatedAt: now };
+    const stored = { ...parsed, accentColor, savedCommands, updatedAt: now };
 
     this.db
       .prepare(
-        `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, updated_at)
-         VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @updated_at)
+        `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at)
+         VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @saved_commands_json, @updated_at)
          ON CONFLICT(group_id) DO UPDATE SET
            workspace_id = excluded.workspace_id,
            default_cwd = excluded.default_cwd,
@@ -79,6 +90,7 @@ export class GroupLayoutRepository {
            panes_json = excluded.panes_json,
            broadcast_input = excluded.broadcast_input,
            accent_color = excluded.accent_color,
+           saved_commands_json = excluded.saved_commands_json,
            updated_at = excluded.updated_at`,
       )
       .run({
@@ -90,6 +102,7 @@ export class GroupLayoutRepository {
         panes_json: JSON.stringify(parsed.panes),
         broadcast_input: parsed.broadcastInput ? 1 : 0,
         accent_color: accentColor,
+        saved_commands_json: JSON.stringify(stored.savedCommands ?? []),
         updated_at: now,
       });
 

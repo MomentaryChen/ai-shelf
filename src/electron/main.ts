@@ -72,6 +72,7 @@ import {
   reorderProfileGroups,
   createProfile,
   updateProfile,
+  setProfileSavedCommands,
   deleteProfile,
   reorderProfiles,
 } from "./workspace-host.js";
@@ -1793,9 +1794,7 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle(
-  "profile-update",
-  (
+ipcMain.handle("profile-update", (
     _e,
     profileId: string,
     patch: {
@@ -1804,10 +1803,28 @@ ipcMain.handle(
       defaultTool?: string;
       broadcastInput?: boolean;
       accentColor?: string | null;
+      savedCommands?: { id: string; name: string; command: string; broadcast?: boolean }[];
     },
   ) => {
     try {
       const profile = updateProfile(profileId, patch);
+      refreshTrayMenu();
+      return { success: true, profile };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
+
+ipcMain.handle(
+  "profile-set-saved-commands",
+  (
+    _e,
+    profileId: string,
+    savedCommands: { id: string; name: string; command: string; broadcast?: boolean }[],
+  ) => {
+    try {
+      const profile = setProfileSavedCommands(profileId, savedCommands);
       refreshTrayMenu();
       return { success: true, profile };
     } catch (err: unknown) {

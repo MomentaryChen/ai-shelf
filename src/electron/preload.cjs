@@ -138,6 +138,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("profile-group-reorder", orderedGroupIds),
   profileCreate: (name, input) => ipcRenderer.invoke("profile-create", name, input),
   profileUpdate: (profileId, patch) => ipcRenderer.invoke("profile-update", profileId, patch),
+  profileSetSavedCommands: (profileId, savedCommands) =>
+    ipcRenderer.invoke("profile-set-saved-commands", profileId, savedCommands),
   profileDelete: (profileId) => ipcRenderer.invoke("profile-delete", profileId),
   profileReorder: (groupIdOrName, orderedProfileIds) =>
     ipcRenderer.invoke("profile-reorder", groupIdOrName, orderedProfileIds),
