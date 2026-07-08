@@ -1,10 +1,10 @@
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 
 export interface NavItem<T extends string> {
   id: T;
-  icon: LucideIcon;
+  icon: ReactNode;
   labelKey: MessageKey;
 }
 
@@ -66,7 +66,7 @@ export function InventoryNav<T extends string>({
                   : "bg-bg-secondary text-text-secondary group-hover:text-accent"
               }`}
             >
-              <it.icon className="h-4 w-4" />
+              {it.icon}
             </span>
             <span className="flex-1 truncate">{t(it.labelKey)}</span>
             {badge != null && badge > 0 && (

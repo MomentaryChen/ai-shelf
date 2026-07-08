@@ -10,18 +10,14 @@ import {
 } from "react";
 import {
   BarChart3,
-  Brain,
-  ClipboardList,
   Compass,
   FileText,
   Monitor,
   Package,
   Plug,
   RefreshCw,
-  Settings,
   Stethoscope,
   Zap,
-  type LucideIcon,
 } from "lucide-react";
 import { Spinner } from "./components/Spinner";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
@@ -134,15 +130,15 @@ function buildGlobalCommands(
   return [...configCommands, ...skillCommands, ...mcpCommands];
 }
 
-const TAB_ICONS: Record<TabId, LucideIcon> = {
-  overview: ClipboardList,
-  models: Brain,
-  skills: Zap,
-  mcp: Plug,
-  config: Settings,
-  doctor: Stethoscope,
-  update: RefreshCw,
-  usage: BarChart3,
+const TAB_ICONS: Record<TabId, string> = {
+  overview: "📋",
+  models: "🧠",
+  skills: "⚡",
+  mcp: "🔌",
+  config: "⚙️",
+  doctor: "🩺",
+  update: "🔄",
+  usage: "📊",
 };
 
 const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
@@ -159,7 +155,7 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
 const TAB_IDS = Object.keys(TAB_LABEL_KEYS) as TabId[];
 const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
   id,
-  icon: TAB_ICONS[id],
+  icon: <span className="text-[14px] leading-none">{TAB_ICONS[id]}</span>,
   labelKey: TAB_LABEL_KEYS[id],
 }));
 
@@ -264,7 +260,7 @@ export function App() {
       id: `go-${it.id}`,
       title: `${t("cmd.go")} ${t(it.labelKey)}`,
       group: t("cmd.group.navigate"),
-      icon: <it.icon className="h-4 w-4" />,
+      icon: it.icon,
       keywords: it.id,
       run: () => goTo(it.id),
     }));
