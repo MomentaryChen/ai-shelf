@@ -9,6 +9,24 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-07-08
+
+Terminal focus shortcuts and flow scheduler reliability fixes.
+
+### Added
+
+- **Terminal focus MRU** — Ctrl+Tab returns to the previously focused terminal across profiles.
+
+### Fixed
+
+- **Terminal sidebar shortcut** — Ctrl+S toggles the sidebar even when the terminal has focus.
+- **Flow scheduler starvation** — Long scheduled runs no longer block the scheduler tick, so other due schedules still fire on time.
+- **Flow cross-process duplicates** — Prevented duplicate scheduled runs when multiple app instances are open.
+- **Flow frontmatter escaping** — Unescape quoted frontmatter scalars so backslashes stop doubling on save.
+- **Flow Windows agent args** — Windows cmd shim no longer drops empty or metacharacter agent arguments.
+
+[3.6.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.6.0
+
 ## [3.5.0] - 2026-07-07
 
 AI Flow advances to a full in-app workflow with scheduler, DAG inspection, and MCP-backed runner execution.
