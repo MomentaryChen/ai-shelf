@@ -467,6 +467,24 @@ export function useProfileWorkspace(
     [getProfilePanes],
   );
 
+  const isPaneLive = useCallback(
+    (workspaceId: string, profileId: string, paneId: string): boolean => {
+      const key = cacheKey(workspaceId, profileId);
+      let panes: PaneInfo[];
+      if (
+        activeProfile?.id === profileId &&
+        activeProfile.workspaceId === workspaceId
+      ) {
+        panes = layout ? collectPanes(layout) : [];
+      } else {
+        const cached = profileLiveCacheRef.current.get(key);
+        panes = cached ? collectPanes(cached.layout) : [];
+      }
+      return panes.some((p) => p.id === paneId);
+    },
+    [activeProfile, layout, cacheKey],
+  );
+
   // Flush on unmount — do not ptyKill here (breaks Strict Mode / profile switch cache).
   useEffect(() => {
     return () => {
@@ -638,6 +656,7 @@ export function useProfileWorkspace(
     getProfileFocusedPaneId,
     getProfileMinimizedPaneIds,
     hasLiveSessions,
+    isPaneLive,
     canAddPane,
     maxPanes: MAX_GROUP_PANES,
     minimizedPaneIds,

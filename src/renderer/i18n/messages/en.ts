@@ -58,7 +58,7 @@ export const en = {
   "settings.paneShortcut.title": "Pane shortcuts",
   "settings.paneShortcut.subtitle":
     "Split and focus shortcuts while a terminal pane is focused. Requires Ctrl (or Cmd on Mac). Close, clear, and restart shortcuts stay fixed.",
-  "settings.paneShortcut.focusNext": "Focus next pane",
+  "settings.paneShortcut.focusNext": "Return to previous terminal",
   "settings.paneShortcut.focusPrev": "Focus previous pane",
   "settings.paneShortcut.splitRight": "Split right",
   "settings.paneShortcut.splitDown": "Split down",
@@ -504,7 +504,7 @@ export const en = {
   "chat.restoring": "Restoring terminals…",
   "chat.restorePaneHint": "— click \"+ Pane\" above to open a terminal (up to {max}, layout is saved)",
   "chat.shortcutHint":
-    "Pane shortcuts: {focusNext} next, {focusPrev} previous, {splitRight} split right, {splitDown} split down, {focusPane} pane 1–9; Ctrl+W close, Ctrl+L clear, Ctrl+Shift+R restart, Ctrl+F search. Right-click menu can also clear or restart.",
+    "Pane shortcuts: {focusNext} previous terminal (any profile), {focusPrev} previous pane, {splitRight} split right, {splitDown} split down, {focusPane} pane 1–9; Ctrl+W close, Ctrl+L clear, Ctrl+Shift+R restart, Ctrl+F search. Right-click menu can also clear or restart.",
   "chat.profileShortcutHint":
     "Profile shortcuts: {profileByIndex} switch by group order (outside terminal); {profileCycle} next recent, {profileCyclePrev} previous recent.",
   "chat.debugHint":

@@ -59,7 +59,7 @@ export const zh: Record<MessageKey, string> = {
   "settings.paneShortcut.title": "窗格快捷鍵",
   "settings.paneShortcut.subtitle":
     "終端機窗格聚焦時的分割與切換快捷鍵，需搭配 Ctrl（Mac 為 Cmd）。關閉、清屏與重啟快捷鍵維持固定。",
-  "settings.paneShortcut.focusNext": "下一個窗格",
+  "settings.paneShortcut.focusNext": "回到上一個終端機",
   "settings.paneShortcut.focusPrev": "上一個窗格",
   "settings.paneShortcut.splitRight": "向右分割",
   "settings.paneShortcut.splitDown": "向下分割",
@@ -499,7 +499,7 @@ export const zh: Record<MessageKey, string> = {
   "chat.restoring": "正在還原 terminal…",
   "chat.restorePaneHint": "— 點上方「+ Pane」開啟 terminal（最多 {max} 個，會自動記住）",
   "chat.shortcutHint":
-    "窗格快捷鍵：{focusNext} 下一個、{focusPrev} 上一個、{splitRight} 向右分割、{splitDown} 向下分割、{focusPane} 窗格 1–9；Ctrl+W 關閉、Ctrl+L 清屏、Ctrl+Shift+R 重啟、Ctrl+F 搜尋。右鍵選單亦可清屏／重啟。",
+    "窗格快捷鍵：{focusNext} 回到上一個終端機（跨 Profile）、{focusPrev} 上一個窗格、{splitRight} 向右分割、{splitDown} 向下分割、{focusPane} 窗格 1–9；Ctrl+W 關閉、Ctrl+L 清屏、Ctrl+Shift+R 重啟、Ctrl+F 搜尋。右鍵選單亦可清屏／重啟。",
   "chat.profileShortcutHint":
     "Profile 快捷鍵：{profileByIndex} 依群組順序切換（終端機外）；{profileCycle} 下一個最近使用、{profileCyclePrev} 上一個最近使用。",
   "chat.debugHint": "除錯：按 F12 或 Ctrl+Shift+I 開啟開發者工具；也可按 Alt → View → Developer Tools",
