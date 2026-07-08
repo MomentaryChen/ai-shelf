@@ -124,6 +124,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("ws-group-layout-set-active", workspaceId, groupId),
   profileGetTree: () => ipcRenderer.invoke("profile-get-tree"),
   profileGroupGetForest: () => ipcRenderer.invoke("profile-group-get-forest"),
+  getOnboardingCompleted: () => ipcRenderer.invoke("get-onboarding-completed"),
+  setOnboardingCompleted: () => ipcRenderer.invoke("set-onboarding-completed"),
   profileGroupCreate: (name) => ipcRenderer.invoke("profile-group-create", name),
   profileGroupUpdate: (idOrName, newName) =>
     ipcRenderer.invoke("profile-group-update", idOrName, newName),
