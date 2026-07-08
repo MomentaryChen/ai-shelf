@@ -501,6 +501,7 @@ export function App() {
                           onGoDoctor={() => goTo("doctor")}
                           onGoUpdate={() => goTo("update")}
                           onRefreshHealth={refreshHealth}
+                          onRefresh={reload}
                         />
                       )}
                       {activeTab === "models" && <ModelsTab data={data} />}
@@ -509,8 +510,8 @@ export function App() {
                       )}
                       {activeTab === "mcp" && <McpTab data={data} />}
                       {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
-                      {activeTab === "doctor" && <DoctorTab data={data} />}
-                      {activeTab === "update" && <UpdateTab data={data} />}
+                      {activeTab === "doctor" && <DoctorTab data={data} onRefresh={reload} />}
+                      {activeTab === "update" && <UpdateTab data={data} onRefresh={reload} />}
                     </Suspense>
                   )}
                   {activeTab === "usage" && (

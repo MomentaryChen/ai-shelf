@@ -13,7 +13,7 @@ import {
 } from "../inventory/index.js";
 import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
-import { TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
+import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
@@ -856,6 +856,19 @@ ipcMain.handle("run-update", async (_event, tool: string) => {
     return { success: true, message: result.stdout || "Update completed" };
   }
   return { success: false, message: result.stderr || result.stdout || "Update failed" };
+});
+
+ipcMain.handle("run-install", async (_event, tool: string) => {
+  const cliPath = join(import.meta.dirname, "..", "cli.js");
+  const cliArg = canonicalToolId(tool);
+  const result = await run(process.execPath, [cliPath, "install", cliArg], 180_000, {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+  });
+  if (result.ok) {
+    inventoryCache = null;
+    return { success: true, message: result.stdout || "Install completed" };
+  }
+  return { success: false, message: result.stderr || result.stdout || "Install failed" };
 });
 
 function detectSelfUpdateCmd(): string {

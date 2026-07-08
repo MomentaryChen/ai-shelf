@@ -517,6 +517,7 @@ export interface ElectronAPI {
   onScanComplete: (cb: () => void) => void;
   offScanListeners: () => void;
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
+  runInstall: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
   previewMcpSync: (opts: {
