@@ -247,6 +247,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
       )}
 
       <InventorySectionHeader count={installedSectionCount} variant="installed" />
+      <div className="ui-stagger-children">
       {selfEntry && (
         <ToolUpdateCard
           tool={selfEntry}
@@ -266,11 +267,14 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
           onUpdate={() => void handleUpdate(t.tool)}
         />
       ))}
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
+      <div className="ui-stagger-children">
       {notInstalled.map((entry) => (
         <NotInstalledUpdateCard key={entry.tool} entry={entry} />
       ))}
+      </div>
     </>
   );
 }

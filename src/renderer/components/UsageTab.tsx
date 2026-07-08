@@ -25,7 +25,7 @@ function UsageToolHeader({ toolId }: { toolId: UsageToolId }) {
   return (
     <div className="flex items-center gap-2">
       {toolIcon(id)}
-      <strong className="text-[var(--ink)]">{toolLabel(id)}</strong>
+      <strong className="text-text-primary">{toolLabel(id)}</strong>
     </div>
   );
 }
@@ -91,7 +91,7 @@ function UsageToolNav({
         className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[13px] transition-colors duration-200 ${
           scope === "all"
             ? "bg-accent font-medium text-on-accent warm-shadow-accent"
-            : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
+            : "bg-secondary text-text-primary hover:bg-accent-surface"
         }`}
       >
         {t("usage.view.all")}
@@ -108,14 +108,14 @@ function UsageToolNav({
             className={`flex cursor-pointer items-center gap-1.5 rounded-full py-1.5 pr-3 pl-2.5 text-[13px] transition-colors duration-200 ${
               active
                 ? "bg-accent font-medium text-on-accent warm-shadow-accent"
-                : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
+                : "bg-secondary text-text-primary hover:bg-accent-surface"
             }`}
           >
             <span className="flex h-5 w-5 items-center justify-center">{toolIcon(snap.toolId)}</span>
             <span>{toolLabel(snap.toolId)}</span>
             {snap.status === "ok" && cost > 0 && (
               <span
-                className={`tabular-nums text-[11px] ${active ? "text-white/85" : "text-[var(--muted)]"}`}
+                className={`tabular-nums text-[11px] ${active ? "text-on-accent/85" : "text-text-secondary"}`}
               >
                 {formatUsd(cost)}
               </span>
@@ -197,31 +197,31 @@ function ToolCredentialRow({
   };
 
   return (
-    <div className="rounded-[22px] border border-[var(--sand)] bg-[var(--cream)]/60 p-4">
+    <div className="rounded-[22px] border border-border bg-bg-primary/60 p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <UsageToolHeader toolId={provider.toolId} />
           {provider.supported ? (
-            <span className="rounded-full bg-[var(--success)]/15 px-2 py-0.5 text-[11px] text-[var(--success)]">
+            <span className="rounded-full bg-ok/15 px-2 py-0.5 text-[11px] text-ok">
               {t("usage.badge.api")}
             </span>
           ) : (
-            <span className="rounded-full bg-[var(--sand-deep)] px-2 py-0.5 text-[11px] text-[var(--muted)]">
+            <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[11px] text-text-secondary">
               {t("usage.badge.comingSoon")}
             </span>
           )}
         </div>
         {status?.configured && status.maskedHint && (
-          <span className="font-mono text-[11px] text-[var(--muted)]">{status.maskedHint}</span>
+          <span className="font-mono text-[11px] text-text-secondary">{status.maskedHint}</span>
         )}
       </div>
 
       {provider.unsupportedReason && (
-        <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">{provider.unsupportedReason}</p>
+        <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">{provider.unsupportedReason}</p>
       )}
 
       {provider.credentialNoteKey && (
-        <p className="mb-4 text-[13px] leading-relaxed text-[var(--muted)]">
+        <p className="mb-4 text-[13px] leading-relaxed text-text-secondary">
           {t(provider.credentialNoteKey as MessageKey)}
         </p>
       )}
@@ -232,10 +232,10 @@ function ToolCredentialRow({
           return (
             <div
               key={groupKey}
-              className="rounded-[18px] border border-[var(--sand)]/80 bg-[var(--surface)]/40 p-3.5"
+              className="rounded-[18px] border border-border/80 bg-bg-secondary/40 p-3.5"
             >
               {groupLabelKey && (
-                <div className="mb-2 text-[13px] font-medium text-[var(--ink)]">
+                <div className="mb-2 text-[13px] font-medium text-text-primary">
                   {t(groupLabelKey as MessageKey)}
                 </div>
               )}
@@ -248,14 +248,14 @@ function ToolCredentialRow({
                 return (
                   <div key={field.key} className="flex flex-col gap-2">
                     {field.noteKey && (
-                      <p className="text-[12px] leading-relaxed text-[var(--muted)]">
+                      <p className="text-[12px] leading-relaxed text-text-secondary">
                         {t(field.noteKey as MessageKey)}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Label className="text-[13px] text-[var(--ink)]">{label}</Label>
+                      <Label className="text-[13px] text-text-primary">{label}</Label>
                       {configured && fieldMaskedHint(field.key) && (
-                        <span className="font-mono text-[11px] text-[var(--muted)]">
+                        <span className="font-mono text-[11px] text-text-secondary">
                           {fieldMaskedHint(field.key)}
                         </span>
                       )}
@@ -269,7 +269,7 @@ function ToolCredentialRow({
                       onChange={(e) =>
                         setValues((v) => ({ ...v, [field.key]: e.target.value }))
                       }
-                      className="border-[var(--sand)] bg-[var(--cream)]"
+                      className="border-border bg-bg-primary"
                     />
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
@@ -316,7 +316,7 @@ function ToolCredentialRow({
                       )}
                     </div>
                     {messages[field.key] && (
-                      <p className="text-[12px] text-[var(--muted)]">{messages[field.key]}</p>
+                      <p className="text-[12px] text-text-secondary">{messages[field.key]}</p>
                     )}
                   </div>
                 );
@@ -340,12 +340,12 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
 
   if (snapshot.status === "unsupported") {
     return (
-      <p className="text-[13px] text-[var(--muted)]">{snapshot.error ?? t("usage.tool.unsupported")}</p>
+      <p className="text-[13px] text-text-secondary">{snapshot.error ?? t("usage.tool.unsupported")}</p>
     );
   }
 
   if (snapshot.status === "not_configured") {
-    return <p className="text-[13px] text-[var(--muted)]">{t("usage.tool.notConfigured")}</p>;
+    return <p className="text-[13px] text-text-secondary">{t("usage.tool.notConfigured")}</p>;
   }
 
   if (snapshot.status === "error") {
@@ -374,28 +374,28 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
     <>
       {(quotaMode || showCursorSpending) && snapshot.quotas && snapshot.quotas.length > 0 && (
         <div className="mb-4">
-          <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">
+          <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">
             {t(quotaHintKey as MessageKey)}
           </p>
           <div className="flex flex-col gap-2.5">
             {snapshot.quotas.map((q) => (
-              <div key={q.key} className="rounded-[16px] bg-[var(--sand)]/50 px-3 py-2.5">
+              <div key={q.key} className="rounded-[16px] bg-secondary/50 px-3 py-2.5">
                 <div className="mb-1.5 flex items-center justify-between gap-2 text-[13px]">
-                  <span className="text-[var(--ink)]">
+                  <span className="text-text-primary">
                     {q.label ?? t(q.labelKey as MessageKey)}
                   </span>
                   <span className="shrink-0 font-medium tabular-nums text-accent">
                     {q.usedPercent}%
                   </span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--sand-deep)]">
+                <div className="h-1.5 overflow-hidden rounded-full bg-accent-surface">
                   <div
                     className="h-full rounded-full bg-accent transition-all duration-300"
                     style={{ width: `${Math.min(100, q.usedPercent)}%` }}
                   />
                 </div>
                 {q.remainingUsd != null && q.limitUsd != null && (
-                  <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+                  <p className="mt-1.5 text-[11px] text-text-secondary">
                     {t("usage.cursor.quota.remaining", {
                       remaining: formatUsd(q.remainingUsd),
                       limit: formatUsd(q.limitUsd),
@@ -403,7 +403,7 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
                   </p>
                 )}
                 {q.resetAt && (
-                  <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+                  <p className="mt-1.5 text-[11px] text-text-secondary">
                     {t("usage.claude.quota.resetsAt", { time: formatResetAt(q.resetAt) })}
                   </p>
                 )}
@@ -415,22 +415,22 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
 
       {showCostGrid && (
         <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
-          <div className="rounded-[16px] bg-[var(--sand)]/50 px-3 py-2">
-            <div className="text-[10px] text-[var(--muted)]">{t("usage.table.cost")}</div>
+          <div className="rounded-[16px] bg-secondary/50 px-3 py-2">
+            <div className="text-[10px] text-text-secondary">{t("usage.table.cost")}</div>
             <div className="text-[18px] font-medium tabular-nums text-accent">
               {formatUsd(snapshot.totalCostUsd ?? 0)}
             </div>
           </div>
           {!quotaMode && (
             <>
-              <div className="rounded-[16px] bg-[var(--sand)]/50 px-3 py-2">
-                <div className="text-[10px] text-[var(--muted)]">{t("usage.metric.inputTokens")}</div>
+              <div className="rounded-[16px] bg-secondary/50 px-3 py-2">
+                <div className="text-[10px] text-text-secondary">{t("usage.metric.inputTokens")}</div>
                 <div className="text-[18px] font-medium tabular-nums">
                   {formatTokens(snapshot.totalInputTokens)}
                 </div>
               </div>
-              <div className="rounded-[16px] bg-[var(--sand)]/50 px-3 py-2">
-                <div className="text-[10px] text-[var(--muted)]">{t("usage.metric.outputTokens")}</div>
+              <div className="rounded-[16px] bg-secondary/50 px-3 py-2">
+                <div className="text-[10px] text-text-secondary">{t("usage.metric.outputTokens")}</div>
                 <div className="text-[18px] font-medium tabular-nums">
                   {formatTokens(snapshot.totalOutputTokens)}
                 </div>
@@ -456,15 +456,15 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
       )}
 
       {snapshot.byModel && snapshot.byModel.length > 0 && (
-        <div className="mt-4 border-t border-[var(--sand)] pt-4">
-          <div className="mb-2 text-[11px] font-medium tracking-wide text-[var(--muted)]">
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 text-[11px] font-medium tracking-wide text-text-secondary">
             {t("usage.byModel")}
           </div>
           <div className="flex flex-col gap-1">
             {snapshot.byModel.slice(0, 12).map((m) => (
               <div key={m.model} className="flex items-center justify-between gap-2 text-[13px]">
                 <span className="truncate font-mono">{m.model}</span>
-                <span className="shrink-0 tabular-nums text-[var(--ink)]">
+                <span className="shrink-0 tabular-nums text-text-primary">
                   {m.costUsd > 0 ? formatUsd(m.costUsd) : formatTokens(m.inputTokens)}
                 </span>
               </div>
@@ -504,7 +504,7 @@ function UsageComparisonTable({
                 <UsageToolHeader toolId={snap.toolId} />
               </div>
             </Td>
-            <Td className="max-w-[180px] truncate text-[12px] text-[var(--muted)]">
+            <Td className="max-w-[180px] truncate text-[12px] text-text-secondary">
               {statusLabel(snap, t)}
             </Td>
             <Td className="tabular-nums">
@@ -520,7 +520,7 @@ function UsageComparisonTable({
               <button
                 type="button"
                 onClick={() => onSelectTool(snap.toolId)}
-                className="cursor-pointer rounded-full px-2.5 py-1 text-[12px] text-[var(--clay)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-[var(--sand)]"
+                className="cursor-pointer rounded-full px-2.5 py-1 text-[12px] text-accent opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-secondary"
               >
                 {t("usage.compare.view")}
               </button>
@@ -589,14 +589,14 @@ export function UsageTab() {
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[18px] font-semibold text-[var(--ink)]">{t("usage.title")}</h1>
-          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.subtitle")}</p>
+          <h1 className="text-[18px] font-semibold text-text-primary">{t("usage.title")}</h1>
+          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-text-secondary">{t("usage.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={rangeDays}
             onChange={(e) => setRangeDays(Number(e.target.value))}
-            className="cursor-pointer rounded-[22px] border border-[var(--sand)] bg-[var(--cream)] px-3 py-1.5 text-[13px] text-[var(--ink)]"
+            className="cursor-pointer rounded-[22px] border border-border bg-bg-primary px-3 py-1.5 text-[13px] text-text-primary"
           >
             <option value={7}>{t("usage.range.7d")}</option>
             <option value={14}>{t("usage.range.14d")}</option>
@@ -610,7 +610,7 @@ export function UsageTab() {
       </div>
 
       {!encryptionAvailable && (
-        <div className="mb-4 rounded-[22px] border border-[var(--clay)]/30 bg-[var(--sand)] px-4 py-3 text-[13px] text-[var(--ink)]">
+        <div className="mb-4 rounded-[22px] border border-accent/30 bg-secondary px-4 py-3 text-[13px] text-text-primary">
           {t("usage.encryptionUnavailable")}
         </div>
       )}
@@ -625,7 +625,7 @@ export function UsageTab() {
             <StatCard
               value={formatUsd(dashboard.summary.totalCostUsd)}
               label={t("usage.summary.totalCost")}
-              valueClassName="text-[var(--clay)]"
+              valueClassName="text-accent"
             />
             <StatCard
               value={`${dashboard.summary.configuredCount}/${providers.length}`}
@@ -640,7 +640,7 @@ export function UsageTab() {
           <UsageComparisonTable tools={tools} onSelectTool={(id) => setScope(id)} />
 
           <Card title={t("usage.credentials.title")} collapsible defaultCollapsed>
-            <p className="mb-4 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.credentials.hint")}</p>
+            <p className="mb-4 text-[13px] leading-relaxed text-text-secondary">{t("usage.credentials.hint")}</p>
             <div className="flex flex-col gap-3">
               {providers.map((provider) => (
                 <ToolCredentialRow
@@ -666,7 +666,7 @@ export function UsageTab() {
               <div className="flex flex-wrap items-center gap-2">
                 <UsageToolHeader toolId={scope} />
                 {activeSnapshot.authSourceKey && activeSnapshot.status === "ok" && (
-                  <span className="rounded-full bg-[var(--sand)] px-2.5 py-0.5 text-[11px] text-[var(--ink)]">
+                  <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] text-text-primary">
                     {t(activeSnapshot.authSourceKey as MessageKey)}
                   </span>
                 )}
@@ -677,7 +677,7 @@ export function UsageTab() {
           </Card>
 
           <Card title={t("usage.credentials.title")}>
-            <p className="mb-4 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.credentials.hint")}</p>
+            <p className="mb-4 text-[13px] leading-relaxed text-text-secondary">{t("usage.credentials.hint")}</p>
             <ToolCredentialRow
               provider={activeProvider}
               status={statusMap.get(scope)}
@@ -700,7 +700,7 @@ export function UsageTab() {
       {error && <EmptyState title={t("usage.fetchFailed")} description={error} />}
 
       {dashboard && (
-        <p className="mt-4 text-[11px] text-[var(--muted)]">
+        <p className="mt-4 text-[11px] text-text-secondary">
           {t("usage.fetchedAt", {
             time: new Date(dashboard.fetchedAt).toLocaleString(),
             days: String(dashboard.rangeDays),

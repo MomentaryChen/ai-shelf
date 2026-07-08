@@ -95,10 +95,14 @@ export function ConfigTab({ data, onRefresh }: { data: ProviderEntry[]; onRefres
       <ConfigSnapshotPanel onRestored={onRefresh} />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <ConfigCards entries={installed} onEdit={setEditPath} />
+      <div className="ui-stagger-children">
+        <ConfigCards entries={installed} onEdit={setEditPath} />
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <ConfigCards entries={notInstalled} onEdit={setEditPath} />
+      <div className="ui-stagger-children">
+        <ConfigCards entries={notInstalled} onEdit={setEditPath} />
+      </div>
 
       {editPath && (
         <ConfigFileEditorModal path={editPath} onClose={() => setEditPath(null)} />

@@ -58,10 +58,14 @@ export function SkillsTab({
       <SkillsSyncPanel />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <SkillsCards entries={installed} />
+      <div className="ui-stagger-children">
+        <SkillsCards entries={installed} />
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <SkillsCards entries={notInstalled} />
+      <div className="ui-stagger-children">
+        <SkillsCards entries={notInstalled} />
+      </div>
 
       {/* Skill matrix */}
       {allSkills.length > 0 && (

@@ -93,10 +93,14 @@ export function McpTab({ data }: { data: ProviderEntry[] }) {
       )}
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <McpCards entries={installed} />
+      <div className="ui-stagger-children">
+        <McpCards entries={installed} />
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <McpCards entries={notInstalled} />
+      <div className="ui-stagger-children">
+        <McpCards entries={notInstalled} />
+      </div>
 
       <McpSyncPanel />
     </>

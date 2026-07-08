@@ -182,10 +182,14 @@ export function DoctorTab({ data }: { data: ProviderEntry[] }) {
       <SectionHeading icon={Stethoscope}>{t("app.tab.doctor")}</SectionHeading>
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <DoctorCards entries={installed} results={results} />
+      <div className="ui-stagger-children">
+        <DoctorCards entries={installed} results={results} />
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <DoctorCards entries={notInstalled} results={results} />
+      <div className="ui-stagger-children">
+        <DoctorCards entries={notInstalled} results={results} />
+      </div>
     </>
   );
 }
