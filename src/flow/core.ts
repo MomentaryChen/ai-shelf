@@ -214,17 +214,21 @@ function spawnAgentPrompt(
     AISHELF_FLOW_OUTPUT_PATH: outputPath,
   };
 
-  const child = spawnAgentPrint({
-    launchCommand: resolved.launchCommand,
-    cwd: resolved.cwd,
-    prompt,
-    env,
-    printPrefix: prep.printPrefix,
-    args: prep.extraArgs,
-    promptLog: { flowId: flow.id, kind: "run", runId },
-  });
-
-  return { child, mcpCleanup: prep.mcpMount.cleanup };
+  try {
+    const child = spawnAgentPrint({
+      launchCommand: resolved.launchCommand,
+      cwd: resolved.cwd,
+      prompt,
+      env,
+      printPrefix: prep.printPrefix,
+      args: prep.extraArgs,
+      promptLog: { flowId: flow.id, kind: "run", runId },
+    });
+    return { child, mcpCleanup: prep.mcpMount.cleanup };
+  } catch (err) {
+    prep.mcpMount.cleanup();
+    throw err;
+  }
 }
 
 function watchRunStateFile(runId: string, state: FlowRunState): () => void {
