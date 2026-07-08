@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.removeAllListeners("scan-complete");
   },
   runUpdate: (tool) => ipcRenderer.invoke("run-update", tool),
+  runInstall: (tool) => ipcRenderer.invoke("run-install", tool),
   getAppUpdateChannel: () => ipcRenderer.invoke("get-app-update-channel"),
   checkAppUpdate: () => ipcRenderer.invoke("check-app-update"),
   getAppUpdateState: () => ipcRenderer.invoke("get-app-update-state"),
