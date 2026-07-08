@@ -34,6 +34,14 @@ export class GroupLayoutService {
     this.layouts.setLastActiveGroupKey(workspaceId, groupId);
   }
 
+  getPreference(key: string): string | null {
+    return this.layouts.getPreference(key);
+  }
+
+  setPreference(key: string, value: string): void {
+    this.layouts.setPreference(key, value);
+  }
+
   private ensureGroup(workspaceId: string, groupId: string): void {
     const workspace = this.workspaces.list().find((w) => w.id === workspaceId);
     if (!workspace) {

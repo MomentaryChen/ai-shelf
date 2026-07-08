@@ -61,6 +61,8 @@ import {
   getGroupLayout,
   saveGroupLayout,
   setLastActiveGroup,
+  getOnboardingCompleted,
+  setOnboardingCompleted,
   getProfileForest,
   getProfileTree,
   createProfileGroup,
@@ -1674,6 +1676,23 @@ ipcMain.handle("profile-get-tree", () => {
 ipcMain.handle("profile-group-get-forest", () => {
   try {
     return { success: true, forest: getProfileForest() };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("get-onboarding-completed", () => {
+  try {
+    return { success: true, completed: getOnboardingCompleted() };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message, completed: false };
+  }
+});
+
+ipcMain.handle("set-onboarding-completed", () => {
+  try {
+    setOnboardingCompleted();
+    return { success: true };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
   }

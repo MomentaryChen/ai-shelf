@@ -593,6 +593,8 @@ export interface ElectronAPI {
   ) => Promise<{ success: boolean; error?: string }>;
   profileGetTree: () => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
   profileGroupGetForest: () => Promise<{ success: boolean; forest?: ProfileForest; error?: string }>;
+  getOnboardingCompleted: () => Promise<{ success: boolean; completed?: boolean; error?: string }>;
+  setOnboardingCompleted: () => Promise<{ success: boolean; error?: string }>;
   profileGroupCreate: (
     name: string,
   ) => Promise<{ success: boolean; group?: ProfileGroupInfo; error?: string }>;
