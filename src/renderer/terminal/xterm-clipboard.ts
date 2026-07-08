@@ -193,6 +193,8 @@ export function bindTerminalClipboard(
   // Dedupe window for copy-on-select. Must expire: re-selecting the same text
   // after copying elsewhere has to write again, or the paste is stale.
   const AUTO_COPY_DEDUPE_MS = 500;
+  const POINTER_PASTE_DEDUPE_MS = 100;
+  let lastPointerPasteAt = 0;
   let lastAutoCopied = { text: "", at: 0 };
   let selCopyTimer = 0;
   let selCopyGeneration = 0;
@@ -391,6 +393,10 @@ export function bindTerminalClipboard(
     const rightClickPaste = options.getRightClickPaste?.() ?? true;
     if (!rightClickPaste || ev.shiftKey) return;
 
+    const now = Date.now();
+    if (now - lastPointerPasteAt < POINTER_PASTE_DEDUPE_MS) return;
+    lastPointerPasteAt = now;
+
     ev.preventDefault();
     ev.stopImmediatePropagation();
     removeMenu();
@@ -449,9 +455,16 @@ export function bindTerminalClipboard(
   };
   const selectionDisposable = term.onSelectionChange(onSelectionChange);
 
+  const isFirefox = /firefox/i.test(navigator.userAgent);
+
   const onMouseDown = (ev: MouseEvent) => {
-    if (ev.button === 0) term.focus();
-    else if (ev.button === 2) onPointerPaste(ev);
+    if (ev.button === 0) {
+      term.focus();
+      return;
+    }
+    // Firefox: contextmenu alone is unreliable; other platforms use contextmenu only
+    // (calling paste on mousedown + contextmenu would paste twice).
+    if (isFirefox && ev.button === 2) onPointerPaste(ev);
   };
 
   const onMouseUp = (ev: MouseEvent) => {
@@ -464,7 +477,6 @@ export function bindTerminalClipboard(
     runAutoCopy(text);
   };
 
-  const isFirefox = /firefox/i.test(navigator.userAgent);
   container.addEventListener("mousedown", onMouseDown, { capture: true });
   container.addEventListener("mouseup", onMouseUp, { capture: true });
 
