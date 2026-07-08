@@ -629,6 +629,7 @@ async function executeFlowRun(
     const outputChunks: string[] = [];
     let stderr = "";
     let stdoutBuf = "";
+    let runSettled = false;
     const stopWatching = watchRunStateFile(state.runId, state);
     ctx.stopWatching = stopWatching;
 
@@ -639,7 +640,7 @@ async function executeFlowRun(
     };
 
     const handleLine = (line: string) => {
-      if (ctx.cancelled) return;
+      if (ctx.cancelled || runSettled) return;
       if (!outputMode) {
         if (line.trim() === FLOW_OUTPUT_BEGIN) {
           outputMode = true;
@@ -680,7 +681,8 @@ async function executeFlowRun(
     ctx.child = child;
 
     const timeout = setTimeout(() => {
-      if (ctx.cancelled) return;
+      if (ctx.cancelled || runSettled) return;
+      runSettled = true;
       killRunChild(child);
       state.status = "failed";
       state.error = `Timed out after ${flow.timeoutSec}s`;
@@ -715,6 +717,11 @@ async function executeFlowRun(
         finish();
         return;
       }
+      if (runSettled) {
+        finish();
+        return;
+      }
+      runSettled = true;
 
       const diskState = readRunState(state.runId);
       if (diskState) Object.assign(state, diskState);
@@ -778,6 +785,11 @@ async function executeFlowRun(
         finish();
         return;
       }
+      if (runSettled) {
+        finish();
+        return;
+      }
+      runSettled = true;
       state.status = "failed";
       state.error = err.message;
       ensureRunOutput(flow, state, outputPath, runDir, {
