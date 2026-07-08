@@ -393,7 +393,8 @@ function ChatTabInner({
       if (ev.key.toLowerCase() !== "s") return;
 
       const target = ev.target as HTMLElement | null;
-      if (target) {
+      // xterm uses a hidden textarea; still allow sidebar toggle (same as pane shortcuts).
+      if (target && !target.closest(".xterm")) {
         const tag = target.tagName;
         if (
           tag === "INPUT" ||
