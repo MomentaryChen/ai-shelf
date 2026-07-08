@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { app } from "electron";
 import type { CloudSyncStateDoc, SyncBundle } from "../shared/sync-types.js";
 import { getAuthUid } from "./auth-service.js";
@@ -25,8 +26,25 @@ function loadEnvValue(key: string): string {
   return process.env[key]?.trim() ?? "";
 }
 
+let cachedBundledProjectId: string | null | undefined;
+
+function loadBundledProjectId(): string {
+  if (cachedBundledProjectId !== undefined) return cachedBundledProjectId ?? "";
+  cachedBundledProjectId = "";
+  try {
+    const configPath = join(dirname(fileURLToPath(import.meta.url)), "firebase-config.json");
+    if (!existsSync(configPath)) return "";
+    const data = JSON.parse(readFileSync(configPath, "utf8")) as { projectId?: string };
+    const id = data.projectId?.trim();
+    if (id) cachedBundledProjectId = id;
+  } catch {
+    // Fall back to .env / process.env (local dev).
+  }
+  return cachedBundledProjectId ?? "";
+}
+
 function projectId(): string {
-  const id = loadEnvValue("VITE_FIREBASE_PROJECT_ID");
+  const id = loadBundledProjectId() || loadEnvValue("VITE_FIREBASE_PROJECT_ID");
   if (!id) throw new Error("VITE_FIREBASE_PROJECT_ID is not set");
   return id;
 }
