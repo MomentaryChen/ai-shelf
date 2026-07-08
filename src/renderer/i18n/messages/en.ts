@@ -628,15 +628,24 @@ export const en = {
   "app.tab.usage": "Usage",
   "usage.title": "Usage & cost",
   "usage.subtitle":
-    "Track API spend and token usage from each provider's official admin API. Keys are encrypted with your OS keychain and never leave this device.",
+    "One place for spend and tokens across every paid CLI you run in parallel. Keys stay on this device — encrypted in your OS keychain.",
   "usage.refresh": "Refresh data",
   "usage.loading": "Loading usage data…",
   "usage.fetchFailed": "Could not load usage data",
   "usage.encryptionUnavailable":
     "Secure credential storage is unavailable on this system. API keys cannot be saved until OS encryption is enabled.",
   "usage.summary.totalCost": "Total cost (period)",
+  "usage.summary.totalInputTokens": "Input tokens (all tools)",
+  "usage.summary.totalOutputTokens": "Output tokens (all tools)",
   "usage.summary.configured": "Tools with API keys",
   "usage.summary.active": "Tools reporting data",
+  "usage.unified.title": "Daily rollup",
+  "usage.unified.hint": "Costs and tokens merged across every tool that reported data for this period.",
+  "usage.unified.empty": "No daily breakdown yet — configure at least one tool below.",
+  "usage.unified.noDaily":
+    "Connected tools report subscription quotas or billing-cycle totals without a daily history. See each tool for allowance details.",
+  "usage.unified.quotaNote":
+    "Period total cost includes billing-cycle or quota-based tools that do not appear in the daily chart below.",
   "usage.credentials.title": "API credentials",
   "usage.credentials.hint":
     "Admin API keys are required for usage and billing endpoints. Standard chat API keys usually will not work.",
