@@ -68,26 +68,62 @@ export function cronNextRun(expression: string, timezone: string, from = new Dat
   }
 }
 
+/** Stable anchor (Monday) for min-interval scans — must not depend on validation time. */
+const CRON_MIN_INTERVAL_SCAN_ANCHOR = new Date("2024-01-01T00:00:00.000Z");
+
+/** Cover weekday-only patterns, full month DOM, and one seasonal cycle. */
+const CRON_MIN_INTERVAL_SCAN_MS = 366 * 24 * 60 * 60 * 1000;
+
+const CRON_MIN_INTERVAL_SCAN_MAX_FIRES = 10_000;
+
+function minConsecutiveCronGapMs(
+  expression: string,
+  timezone: string,
+  anchor: Date,
+  scanMs: number,
+  maxFires: number,
+  stopBelowMs?: number,
+): number | null {
+  const iter = CronExpressionParser.parse(expression, {
+    tz: flowTimezone(timezone),
+    currentDate: anchor,
+  });
+  let prev = iter.next().toDate();
+  let minGapMs = Number.POSITIVE_INFINITY;
+  const endMs = anchor.getTime() + scanMs;
+
+  for (let i = 1; i < maxFires && prev.getTime() < endMs; i++) {
+    const next = iter.next().toDate();
+    const gapMs = next.getTime() - prev.getTime();
+    if (gapMs < minGapMs) {
+      minGapMs = gapMs;
+      if (stopBelowMs !== undefined && minGapMs < stopBelowMs) return minGapMs;
+    }
+    prev = next;
+  }
+
+  return Number.isFinite(minGapMs) ? minGapMs : null;
+}
+
 export function validateFlowCronMinInterval(
   expression: string,
   timezone: string,
   minMs = FLOW_CRON_MIN_INTERVAL_MS,
-  from = new Date(),
 ): string | null {
   try {
-    const iter = CronExpressionParser.parse(expression, {
-      tz: flowTimezone(timezone),
-      currentDate: from,
-    });
-    const first = iter.next();
-    const second = iter.next();
-    const gapMs = second.getTime() - first.getTime();
-    if (gapMs < minMs) {
-      const gapMin = Math.max(1, Math.round(gapMs / 60_000));
-      const minHours = minMs / 3_600_000;
-      return `Schedule fires every ${gapMin} minute(s); minimum interval is ${minHours} hour(s)`;
-    }
-    return null;
+    const minGapMs = minConsecutiveCronGapMs(
+      expression,
+      timezone,
+      CRON_MIN_INTERVAL_SCAN_ANCHOR,
+      CRON_MIN_INTERVAL_SCAN_MS,
+      CRON_MIN_INTERVAL_SCAN_MAX_FIRES,
+      minMs,
+    );
+    if (minGapMs === null || minGapMs >= minMs) return null;
+
+    const gapMin = Math.max(1, Math.round(minGapMs / 60_000));
+    const minHours = minMs / 3_600_000;
+    return `Schedule fires every ${gapMin} minute(s); minimum interval is ${minHours} hour(s)`;
   } catch {
     return null;
   }
