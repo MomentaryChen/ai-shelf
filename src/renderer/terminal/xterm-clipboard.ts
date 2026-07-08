@@ -22,6 +22,16 @@ let writeSeq = 0;
 /** After copy, paste within this window skips a stale OS / navigator read. */
 const PASTE_AFTER_WRITE_MS = 200;
 
+/** Copy-on-select text captured but not yet written; paste can use this immediately. */
+let pendingAutoCopy = { text: "", at: 0 };
+const PENDING_AUTO_COPY_MS = 2000;
+
+function clearPendingAutoCopy(text?: string): void {
+  if (!text || pendingAutoCopy.text === text) {
+    pendingAutoCopy = { text: "", at: 0 };
+  }
+}
+
 function runOsClipboardRead(): Promise<string> {
   return (async () => {
     try {
@@ -40,6 +50,13 @@ function runOsClipboardRead(): Promise<string> {
 
 async function readClipboardText(): Promise<string> {
   return runClipboardOp(async () => {
+    const pendingAge = Date.now() - pendingAutoCopy.at;
+    if (pendingAutoCopy.text && pendingAge < PENDING_AUTO_COPY_MS) {
+      const pending = pendingAutoCopy.text;
+      // Sync the OS clipboard after returning so external paste still works.
+      void writeClipboardText(pending);
+      return pending;
+    }
     const age = Date.now() - lastOurWrite.at;
     if (
       lastOurWrite.text &&
@@ -176,15 +193,36 @@ export function bindTerminalClipboard(
   // Dedupe window for copy-on-select. Must expire: re-selecting the same text
   // after copying elsewhere has to write again, or the paste is stale.
   const AUTO_COPY_DEDUPE_MS = 500;
+  const POINTER_PASTE_DEDUPE_MS = 100;
+  let lastPointerPasteAt = 0;
   let lastAutoCopied = { text: "", at: 0 };
   let selCopyTimer = 0;
   let selCopyGeneration = 0;
+  let pendingCopyText = "";
 
   const isRecentAutoCopy = (text: string) =>
     text === lastAutoCopied.text &&
     Date.now() - lastAutoCopied.at < AUTO_COPY_DEDUPE_MS;
 
+  const runAutoCopy = (text: string) => {
+    selCopyTimer = 0;
+    pendingCopyText = "";
+    if (!(options.getCopyOnSelect?.() ?? false)) return;
+    if (isRecentAutoCopy(text)) {
+      clearPendingAutoCopy(text);
+      return;
+    }
+    void writeClipboardText(text).then((ok) => {
+      if (ok) {
+        lastAutoCopied = { text, at: Date.now() };
+        clearPendingAutoCopy(text);
+      }
+    });
+  };
+
   const cancelPendingAutoCopy = () => {
+    if (pendingCopyText) clearPendingAutoCopy(pendingCopyText);
+    pendingCopyText = "";
     selCopyGeneration += 1;
     window.clearTimeout(selCopyTimer);
     selCopyTimer = 0;
@@ -355,6 +393,10 @@ export function bindTerminalClipboard(
     const rightClickPaste = options.getRightClickPaste?.() ?? true;
     if (!rightClickPaste || ev.shiftKey) return;
 
+    const now = Date.now();
+    if (now - lastPointerPasteAt < POINTER_PASTE_DEDUPE_MS) return;
+    lastPointerPasteAt = now;
+
     ev.preventDefault();
     ev.stopImmediatePropagation();
     removeMenu();
@@ -403,35 +445,48 @@ export function bindTerminalClipboard(
     // Capture `text` now and write that exact value; re-reading on the timer
     // could see an already-cleared selection after the pane lost focus.
     const gen = ++selCopyGeneration;
+    pendingCopyText = text;
+    pendingAutoCopy = { text, at: Date.now() };
     window.clearTimeout(selCopyTimer);
     selCopyTimer = window.setTimeout(() => {
       if (gen !== selCopyGeneration) return;
-      if (!(options.getCopyOnSelect?.() ?? false)) return;
-      void writeClipboardText(text).then((ok) => {
-        // Record only successful writes so a locked clipboard gets retried
-        // by the next selection event instead of being deduped away.
-        if (ok) lastAutoCopied = { text, at: Date.now() };
-      });
+      runAutoCopy(text);
     }, 50);
   };
   const selectionDisposable = term.onSelectionChange(onSelectionChange);
 
-  const onMouseDown = (ev: MouseEvent) => {
-    if (ev.button === 2) onPointerPaste(ev);
-  };
   const isFirefox = /firefox/i.test(navigator.userAgent);
-  if (isFirefox) {
-    container.addEventListener("mousedown", onMouseDown, { capture: true });
-  }
+
+  const onMouseDown = (ev: MouseEvent) => {
+    if (ev.button === 0) {
+      term.focus();
+      return;
+    }
+    // Firefox: contextmenu alone is unreliable; other platforms use contextmenu only
+    // (calling paste on mousedown + contextmenu would paste twice).
+    if (isFirefox && ev.button === 2) onPointerPaste(ev);
+  };
+
+  const onMouseUp = (ev: MouseEvent) => {
+    if (ev.button !== 0 || !selCopyTimer || !pendingCopyText) return;
+    const text = pendingCopyText;
+    const gen = selCopyGeneration;
+    window.clearTimeout(selCopyTimer);
+    selCopyTimer = 0;
+    if (gen !== selCopyGeneration) return;
+    runAutoCopy(text);
+  };
+
+  container.addEventListener("mousedown", onMouseDown, { capture: true });
+  container.addEventListener("mouseup", onMouseUp, { capture: true });
 
   return () => {
     removeMenu();
-    window.clearTimeout(selCopyTimer);
+    cancelPendingAutoCopy();
     selectionDisposable.dispose();
     container.removeEventListener("contextmenu", onContextMenu, { capture: true });
-    if (isFirefox) {
-      container.removeEventListener("mousedown", onMouseDown, { capture: true });
-    }
+    container.removeEventListener("mousedown", onMouseDown, { capture: true });
+    container.removeEventListener("mouseup", onMouseUp, { capture: true });
     term.attachCustomKeyEventHandler(() => true);
     osc52Disposable.dispose();
   };
