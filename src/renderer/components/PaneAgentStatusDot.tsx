@@ -5,8 +5,8 @@ import { useLocale } from "../i18n/LocaleProvider";
 const STATUS_CLASS: Record<PaneAgentStatus, string> = {
   idle: "bg-chrome-text-dim/50",
   running: "pane-agent-dot-running bg-chrome-ui-accent",
-  waiting_input: "pane-agent-dot-attention bg-[var(--clay,#C97B5A)]",
-  stalled: "pane-agent-dot-stalled bg-amber-500/90",
+  waiting_input: "pane-agent-dot-attention bg-chrome-ui-accent",
+  stalled: "pane-agent-dot-stalled bg-warn/90",
 };
 
 export function PaneAgentStatusDot({ status }: { status: PaneAgentStatus }) {

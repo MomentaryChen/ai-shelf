@@ -72,8 +72,8 @@ export function ClaudeModelSelector({
     warm
       ? `cursor-pointer rounded-full px-3 py-1.5 text-[12px] transition-colors ${
           active
-            ? "bg-[var(--clay)] text-white shadow-[var(--shadow-accent)]"
-            : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
+            ? "bg-accent text-on-accent warm-shadow-accent"
+            : "bg-secondary text-text-primary hover:bg-accent-surface"
         }`
       : `cursor-pointer rounded-md border px-2.5 py-1 text-[12px] transition-colors ${
           active
@@ -81,9 +81,9 @@ export function ClaudeModelSelector({
             : "border-chrome-border-subtle text-chrome-text-secondary hover:border-chrome-border-hover"
         }`;
 
-  const fieldLabel = warm ? "text-[12px] text-[var(--muted)]" : "text-[11px] text-chrome-text-subtle";
+  const fieldLabel = warm ? "text-[12px] text-text-secondary" : "text-[11px] text-chrome-text-subtle";
   const inputClass = warm
-    ? "rounded-[22px] border-[var(--sand)] bg-[var(--cream)] font-mono text-[13px]"
+    ? "rounded-[22px] border-border bg-bg-primary font-mono text-[13px]"
     : "min-w-0 flex-1 border-border bg-bg-secondary font-mono text-[12px] placeholder:text-text-tertiary focus-visible:border-accent/40";
 
   return (
@@ -126,7 +126,7 @@ export function ClaudeModelSelector({
           }}
           className={
             warm
-              ? "rounded-[22px] border border-[var(--sand)] bg-[var(--cream)] px-3 py-2 font-mono text-[12px] text-[var(--ink)]"
+              ? "rounded-[22px] border border-border bg-bg-primary px-3 py-2 font-mono text-[12px] text-text-primary"
               : "rounded-md border border-chrome-border-subtle bg-bg-secondary px-2 py-1.5 font-mono text-[12px]"
           }
         >

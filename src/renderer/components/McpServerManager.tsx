@@ -1,3 +1,4 @@
+import { Plug, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { McpListResult, McpServerRecord } from "../types";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,11 @@ export function McpServerManager({ tool }: { tool: string }) {
         </div>
       </div>
 
-      {error && <p className="mb-2 break-all text-xs text-fail">❌ {error}</p>}
+      {error && (
+        <p className="mb-2 inline-flex items-start gap-1 break-all text-xs text-fail">
+          <XCircle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
+        </p>
+      )}
 
       {list.servers.length === 0 ? (
         <p className="py-1 text-[13px] text-text-tertiary">{t("mcpManage.none")}</p>
@@ -80,7 +85,9 @@ export function McpServerManager({ tool }: { tool: string }) {
                 rec.enabled ? "bg-bg-secondary" : "bg-bg-secondary/40 opacity-70"
               }`}
             >
-              <span className="font-mono text-[13px] text-text-primary">🔌 {rec.name}</span>
+              <span className="inline-flex items-center gap-1.5 font-mono text-[13px] text-text-primary">
+                <Plug aria-hidden className="h-3.5 w-3.5 text-text-tertiary" /> {rec.name}
+              </span>
               <span
                 className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
                   rec.enabled ? "bg-ok/15 text-ok" : "bg-text-tertiary/15 text-text-tertiary"

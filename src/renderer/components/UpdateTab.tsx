@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { ArrowUpCircle, Check, CheckCircle2, Package, PartyPopper, RefreshCw, XCircle } from "lucide-react";
 import type { ProviderEntry, ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
 import { Badge, InstallStatusBadge } from "./Badge";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
+import { SectionHeading } from "./SectionHeading";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { toolIcon, toolLabel } from "../utils";
 import { toolHasNpmLatest } from "../../tools.js";
@@ -202,26 +204,27 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-        🔄 {t("app.tab.update")}
+      <SectionHeading icon={RefreshCw}>
+        {t("app.tab.update")}
         {checkingAll && (
           <span className="animate-pulse text-sm font-normal text-text-secondary">{t("inventory.update.checking")}</span>
         )}
-      </h2>
+      </SectionHeading>
 
       <div className="mb-3 flex justify-end">
         <Button variant="outline" onClick={() => void runCheckAll(false)} disabled={checkingAll}>
-          🔍 {t("inventory.update.recheckAll")}
+          <RefreshCw aria-hidden className={checkingAll ? "animate-spin" : ""} />
+          {t("inventory.update.recheckAll")}
         </Button>
       </div>
 
       {!anyChecking && checkableTools.length === 0 && (
-        <EmptyState icon="📦" title={t("inventory.update.noTools")} />
+        <EmptyState icon={<Package aria-hidden className="h-9 w-9 text-text-tertiary" />} title={t("inventory.update.noTools")} />
       )}
 
       {allUpToDate && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-ok/30 bg-ok/10 px-4 py-3">
-          <span className="text-2xl">🎉</span>
+          <PartyPopper aria-hidden className="h-6 w-6 shrink-0 text-ok" />
           <div>
             <p className="font-semibold text-ok">{t("inventory.update.allUpToDate")}</p>
             <p className="text-xs text-text-secondary">
@@ -233,7 +236,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
 
       {hasUpdates && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-warn/30 bg-warn/10 px-4 py-3">
-          <span className="text-2xl">⬆️</span>
+          <ArrowUpCircle aria-hidden className="h-6 w-6 shrink-0 text-warn" />
           <div>
             <p className="font-semibold text-warn">
               {t("inventory.update.toolsCanUpdate", { n: outdatedTools.length })}
@@ -244,6 +247,7 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
       )}
 
       <InventorySectionHeader count={installedSectionCount} variant="installed" />
+      <div className="ui-stagger-children">
       {selfEntry && (
         <ToolUpdateCard
           tool={selfEntry}
@@ -263,11 +267,14 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
           onUpdate={() => void handleUpdate(t.tool)}
         />
       ))}
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
+      <div className="ui-stagger-children">
       {notInstalled.map((entry) => (
         <NotInstalledUpdateCard key={entry.tool} entry={entry} />
       ))}
+      </div>
     </>
   );
 }
@@ -276,6 +283,7 @@ function NotInstalledUpdateCard({ entry }: { entry: ProviderEntry }) {
   const { t } = useLocale();
   return (
     <Card
+      dense
       className={installedCardClass(false)}
       title={<ToolNameCell entry={entry} />}
       trailing={<InstallStatusBadge available={false} />}
@@ -318,7 +326,7 @@ function ToolUpdateCard({
         : <Badge text={t("inventory.installedBadge")} variant="info" />;
 
   return (
-    <Card title={<>{icon} {toolInfo.label}</>} trailing={badge}>
+    <Card dense title={<>{icon} {toolInfo.label}</>} trailing={badge}>
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-sm">
           {isOutdated ? (
@@ -337,7 +345,7 @@ function ToolUpdateCard({
               <span className={`font-mono font-semibold ${isUpToDate ? "text-ok" : "text-text-primary"}`}>
                 {toolInfo.currentVersion ?? "—"}
               </span>
-              {isUpToDate && <span className="text-ok">✓</span>}
+              {isUpToDate && <Check aria-hidden className="h-4 w-4 text-ok" />}
               {isChecking && (
                 <span className="animate-pulse text-xs text-text-secondary">{t("inventory.update.checkingLatest")}</span>
               )}
@@ -358,14 +366,14 @@ function ToolUpdateCard({
         {(toolInfo.updateCommand || toolInfo.desktopUpdate) && !isChecking && (
           isUpToDate ? (
             <div className="flex items-center gap-2 text-sm text-ok">
-              <span>✅</span>
+              <CheckCircle2 aria-hidden className="h-4 w-4" />
               <span>{t("inventory.update.noUpdateNeeded")}</span>
             </div>
           ) : (
             <Button onClick={onUpdate} disabled={isUpdating}>
               {isUpdating
-                ? `⏳ ${t("inventory.update.updating")}`
-                : `⬆️ ${t("inventory.update.runUpdate")}`}
+                ? t("inventory.update.updating")
+                : t("inventory.update.runUpdate")}
             </Button>
           )
         )}
@@ -375,11 +383,16 @@ function ToolUpdateCard({
             className={`rounded-lg p-3 text-sm ${result.success ? "bg-ok/10 text-ok" : "bg-fail/10 text-fail"}`}
           >
             {result.success ? (
-              <p className="mb-0">✅ {result.message}</p>
+              <p className="mb-0 flex items-center gap-1.5">
+                <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" /> {result.message}
+              </p>
             ) : (
-              <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap font-mono text-xs">
-                ❌ {result.message}
-              </pre>
+              <div className="flex items-start gap-1.5">
+                <XCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+                <pre className="max-h-32 flex-1 overflow-y-auto whitespace-pre-wrap font-mono text-xs">
+                  {result.message}
+                </pre>
+              </div>
             )}
           </div>
         )}

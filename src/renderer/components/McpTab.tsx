@@ -1,5 +1,7 @@
+import { Plug } from "lucide-react";
 import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
+import { SectionHeading } from "./SectionHeading";
 import { StatCard } from "./StatCard";
 import { Badge, InstallStatusBadge } from "./Badge";
 import { Tag } from "./Tag";
@@ -22,6 +24,7 @@ function McpCards({ entries }: { entries: ProviderEntry[] }) {
       key={e.tool}
       collapsible
       defaultCollapsed
+      dense
       className={installedCardClass(e.available)}
       title={<ToolNameCell entry={e} />}
       trailing={
@@ -30,7 +33,7 @@ function McpCards({ entries }: { entries: ProviderEntry[] }) {
         ) : e.mcp.supported ? (
           <Badge text={t("inventory.mcp.supported")} variant="ok" />
         ) : (
-          <Badge text={t("inventory.mcp.notSupported")} variant="fail" />
+          <Badge text={t("inventory.mcp.notSupported")} variant="neutral" />
         )
       }
     >
@@ -42,7 +45,11 @@ function McpCards({ entries }: { entries: ProviderEntry[] }) {
             <McpServerManager tool={toolId} />
           ) : e.mcp.servers.length > 0 ? (
             <div className="mb-3 flex flex-wrap gap-1.5">
-              {e.mcp.servers.map((s) => <Tag key={s}>🔌 {s}</Tag>)}
+              {e.mcp.servers.map((s) => (
+                <Tag key={s}>
+                  <Plug aria-hidden className="h-3 w-3 text-text-tertiary" /> {s}
+                </Tag>
+              ))}
             </div>
           ) : e.mcp.supported ? (
             <p className="mb-3 text-text-secondary">{t("inventory.mcp.noneConfigured")}</p>
@@ -77,7 +84,7 @@ export function McpTab({ data }: { data: ProviderEntry[] }) {
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">🔌 {t("app.tab.mcp")}</h2>
+      <SectionHeading icon={Plug}>{t("app.tab.mcp")}</SectionHeading>
 
       {allServers.length > 0 && (
         <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
@@ -86,10 +93,14 @@ export function McpTab({ data }: { data: ProviderEntry[] }) {
       )}
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <McpCards entries={installed} />
+      <div className="ui-stagger-children">
+        <McpCards entries={installed} />
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <McpCards entries={notInstalled} />
+      <div className="ui-stagger-children">
+        <McpCards entries={notInstalled} />
+      </div>
 
       <McpSyncPanel />
     </>

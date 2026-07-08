@@ -1,4 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  KeyRound,
+  Search,
+  X,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { EnvVarGroup, HealthMonitorState, ProviderEntry } from "../types";
@@ -6,7 +15,7 @@ import { Card } from "./Card";
 import { StatCard } from "./StatCard";
 import { HealthStatusBanner } from "./HealthStatusBanner";
 import { DataTable, Td } from "./DataTable";
-import { AuthBadgeForEntry, Badge, YesNo } from "./Badge";
+import { AuthBadgeForEntry, YesNo } from "./Badge";
 import { Tag } from "./Tag";
 import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
@@ -100,7 +109,17 @@ export function OverviewTab({
       className="inline-flex cursor-pointer items-center gap-1 uppercase transition-colors hover:text-text-secondary"
     >
       {label}
-      <span className="text-[8px] opacity-70">{sortKey === k ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+      <span aria-hidden className="opacity-70">
+        {sortKey === k ? (
+          sortAsc ? (
+            <ArrowUp className="h-3 w-3" />
+          ) : (
+            <ArrowDown className="h-3 w-3" />
+          )
+        ) : (
+          <ChevronsUpDown className="h-3 w-3" />
+        )}
+      </span>
     </button>
   );
 
@@ -138,9 +157,10 @@ export function OverviewTab({
       {/* Toolbar */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
-          <span className="pointer-events-none absolute top-1/2 left-2.5 z-10 -translate-y-1/2 text-text-tertiary">
-            ⌕
-          </span>
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-2.5 z-10 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary"
+          />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -166,7 +186,7 @@ export function OverviewTab({
 
       <Card>
         {rows.length === 0 ? (
-          <EmptyState icon="🔍" title={t("inventory.search.noMatch")} />
+          <EmptyState icon={<Search aria-hidden className="h-9 w-9 text-text-tertiary" />} title={t("inventory.search.noMatch")} />
         ) : (
           <DataTable
             headers={[
@@ -187,16 +207,19 @@ export function OverviewTab({
                 <ToolNameCell entry={e} />
               </Td>
               <Td>
-                <span className="text-text-secondary">{e.available ? (e.version ?? "—") : "—"}</span>
+                <span
+                  title={e.available ? (e.version ?? undefined) : undefined}
+                  className="inline-block max-w-[13ch] truncate whitespace-nowrap align-bottom text-text-secondary"
+                >
+                  {e.available ? (e.version ?? "—") : "—"}
+                </span>
               </Td>
               <Td><AuthBadgeForEntry entry={e} /></Td>
               <Td>
                 {!e.available ? (
                   <span className="text-text-tertiary">—</span>
-                ) : e.mcp.supported ? (
-                  <Badge text="Yes" variant="ok" />
                 ) : (
-                  <Badge text="No" variant="fail" />
+                  <YesNo value={e.mcp.supported} />
                 )}
               </Td>
               <Td>{e.available ? (modelOverrides[e.tool] ?? e.model ?? "default") : "—"}</Td>
@@ -225,7 +248,14 @@ export function OverviewTab({
       {/* Warnings + Environment — side by side on wide screens */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start [&>*]:mb-0 [&>*]:min-w-0 [&>*]:flex-1">
       {warnings > 0 && (
-        <Card title={`⚠️ ${t("inventory.overview.cardWarnings")}`}>
+        <Card
+          title={
+            <>
+              <AlertTriangle aria-hidden className="h-4 w-4 text-warn" />
+              {t("inventory.overview.cardWarnings")}
+            </>
+          }
+        >
           {data
             .filter((e) => !e.available || (e.available && e.auth === "missing"))
             .map((w) => (
@@ -235,7 +265,9 @@ export function OverviewTab({
                 )}
                 {w.available && w.auth === "missing" && (
                   <div className="flex items-center gap-2 py-1 text-[13px]">
-                    <span className="w-5 text-center">✗</span>
+                    <span className="flex w-5 justify-center">
+                      <X aria-hidden className="h-3.5 w-3.5 text-fail" />
+                    </span>
                     <strong>{toolLabel(w.tool)}</strong>: {t("inventory.overview.authNotConfigured")}
                   </div>
                 )}
@@ -245,7 +277,14 @@ export function OverviewTab({
       )}
       {/* Environment Variables */}
       {envGroups.length > 0 && (
-        <Card title={`🔑 ${t("inventory.overview.cardEnvironment")}`}>
+        <Card
+          title={
+            <>
+              <KeyRound aria-hidden className="h-4 w-4 text-text-secondary" />
+              {t("inventory.overview.cardEnvironment")}
+            </>
+          }
+        >
           {envGroups.map((group) => (
             <div key={group.provider} className="flex items-start gap-4 border-t border-border py-2.5 first:border-none first:pt-0 text-[13px]">
               <span className="w-20 shrink-0 font-medium text-text-primary">{group.provider}</span>
@@ -319,7 +358,9 @@ function InstallPrompt({ tool }: { tool: string }) {
   return (
     <div className="text-[13px]">
       <div className="flex items-center gap-2 py-1">
-        <span className="w-5 text-center">✗</span>
+        <span className="flex w-5 justify-center">
+          <X aria-hidden className="h-3.5 w-3.5 text-fail" />
+        </span>
         <strong>{toolLabel(tool)}</strong>: {t("inventory.overview.notInPath")}
         {info?.url && (
           <a

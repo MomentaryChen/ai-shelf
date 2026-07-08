@@ -1,19 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import { Check, CheckCircle2, XCircle, Zap } from "lucide-react";
 import type { SkillSyncResult, SkillsRawData } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { Button } from "@/components/ui/button";
 import { SKILL_SYNC_TOOL_IDS } from "../../tools.js";
+import { ToolLogo } from "./ToolLogo";
 import { useLocale } from "../i18n/LocaleProvider";
 
 const TOOLS = SKILL_SYNC_TOOL_IDS;
-const TOOL_ICONS: Record<string, string> = {
-  claude: "🟣",
-  cursor: "📐",
-  gemini: "✨",
-  crush: "💥",
-  goose: "🪿",
-};
+const toolMark = (tool: string) => <ToolLogo tool={tool} size={14} />;
 
 export function SkillsSyncPanel() {
   const { t } = useLocale();
@@ -80,17 +76,27 @@ export function SkillsSyncPanel() {
   };
 
   return (
-    <Card className="mb-5" title={`⚡ ${t("inventory.skillsSync.title")}`}>
+    <Card
+      className="mb-5"
+      title={
+        <>
+          <Zap aria-hidden className="h-4 w-4 text-accent" />
+          {t("inventory.skillsSync.title")}
+        </>
+      }
+    >
       {results && (
         <div className="mb-4 rounded-lg border border-border bg-bg-primary p-3">
           {results.map((r) => (
             <div key={r.tool} className="mb-1 text-sm">
-              <strong>
-                {TOOL_ICONS[r.tool] ?? "🔧"} {r.tool}
+              <strong className="inline-flex items-center gap-1.5">
+                {toolMark(r.tool)} {r.tool}
               </strong>
               :{" "}
               {r.error ? (
-                <span className="text-fail">❌ {r.error}</span>
+                <span className="inline-flex items-center gap-1 text-fail">
+                  <XCircle aria-hidden className="h-3.5 w-3.5" /> {r.error}
+                </span>
               ) : (
                 <>
                   {r.added.length > 0 && (
@@ -114,7 +120,7 @@ export function SkillsSyncPanel() {
 
       {syncableSkills.length === 0 && allSkillNames.length > 0 && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-ok/30 bg-ok/10 px-4 py-3">
-          <span className="text-2xl">✅</span>
+          <CheckCircle2 aria-hidden className="h-6 w-6 shrink-0 text-ok" />
           <div>
             <p className="font-semibold text-ok">{t("inventory.skillsSync.allSynced")}</p>
             <p className="text-xs text-text-secondary">
@@ -136,7 +142,7 @@ export function SkillsSyncPanel() {
                   onChange={() => toggleTarget(tool)}
                   className="accent-accent"
                 />
-                {TOOL_ICONS[tool]} {tool}
+                <span className="inline-flex items-center gap-1">{toolMark(tool)} {tool}</span>
               </label>
             ))}
           </div>
@@ -189,7 +195,7 @@ export function SkillsSyncPanel() {
                   key={tool}
                   className="border-b border-border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-text-secondary"
                 >
-                  {TOOL_ICONS[tool]} {tool}
+                  <span className="inline-flex items-center gap-1.5">{toolMark(tool)} {tool}</span>
                 </th>
               ))}
             </tr>
@@ -205,10 +211,10 @@ export function SkillsSyncPanel() {
                     className="accent-accent"
                   />
                 </td>
-                <td className="border-b border-border/40 px-3 py-2 font-medium">⚡ {skill}</td>
+                <td className="border-b border-border/40 px-3 py-2 font-medium">{skill}</td>
                 {TOOLS.map((tool) => (
                   <td key={tool} className="border-b border-border/40 px-3 py-2">
-                    {rawData[tool]?.skills?.[skill] ? "✅" : <Badge text="Missing" variant="warn" />}
+                    {rawData[tool]?.skills?.[skill] ? <Check aria-label="synced" className="h-4 w-4 text-ok" /> : <Badge text="Missing" variant="warn" />}
                   </td>
                 ))}
               </tr>
@@ -220,10 +226,10 @@ export function SkillsSyncPanel() {
                   <td className="border-b border-border/30 px-3 py-2">
                     <input type="checkbox" disabled className="cursor-not-allowed opacity-30" />
                   </td>
-                  <td className="border-b border-border/30 px-3 py-2 font-medium">⚡ {skill}</td>
+                  <td className="border-b border-border/30 px-3 py-2 font-medium">{skill}</td>
                   {TOOLS.map((tool) => (
                     <td key={tool} className="border-b border-border/30 px-3 py-2">
-                      ✅
+                      <Check aria-label="synced" className="h-4 w-4 text-ok" />
                     </td>
                   ))}
                 </tr>

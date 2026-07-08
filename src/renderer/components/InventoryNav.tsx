@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 
 export interface NavItem<T extends string> {
   id: T;
-  icon: string;
+  icon: ReactNode;
   labelKey: MessageKey;
 }
 
@@ -43,7 +44,7 @@ export function InventoryNav<T extends string>({
             disabled={disabled}
             aria-current={isActive ? "page" : undefined}
             onClick={() => onSelect(it.id)}
-            className={`relative flex items-center gap-2.5 rounded-lg py-2 pr-2.5 pl-3 text-left text-[13px] transition-[color,background-color,transform] duration-200 ${
+            className={`group relative flex items-center gap-2.5 rounded-xl py-1.5 pr-2.5 pl-2 text-left text-[13px] transition-[color,background-color,transform] duration-200 ${
               disabled
                 ? "cursor-not-allowed text-text-tertiary opacity-50"
                 : isActive
@@ -57,7 +58,14 @@ export function InventoryNav<T extends string>({
                 isActive ? "scale-y-100 opacity-100" : "scale-y-75 opacity-0"
               }`}
             />
-            <span aria-hidden className="w-4 text-center text-[15px]">
+            <span
+              aria-hidden
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-[color,background-color,box-shadow] duration-200 ${
+                isActive
+                  ? "warm-shadow-accent bg-accent text-on-accent"
+                  : "bg-bg-secondary text-text-secondary group-hover:text-accent"
+              }`}
+            >
               {it.icon}
             </span>
             <span className="flex-1 truncate">{t(it.labelKey)}</span>

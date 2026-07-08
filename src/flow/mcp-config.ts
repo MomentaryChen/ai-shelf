@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAppDataDir } from "ai-shelf";
 import { canonicalToolId } from "../tools.js";
@@ -56,16 +56,34 @@ export function buildFlowMcpConfigJson(
   return JSON.stringify(config);
 }
 
+export function flowMcpConfigTempPath(runId: string): string {
+  return join(tmpdir(), `ai-shelf-flow-mcp-${runId}.json`);
+}
+
+/** Best-effort delete of a per-run MCP config temp file. */
+export function deleteFlowMcpConfigFile(path: string): void {
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Write MCP config to a temp file for `claude -p --mcp-config`. */
 export function writeFlowMcpConfigFile(
   runId: string,
   outputPath: string,
   extraServerNames: string[] = [],
 ): string {
-  const path = join(tmpdir(), `ai-shelf-flow-mcp-${runId}.json`);
+  const path = flowMcpConfigTempPath(runId);
   writeFileSync(path, buildFlowMcpConfigJson(runId, outputPath, extraServerNames), "utf8");
   return path;
 }
+
+export type FlowAgentSpawnOptions = {
+  /** When false, args reference the temp path but no file is written (preview only). */
+  writeMcpConfig?: boolean;
+};
 
 export function flowMcpAllowedTools(): string[] {
   return [
@@ -97,7 +115,64 @@ export type FlowMcpMount = {
 
 function cursorProjectMcpPath(cwd: string): string {
   const base = cwd.trim() || process.cwd();
-  return join(base, ".cursor", "mcp.json");
+  const resolvedBase = existsSync(base) ? realpathSync.native(base) : resolve(base);
+  return join(resolvedBase, ".cursor", "mcp.json");
+}
+
+type CursorMcpMountEntry = {
+  mountId: number;
+  runId: string;
+  outputPath: string;
+};
+
+type CursorMcpMountGroup = {
+  fileExisted: boolean;
+  hadEntry: boolean;
+  originalEntry?: McpServerEntry;
+  mounts: CursorMcpMountEntry[];
+};
+
+/** Per-project mount registry so concurrent runs in the same cwd don't clobber cleanup. */
+const cursorMcpMountGroups = new Map<string, CursorMcpMountGroup>();
+let nextCursorMcpMountId = 0;
+
+function flowMcpEntryForCursor(runId: string, outputPath: string): McpServerEntry {
+  return adaptMcpEntry(buildFlowMcpServerEntry(runId, outputPath), "cursor");
+}
+
+function writeFlowMcpToCursorProject(
+  configPath: string,
+  runId: string,
+  outputPath: string,
+): void {
+  const existed = existsSync(configPath);
+  const data = (existed ? tryReadJson<Record<string, unknown>>(configPath) : null) ?? {};
+  const servers = { ...((data["mcpServers"] as Record<string, McpServerEntry>) ?? {}) };
+  servers[FLOW_MCP_SERVER_NAME] = flowMcpEntryForCursor(runId, outputPath);
+  data["mcpServers"] = servers;
+  writeJson(configPath, data);
+}
+
+function restoreCursorProjectMcp(group: CursorMcpMountGroup, configPath: string): void {
+  try {
+    if (!existsSync(configPath)) return;
+    const current = tryReadJson<Record<string, unknown>>(configPath);
+    if (!current) return;
+    const nextServers = { ...((current["mcpServers"] as Record<string, McpServerEntry>) ?? {}) };
+    if (group.hadEntry && group.originalEntry) {
+      nextServers[FLOW_MCP_SERVER_NAME] = group.originalEntry;
+    } else {
+      delete nextServers[FLOW_MCP_SERVER_NAME];
+    }
+    if (Object.keys(nextServers).length === 0 && !group.fileExisted) {
+      unlinkSync(configPath);
+      return;
+    }
+    current["mcpServers"] = nextServers;
+    writeJson(configPath, current);
+  } catch {
+    /* best-effort restore */
+  }
 }
 
 /** Cursor reads MCP from project `.cursor/mcp.json` — inject per-run server env there. */
@@ -109,42 +184,41 @@ function mountFlowMcpInCursorProject(
   const configPath = cursorProjectMcpPath(cwd);
   mkdirSync(dirname(configPath), { recursive: true });
 
-  const existed = existsSync(configPath);
-  const data = (existed ? tryReadJson<Record<string, unknown>>(configPath) : null) ?? {};
-  const servers = { ...((data["mcpServers"] as Record<string, McpServerEntry>) ?? {}) };
-  const hadEntry = FLOW_MCP_SERVER_NAME in servers;
-  const previous = hadEntry ? structuredClone(servers[FLOW_MCP_SERVER_NAME]) : undefined;
+  let group = cursorMcpMountGroups.get(configPath);
+  if (!group) {
+    const existed = existsSync(configPath);
+    const data = (existed ? tryReadJson<Record<string, unknown>>(configPath) : null) ?? {};
+    const servers = (data["mcpServers"] as Record<string, McpServerEntry>) ?? {};
+    const hadEntry = FLOW_MCP_SERVER_NAME in servers;
+    const originalEntry = hadEntry ? structuredClone(servers[FLOW_MCP_SERVER_NAME]) : undefined;
 
-  servers[FLOW_MCP_SERVER_NAME] = adaptMcpEntry(
-    buildFlowMcpServerEntry(runId, outputPath),
-    "cursor",
-  );
-  data["mcpServers"] = servers;
+    group = { fileExisted: existed, hadEntry, originalEntry, mounts: [] };
+    cursorMcpMountGroups.set(configPath, group);
 
-  if (existed) backupFile(configPath);
-  writeJson(configPath, data);
+    if (existed) backupFile(configPath);
+  }
 
+  group.mounts.push({ mountId: ++nextCursorMcpMountId, runId, outputPath });
+  writeFlowMcpToCursorProject(configPath, runId, outputPath);
+
+  const mountId = nextCursorMcpMountId;
   return {
     cleanup: () => {
-      try {
-        if (!existsSync(configPath)) return;
-        const current = tryReadJson<Record<string, unknown>>(configPath);
-        if (!current) return;
-        const nextServers = { ...((current["mcpServers"] as Record<string, McpServerEntry>) ?? {}) };
-        if (hadEntry && previous) {
-          nextServers[FLOW_MCP_SERVER_NAME] = previous;
-        } else {
-          delete nextServers[FLOW_MCP_SERVER_NAME];
-        }
-        if (Object.keys(nextServers).length === 0 && !existed) {
-          unlinkSync(configPath);
-          return;
-        }
-        current["mcpServers"] = nextServers;
-        writeJson(configPath, current);
-      } catch {
-        /* best-effort restore */
+      const g = cursorMcpMountGroups.get(configPath);
+      if (!g) return;
+
+      const idx = g.mounts.findIndex((m) => m.mountId === mountId);
+      if (idx === -1) return;
+      g.mounts.splice(idx, 1);
+
+      if (g.mounts.length === 0) {
+        cursorMcpMountGroups.delete(configPath);
+        restoreCursorProjectMcp(g, configPath);
+        return;
       }
+
+      const last = g.mounts[g.mounts.length - 1]!;
+      writeFlowMcpToCursorProject(configPath, last.runId, last.outputPath);
     },
   };
 }
@@ -173,26 +247,38 @@ export function flowAgentMcpSpawnArgs(
   runId: string,
   outputPath: string,
   scope: FlowAgentSpawnScope = {},
-): string[] {
+  options: FlowAgentSpawnOptions = {},
+): { args: string[]; mcpConfigPath?: string } {
+  const writeMcpConfig = options.writeMcpConfig !== false;
   const canonical = canonicalToolId(tool);
   if (canonical === "claude") {
     const extraMcp = scope.extraMcpServers ?? [];
-    const mcpConfigPath = writeFlowMcpConfigFile(runId, outputPath, extraMcp);
+    const mcpConfigPath = flowMcpConfigTempPath(runId);
+    if (writeMcpConfig) {
+      writeFileSync(
+        mcpConfigPath,
+        buildFlowMcpConfigJson(runId, outputPath, extraMcp),
+        "utf8",
+      );
+    }
     const allowed = buildFlowAgentAllowedTools(extraMcp, scope.agentAllowedTools ?? []);
-    return [
-      "--strict-mcp-config",
-      "--mcp-config",
-      mcpConfigPath,
-      "--tools",
-      "",
-      "--allowedTools",
-      ...allowed,
-    ];
+    return {
+      args: [
+        "--strict-mcp-config",
+        "--mcp-config",
+        mcpConfigPath,
+        "--tools",
+        "",
+        "--allowedTools",
+        ...allowed,
+      ],
+      mcpConfigPath: writeMcpConfig ? mcpConfigPath : undefined,
+    };
   }
   if (canonical === "cursor") {
-    return ["--approve-mcps", "--trust", "--force"];
+    return { args: ["--approve-mcps", "--trust", "--force"] };
   }
-  return [];
+  return { args: [] };
 }
 
 export function prepareFlowAgentSpawn(
@@ -201,14 +287,31 @@ export function prepareFlowAgentSpawn(
   outputPath: string,
   cwd: string,
   scope: FlowAgentSpawnScope = {},
+  options: FlowAgentSpawnOptions = {},
 ): {
   mcpMount: FlowMcpMount;
   printPrefix: string[];
   extraArgs: string[];
 } {
+  const writeMcpConfig = options.writeMcpConfig !== false;
+  const agentMount = writeMcpConfig
+    ? mountFlowMcpForAgent(tool, runId, outputPath, cwd)
+    : { cleanup: () => {} };
+  const { args: extraArgs, mcpConfigPath } = flowAgentMcpSpawnArgs(
+    tool,
+    runId,
+    outputPath,
+    scope,
+    options,
+  );
   return {
-    mcpMount: mountFlowMcpForAgent(tool, runId, outputPath, cwd),
+    mcpMount: {
+      cleanup: () => {
+        agentMount.cleanup();
+        if (mcpConfigPath) deleteFlowMcpConfigFile(mcpConfigPath);
+      },
+    },
     printPrefix: flowAgentPrintPrefix(tool),
-    extraArgs: flowAgentMcpSpawnArgs(tool, runId, outputPath, scope),
+    extraArgs,
   };
 }

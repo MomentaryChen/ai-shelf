@@ -1,5 +1,7 @@
+import { Check, Zap } from "lucide-react";
 import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
+import { SectionHeading } from "./SectionHeading";
 import { DataTable, Td } from "./DataTable";
 import { Badge, InstallStatusBadge } from "./Badge";
 import { SkillsMcpDiffPanel } from "./SkillsMcpDiffPanel";
@@ -16,6 +18,7 @@ function SkillsCards({ entries }: { entries: ProviderEntry[] }) {
   return entries.map((e) => (
     <Card
       key={e.tool}
+      dense
       className={installedCardClass(e.available)}
       title={<ToolNameCell entry={e} />}
       trailing={
@@ -48,17 +51,21 @@ export function SkillsTab({
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">⚡ {t("app.tab.skills")}</h2>
+      <SectionHeading icon={Zap}>{t("app.tab.skills")}</SectionHeading>
 
       <SkillsMcpDiffPanel data={data} onOpenMcpSync={onOpenMcpSync} />
 
       <SkillsSyncPanel />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <SkillsCards entries={installed} />
+      <div className="ui-stagger-children">
+        <SkillsCards entries={installed} />
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <SkillsCards entries={notInstalled} />
+      <div className="ui-stagger-children">
+        <SkillsCards entries={notInstalled} />
+      </div>
 
       {/* Skill matrix */}
       {allSkills.length > 0 && (
@@ -70,7 +77,13 @@ export function SkillsTab({
               <tr key={skill}>
                 <Td>{skill}</Td>
                 {installed.map((e) => (
-                  <Td key={e.tool}>{e.skills.includes(skill) ? "✅" : "—"}</Td>
+                  <Td key={e.tool}>
+                    {e.skills.includes(skill) ? (
+                      <Check aria-label="yes" className="h-4 w-4 text-ok" />
+                    ) : (
+                      <span className="text-text-tertiary">—</span>
+                    )}
+                  </Td>
                 ))}
               </tr>
             ))}

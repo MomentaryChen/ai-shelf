@@ -79,8 +79,8 @@ export const SETTINGS_KEY = "ai-inventory-chat-settings";
 export const SETTINGS_CHANGE_EVENT = "ai-shelf-settings-change";
 
 export const TERMINAL_OPTIONS: { value: ExternalTerminal; label: string }[] = [
-  { value: "auto", label: "🔍 Auto detect" },
-  { value: "wt", label: "🪟 Windows Terminal" },
+  { value: "auto", label: "Auto detect" },
+  { value: "wt", label: "Windows Terminal" },
   { value: "pwsh", label: "🔵 PowerShell 7+ (pwsh)" },
   { value: "powershell", label: "💙 PowerShell 5 (built-in)" },
   { value: "cmd", label: "⬛ Command Prompt" },

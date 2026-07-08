@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { Brain } from "lucide-react";
 import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { DataTable, Td } from "./DataTable";
 import { YesNo } from "./Badge";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
+import { SectionHeading } from "./SectionHeading";
 import { formatContext, toolInstall } from "../utils";
 import { partitionByInstalled, installedRowClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -113,7 +115,7 @@ export function ModelsTab({ data }: { data: ProviderEntry[] }) {
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">🧠 {t("app.tab.models")}</h2>
+      <SectionHeading icon={Brain}>{t("app.tab.models")}</SectionHeading>
 
       <InventorySectionHeader count={installed.length} variant="installed" />
       <ModelsTable entries={installed} expanded={expanded} toggleExpand={toggleExpand} />

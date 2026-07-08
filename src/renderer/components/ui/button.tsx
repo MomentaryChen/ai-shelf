@@ -10,7 +10,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "rounded-[22px] border-0 text-white warm-clay-gradient warm-shadow-accent hover:brightness-95 focus-visible:shadow-[0_0_0_2px_rgb(201_123_90/0.35),0_4px_16px_-6px_rgb(201_123_90/0.25)]",
+          "rounded-[22px] border-0 text-on-accent warm-clay-gradient warm-shadow-accent hover:brightness-95 focus-visible:shadow-[0_0_0_2px_var(--color-accent-soft),0_4px_16px_-6px_var(--color-accent-soft)]",
         destructive: "rounded-[22px] bg-destructive text-destructive-foreground warm-shadow-card hover:bg-destructive/90",
         outline:
           "rounded-[22px] border border-input bg-transparent text-foreground hover:bg-accent-surface hover:text-accent-surface-foreground",
@@ -19,7 +19,7 @@ const buttonVariants = cva(
         chromeOutline:
           "rounded-[22px] border border-chrome-border-strong bg-chrome-surface text-[13px] text-chrome-text-secondary hover:border-chrome-border-hover hover:bg-chrome-hover hover:text-chrome-text focus-visible:shadow-[0_0_0_2px_rgb(201_123_90/0.35),0_4px_16px_-6px_rgb(201_123_90/0.25)]",
         chromeSolid:
-          "rounded-[22px] border-0 warm-clay-gradient text-white warm-shadow-accent hover:brightness-95 active:scale-95 focus-visible:shadow-[0_0_0_2px_rgb(201_123_90/0.35),0_4px_16px_-6px_rgb(201_123_90/0.25)]",
+          "rounded-[22px] border-0 warm-clay-gradient text-on-accent warm-shadow-accent hover:brightness-95 active:scale-95 focus-visible:shadow-[0_0_0_2px_var(--color-accent-soft),0_4px_16px_-6px_var(--color-accent-soft)]",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

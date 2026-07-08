@@ -1,3 +1,4 @@
+import { Settings } from "lucide-react";
 import { useState } from "react";
 import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
@@ -5,6 +6,7 @@ import { DataTable, Td } from "./DataTable";
 import { Badge } from "./Badge";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
+import { SectionHeading } from "./SectionHeading";
 import { ConfigFileEditorModal } from "./ConfigFileEditorModal";
 import { ConfigSnapshotPanel } from "./ConfigSnapshotPanel";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
@@ -88,15 +90,19 @@ export function ConfigTab({ data, onRefresh }: { data: ProviderEntry[]; onRefres
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">⚙️ {t("app.tab.config")}</h2>
+      <SectionHeading icon={Settings}>{t("app.tab.config")}</SectionHeading>
 
       <ConfigSnapshotPanel onRestored={onRefresh} />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <ConfigCards entries={installed} onEdit={setEditPath} />
+      <div className="ui-stagger-children">
+        <ConfigCards entries={installed} onEdit={setEditPath} />
+      </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <ConfigCards entries={notInstalled} onEdit={setEditPath} />
+      <div className="ui-stagger-children">
+        <ConfigCards entries={notInstalled} onEdit={setEditPath} />
+      </div>
 
       {editPath && (
         <ConfigFileEditorModal path={editPath} onClose={() => setEditPath(null)} />

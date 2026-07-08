@@ -590,7 +590,7 @@ function EmbeddedTerminalInner({
 
   return (
     <div
-      className="absolute inset-0 isolate"
+      className="ui-view-rise absolute inset-0 isolate"
       data-terminal-overlay-open={findOpen ? "" : undefined}
     >
       <div ref={containerRef} className="absolute inset-0 z-0 h-full w-full" />

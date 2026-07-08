@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import {
   Card as UiCard,
   CardContent,
@@ -20,6 +21,7 @@ export function Card({
   className = "",
   collapsible = false,
   defaultCollapsed = false,
+  dense = false,
 }: {
   title?: React.ReactNode;
   trailing?: React.ReactNode;
@@ -28,19 +30,28 @@ export function Card({
   className?: string;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
+  /** Tighter padding/radius/margin for per-item cards in long lists (MCP, Doctor…). */
+  dense?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed);
   const hasHeader = title || trailing;
   const interactive = hoverable
     ? "transition-[border-color,box-shadow,transform] duration-200 hover:shadow-pop"
     : "";
-  const cardClass = cn("warm-rise rounded-[28px] warm-shadow-card", interactive);
+  const cardClass = cn(
+    "warm-rise warm-shadow-card",
+    dense ? "rounded-2xl" : "rounded-[28px]",
+    interactive,
+  );
+  const pad = dense ? "p-3.5" : "p-5";
+  const gap = dense ? "mb-2.5" : "mb-4";
+  const headerGap = dense ? "mb-3" : "mb-4";
 
   if (!collapsible) {
     return (
-      <UiCard className={cn("mb-4 p-5", cardClass, className)}>
+      <UiCard className={cn(gap, pad, cardClass, className)}>
         {hasHeader && (
-          <CardHeader className="mb-4">
+          <CardHeader className={headerGap}>
             {title && <CardTitle>{title}</CardTitle>}
             {trailing}
           </CardHeader>
@@ -54,22 +65,26 @@ export function Card({
     <Collapsible
       open={!collapsed}
       onOpenChange={(open) => setCollapsed(!open)}
-      className={cn("mb-4", className)}
+      className={cn(gap, className)}
     >
-      <UiCard className={cn("p-5", cardClass)}>
+      <UiCard className={cn(pad, cardClass)}>
         {hasHeader && (
           <CollapsibleTrigger asChild>
             <button
               type="button"
               className={cn(
                 "flex w-full cursor-pointer select-none items-center justify-between gap-3 text-left",
-                collapsed ? "" : "mb-4",
+                collapsed ? "" : headerGap,
               )}
             >
               <CardTitle>
-                <span className="w-3 shrink-0 text-xs text-text-tertiary">
-                  {collapsed ? "▶" : "▼"}
-                </span>
+                <ChevronRight
+                  aria-hidden
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0 text-text-tertiary transition-transform duration-200",
+                    collapsed ? "" : "rotate-90",
+                  )}
+                />
                 {title}
               </CardTitle>
               {trailing}

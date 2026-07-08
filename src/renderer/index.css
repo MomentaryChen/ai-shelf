@@ -182,6 +182,43 @@ input:focus-visible,
   animation: warm-rise 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Collapsible cards (MCP / Doctor / Config) — animate open/close height.
+   Radix exposes --radix-collapsible-content-height and keeps the node mounted
+   until the close animation finishes. Reduced-motion is handled globally. */
+@keyframes ui-collapse-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes ui-collapse-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+[data-slot="collapsible-content"] {
+  overflow: hidden;
+}
+
+[data-slot="collapsible-content"][data-state="open"] {
+  animation: ui-collapse-down 240ms var(--ease-in);
+}
+
+[data-slot="collapsible-content"][data-state="closed"] {
+  animation: ui-collapse-up 200ms var(--ease-in);
+}
+
 /* Shared view / panel transitions */
 @keyframes ui-view-fade-in {
   from {
@@ -258,7 +295,7 @@ input:focus-visible,
 
 .warm-typing-dot {
   animation: warm-dot-blink 1.2s ease-in-out infinite;
-  background: #c0a98d;
+  background: var(--color-chrome-text-faint);
 }
 
 @keyframes pane-agent-pulse {
@@ -279,7 +316,7 @@ input:focus-visible,
 
 .pane-agent-dot-attention {
   animation: pane-agent-pulse 1s ease-in-out infinite;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--clay, #c97b5a) 35%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-chrome-ui-accent) 35%, transparent);
 }
 
 .pane-agent-dot-stalled {
@@ -344,7 +381,11 @@ input:focus-visible,
 }
 
 .warm-clay-gradient {
-  background: linear-gradient(135deg, var(--color-clay-soft), var(--color-clay));
+  background: linear-gradient(
+    135deg,
+    var(--accent-grad-from, var(--color-clay-soft)),
+    var(--accent-grad-to, var(--color-clay))
+  );
 }
 
 @theme {
@@ -497,6 +538,9 @@ html[data-app-theme="warm"] {
 }
 
 html[data-app-theme="dark"] {
+  --accent-grad-from: #38bdf8;
+  --accent-grad-to: #0284c7;
+  --shadow-warm-accent: 0 4px 14px -6px rgb(56 189 248 / 0.45);
   --color-bg-primary: #0d1117;
   --color-bg-secondary: #161b22;
   --color-bg-card: #21262d;
@@ -571,6 +615,9 @@ html[data-app-theme="dark"] {
 }
 
 html[data-app-theme="light"] {
+  --accent-grad-from: #0ea5e9;
+  --accent-grad-to: #0284c7;
+  --shadow-warm-accent: 0 4px 14px -6px rgb(2 132 199 / 0.4);
   --color-bg-primary: #f6f8fa;
   --color-bg-secondary: #ffffff;
   --color-bg-card: #f0f3f6;
@@ -658,6 +705,9 @@ html:not([data-app-theme]) select:focus-visible {
 }
 
 html[data-app-theme="contrast"] {
+  --accent-grad-from: #ffff00;
+  --accent-grad-to: #ffff00;
+  --shadow-warm-accent: 0 0 0 1px #ffffff;
   --color-bg-primary: #000000;
   --color-bg-secondary: #000000;
   --color-bg-card: #1a1a1a;

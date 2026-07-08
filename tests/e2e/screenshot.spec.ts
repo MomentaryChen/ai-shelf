@@ -74,38 +74,40 @@ async function waitForScreenshotSettled(page: Page, tabIndex: number) {
       ).toBeVisible({ timeout: ASYNC_PANEL_TIMEOUT });
       break;
     case 1:
-      await expect(page.getByRole("heading", { name: /🧠.*Models|模型/ })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Models|模型/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 2:
-      await expect(page.getByRole("heading", { name: /⚡.*Skills|技能/ })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Skills|技能/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 3:
-      await expect(page.getByRole("heading", { name: /🔌.*MCP/ })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /^MCP$/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 4:
-      await expect(page.getByRole("heading", { name: /⚙️.*Config|設定/ })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Config|設定/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
       break;
     case 5:
-      await expect(page.getByRole("heading", { name: /🩺.*Doctor|診斷/ })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Doctor|診斷/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
-      await expect(page.getByText(/Checking…|檢查中…/)).toHaveCount(0, { timeout: ASYNC_PANEL_TIMEOUT });
+      await expect(page.getByText(/Checking…|檢查中…/)).toHaveCount(0, {
+        timeout: ASYNC_PANEL_TIMEOUT,
+      });
       break;
     case 6:
-      await expect(page.getByRole("heading", { name: /🔄.*Update|更新/ })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Update|更新/ })).toBeVisible({
         timeout: ASYNC_PANEL_TIMEOUT,
       });
-      await expect(
-        page.getByRole("button", { name: /🔍.*Re-check|全部重新檢查/i }),
-      ).toBeEnabled({ timeout: ASYNC_PANEL_TIMEOUT });
+      await expect(page.getByRole("button", { name: /Re-check|全部重新檢查/i })).toBeEnabled({
+        timeout: ASYNC_PANEL_TIMEOUT,
+      });
       break;
     default:
       break;

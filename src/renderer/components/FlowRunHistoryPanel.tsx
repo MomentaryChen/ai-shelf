@@ -65,7 +65,7 @@ export function FlowRunHistoryPanel({ flowId, refreshKey = 0, onSelectRun }: Pro
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                     tone === "success"
-                      ? "bg-[#7FB069]/20 text-[#3d6b32]"
+                      ? "bg-ok/15 text-ok"
                       : tone === "failed"
                         ? "bg-fail/15 text-fail"
                         : tone === "running"

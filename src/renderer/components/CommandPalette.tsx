@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Command,
   CommandEmpty,
@@ -24,7 +24,8 @@ export interface Command {
   id: string;
   title: string;
   group: string;
-  icon?: string;
+  /** Row icon — a lucide element (preferred) or short text glyph. */
+  icon?: ReactNode;
   /** Extra space-separated terms the fuzzy filter should also match against. */
   keywords?: string;
   /** Hotkey hint rendered at the right of the row (e.g. "Ctrl+1"). */
@@ -73,7 +74,10 @@ function CommandRow({
       onSelect={() => onRun(command)}
     >
       {command.icon && (
-        <span aria-hidden className="w-4 text-center">
+        <span
+          aria-hidden
+          className="inline-flex w-4 shrink-0 items-center justify-center text-muted-foreground"
+        >
           {command.icon}
         </span>
       )}

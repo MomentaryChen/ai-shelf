@@ -1,3 +1,4 @@
+import { AlertTriangle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -100,7 +101,11 @@ export function McpServerEditorModal({ tool, initial, onClose, onSaved }: Props)
               className="min-h-[180px] flex-1 resize-none border-border bg-bg-primary font-mono text-xs leading-relaxed text-text-primary"
             />
             <p className="mt-1 text-[11px] text-text-tertiary">{t("mcpServerEditor.hint")}</p>
-            {jsonError && <p className="mt-1 break-all text-xs text-fail">⚠️ {jsonError}</p>}
+            {jsonError && (
+              <p className="mt-1 inline-flex items-start gap-1 break-all text-xs text-fail">
+                <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {jsonError}
+              </p>
+            )}
           </div>
 
           <Label className="flex cursor-pointer items-center gap-2 text-sm font-normal text-text-primary">
@@ -108,7 +113,11 @@ export function McpServerEditorModal({ tool, initial, onClose, onSaved }: Props)
             {t("mcpServerEditor.enabled")}
           </Label>
 
-          {error && <p className="break-all text-xs text-fail">❌ {error}</p>}
+          {error && (
+            <p className="inline-flex items-start gap-1 break-all text-xs text-fail">
+              <XCircle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}
+            </p>
+          )}
         </div>
 
         <DialogFooter className="mt-2">

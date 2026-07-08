@@ -69,7 +69,9 @@ export function buildFlowAgentCliArgs(
   const outputPath =
     options.outputPath ?? join(tmpdir(), `ai-shelf-flow-preview-${runId}-output.md`);
 
-  const prep = prepareFlowAgentSpawn(resolved.tool, runId, outputPath, resolved.cwd);
+  const prep = prepareFlowAgentSpawn(resolved.tool, runId, outputPath, resolved.cwd, {}, {
+    writeMcpConfig: false,
+  });
   const printArgs = [...prep.printPrefix, ...prep.extraArgs];
   const cliArgs = [...resolved.launchCommand.trim().split(/\s+/), ...printArgs];
 
