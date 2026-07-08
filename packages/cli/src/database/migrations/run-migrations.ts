@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const MIGRATION_V2 = `
 ALTER TABLE sessions ADD COLUMN tool TEXT;
@@ -53,6 +53,10 @@ ALTER TABLE groups ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
 
 const MIGRATION_V9 = `
 ALTER TABLE workspaces ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+`;
+
+const MIGRATION_V10 = `
+ALTER TABLE group_layouts ADD COLUMN saved_commands_json TEXT NOT NULL DEFAULT '[]';
 `;
 
 const INITIAL_SCHEMA = `
@@ -180,6 +184,15 @@ export function runMigrations(db: Database.Database): void {
     }
     backfillWorkspaceSortOrder(db);
     db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(9);
+  }
+
+  if (current < 10) {
+    try {
+      db.exec(MIGRATION_V10);
+    } catch {
+      /* column may exist */
+    }
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(10);
   }
 }
 

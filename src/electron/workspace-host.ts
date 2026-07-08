@@ -1,4 +1,5 @@
 import { bootstrap, type AppContext, type CreateProfileInput, type GroupLayoutSnapshot } from "ai-shelf";
+import { PREF_ONBOARDING_COMPLETED } from "../shared/onboarding-pref.js";
 
 let ctx: AppContext | null = null;
 
@@ -61,6 +62,16 @@ export function setLastActiveGroup(workspaceId: string, groupId: string) {
   getWorkspaceContext().groupLayoutService.setLastActiveGroup(workspaceId, groupId);
 }
 
+export function getOnboardingCompleted(): boolean {
+  return (
+    getWorkspaceContext().groupLayoutService.getPreference(PREF_ONBOARDING_COMPLETED) === "1"
+  );
+}
+
+export function setOnboardingCompleted(): void {
+  getWorkspaceContext().groupLayoutService.setPreference(PREF_ONBOARDING_COMPLETED, "1");
+}
+
 export function getProfileForest() {
   return getWorkspaceContext().profileService.getForest();
 }
@@ -108,9 +119,33 @@ export function updateProfile(
     defaultTool?: string;
     broadcastInput?: boolean;
     accentColor?: string | null;
+    savedCommands?: {
+      id: string;
+      name: string;
+      command: string;
+      broadcast?: boolean;
+    }[];
   },
 ) {
-  return getWorkspaceContext().profileService.update(profileId, patch);
+  return getWorkspaceContext().profileService.update(profileId, {
+    ...patch,
+    savedCommands: patch.savedCommands?.map((s) => ({ ...s, broadcast: s.broadcast ?? false })),
+  });
+}
+
+export function setProfileSavedCommands(
+  profileId: string,
+  savedCommands: {
+    id: string;
+    name: string;
+    command: string;
+    broadcast?: boolean;
+  }[],
+) {
+  return getWorkspaceContext().profileService.setSavedCommands(
+    profileId,
+    savedCommands.map((s) => ({ ...s, broadcast: s.broadcast ?? false })),
+  );
 }
 
 export function deleteProfile(profileId: string) {

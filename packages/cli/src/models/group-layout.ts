@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const SavedCommandSnippetSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(64),
+  command: z.string().min(1).max(4096),
+  broadcast: z.boolean().optional().default(false),
+});
+
+export type SavedCommandSnippet = z.infer<typeof SavedCommandSnippetSchema>;
+
 export const SavedPaneSlotSchema = z.object({
   tool: z.string().min(1),
   cwd: z.string(),
@@ -24,6 +33,7 @@ export const GroupLayoutSnapshotSchema = z.object({
   layout: z.custom<SerializedLayoutNode | null>().nullable(),
   broadcastInput: z.boolean().optional().default(false),
   accentColor: z.string().nullable().optional(),
+  savedCommands: z.array(SavedCommandSnippetSchema).optional(),
   updatedAt: z.string(),
 });
 

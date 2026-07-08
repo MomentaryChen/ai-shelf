@@ -35,7 +35,7 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
 
     const layoutRows = db
       .prepare(
-        `SELECT group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, updated_at
+        `SELECT group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at
          FROM group_layouts`,
       )
       .all() as {
@@ -47,6 +47,7 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
       panes_json: string;
       broadcast_input: number;
       accent_color: string | null;
+      saved_commands_json: string;
       updated_at: string;
     }[];
 
@@ -68,6 +69,12 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
       } catch {
         panes = [];
       }
+      let savedCommands: GroupLayoutSnapshot["savedCommands"] = [];
+      try {
+        savedCommands = JSON.parse(row.saved_commands_json ?? "[]") as GroupLayoutSnapshot["savedCommands"];
+      } catch {
+        savedCommands = [];
+      }
       layouts.push({
         profileId: row.group_id,
         workspaceId: row.workspace_id,
@@ -78,6 +85,7 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
           layout,
           broadcastInput: Boolean(row.broadcast_input),
           accentColor: row.accent_color ?? null,
+          savedCommands,
           updatedAt: row.updated_at,
         },
       });

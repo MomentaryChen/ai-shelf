@@ -2,7 +2,7 @@ import type { GroupRepositoryPort, WorkspaceRepositoryPort } from "../core/ports
 import type { GroupLayoutRepository } from "../database/repositories/group-layout-repository.js";
 import type { EventBus } from "../runtime/event-bus.js";
 import type { GroupModel } from "../models/group.js";
-import type { GroupLayoutSnapshot } from "../models/group-layout.js";
+import type { GroupLayoutSnapshot, SavedCommandSnippet } from "../models/group-layout.js";
 import { AppError } from "../core/errors/app-error.js";
 import { homedir } from "node:os";
 import {
@@ -28,6 +28,7 @@ export interface ProfileInfo {
   accentColor: string | null;
   paneCount: number;
   terminals: { tool: string; cwd: string; title?: string }[];
+  savedCommands: SavedCommandSnippet[];
   updatedAt: string | null;
 }
 
@@ -217,6 +218,7 @@ export class ProfileService {
       layout: null,
       broadcastInput,
       accentColor: resolvedAccent,
+      savedCommands: source?.savedCommands ? [...source.savedCommands] : [],
       updatedAt: new Date().toISOString(),
     };
     this.layouts.upsert(group.id, ws.id, snapshot);
@@ -233,6 +235,7 @@ export class ProfileService {
       defaultTool?: string;
       broadcastInput?: boolean;
       accentColor?: string | null;
+      savedCommands?: SavedCommandSnippet[];
     },
   ): ProfileInfo {
     const { workspaceId, group } = this.resolve(profileId);
@@ -257,6 +260,7 @@ export class ProfileService {
         layout: null,
         broadcastInput: false,
         accentColor: null,
+        savedCommands: [],
         updatedAt: new Date().toISOString(),
       } satisfies GroupLayoutSnapshot);
 
@@ -290,6 +294,8 @@ export class ProfileService {
       broadcastInput:
         patch.broadcastInput !== undefined ? patch.broadcastInput : (snap.broadcastInput ?? false),
       accentColor: nextAccent,
+      savedCommands:
+        patch.savedCommands !== undefined ? patch.savedCommands : snap.savedCommands,
       panes,
       updatedAt: new Date().toISOString(),
     };
@@ -302,6 +308,34 @@ export class ProfileService {
     }
 
     return this.toProfileInfo(updatedGroup, workspaceId);
+  }
+
+  setSavedCommands(profileId: string, savedCommands: SavedCommandSnippet[]): ProfileInfo {
+    const { workspaceId, group } = this.resolve(profileId);
+    const ws = this.workspaces.findById(workspaceId)!;
+    const snap =
+      this.layouts.findByGroupId(profileId) ??
+      ({
+        defaultCwd: ws?.root_path ?? homedir(),
+        defaultTool: DEFAULT_PROFILE_TOOL,
+        panes: [],
+        layout: null,
+        broadcastInput: false,
+        accentColor: null,
+        savedCommands: [],
+        updatedAt: new Date().toISOString(),
+      } satisfies GroupLayoutSnapshot);
+
+    const next: GroupLayoutSnapshot = {
+      ...snap,
+      savedCommands,
+      updatedAt: new Date().toISOString(),
+    };
+    this.layouts.upsert(profileId, workspaceId, next);
+    if (ws.name !== DEFAULT_PROFILE_GROUP_NAME) {
+      this.upsertLegacyMirror(ws.name, group.name, next);
+    }
+    return this.toProfileInfo(group, workspaceId);
   }
 
   reorder(groupIdOrName: string, orderedProfileIds: string[]): ProfileForest {
@@ -412,6 +446,7 @@ export class ProfileService {
       accentColor: snap?.accentColor ?? meta?.accentColor ?? null,
       paneCount: meta?.paneCount ?? 0,
       terminals: snap?.panes ?? [],
+      savedCommands: snap?.savedCommands ?? [],
       updatedAt: meta?.updatedAt ?? null,
     };
   }

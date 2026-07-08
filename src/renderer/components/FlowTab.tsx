@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MessageSquare, Plus, Settings } from "lucide-react";
+import { MessageSquare, Plus, Settings, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +20,7 @@ import { FlowRunDetailDialog } from "./FlowRunDetailDialog";
 import { FlowRunHistoryPanel } from "./FlowRunHistoryPanel";
 import { FlowSettingsDialog } from "./FlowSettingsDialog";
 import { FlowSourceDialog } from "./FlowSourceDialog";
+import { FlowTemplateMarketplace } from "./FlowTemplateMarketplace";
 import { Spinner } from "./Spinner";
 import { useLocale } from "../i18n/LocaleProvider";
 import { loadSettings } from "../chat-settings";
@@ -59,6 +60,7 @@ export function FlowTab() {
   const [expandedOutputPath, setExpandedOutputPath] = useState<string | null>(null);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [chatFlowId, setChatFlowId] = useState<string | undefined>(undefined);
   const [historyRun, setHistoryRun] = useState<FlowRunState | null>(null);
   const [historyRefreshByFlowId, setHistoryRefreshByFlowId] = useState<Record<string, number>>({});
@@ -411,10 +413,36 @@ export function FlowTab() {
           <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden />
           {t("flow.create.new")}
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mb-1 w-full shrink-0 rounded-[22px] border-border text-[13px]"
+          onClick={() => setMarketplaceOpen(true)}
+        >
+          <BookOpen className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+          {t("flow.template.marketplace")}
+        </Button>
         {loading && <Spinner label={t("flow.loading")} />}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         {!loading && flows.length === 0 && (
-          <p className="px-1 text-[13px] text-text-secondary">{t("flow.empty")}</p>
+          <EmptyState
+            compact
+            className="px-1 py-3"
+            title={t("flow.empty")}
+            description={t("flow.emptyDesc")}
+            action={
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-[22px]"
+                onClick={() => setMarketplaceOpen(true)}
+              >
+                {t("flow.emptyBrowseTemplates")}
+              </Button>
+            }
+          />
         )}
         {flows.map((flow) => {
           const isSelected = selectedId === flow.id;
@@ -489,7 +517,20 @@ export function FlowTab() {
           )}
 
           {!showCreate && !selected && !loading && (
-            <EmptyState title={t("flow.emptyTitle")} description={t("flow.emptyDesc")} />
+            <EmptyState
+              title={t("flow.emptyTitle")}
+              description={t("flow.emptyDesc")}
+              action={
+                <Button
+                  type="button"
+                  size="sm"
+                  className="rounded-[22px]"
+                  onClick={() => setMarketplaceOpen(true)}
+                >
+                  {t("flow.emptyBrowseTemplates")}
+                </Button>
+              }
+            />
           )}
 
           {!showCreate && selected && flowDef && (
@@ -710,6 +751,15 @@ export function FlowTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <FlowTemplateMarketplace
+        open={marketplaceOpen}
+        onClose={() => setMarketplaceOpen(false)}
+        onInstalled={(flowId) => {
+          setMarketplaceOpen(false);
+          void refreshList().then(() => setSelectedId(flowId));
+        }}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ export interface GroupLayoutSnapshot {
   layout: SerializedLayoutNode | null;
   broadcastInput?: boolean;
   accentColor?: string | null;
+  savedCommands?: { id: string; name: string; command: string; broadcast?: boolean }[];
   updatedAt: string;
 }
 

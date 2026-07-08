@@ -6,6 +6,7 @@ import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../sha
 import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
 import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
+import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
@@ -14,6 +15,8 @@ export type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-ty
 export type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 export type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 export type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
+
+export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boolean };
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -197,6 +200,51 @@ export interface McpEditResult {
   error?: string;
 }
 
+export type McpRegistryTransport = "stdio" | "remote";
+
+export interface McpRegistryServerItem {
+  id: string;
+  title?: string;
+  description?: string;
+  version: string;
+  transport: McpRegistryTransport;
+  websiteUrl?: string;
+  repositoryUrl?: string;
+}
+
+export interface McpRegistryListResult {
+  servers: McpRegistryServerItem[];
+  nextCursor?: string;
+  error?: string;
+}
+
+export interface McpRegistryEnvVar {
+  name: string;
+  description?: string;
+  isRequired?: boolean;
+  isSecret?: boolean;
+  default?: string;
+}
+
+export interface McpRegistryArg {
+  name: string;
+  description?: string;
+  isRequired?: boolean;
+  default?: string;
+  type?: string;
+}
+
+export interface McpRegistryInstallPreview {
+  registryId: string;
+  suggestedName: string;
+  title?: string;
+  description?: string;
+  transport: McpRegistryTransport;
+  entry: Record<string, unknown>;
+  envVars: McpRegistryEnvVar[];
+  packageArgs: McpRegistryArg[];
+}
+
 export type McpTransport = "stdio" | "http" | "unknown";
 
 export interface McpPingResult {
@@ -302,7 +350,15 @@ export interface GroupLayoutSnapshot {
   layout: unknown;
   broadcastInput?: boolean;
   accentColor?: string | null;
+  savedCommands?: SavedCommandSnippet[];
   updatedAt: string;
+}
+
+export interface SavedCommandSnippet {
+  id: string;
+  name: string;
+  command: string;
+  broadcast?: boolean;
 }
 
 export interface ProfileTerminal {
@@ -321,6 +377,7 @@ export interface ProfileInfo {
   accentColor: string | null;
   paneCount: number;
   terminals: ProfileTerminal[];
+  savedCommands: SavedCommandSnippet[];
   updatedAt: string | null;
 }
 
@@ -418,6 +475,20 @@ export interface UsageDayBucket {
   outputTokens?: number;
 }
 
+export interface UsageDailyToolSlice {
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export interface UsageDailyUnifiedRow {
+  date: string;
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  byTool: Partial<Record<UsageToolId, UsageDailyToolSlice>>;
+}
+
 export interface UsageModelBreakdown {
   model: string;
   costUsd: number;
@@ -457,8 +528,11 @@ export interface UsageDashboardResult {
   tools: UsageToolSnapshot[];
   summary: {
     totalCostUsd: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
     configuredCount: number;
     supportedCount: number;
+    dailyUnified: UsageDailyUnifiedRow[];
   };
 }
 
@@ -500,6 +574,7 @@ export interface ElectronAPI {
   onScanComplete: (cb: () => void) => void;
   offScanListeners: () => void;
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
+  runInstall: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
   previewMcpSync: (opts: {
@@ -525,6 +600,16 @@ export interface ElectronAPI {
   ) => Promise<McpEditResult>;
   mcpDeleteServer: (tool: string, name: string) => Promise<McpEditResult>;
   mcpSetServerEnabled: (tool: string, name: string, enabled: boolean) => Promise<McpEditResult>;
+  mcpRegistryList: (opts: {
+    search?: string;
+    cursor?: string;
+    limit?: number;
+  }) => Promise<McpRegistryListResult>;
+  mcpRegistryPreview: (
+    tool: string,
+    registryId: string,
+    values?: { env?: Record<string, string>; packageArgs?: Record<string, string> },
+  ) => Promise<McpRegistryInstallPreview | { error: string }>;
   mcpPingTool: (tool: string) => Promise<McpPingToolResult>;
   openPath: (filePath: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
@@ -593,6 +678,8 @@ export interface ElectronAPI {
   ) => Promise<{ success: boolean; error?: string }>;
   profileGetTree: () => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
   profileGroupGetForest: () => Promise<{ success: boolean; forest?: ProfileForest; error?: string }>;
+  getOnboardingCompleted: () => Promise<{ success: boolean; completed?: boolean; error?: string }>;
+  setOnboardingCompleted: () => Promise<{ success: boolean; error?: string }>;
   profileGroupCreate: (
     name: string,
   ) => Promise<{ success: boolean; group?: ProfileGroupInfo; error?: string }>;
@@ -616,7 +703,12 @@ export interface ElectronAPI {
       defaultTool?: string;
       broadcastInput?: boolean;
       accentColor?: string | null;
+      savedCommands?: SavedCommandSnippet[];
     },
+  ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
+  profileSetSavedCommands: (
+    profileId: string,
+    savedCommands: SavedCommandSnippet[],
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileDelete: (profileId: string) => Promise<{ success: boolean; error?: string }>;
   profileReorder: (
@@ -837,6 +929,10 @@ export interface ElectronAPI {
   flowCreate: (
     content: string,
     overwrite?: boolean,
+  ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
+  flowListTemplates: () => Promise<FlowTemplateListItem[]>;
+  flowInstallTemplate: (
+    templateId: string,
   ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
 }

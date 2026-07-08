@@ -28,6 +28,7 @@ import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
 import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
+import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
   formatFocusPaneBinding,
@@ -46,6 +47,7 @@ import {
   type SplitDirection,
 } from "../terminal/split-tree";
 import { normalizePaneTitle, paneDisplayLabel } from "../utils/pane-label";
+import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -135,11 +137,13 @@ function ChatTabInner({
   active = true,
   inventoryScanning = false,
   onRegisterCommands,
+  onRequestTerminalMode,
 }: {
   data: ProviderEntry[];
   active?: boolean;
   inventoryScanning?: boolean;
   onRegisterCommands?: (commands: Command[]) => void;
+  onRequestTerminalMode?: () => void;
 }) {
   const { t } = useLocale();
   const [layout, setLayout] = useState<LayoutNode | null>(null);
@@ -378,7 +382,14 @@ function ChatTabInner({
     const unsub = window.api.onSyncDataApplied(() => {
       void refreshSidebarForest();
     });
-    return unsub;
+    const onProfilesChanged = () => {
+      void refreshSidebarForest();
+    };
+    window.addEventListener(PROFILES_CHANGED_EVENT, onProfilesChanged);
+    return () => {
+      unsub();
+      window.removeEventListener(PROFILES_CHANGED_EVENT, onProfilesChanged);
+    };
   }, [refreshSidebarForest]);
 
   useEffect(() => {
@@ -834,6 +845,46 @@ function ChatTabInner({
     }
   }
 
+  const handleNewTerminalRef = useRef(handleNewTerminal);
+  handleNewTerminalRef.current = handleNewTerminal;
+
+  const runSavedCommand = useCallback(
+    async (profileId: string, command: string, broadcast: boolean) => {
+      const profile = sidebarForest?.groups
+        .flatMap((g) => g.profiles)
+        .find((p) => p.id === profileId);
+      if (!profile) return;
+
+      if (activeProfile?.id !== profileId) {
+        await handleActivateProfileRef.current(profile);
+      }
+
+      let targetPanes = getProfilePanes(profileId);
+      if (targetPanes.length === 0) {
+        await handleNewTerminalRef.current(profile);
+        targetPanes = getProfilePanes(profileId);
+      }
+      if (targetPanes.length === 0) return;
+
+      const line = command.endsWith("\n") || command.endsWith("\r") ? command : `${command}\r`;
+      if (broadcast) {
+        for (const p of targetPanes) {
+          window.api.ptyWrite(p.sessionId, line);
+          recordPaneAgentInput(p.sessionId);
+        }
+        return;
+      }
+
+      const focusId = getProfileFocusedPaneId(profileId);
+      const target =
+        (focusId ? targetPanes.find((p) => p.id === focusId) : null) ?? targetPanes[0];
+      if (!target) return;
+      window.api.ptyWrite(target.sessionId, line);
+      recordPaneAgentInput(target.sessionId);
+    },
+    [sidebarForest, activeProfile?.id, getProfilePanes, getProfileFocusedPaneId, recordPaneAgentInput],
+  );
+
   async function handleToggleBroadcast(profileId: string, enabled: boolean) {
     if (activeProfile?.id === profileId) setBroadcastInput(enabled);
     await window.api.profileUpdate(profileId, { broadcastInput: enabled });
@@ -854,17 +905,31 @@ function ChatTabInner({
 
   const paletteActions = useMemo(
     () => ({
-      addPane: (tool: string) => void addPane(tool),
-      openExternal: (tool: string) => void openExternal(tool),
+      addPane: (tool: string) => {
+        onRequestTerminalMode?.();
+        void addPane(tool);
+      },
+      openExternal: (tool: string) => {
+        onRequestTerminalMode?.();
+        void openExternal(tool);
+      },
       activateProfile: (profileId: string) => {
+        onRequestTerminalMode?.();
         const profile = sidebarForest?.groups
           .flatMap((g) => g.profiles)
           .find((p) => p.id === profileId);
         if (profile) void handleActivateProfileRef.current(profile);
       },
-      broadcastCommand: broadcastCommandToPanes,
+      broadcastCommand: (text: string) => {
+        onRequestTerminalMode?.();
+        broadcastCommandToPanes(text);
+      },
+      runSavedCommand: (profileId: string, command: string, broadcast: boolean) => {
+        onRequestTerminalMode?.();
+        void runSavedCommand(profileId, command, broadcast);
+      },
     }),
-    [addPane, openExternal, sidebarForest, broadcastCommandToPanes],
+    [addPane, openExternal, sidebarForest, broadcastCommandToPanes, runSavedCommand, onRequestTerminalMode],
   );
 
   // Group used to map Ctrl+1–9 shortcut hints in the palette (mirrors currentGroupId below).
@@ -880,17 +945,17 @@ function ChatTabInner({
     data,
     sidebarForest,
     activeProfile?.id ?? null,
-    { currentGroupId: paletteGroupId, paneCount: panes.length },
+    {
+      currentGroupId: paletteGroupId,
+      paneCount: panes.length,
+      savedCommands: activeProfile?.savedCommands ?? [],
+    },
     paletteActions,
   );
 
   useEffect(() => {
-    if (!active) {
-      onRegisterCommands?.([]);
-      return;
-    }
     onRegisterCommands?.(terminalCommands);
-  }, [active, terminalCommands, onRegisterCommands]);
+  }, [terminalCommands, onRegisterCommands]);
 
   const profileLabel = activeProfile?.name ?? null;
 
@@ -952,6 +1017,7 @@ function ChatTabInner({
           accentColor: p.accentColor,
           terminalCount: terminals.length,
           broadcastInput: p.broadcastInput,
+          savedCommands: p.savedCommands ?? [],
           terminals,
         };
       }),
@@ -1117,6 +1183,9 @@ function ChatTabInner({
             prev ? movePaneInTree(prev, dragTerminalId, dropTerminalId, zone) : prev,
           );
           void persistCurrentProfile();
+        }}
+        onSavedCommandRun={(profileId, command, broadcast) => {
+          void runSavedCommand(profileId, command, broadcast);
         }}
         onTerminalSelect={(profileId, terminalId, opts) => {
           const profile = sidebarForest?.groups
@@ -1383,6 +1452,13 @@ function ChatTabInner({
             {t("chat.profileShortcutHint", paneShortcutLabels)}
           </p>
           <p className="mt-1 text-[11px] text-chrome-text-dim">{t("chat.debugHint")}</p>
+          <button
+            type="button"
+            onClick={openShortcutCheatsheet}
+            className="mt-2 text-[11px] text-chrome-accent-text underline-offset-2 hover:underline"
+          >
+            {t("shortcuts.openLink")}
+          </button>
         </div>
       ) : (
         <EmptyState
@@ -1455,6 +1531,7 @@ export const ChatTab = memo(ChatTabInner, (prev, next) => {
     prev.active === next.active &&
     prev.inventoryScanning === next.inventoryScanning &&
     prev.onRegisterCommands === next.onRegisterCommands &&
+    prev.onRequestTerminalMode === next.onRequestTerminalMode &&
     inventoryTerminalFingerprint(prev.data) === inventoryTerminalFingerprint(next.data)
   );
 });

@@ -10,6 +10,7 @@ import { InventorySectionHeader } from "./InventorySection";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { canonicalToolId } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
+import { ToolInstallPanel } from "./ToolInstallPanel";
 
 /** Live MCP connectivity test — runs a real `initialize` handshake per server. */
 function McpConnectivity({ entry }: { entry: ProviderEntry }) {
@@ -87,9 +88,11 @@ function McpConnectivity({ entry }: { entry: ProviderEntry }) {
 function DoctorCards({
   entries,
   results,
+  onRefresh,
 }: {
   entries: ProviderEntry[];
   results: Record<string, DoctorResult>;
+  onRefresh?: () => void;
 }) {
   const { t } = useLocale();
   return entries.map((entry) => {
@@ -119,7 +122,7 @@ function DoctorCards({
         }
       >
         {!available ? (
-          <p className="text-[13px] text-text-tertiary">{t("inventory.skipDoctor")}</p>
+          <ToolInstallPanel tool={tool} onInstalled={onRefresh} />
         ) : !r ? (
           <div className="flex items-center gap-2 text-[13px] text-text-secondary">
             <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-accent" />
@@ -149,7 +152,13 @@ function DoctorCards({
   });
 }
 
-export function DoctorTab({ data }: { data: ProviderEntry[] }) {
+export function DoctorTab({
+  data,
+  onRefresh,
+}: {
+  data: ProviderEntry[];
+  onRefresh?: () => void;
+}) {
   const { t } = useLocale();
   const [results, setResults] = useState<Record<string, DoctorResult>>({});
   const { installed, notInstalled } = partitionByInstalled(data);
@@ -183,12 +192,12 @@ export function DoctorTab({ data }: { data: ProviderEntry[] }) {
 
       <InventorySectionHeader count={installed.length} variant="installed" />
       <div className="ui-stagger-children">
-        <DoctorCards entries={installed} results={results} />
+        <DoctorCards entries={installed} results={results} onRefresh={onRefresh} />
       </div>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
       <div className="ui-stagger-children">
-        <DoctorCards entries={notInstalled} results={results} />
+        <DoctorCards entries={notInstalled} results={results} onRefresh={onRefresh} />
       </div>
     </>
   );

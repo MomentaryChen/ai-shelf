@@ -13,6 +13,7 @@ import { toolIcon, toolLabel } from "../utils";
 import { toolHasNpmLatest } from "../../tools.js";
 import { versionsEqual } from "../../utils/version.js";
 import { useLocale } from "../i18n/LocaleProvider";
+import { ToolInstallPanel } from "./ToolInstallPanel";
 
 /** Cursor / Aider / OpenCode etc. — `agent update` reports already current. */
 function updateMessageIndicatesUpToDate(message: string): boolean {
@@ -95,7 +96,13 @@ function applyCheckResult(
   setVersionOverrides(versions);
 }
 
-export function UpdateTab({ data }: { data: ProviderEntry[] }) {
+export function UpdateTab({
+  data,
+  onRefresh,
+}: {
+  data: ProviderEntry[];
+  onRefresh?: () => void;
+}) {
   const { t } = useLocale();
   const { installed, notInstalled } = partitionByInstalled(data);
   const [meta, setMeta] = useState<UpdateMeta>({});
@@ -272,14 +279,20 @@ export function UpdateTab({ data }: { data: ProviderEntry[] }) {
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
       <div className="ui-stagger-children">
       {notInstalled.map((entry) => (
-        <NotInstalledUpdateCard key={entry.tool} entry={entry} />
+        <NotInstalledUpdateCard key={entry.tool} entry={entry} onRefresh={onRefresh} />
       ))}
       </div>
     </>
   );
 }
 
-function NotInstalledUpdateCard({ entry }: { entry: ProviderEntry }) {
+function NotInstalledUpdateCard({
+  entry,
+  onRefresh,
+}: {
+  entry: ProviderEntry;
+  onRefresh?: () => void;
+}) {
   const { t } = useLocale();
   return (
     <Card
@@ -288,7 +301,8 @@ function NotInstalledUpdateCard({ entry }: { entry: ProviderEntry }) {
       title={<ToolNameCell entry={entry} />}
       trailing={<InstallStatusBadge available={false} />}
     >
-      <p className="text-[13px] text-text-tertiary">{t("inventory.skipUpdate")}</p>
+      <p className="mb-2 text-[13px] text-text-tertiary">{t("inventory.skipUpdate")}</p>
+      <ToolInstallPanel tool={entry.tool} onInstalled={onRefresh} />
     </Card>
   );
 }

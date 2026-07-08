@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type {
   UsageCredentialStatus,
+  UsageDailyUnifiedRow,
   UsageDashboardResult,
   UsageProviderMeta,
   UsageToolId,
@@ -335,6 +336,14 @@ function formatResetAt(iso?: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
+const USAGE_TOOL_BAR_COLORS: Record<UsageToolId, string> = {
+  claude: "var(--clay)",
+  codex: "var(--success)",
+  cursor: "var(--muted)",
+  gemini: "var(--clay-soft)",
+  copilot: "var(--clay-deep)",
+};
+
 function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
   const { t } = useLocale();
 
@@ -476,6 +485,142 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
   );
 }
 
+function UsageUnifiedDaily({
+  rows,
+  activeToolIds,
+  quotaOnlyToolIds,
+  onSelectTool,
+}: {
+  rows: UsageDailyUnifiedRow[];
+  activeToolIds: UsageToolId[];
+  quotaOnlyToolIds: UsageToolId[];
+  onSelectTool: (toolId: UsageToolId) => void;
+}) {
+  const { t } = useLocale();
+  const maxCost = useMemo(() => Math.max(0, ...rows.map((r) => r.costUsd)), [rows]);
+
+  if (rows.length === 0) {
+    return (
+      <Card title={t("usage.unified.title")}>
+        <p className="text-[13px] text-[var(--muted)]">
+          {activeToolIds.length > 0 ? t("usage.unified.noDaily") : t("usage.unified.empty")}
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title={t("usage.unified.title")}>
+      <p className="mb-4 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.unified.hint")}</p>
+      {quotaOnlyToolIds.length > 0 && (
+        <p className="mb-4 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.unified.quotaNote")}</p>
+      )}
+
+      {maxCost > 0 && (
+        <div className="mb-5 flex flex-col gap-2">
+          {rows.map((row) => (
+            <div key={row.date} className="flex items-center gap-3">
+              <span className="w-[4.5rem] shrink-0 font-mono text-[11px] text-[var(--muted)]">
+                {row.date.slice(5)}
+              </span>
+              <div
+                className="flex h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--sand-deep)]"
+                style={{ maxWidth: `${(row.costUsd / maxCost) * 100}%` }}
+              >
+                {activeToolIds.map((toolId) => {
+                  const slice = row.byTool[toolId];
+                  if (!slice || slice.costUsd <= 0) return null;
+                  const share = row.costUsd > 0 ? (slice.costUsd / row.costUsd) * 100 : 0;
+                  return (
+                    <button
+                      key={toolId}
+                      type="button"
+                      title={`${toolLabel(toolId)} ${formatUsd(slice.costUsd)}`}
+                      onClick={() => onSelectTool(toolId)}
+                      className="h-full min-w-0 cursor-pointer border-0 p-0 transition-opacity hover:opacity-80"
+                      style={{
+                        flex: `0 0 ${share}%`,
+                        backgroundColor: USAGE_TOOL_BAR_COLORS[toolId],
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <span className="w-16 shrink-0 text-right text-[12px] tabular-nums text-[var(--ink)]">
+                {formatUsd(row.costUsd)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap gap-3">
+        {activeToolIds.map((toolId) => (
+          <button
+            key={toolId}
+            type="button"
+            onClick={() => onSelectTool(toolId)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--sand)]/60 px-2.5 py-1 text-[11px] text-[var(--ink)] hover:bg-[var(--sand)]"
+          >
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: USAGE_TOOL_BAR_COLORS[toolId] }}
+            />
+            {toolLabel(toolId)}
+          </button>
+        ))}
+      </div>
+
+      <DataTable
+        headers={[
+          t("usage.table.date"),
+          t("usage.table.cost"),
+          t("usage.table.input"),
+          t("usage.table.output"),
+          t("usage.byTool"),
+        ]}
+      >
+        {[...rows].reverse().map((row) => (
+          <tr key={row.date}>
+            <Td className="font-mono text-[12px]">{row.date}</Td>
+            <Td className="tabular-nums">{formatUsd(row.costUsd)}</Td>
+            <Td className="tabular-nums">{formatTokens(row.inputTokens)}</Td>
+            <Td className="tabular-nums">{formatTokens(row.outputTokens)}</Td>
+            <Td>
+              <div className="flex flex-wrap gap-1">
+                {activeToolIds.map((toolId) => {
+                  const slice = row.byTool[toolId];
+                  if (!slice) return null;
+                  const hasData =
+                    slice.costUsd > 0 ||
+                    (slice.inputTokens ?? 0) > 0 ||
+                    (slice.outputTokens ?? 0) > 0;
+                  if (!hasData) return null;
+                  return (
+                    <button
+                      key={toolId}
+                      type="button"
+                      onClick={() => onSelectTool(toolId)}
+                      className="cursor-pointer rounded-full bg-[var(--sand)] px-2 py-0.5 text-[11px] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
+                    >
+                      {toolLabel(toolId)}{" "}
+                      <span className="tabular-nums text-[var(--muted)]">
+                        {slice.costUsd > 0
+                          ? formatUsd(slice.costUsd)
+                          : formatTokens((slice.inputTokens ?? 0) + (slice.outputTokens ?? 0))}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Td>
+          </tr>
+        ))}
+      </DataTable>
+    </Card>
+  );
+}
+
 function UsageComparisonTable({
   tools,
   onSelectTool,
@@ -581,7 +726,18 @@ export function UsageTab() {
   );
 
   const tools = dashboard?.tools ?? [];
+  const activeToolIds = useMemo(
+    () => tools.filter((snap) => snap.status === "ok").map((snap) => snap.toolId),
+    [tools],
+  );
   const supportedSnapshots = tools.filter((snap) => snap.status === "ok");
+  const quotaOnlyToolIds = useMemo(
+    () =>
+      tools
+        .filter((snap) => snap.status === "ok" && snap.daily.length === 0)
+        .map((snap) => snap.toolId),
+    [tools],
+  );
   const activeSnapshot = scope === "all" ? null : tools.find((snap) => snap.toolId === scope);
   const activeProvider = scope === "all" ? null : providerMap.get(scope);
 
@@ -621,11 +777,19 @@ export function UsageTab() {
 
       {scope === "all" && dashboard && (
         <>
-          <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+          <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
             <StatCard
               value={formatUsd(dashboard.summary.totalCostUsd)}
               label={t("usage.summary.totalCost")}
               valueClassName="text-accent"
+            />
+            <StatCard
+              value={formatTokens(dashboard.summary.totalInputTokens)}
+              label={t("usage.summary.totalInputTokens")}
+            />
+            <StatCard
+              value={formatTokens(dashboard.summary.totalOutputTokens)}
+              label={t("usage.summary.totalOutputTokens")}
             />
             <StatCard
               value={`${dashboard.summary.configuredCount}/${providers.length}`}
@@ -636,6 +800,13 @@ export function UsageTab() {
               label={t("usage.summary.active")}
             />
           </div>
+
+          <UsageUnifiedDaily
+            rows={dashboard.summary.dailyUnified}
+            activeToolIds={activeToolIds}
+            quotaOnlyToolIds={quotaOnlyToolIds}
+            onSelectTool={(id) => setScope(id)}
+          />
 
           <UsageComparisonTable tools={tools} onSelectTool={(id) => setScope(id)} />
 

@@ -7,7 +7,7 @@ export { PtyRuntime, TOOL_LAUNCH_CMD } from "./runtime/pty-runtime.js";
 export type { WorkspaceModel } from "./models/workspace.js";
 export type { GroupModel } from "./models/group.js";
 export type { SessionModel } from "./models/session.js";
-export type { GroupLayoutSnapshot, GroupLayoutMeta, SerializedLayoutNode } from "./models/group-layout.js";
+export type { GroupLayoutSnapshot, GroupLayoutMeta, SerializedLayoutNode, SavedCommandSnippet } from "./models/group-layout.js";
 export type {
   ProfileInfo,
   ProfileTree,

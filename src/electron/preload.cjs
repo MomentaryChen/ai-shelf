@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.removeAllListeners("scan-complete");
   },
   runUpdate: (tool) => ipcRenderer.invoke("run-update", tool),
+  runInstall: (tool) => ipcRenderer.invoke("run-install", tool),
   getAppUpdateChannel: () => ipcRenderer.invoke("get-app-update-channel"),
   checkAppUpdate: () => ipcRenderer.invoke("check-app-update"),
   getAppUpdateState: () => ipcRenderer.invoke("get-app-update-state"),
@@ -80,6 +81,9 @@ contextBridge.exposeInMainWorld("api", {
   mcpDeleteServer: (tool, name) => ipcRenderer.invoke("mcp-delete-server", tool, name),
   mcpSetServerEnabled: (tool, name, enabled) =>
     ipcRenderer.invoke("mcp-set-server-enabled", tool, name, enabled),
+  mcpRegistryList: (opts) => ipcRenderer.invoke("mcp-registry-list", opts),
+  mcpRegistryPreview: (tool, registryId, values) =>
+    ipcRenderer.invoke("mcp-registry-preview", tool, registryId, values),
   mcpPingTool: (tool) => ipcRenderer.invoke("mcp-ping-tool", tool),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
@@ -124,6 +128,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("ws-group-layout-set-active", workspaceId, groupId),
   profileGetTree: () => ipcRenderer.invoke("profile-get-tree"),
   profileGroupGetForest: () => ipcRenderer.invoke("profile-group-get-forest"),
+  getOnboardingCompleted: () => ipcRenderer.invoke("get-onboarding-completed"),
+  setOnboardingCompleted: () => ipcRenderer.invoke("set-onboarding-completed"),
   profileGroupCreate: (name) => ipcRenderer.invoke("profile-group-create", name),
   profileGroupUpdate: (idOrName, newName) =>
     ipcRenderer.invoke("profile-group-update", idOrName, newName),
@@ -132,6 +138,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("profile-group-reorder", orderedGroupIds),
   profileCreate: (name, input) => ipcRenderer.invoke("profile-create", name, input),
   profileUpdate: (profileId, patch) => ipcRenderer.invoke("profile-update", profileId, patch),
+  profileSetSavedCommands: (profileId, savedCommands) =>
+    ipcRenderer.invoke("profile-set-saved-commands", profileId, savedCommands),
   profileDelete: (profileId) => ipcRenderer.invoke("profile-delete", profileId),
   profileReorder: (groupIdOrName, orderedProfileIds) =>
     ipcRenderer.invoke("profile-reorder", groupIdOrName, orderedProfileIds),
@@ -247,6 +255,8 @@ contextBridge.exposeInMainWorld("api", {
   flowGetDagNodeCommand: (flowId, node, options) =>
     ipcRenderer.invoke("flow-get-dag-node-command", flowId, node, options),
   flowCreate: (content, overwrite) => ipcRenderer.invoke("flow-create", content, overwrite),
+  flowListTemplates: () => ipcRenderer.invoke("flow-list-templates"),
+  flowInstallTemplate: (templateId) => ipcRenderer.invoke("flow-install-template", templateId),
   onFlowRunState: (cb) => {
     const handler = (_e, state) => cb(state);
     ipcRenderer.on("flow-run-state", handler);

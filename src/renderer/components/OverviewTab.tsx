@@ -20,10 +20,10 @@ import { Tag } from "./Tag";
 import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
 import { EmptyInventoryHint } from "./InventorySection";
-import { toolLabel, toolInstall, formatContext } from "../utils";
-import { writeClipboardText } from "../terminal/xterm-clipboard";
+import { toolLabel, formatContext } from "../utils";
 import { partitionByInstalled, sortByInstalled, installedRowClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
+import { ToolInstallPanel } from "./ToolInstallPanel";
 
 type ToolFilter = "all" | "installed" | "notInstalled";
 type SortKey = "default" | "tool" | "context";
@@ -35,6 +35,7 @@ export function OverviewTab({
   onGoDoctor,
   onGoUpdate,
   onRefreshHealth,
+  onRefresh,
 }: {
   data: ProviderEntry[];
   modelOverrides?: Record<string, string>;
@@ -42,6 +43,7 @@ export function OverviewTab({
   onGoDoctor?: () => void;
   onGoUpdate?: () => void;
   onRefreshHealth?: () => void;
+  onRefresh?: () => void;
 }) {
   const { t } = useLocale();
   const sorted = sortByInstalled(data);
@@ -261,7 +263,7 @@ export function OverviewTab({
             .map((w) => (
               <div key={w.tool} className="border-t border-border py-2 first:border-none first:pt-0">
                 {!w.available && (
-                  <InstallPrompt tool={w.tool} />
+                  <ToolInstallPanel tool={w.tool} compact onInstalled={onRefresh} />
                 )}
                 {w.available && w.auth === "missing" && (
                   <div className="flex items-center gap-2 py-1 text-[13px]">
@@ -339,54 +341,5 @@ export function OverviewTab({
       )}
       </div>
     </>
-  );
-}
-
-function InstallPrompt({ tool }: { tool: string }) {
-  const { t } = useLocale();
-  const [copied, setCopied] = useState(false);
-  const info = toolInstall(tool);
-
-  const copy = async () => {
-    if (!info) return;
-    const ok = await writeClipboardText(info.cmd);
-    if (!ok) return;
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="text-[13px]">
-      <div className="flex items-center gap-2 py-1">
-        <span className="flex w-5 justify-center">
-          <X aria-hidden className="h-3.5 w-3.5 text-fail" />
-        </span>
-        <strong>{toolLabel(tool)}</strong>: {t("inventory.overview.notInPath")}
-        {info?.url && (
-          <a
-            href={info.url}
-            target="_blank"
-            rel="noreferrer"
-            className="ml-1 text-accent underline-offset-2 hover:underline"
-          >
-            {t("inventory.overview.website")}
-          </a>
-        )}
-      </div>
-      {info && (
-        <div className="ml-7 mt-1 flex items-center gap-2">
-          <span className="text-text-secondary text-[11px]">{t("inventory.overview.install")}</span>
-          <code className="flex-1 rounded bg-bg-secondary px-2 py-1 font-mono text-[11px] text-text-primary">
-            {info.cmd}
-          </code>
-          <button
-            onClick={copy}
-            className="cursor-pointer rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-all hover:border-accent hover:text-accent"
-          >
-            {copied ? t("inventory.overview.copied") : t("inventory.overview.copy")}
-          </button>
-        </div>
-      )}
-    </div>
   );
 }

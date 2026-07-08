@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useLocale } from "../i18n/LocaleProvider";
 import { AccountSidebar } from "./AccountSidebar";
+import { EmptyState } from "./EmptyState";
 import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { ToolLogo } from "./ToolLogo";
@@ -63,7 +64,15 @@ export interface SidebarProfileItem {
   terminalCount: number;
   broadcastInput?: boolean;
   accentColor?: string | null;
+  savedCommands?: SidebarSavedCommandItem[];
   terminals?: SidebarTerminalItem[];
+}
+
+export interface SidebarSavedCommandItem {
+  id: string;
+  name: string;
+  command: string;
+  broadcast?: boolean;
 }
 
 export interface SidebarTerminalItem {
@@ -112,6 +121,11 @@ interface SidebarProps {
     dropTerminalId: string,
     zone: "above" | "below",
   ) => void;
+  onSavedCommandRun?: (
+    profileId: string,
+    command: string,
+    broadcast: boolean,
+  ) => void;
   onProfilePaneDragChange?: (active: boolean) => void;
   onNavChange?: (itemId: string) => void;
 }
@@ -145,6 +159,7 @@ export function Sidebar({
   onTerminalMinimize,
   onTerminalRestore,
   onTerminalReorder,
+  onSavedCommandRun,
   onProfilePaneDragChange,
   onNavChange,
 }: SidebarProps) {
@@ -233,8 +248,10 @@ export function Sidebar({
           {!collapsed && (
             <>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-chrome-text">{currentGroup?.name ?? "No workspace"}</div>
-                <div className="truncate text-xs text-chrome-text-muted">Group Switcher</div>
+                <div className="truncate text-chrome-text">
+                  {currentGroup?.name ?? t("workspace.empty")}
+                </div>
+                <div className="truncate text-xs text-chrome-text-muted">{t("workspace.groupSwitcher")}</div>
               </div>
               <ChevronDown className={`h-4 w-4 text-chrome-text-muted transition-transform ${groupOpen ? "rotate-180" : ""}`} />
             </>
@@ -399,9 +416,15 @@ export function Sidebar({
             </div>
             <div className="mt-1 space-y-1">
               {filteredProfiles.length === 0 && (
-                <p className="rounded-lg px-2 py-1.5 text-xs text-chrome-text-muted">
-                  {query.trim() ? "No matching profiles or terminals" : "No profiles"}
-                </p>
+                <EmptyState
+                  tone="chrome"
+                  compact
+                  className="items-start px-1 py-2 text-left"
+                  title={
+                    query.trim() ? t("sidebar.noMatchingProfiles") : t("profile.empty")
+                  }
+                  description={query.trim() ? undefined : t("profile.emptyHint")}
+                />
               )}
               {filteredProfiles.map((item) => {
                 const active = item.id === activeProfileId;
@@ -516,7 +539,13 @@ export function Sidebar({
                     {expanded && (
                       <div className="mt-0.5 space-y-1 border-t border-chrome-border-subtle pl-2 pt-1">
                         {(item.terminals ?? []).length === 0 && (
-                          <p className="rounded-lg px-2 py-1.5 text-xs text-chrome-text-muted">No terminals</p>
+                          <EmptyState
+                            tone="chrome"
+                            compact
+                            className="items-start px-1 py-1.5 text-left"
+                            title={t("terminal.empty")}
+                            description={t("terminal.emptyHint")}
+                          />
                         )}
                         {(item.terminals ?? []).map((terminal) => {
                           const terminalActive = terminal.id === activeTerminalId;
@@ -665,6 +694,33 @@ export function Sidebar({
                             </button>
                           );
                         })}
+                        {(item.savedCommands ?? []).length > 0 && (
+                          <div className="mt-1 space-y-0.5 border-t border-chrome-border-subtle/60 pt-1">
+                            <p className="px-2 text-[9px] font-medium uppercase tracking-wide text-chrome-text-dim">
+                              {t("sidebar.savedCommands")}
+                            </p>
+                            {(item.savedCommands ?? []).map((snippet) => (
+                              <button
+                                key={snippet.id}
+                                type="button"
+                                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-[11px] text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
+                                title={snippet.command}
+                                onClick={() =>
+                                  onSavedCommandRun?.(
+                                    item.id,
+                                    snippet.command,
+                                    snippet.broadcast ?? false,
+                                  )
+                                }
+                              >
+                                <span className="shrink-0 text-[10px]" aria-hidden>
+                                  {snippet.broadcast ? "📡" : "⚡"}
+                                </span>
+                                <span className="truncate">{snippet.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
