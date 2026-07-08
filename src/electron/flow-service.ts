@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Notification } from "electron";
@@ -34,6 +34,11 @@ import {
   readFlowChat,
   saveFlowChat,
 } from "../flow/flow-chat-store.js";
+import {
+  FLOW_TEMPLATE_CATALOG,
+  isBundledFlowTemplateFile,
+  type FlowTemplateCatalogEntry,
+} from "../shared/flow-template-catalog.js";
 
 export {
   createFlowFromContent,
@@ -77,6 +82,52 @@ function seedExampleFlows(): void {
       copyFileSync(src, dest);
     }
   }
+}
+
+export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boolean };
+
+export function listBundledFlowTemplates(): FlowTemplateListItem[] {
+  const flowsDir = getFlowsDir();
+  return FLOW_TEMPLATE_CATALOG.map((entry) => ({
+    ...entry,
+    installed: existsSync(join(flowsDir, `${entry.id}.flow.md`)),
+  }));
+}
+
+export function readBundledFlowTemplate(
+  fileName: string,
+): { ok: true; content: string } | { ok: false; error: string } {
+  if (!isBundledFlowTemplateFile(fileName)) {
+    return { ok: false, error: `Unknown template: ${fileName}` };
+  }
+  const src = bundledFlowPath(fileName);
+  if (!existsSync(src)) {
+    return { ok: false, error: `Template file missing: ${fileName}` };
+  }
+  try {
+    return { ok: true, content: readFileSync(src, "utf8") };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+export function installBundledFlowTemplate(
+  templateId: string,
+): { ok: boolean; flowId?: string; path?: string; error?: string } {
+  const entry = FLOW_TEMPLATE_CATALOG.find((t) => t.id === templateId);
+  if (!entry) {
+    return { ok: false, error: `Unknown template: ${templateId}` };
+  }
+  const read = readBundledFlowTemplate(entry.fileName);
+  if (!read.ok) {
+    return { ok: false, error: read.error };
+  }
+  const destPath = join(getFlowsDir(), `${entry.id}.flow.md`);
+  return createFlowFromContent(read.content, {
+    overwrite: existsSync(destPath),
+    migrateChatFromDraft: false,
+  });
 }
 
 function wireDesktopNotifyOnFail(): void {

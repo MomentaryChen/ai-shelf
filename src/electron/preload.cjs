@@ -255,6 +255,8 @@ contextBridge.exposeInMainWorld("api", {
   flowGetDagNodeCommand: (flowId, node, options) =>
     ipcRenderer.invoke("flow-get-dag-node-command", flowId, node, options),
   flowCreate: (content, overwrite) => ipcRenderer.invoke("flow-create", content, overwrite),
+  flowListTemplates: () => ipcRenderer.invoke("flow-list-templates"),
+  flowInstallTemplate: (templateId) => ipcRenderer.invoke("flow-install-template", templateId),
   onFlowRunState: (cb) => {
     const handler = (_e, state) => cb(state);
     ipcRenderer.on("flow-run-state", handler);

@@ -128,6 +128,8 @@ import {
   getRunEvents,
   getFlowsDir,
   initFlowService,
+  installBundledFlowTemplate,
+  listBundledFlowTemplates,
   listFlows,
   listActiveFlowRuns,
   listFlowPromptLogs,
@@ -2370,6 +2372,15 @@ ipcMain.handle("flow-create", (_event, content: unknown, overwrite: unknown) => 
     overwrite: overwrite === true,
     migrateChatFromDraft: overwrite !== true,
   });
+});
+
+ipcMain.handle("flow-list-templates", () => listBundledFlowTemplates());
+
+ipcMain.handle("flow-install-template", (_event, templateId: unknown) => {
+  if (typeof templateId !== "string" || !templateId.trim()) {
+    return { ok: false, error: "Invalid template id" };
+  }
+  return installBundledFlowTemplate(templateId.trim());
 });
 
 app.whenReady().then(async () => {

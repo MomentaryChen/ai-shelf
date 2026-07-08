@@ -6,6 +6,7 @@ import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../sha
 import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
 import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
+import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
@@ -14,6 +15,8 @@ export type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-ty
 export type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
 export type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 export type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
+
+export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boolean };
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -926,6 +929,10 @@ export interface ElectronAPI {
   flowCreate: (
     content: string,
     overwrite?: boolean,
+  ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
+  flowListTemplates: () => Promise<FlowTemplateListItem[]>;
+  flowInstallTemplate: (
+    templateId: string,
   ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
 }
