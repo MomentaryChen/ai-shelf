@@ -4,7 +4,7 @@ import type { FlowDefinition } from "../shared/flow-types.js";
 import type { ToolLaunchArgs } from "../tool-launch.js";
 import type { FlowPromptLogEntry } from "../shared/flow-chat-types.js";
 import { resolveFlowRunner } from "./flow-runner-resolve.js";
-import { flowAgentMcpSpawnArgs, flowAgentPrintPrefix } from "./mcp-config.js";
+import { prepareFlowAgentSpawn } from "./mcp-config.js";
 import { listFlowPromptLogs } from "./flow-chat-store.js";
 import { quoteCmdArg } from "./cmd-quote.js";
 
@@ -69,10 +69,10 @@ export function buildFlowAgentCliArgs(
   const outputPath =
     options.outputPath ?? join(tmpdir(), `ai-shelf-flow-preview-${runId}-output.md`);
 
-  const printArgs = [
-    ...flowAgentPrintPrefix(resolved.tool),
-    ...flowAgentMcpSpawnArgs(resolved.tool, runId, outputPath),
-  ];
+  const prep = prepareFlowAgentSpawn(resolved.tool, runId, outputPath, resolved.cwd, {}, {
+    writeMcpConfig: false,
+  });
+  const printArgs = [...prep.printPrefix, ...prep.extraArgs];
   const cliArgs = [...resolved.launchCommand.trim().split(/\s+/), ...printArgs];
 
   return { cliArgs, cwd: resolved.cwd, tool: resolved.tool };
