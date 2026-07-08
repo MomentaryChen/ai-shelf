@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, Plug, Stethoscope, XCircle } from "lucide-react";
 import type { DoctorResult, McpPingResult, ProviderEntry } from "../types";
 import { Card } from "./Card";
+import { SectionHeading } from "./SectionHeading";
 import { Badge, InstallStatusBadge } from "./Badge";
 import { Button } from "@/components/ui/button";
 import { ToolNameCell } from "./ToolNameCell";
@@ -32,8 +34,8 @@ function McpConnectivity({ entry }: { entry: ProviderEntry }) {
   return (
     <div className="mt-3 border-t border-border/50 pt-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-          🔌 MCP
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+          <Plug aria-hidden className="h-3.5 w-3.5" /> MCP
         </span>
         <Button size="sm" variant="outline" onClick={run} disabled={testing}>
           {testing
@@ -53,7 +55,13 @@ function McpConnectivity({ entry }: { entry: ProviderEntry }) {
           <div className="mt-2 flex flex-col gap-1">
             {results.map((r) => (
               <div key={r.name} className="flex items-center gap-2 text-[13px]">
-                <span className="w-5 shrink-0 text-center">{r.ok ? "✅" : "❌"}</span>
+                <span className="flex w-5 shrink-0 justify-center">
+                  {r.ok ? (
+                    <CheckCircle2 aria-label="ok" className="h-4 w-4 text-ok" />
+                  ) : (
+                    <XCircle aria-label="failed" className="h-4 w-4 text-fail" />
+                  )}
+                </span>
                 <span className="font-mono text-text-primary">{r.name}</span>
                 <span className="rounded bg-bg-secondary px-1 text-[10px] uppercase text-text-tertiary">
                   {r.transport}
@@ -96,6 +104,7 @@ function DoctorCards({
         key={tool}
         collapsible
         defaultCollapsed
+        dense
         className={installedCardClass(available)}
         title={<ToolNameCell entry={entry} />}
         trailing={
@@ -119,10 +128,15 @@ function DoctorCards({
         ) : (
           <>
             {r.checks.map((c) => {
-              const icon = c.status === "pass" ? "✅" : c.status === "fail" ? "❌" : "⚠️";
+              const Icon =
+                c.status === "pass" ? CheckCircle2 : c.status === "fail" ? XCircle : AlertTriangle;
+              const color =
+                c.status === "pass" ? "text-ok" : c.status === "fail" ? "text-fail" : "text-warn";
               return (
                 <div key={c.detail} className="flex items-center gap-2 py-1.5 text-[13px]">
-                  <span className="w-5 shrink-0 text-center">{icon}</span>
+                  <span className="flex w-5 shrink-0 justify-center">
+                    <Icon aria-label={c.status} className={`h-4 w-4 ${color}`} />
+                  </span>
                   <span>{c.detail}</span>
                 </div>
               );
@@ -165,7 +179,7 @@ export function DoctorTab({ data }: { data: ProviderEntry[] }) {
 
   return (
     <>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">🩺 {t("app.tab.doctor")}</h2>
+      <SectionHeading icon={Stethoscope}>{t("app.tab.doctor")}</SectionHeading>
 
       <InventorySectionHeader count={installed.length} variant="installed" />
       <DoctorCards entries={installed} results={results} />

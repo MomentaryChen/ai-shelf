@@ -1,3 +1,4 @@
+import { AlertTriangle, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,7 +91,9 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
             {t("configEditor.loading")}
           </div>
         ) : loadError ? (
-          <div className="py-12 text-center text-sm text-fail">❌ {loadError}</div>
+          <div className="flex items-center justify-center gap-1.5 py-12 text-sm text-fail">
+            <XCircle aria-hidden className="h-4 w-4 shrink-0" /> {loadError}
+          </div>
         ) : (
           <>
             <Textarea
@@ -101,10 +104,15 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
             />
             {jsonError && (
               <p className="mt-2 break-all text-xs text-fail">
-                ⚠️ {t("configEditor.invalidJson")}: {jsonError}
+                <AlertTriangle aria-hidden className="inline h-3.5 w-3.5 align-[-2px]" />{" "}
+                {t("configEditor.invalidJson")}: {jsonError}
               </p>
             )}
-            {saveError && <p className="mt-2 break-all text-xs text-fail">❌ {saveError}</p>}
+            {saveError && (
+              <p className="mt-2 inline-flex items-start gap-1 break-all text-xs text-fail">
+                <XCircle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {saveError}
+              </p>
+            )}
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-xs text-text-tertiary">{t("configEditor.backupNote")}</span>
               <DialogFooter className="gap-2 sm:justify-end">

@@ -72,7 +72,7 @@ export function ClaudeModelSelector({
     warm
       ? `cursor-pointer rounded-full px-3 py-1.5 text-[12px] transition-colors ${
           active
-            ? "bg-[var(--clay)] text-white shadow-[var(--shadow-accent)]"
+            ? "bg-accent text-on-accent warm-shadow-accent"
             : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
         }`
       : `cursor-pointer rounded-md border px-2.5 py-1 text-[12px] transition-colors ${

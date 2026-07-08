@@ -307,11 +307,6 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         >
           {TERMINAL_OPTIONS.map((opt) => (
             <ToggleGroupItem key={opt.value} value={opt.value}>
-              {opt.value === "auto" ? "🔍 " : ""}
-              {opt.value === "wt" ? "🪟 " : ""}
-              {opt.value === "pwsh" ? "🔵 " : ""}
-              {opt.value === "powershell" ? "💙 " : ""}
-              {opt.value === "cmd" ? "⬛ " : ""}
               {t(TERMINAL_LABEL_KEYS[opt.value])}
             </ToggleGroupItem>
           ))}

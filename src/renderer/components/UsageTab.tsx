@@ -90,7 +90,7 @@ function UsageToolNav({
         onClick={() => onSelect("all")}
         className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[13px] transition-colors duration-200 ${
           scope === "all"
-            ? "bg-[var(--clay)] font-medium text-white shadow-[var(--shadow-accent)]"
+            ? "bg-accent font-medium text-on-accent warm-shadow-accent"
             : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
         }`}
       >
@@ -107,7 +107,7 @@ function UsageToolNav({
             onClick={() => onSelect(snap.toolId)}
             className={`flex cursor-pointer items-center gap-1.5 rounded-full py-1.5 pr-3 pl-2.5 text-[13px] transition-colors duration-200 ${
               active
-                ? "bg-[var(--clay)] font-medium text-white shadow-[var(--shadow-accent)]"
+                ? "bg-accent font-medium text-on-accent warm-shadow-accent"
                 : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
             }`}
           >
@@ -306,7 +306,7 @@ function ToolCredentialRow({
                       {field.helpUrl && (
                         <button
                           type="button"
-                          className="cursor-pointer text-[12px] text-[var(--clay)] underline-offset-2 hover:underline"
+                          className="cursor-pointer text-[12px] text-accent underline-offset-2 hover:underline"
                           onClick={() => window.api.openExternal(field.helpUrl!)}
                         >
                           {field.helpLinkKey
@@ -349,7 +349,7 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
   }
 
   if (snapshot.status === "error") {
-    return <p className="text-[13px] text-[var(--clay-deep)]">{snapshot.error}</p>;
+    return <p className="text-[13px] text-fail">{snapshot.error}</p>;
   }
 
   const quotaMode = (snapshot.quotas?.length ?? 0) > 0 && snapshot.daily.length === 0;
@@ -384,13 +384,13 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
                   <span className="text-[var(--ink)]">
                     {q.label ?? t(q.labelKey as MessageKey)}
                   </span>
-                  <span className="shrink-0 font-medium tabular-nums text-[var(--clay)]">
+                  <span className="shrink-0 font-medium tabular-nums text-accent">
                     {q.usedPercent}%
                   </span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-[var(--sand-deep)]">
                   <div
-                    className="h-full rounded-full bg-[var(--clay)] transition-all duration-300"
+                    className="h-full rounded-full bg-accent transition-all duration-300"
                     style={{ width: `${Math.min(100, q.usedPercent)}%` }}
                   />
                 </div>
@@ -417,7 +417,7 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
         <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
           <div className="rounded-[16px] bg-[var(--sand)]/50 px-3 py-2">
             <div className="text-[10px] text-[var(--muted)]">{t("usage.table.cost")}</div>
-            <div className="text-[18px] font-medium tabular-nums text-[var(--clay)]">
+            <div className="text-[18px] font-medium tabular-nums text-accent">
               {formatUsd(snapshot.totalCostUsd ?? 0)}
             </div>
           </div>

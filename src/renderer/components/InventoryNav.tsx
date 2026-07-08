@@ -1,9 +1,10 @@
+import type { LucideIcon } from "lucide-react";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 
 export interface NavItem<T extends string> {
   id: T;
-  icon: string;
+  icon: LucideIcon;
   labelKey: MessageKey;
 }
 
@@ -57,9 +58,12 @@ export function InventoryNav<T extends string>({
                 isActive ? "scale-y-100 opacity-100" : "scale-y-75 opacity-0"
               }`}
             />
-            <span aria-hidden className="w-4 text-center text-[15px]">
-              {it.icon}
-            </span>
+            <it.icon
+              aria-hidden
+              className={`h-4 w-4 shrink-0 transition-colors duration-200 ${
+                isActive ? "" : "text-text-tertiary"
+              }`}
+            />
             <span className="flex-1 truncate">{t(it.labelKey)}</span>
             {badge != null && badge > 0 && (
               <span

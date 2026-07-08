@@ -8,6 +8,21 @@ import {
   useState,
   useTransition,
 } from "react";
+import {
+  BarChart3,
+  Brain,
+  ClipboardList,
+  Compass,
+  FileText,
+  Monitor,
+  Package,
+  Plug,
+  RefreshCw,
+  Settings,
+  Stethoscope,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { Spinner } from "./components/Spinner";
 import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
 import { InventoryNav, type NavItem } from "./components/InventoryNav";
@@ -72,7 +87,7 @@ function buildGlobalCommands(
         id: `open-config-${path}`,
         title: t("cmd.openConfig", { name: basename(path) }),
         group: t("cmd.group.config"),
-        icon: "📄",
+        icon: <FileText className="h-4 w-4" />,
         keywords: `${entry.tool} config ${path}`,
         hideWhenEmpty: true,
         run: () => void window.api.openPath(path),
@@ -90,7 +105,7 @@ function buildGlobalCommands(
         id: `find-skill-${skill}`,
         title: t("cmd.skillSearch", { name: skill }),
         group: t("cmd.group.skills"),
-        icon: "⚡",
+        icon: <Zap className="h-4 w-4" />,
         keywords: `skill ${skill}`,
         hideWhenEmpty: true,
         run: () => goTo("skills"),
@@ -108,7 +123,7 @@ function buildGlobalCommands(
         id: `find-mcp-${server}`,
         title: t("cmd.mcpSearch", { name: server }),
         group: t("cmd.group.mcp"),
-        icon: "🔌",
+        icon: <Plug className="h-4 w-4" />,
         keywords: `mcp server ${server}`,
         hideWhenEmpty: true,
         run: () => goTo("mcp"),
@@ -119,15 +134,15 @@ function buildGlobalCommands(
   return [...configCommands, ...skillCommands, ...mcpCommands];
 }
 
-const TAB_ICONS: Record<TabId, string> = {
-  overview: "📋",
-  models: "🧠",
-  skills: "⚡",
-  mcp: "🔌",
-  config: "⚙️",
-  doctor: "🩺",
-  update: "🔄",
-  usage: "📊",
+const TAB_ICONS: Record<TabId, LucideIcon> = {
+  overview: ClipboardList,
+  models: Brain,
+  skills: Zap,
+  mcp: Plug,
+  config: Settings,
+  doctor: Stethoscope,
+  update: RefreshCw,
+  usage: BarChart3,
 };
 
 const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
@@ -249,7 +264,7 @@ export function App() {
       id: `go-${it.id}`,
       title: `${t("cmd.go")} ${t(it.labelKey)}`,
       group: t("cmd.group.navigate"),
-      icon: it.icon,
+      icon: <it.icon className="h-4 w-4" />,
       keywords: it.id,
       run: () => goTo(it.id),
     }));
@@ -258,35 +273,35 @@ export function App() {
         id: "mode-terminal",
         title: t("cmd.action.terminal"),
         group: t("cmd.group.actions"),
-        icon: "🖥️",
+        icon: <Monitor className="h-4 w-4" />,
         run: () => handleModeChange("terminal"),
       },
       {
         id: "mode-inventory",
         title: t("cmd.action.inventory"),
         group: t("cmd.group.actions"),
-        icon: "📦",
+        icon: <Package className="h-4 w-4" />,
         run: () => handleModeChange("inventory"),
       },
       {
         id: "mode-flow",
         title: t("cmd.action.flow"),
         group: t("cmd.group.actions"),
-        icon: "🧭",
+        icon: <Compass className="h-4 w-4" />,
         run: () => handleModeChange("flow"),
       },
       {
         id: "refresh",
         title: t("cmd.action.refresh"),
         group: t("cmd.group.actions"),
-        icon: "🔄",
+        icon: <RefreshCw className="h-4 w-4" />,
         run: () => reload(),
       },
       {
         id: "run-doctor",
         title: t("cmd.action.doctor"),
         group: t("cmd.group.actions"),
-        icon: "🩺",
+        icon: <Stethoscope className="h-4 w-4" />,
         keywords: "doctor health check",
         run: () => goTo("doctor"),
       },
@@ -294,7 +309,7 @@ export function App() {
         id: "mcp-sync",
         title: t("cmd.action.mcpSync"),
         group: t("cmd.group.actions"),
-        icon: "🔌",
+        icon: <Plug className="h-4 w-4" />,
         keywords: "mcp sync servers",
         run: () => goTo("mcp"),
       },
@@ -309,21 +324,21 @@ export function App() {
         id: "mode-terminal",
         title: t("cmd.action.terminal"),
         group: t("cmd.group.actions"),
-        icon: "🖥️",
+        icon: <Monitor className="h-4 w-4" />,
         run: () => handleModeChange("terminal"),
       },
       {
         id: "mode-inventory",
         title: t("cmd.action.inventory"),
         group: t("cmd.group.actions"),
-        icon: "📦",
+        icon: <Package className="h-4 w-4" />,
         run: () => handleModeChange("inventory"),
       },
       {
         id: "mode-flow",
         title: t("cmd.action.flow"),
         group: t("cmd.group.actions"),
-        icon: "🧭",
+        icon: <Compass className="h-4 w-4" />,
         run: () => handleModeChange("flow"),
       },
     ],
@@ -406,9 +421,13 @@ export function App() {
               type="button"
               onClick={reload}
               disabled={scanning && !hasData}
-              className="cursor-pointer rounded-md border border-border bg-bg-secondary px-2.5 py-1 text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-secondary px-2.5 py-1 text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
             >
-              🔄 {t("app.refresh")}
+              <RefreshCw
+                aria-hidden
+                className={`h-3 w-3 text-text-secondary ${scanning && hasData ? "animate-spin" : ""}`}
+              />
+              {t("app.refresh")}
             </button>
           )}
         </div>

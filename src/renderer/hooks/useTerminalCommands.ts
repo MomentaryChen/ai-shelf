@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { createElement, useMemo } from "react";
+import { AppWindow, Monitor, Radio, Terminal, User, Zap, type LucideIcon } from "lucide-react";
 import type { Command } from "../components/CommandPalette";
 import type { ProfileForest, ProviderEntry } from "../types";
 import { findProviderEntry } from "../utils/claude-cursor-diff";
@@ -19,6 +20,9 @@ export interface TerminalCommandOptions {
   /** Number of open panes; the broadcast command is hidden when there are none. */
   paneCount: number;
 }
+
+/** Plain .ts file — build lucide icon elements without JSX. */
+const icon = (Icon: LucideIcon) => createElement(Icon, { className: "h-4 w-4" });
 
 export function useTerminalCommands(
   t: (key: import("../i18n/messages/en").MessageKey, params?: Record<string, string | number>) => string,
@@ -42,7 +46,7 @@ export function useTerminalCommands(
         id: "broadcast-command",
         title: t("cmd.terminal.broadcast"),
         group: t("cmd.group.agents"),
-        icon: "📡",
+        icon: icon(Radio),
         keywords: "broadcast send all panes command run",
         input: {
           placeholder: t("cmd.input.broadcastPlaceholder"),
@@ -56,7 +60,7 @@ export function useTerminalCommands(
         id: "open-claude-cursor",
         title: t("cmd.terminal.openClaudeCursor"),
         group: t("cmd.group.agents"),
-        icon: "⚡",
+        icon: icon(Zap),
         keywords: "claude cursor agent",
         run: () => {
           void (async () => {
@@ -72,7 +76,7 @@ export function useTerminalCommands(
         id: `open-inapp-${entry.tool}`,
         title: t("cmd.terminal.openInApp", { tool: toolLabel(entry.tool) }),
         group: t("cmd.group.agents"),
-        icon: "🖥️",
+        icon: icon(Monitor),
         keywords: `${entry.tool} in-app terminal`,
         run: () => void addPane(entry.tool),
       });
@@ -97,7 +101,7 @@ export function useTerminalCommands(
           ? t("cmd.terminal.switchProfileActive", { name: profile.name })
           : t("cmd.terminal.switchProfile", { name: profile.name }),
         group: t("cmd.group.profiles"),
-        icon: "👤",
+        icon: icon(User),
         keywords: `${profile.name} ${profile.groupName} profile`,
         shortcut: profile.shortcut,
         run: () => void activateProfile(profile.id),
@@ -109,7 +113,7 @@ export function useTerminalCommands(
         id: `open-external-${entry.tool}`,
         title: t("cmd.terminal.openExternal", { tool: toolLabel(entry.tool) }),
         group: t("cmd.group.external"),
-        icon: "🪟",
+        icon: icon(AppWindow),
         keywords: `${entry.tool} external terminal`,
         run: () => void openExternal(entry.tool),
       });
@@ -119,7 +123,7 @@ export function useTerminalCommands(
       id: "open-external-shell",
       title: t("cmd.terminal.openExternalShell"),
       group: t("cmd.group.external"),
-      icon: "💻",
+      icon: icon(Terminal),
       keywords: "shell external terminal plain",
       run: () => void openExternal("shell"),
     });

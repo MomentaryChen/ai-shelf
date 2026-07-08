@@ -108,7 +108,7 @@ export function FlowRunDetailDialog({ run, onClose, onOpenOutput }: Props) {
             <span
               className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                 tone === "success"
-                  ? "bg-[#7FB069]/20 text-[#3d6b32]"
+                  ? "bg-ok/15 text-ok"
                   : tone === "failed"
                     ? "bg-fail/15 text-fail"
                     : tone === "running"

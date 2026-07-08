@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Check, CheckCircle2, Plug, XCircle } from "lucide-react";
 import type { McpRawData, McpSyncResult } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
@@ -7,17 +8,11 @@ import { Button } from "@/components/ui/button";
 import { MCP_SYNC_TOOL_IDS } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { McpSyncPreviewDialog } from "./McpSyncPreviewDialog";
+import { ToolLogo } from "./ToolLogo";
 import type { McpSyncPreviewItem } from "../types";
 
 const TOOLS = MCP_SYNC_TOOL_IDS;
-const TOOL_ICONS: Record<string, string> = {
-  claude: "🟣",
-  copilot: "🐙",
-  cursor: "📐",
-  codex: "🤖",
-  gemini: "✨",
-  opencode: "◇",
-};
+const toolMark = (tool: string) => <ToolLogo tool={tool} size={14} />;
 
 export function McpSyncPanel() {
   const { t } = useLocale();
@@ -120,15 +115,24 @@ export function McpSyncPanel() {
   const doSync = (serverNames: string[]) => void requestSync(serverNames);
 
   return (
-    <Card title={`🔌 ${t("inventory.mcpSync.title")}`}>
+    <Card
+      title={
+        <>
+          <Plug aria-hidden className="h-4 w-4 text-accent" />
+          {t("inventory.mcpSync.title")}
+        </>
+      }
+    >
       {/* Sync results */}
       {results && (
         <div className="mb-4 rounded-lg border border-border bg-bg-primary p-3">
           {results.map((r) => (
             <div key={r.tool} className="mb-1 text-sm">
-              <strong>{TOOL_ICONS[r.tool] ?? "🔧"} {r.tool}</strong>:{" "}
+              <strong className="inline-flex items-center gap-1.5">{toolMark(r.tool)} {r.tool}</strong>:{" "}
               {r.error ? (
-                <span className="text-fail">❌ {r.error}</span>
+                <span className="inline-flex items-center gap-1 text-fail">
+                  <XCircle aria-hidden className="h-3.5 w-3.5" /> {r.error}
+                </span>
               ) : (
                 <>
                   {r.added.length > 0 && (
@@ -151,7 +155,7 @@ export function McpSyncPanel() {
       {/* All synced banner */}
       {syncableServers.length === 0 && allServerNames.length > 0 && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-ok/30 bg-ok/10 px-4 py-3">
-          <span className="text-2xl">✅</span>
+          <CheckCircle2 aria-hidden className="h-6 w-6 shrink-0 text-ok" />
           <div>
             <p className="font-semibold text-ok">{t("inventory.mcpSync.allSynced")}</p>
             <p className="text-xs text-text-secondary">
@@ -174,7 +178,7 @@ export function McpSyncPanel() {
                   onChange={() => toggleTarget(tool)}
                   className="accent-accent"
                 />
-                {TOOL_ICONS[tool]} {tool}
+                <span className="inline-flex items-center gap-1">{toolMark(tool)} {tool}</span>
               </label>
             ))}
           </div>
@@ -219,7 +223,7 @@ export function McpSyncPanel() {
               </th>
               {TOOLS.map((t) => (
                 <th key={t} className="border-b border-border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                  {TOOL_ICONS[t]} {t}
+                  <span className="inline-flex items-center gap-1.5">{toolMark(t)} {t}</span>
                 </th>
               ))}
             </tr>
@@ -237,11 +241,11 @@ export function McpSyncPanel() {
                   />
                 </td>
                 <td className="border-b border-border/40 px-3 py-2 font-medium">
-                  🔌 {server}
+                  {server}
                 </td>
                 {TOOLS.map((t) => (
                   <td key={t} className="border-b border-border/40 px-3 py-2">
-                    {rawData[t]?.servers?.[server] ? "✅" : <Badge text="Missing" variant="warn" />}
+                    {rawData[t]?.servers?.[server] ? <Check aria-label="synced" className="h-4 w-4 text-ok" /> : <Badge text="Missing" variant="warn" />}
                   </td>
                 ))}
               </tr>
@@ -255,10 +259,10 @@ export function McpSyncPanel() {
                     <input type="checkbox" disabled className="cursor-not-allowed opacity-30" />
                   </td>
                   <td className="border-b border-border/30 px-3 py-2 font-medium">
-                    🔌 {server}
+                    {server}
                   </td>
                   {TOOLS.map((t) => (
-                    <td key={t} className="border-b border-border/30 px-3 py-2">✅</td>
+                    <td key={t} className="border-b border-border/30 px-3 py-2"><Check aria-label="synced" className="h-4 w-4 text-ok" /></td>
                   ))}
                 </tr>
               ))}

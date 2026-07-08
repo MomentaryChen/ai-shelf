@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { CheckCircle2, Wrench, XCircle } from "lucide-react";
 import type { McpRawData, McpSyncPreviewItem, McpSyncResult, ProviderEntry, SkillSyncResult } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { Tag } from "./Tag";
 import { McpSyncPreviewDialog } from "./McpSyncPreviewDialog";
+import { ToolLogo } from "./ToolLogo";
 import {
   findProviderEntry,
   mcpServersMissingInCursor,
@@ -57,7 +59,7 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
     return (
       <Card className="mb-5 border-ok/30 bg-ok/5">
         <div className="flex items-center gap-3">
-          <span className="text-2xl">✅</span>
+          <CheckCircle2 aria-hidden className="h-6 w-6 shrink-0 text-ok" />
           <div>
             <p className="font-semibold text-ok">{t("inventory.diffFix.allSynced")}</p>
             <p className="text-xs text-text-secondary">{t("inventory.diffFix.allSyncedHint")}</p>
@@ -126,7 +128,12 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
   return (
     <Card
       className={`mb-5 ${hasMcpGap || hasSkillsGap ? "border-warn/40 bg-warn/5" : "border-border"}`}
-      title={`🔧 ${t("inventory.diffFix.title")}`}
+      title={
+        <>
+          <Wrench aria-hidden className="h-4 w-4 text-accent" />
+          {t("inventory.diffFix.title")}
+        </>
+      }
     >
       <p className="mb-3 text-[13px] text-text-secondary">{t("inventory.diffFix.subtitle")}</p>
 
@@ -146,9 +153,11 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
             <div className="mt-3 rounded-lg border border-border bg-bg-primary p-3">
               {skillResults.map((r) => (
                 <div key={r.tool} className="text-sm">
-                  <strong>📐 {r.tool}</strong>:{" "}
+                  <strong className="inline-flex items-center gap-1.5"><ToolLogo tool={r.tool} size={14} /> {r.tool}</strong>:{" "}
                   {r.error ? (
-                    <span className="text-fail">❌ {r.error}</span>
+                    <span className="inline-flex items-center gap-1 text-fail">
+                      <XCircle aria-hidden className="h-3.5 w-3.5" /> {r.error}
+                    </span>
                   ) : r.added.length > 0 ? (
                     <span className="text-ok">
                       {t("inventory.diffFix.syncSkillsAdded", { names: r.added.join(", ") })}
@@ -182,7 +191,7 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
             </p>
             <div className="flex flex-wrap gap-1.5">
               {missingMcp.map((server) => (
-                <Badge key={server} text={`🔌 ${server}`} variant="warn" />
+                <Badge key={server} text={server} variant="warn" />
               ))}
             </div>
           </div>
@@ -191,9 +200,11 @@ export function SkillsMcpDiffPanel({ data, onOpenMcpSync }: SkillsMcpDiffPanelPr
             <div className="mb-4 rounded-lg border border-border bg-bg-primary p-3">
               {mcpResults.map((r) => (
                 <div key={r.tool} className="text-sm">
-                  <strong>📐 {r.tool}</strong>:{" "}
+                  <strong className="inline-flex items-center gap-1.5"><ToolLogo tool={r.tool} size={14} /> {r.tool}</strong>:{" "}
                   {r.error ? (
-                    <span className="text-fail">❌ {r.error}</span>
+                    <span className="inline-flex items-center gap-1 text-fail">
+                      <XCircle aria-hidden className="h-3.5 w-3.5" /> {r.error}
+                    </span>
                   ) : r.added.length > 0 ? (
                     <span className="text-ok">
                       {t("inventory.diffFix.syncAdded", { names: r.added.join(", ") })}

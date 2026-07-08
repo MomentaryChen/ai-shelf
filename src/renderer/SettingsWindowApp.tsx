@@ -1,3 +1,4 @@
+import { Settings } from "lucide-react";
 import { ChatSettingsPanel } from "./components/ChatSettingsPanel";
 import { useLocale } from "./i18n/LocaleProvider";
 
@@ -8,7 +9,10 @@ export function SettingsWindowApp() {
     <div className="flex h-screen flex-col overflow-hidden bg-bg-primary text-text-primary">
       <header className="border-b border-sand bg-bg-secondary px-5 py-5">
         <div>
-          <h1 className="text-[17px] font-semibold">⚙️ {t("settings.title")}</h1>
+          <h1 className="flex items-center gap-2 text-[17px] font-semibold">
+            <Settings aria-hidden className="h-[18px] w-[18px] text-accent" />
+            {t("settings.title")}
+          </h1>
           <p className="mt-1 text-[13px] text-text-secondary">{t("settings.subtitle")}</p>
         </div>
       </header>

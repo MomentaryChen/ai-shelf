@@ -33,12 +33,13 @@ export function Badge({
   );
 }
 
+/** "No" is a capability fact, not an error — render it neutral, not red. */
 export function YesNo({ value }: { value?: boolean }) {
   const { t } = useLocale();
   return value ? (
     <Badge text={t("inventory.yes")} variant="ok" />
   ) : (
-    <Badge text={t("inventory.no")} variant="fail" />
+    <Badge text={t("inventory.no")} variant="neutral" />
   );
 }
 
@@ -49,12 +50,13 @@ export function AuthBadge({ auth }: { auth: string }) {
   return <Badge text={auth} variant="warn" />;
 }
 
+/** "Not installed" is a state, not a failure — neutral keeps the page calm. */
 export function InstallStatusBadge({ available }: { available: boolean }) {
   const { t } = useLocale();
   return available ? (
     <Badge text={t("inventory.installedBadge")} variant="ok" />
   ) : (
-    <Badge text={t("inventory.notInstalledBadge")} variant="fail" />
+    <Badge text={t("inventory.notInstalledBadge")} variant="neutral" />
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { Monitor, Terminal, FolderOpen, Loader2 } from "lucide-react";
+import { Monitor, Terminal, FolderOpen, Loader2, Hand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -1387,7 +1387,11 @@ function ChatTabInner({
       ) : (
         <EmptyState
           tone="chrome"
-          icon="👋"
+          icon={
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-chrome-ui-accent-soft">
+              <Hand aria-hidden className="h-7 w-7 text-chrome-ui-accent" />
+            </span>
+          }
           title={t("chat.pickProfileTitle")}
           description={t("chat.pickProfile")}
         />
