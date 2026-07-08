@@ -80,6 +80,9 @@ contextBridge.exposeInMainWorld("api", {
   mcpDeleteServer: (tool, name) => ipcRenderer.invoke("mcp-delete-server", tool, name),
   mcpSetServerEnabled: (tool, name, enabled) =>
     ipcRenderer.invoke("mcp-set-server-enabled", tool, name, enabled),
+  mcpRegistryList: (opts) => ipcRenderer.invoke("mcp-registry-list", opts),
+  mcpRegistryPreview: (tool, registryId, values) =>
+    ipcRenderer.invoke("mcp-registry-preview", tool, registryId, values),
   mcpPingTool: (tool) => ipcRenderer.invoke("mcp-ping-tool", tool),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),

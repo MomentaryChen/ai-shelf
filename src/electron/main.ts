@@ -37,6 +37,7 @@ import {
   setMcpServerEnabled,
   upsertMcpServer,
 } from "../utils/mcp-edit.js";
+import { getMcpRegistryInstallPreview, listMcpRegistryServers } from "../utils/mcp-registry.js";
 import { pingToolServers } from "../utils/mcp-ping.js";
 import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
@@ -1091,6 +1092,22 @@ ipcMain.handle(
 );
 
 ipcMain.handle("mcp-ping-tool", (_event, tool: string) => pingToolServers(tool));
+
+ipcMain.handle(
+  "mcp-registry-list",
+  (_event, opts: { search?: string; cursor?: string; limit?: number }) =>
+    listMcpRegistryServers(opts),
+);
+
+ipcMain.handle(
+  "mcp-registry-preview",
+  (
+    _event,
+    tool: string,
+    registryId: string,
+    values?: { env?: Record<string, string>; packageArgs?: Record<string, string> },
+  ) => getMcpRegistryInstallPreview(registryId, tool, values),
+);
 
 function normalizeOpenPath(raw: string): string {
   let p = raw.trim();
