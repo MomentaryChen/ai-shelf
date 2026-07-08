@@ -4,6 +4,7 @@ import { fetchCopilotUsage } from "./providers/copilot.js";
 import { fetchCursorUsage } from "./providers/cursor.js";
 import { fetchGeminiUsage } from "./providers/gemini.js";
 import { fetchOpenAiUsage } from "./providers/openai.js";
+import { aggregateUsageDashboard } from "./aggregate-daily.js";
 import { USAGE_PROVIDERS } from "./registry.js";
 import type { UsageDashboardResult, UsageFetchOptions, UsageToolSnapshot } from "./types.js";
 
@@ -104,19 +105,13 @@ export async function fetchUsageDashboard(opts: UsageFetchOptions = {}): Promise
   );
 
   const supported = USAGE_PROVIDERS.filter((p) => p.supported);
-  const totalCostUsd = tools
-    .filter((t) => t.status === "ok")
-    .reduce((sum, t) => sum + (t.totalCostUsd ?? 0), 0);
+  const configuredCount = statuses.filter((s) => s.configured).length;
 
   return {
     rangeDays: days,
     fetchedAt: new Date().toISOString(),
     encryptionAvailable: isUsageEncryptionAvailable(),
     tools,
-    summary: {
-      totalCostUsd,
-      configuredCount: statuses.filter((s) => s.configured).length,
-      supportedCount: supported.length,
-    },
+    summary: aggregateUsageDashboard(tools, configuredCount, supported.length),
   };
 }

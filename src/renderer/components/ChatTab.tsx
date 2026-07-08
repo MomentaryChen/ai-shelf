@@ -47,6 +47,7 @@ import {
   type SplitDirection,
 } from "../terminal/split-tree";
 import { normalizePaneTitle, paneDisplayLabel } from "../utils/pane-label";
+import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -136,11 +137,13 @@ function ChatTabInner({
   active = true,
   inventoryScanning = false,
   onRegisterCommands,
+  onRequestTerminalMode,
 }: {
   data: ProviderEntry[];
   active?: boolean;
   inventoryScanning?: boolean;
   onRegisterCommands?: (commands: Command[]) => void;
+  onRequestTerminalMode?: () => void;
 }) {
   const { t } = useLocale();
   const [layout, setLayout] = useState<LayoutNode | null>(null);
@@ -379,7 +382,14 @@ function ChatTabInner({
     const unsub = window.api.onSyncDataApplied(() => {
       void refreshSidebarForest();
     });
-    return unsub;
+    const onProfilesChanged = () => {
+      void refreshSidebarForest();
+    };
+    window.addEventListener(PROFILES_CHANGED_EVENT, onProfilesChanged);
+    return () => {
+      unsub();
+      window.removeEventListener(PROFILES_CHANGED_EVENT, onProfilesChanged);
+    };
   }, [refreshSidebarForest]);
 
   useEffect(() => {
@@ -855,17 +865,27 @@ function ChatTabInner({
 
   const paletteActions = useMemo(
     () => ({
-      addPane: (tool: string) => void addPane(tool),
-      openExternal: (tool: string) => void openExternal(tool),
+      addPane: (tool: string) => {
+        onRequestTerminalMode?.();
+        void addPane(tool);
+      },
+      openExternal: (tool: string) => {
+        onRequestTerminalMode?.();
+        void openExternal(tool);
+      },
       activateProfile: (profileId: string) => {
+        onRequestTerminalMode?.();
         const profile = sidebarForest?.groups
           .flatMap((g) => g.profiles)
           .find((p) => p.id === profileId);
         if (profile) void handleActivateProfileRef.current(profile);
       },
-      broadcastCommand: broadcastCommandToPanes,
+      broadcastCommand: (text: string) => {
+        onRequestTerminalMode?.();
+        broadcastCommandToPanes(text);
+      },
     }),
-    [addPane, openExternal, sidebarForest, broadcastCommandToPanes],
+    [addPane, openExternal, sidebarForest, broadcastCommandToPanes, onRequestTerminalMode],
   );
 
   // Group used to map Ctrl+1–9 shortcut hints in the palette (mirrors currentGroupId below).
@@ -886,12 +906,8 @@ function ChatTabInner({
   );
 
   useEffect(() => {
-    if (!active) {
-      onRegisterCommands?.([]);
-      return;
-    }
     onRegisterCommands?.(terminalCommands);
-  }, [active, terminalCommands, onRegisterCommands]);
+  }, [terminalCommands, onRegisterCommands]);
 
   const profileLabel = activeProfile?.name ?? null;
 
@@ -1459,6 +1475,7 @@ export const ChatTab = memo(ChatTabInner, (prev, next) => {
     prev.active === next.active &&
     prev.inventoryScanning === next.inventoryScanning &&
     prev.onRegisterCommands === next.onRegisterCommands &&
+    prev.onRequestTerminalMode === next.onRequestTerminalMode &&
     inventoryTerminalFingerprint(prev.data) === inventoryTerminalFingerprint(next.data)
   );
 });

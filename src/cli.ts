@@ -7,6 +7,7 @@ const { version: APP_VERSION } = createRequire(import.meta.url)("../package.json
   version: string;
 };
 import { runDoctor } from "./commands/doctor.js";
+import { runInstall } from "./commands/install.js";
 import { runRaw } from "./commands/raw.js";
 import { runUpdate } from "./commands/update.js";
 
@@ -45,6 +46,9 @@ switch (command) {
   case "update":
     await runUpdate(rest);
     break;
+  case "install":
+    await runInstall(rest);
+    break;
   default:
     console.error(`Unknown command: ${command}`);
     printHelp();
@@ -59,6 +63,7 @@ Usage:
   ai inventory [models|skills|mcp|config]   Show AI tool overview
   ai doctor                                  Check environment health
   ai raw <tool> [args...]                    Pass-through to underlying CLI
+  ai install <tool>                            Install a missing AI CLI (npm -g, winget, official script)
   ai update [tool|self]                      Update AI tools (claude, copilot, cursor, codex, gemini, aider, opencode, self)
 
 Options:
