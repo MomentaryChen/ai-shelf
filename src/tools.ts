@@ -83,9 +83,23 @@ export const TOOL_NPM_PACKAGE: Record<string, string> = {
   gemini: "@google/gemini-cli",
 };
 
+/** Non-npm tools whose latest version comes from GitHub Releases (`owner/repo`). */
+export const TOOL_GITHUB_REPO: Record<string, string> = {
+  aider: "Aider-AI/aider",
+  opencode: "anomalyco/opencode",
+  crush: "charmbracelet/crush",
+  goose: "block/goose",
+};
+
 /** Tools without an npm registry entry — latest is inferred after a successful update check. */
 export function toolHasNpmLatest(tool: string): boolean {
   return tool in TOOL_NPM_PACKAGE;
+}
+
+/** Tools that can resolve latest version from npm or GitHub Releases. */
+export function toolHasRemoteLatest(tool: string): boolean {
+  const id = canonicalToolId(tool);
+  return id in TOOL_NPM_PACKAGE || id in TOOL_GITHUB_REPO;
 }
 
 export type ToolInstallSpec = {

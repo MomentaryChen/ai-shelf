@@ -13,10 +13,14 @@ import {
 } from "../inventory/index.js";
 import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
-import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
+import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
+import {
+  fetchRemoteLatestVersion,
+  resolveToolLatestVersion,
+} from "../utils/latest-version.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
 import {
   collectAllMcpServers,
@@ -603,31 +607,6 @@ ipcMain.handle("get-env-vars", () => {
   ];
 });
 
-function fetchLatestNpmVersion(pkg: string): string | null {
-  try {
-    return execSync(`npm view ${pkg} version`, {
-      encoding: "utf-8",
-      timeout: 10000,
-    }).trim();
-  } catch {
-    return null;
-  }
-}
-
-/** npm registry when available; optional baseline from installed version (single-tool refresh). */
-function resolveToolLatestVersion(
-  tool: string,
-  available: boolean,
-  currentVersion: string | null,
-  npmLatest: string | null | undefined,
-  inferNonNpmFromInstalled = false,
-): string | null {
-  if (!available) return null;
-  if (tool in TOOL_NPM_PACKAGE) return npmLatest ?? null;
-  if (inferNonNpmFromInstalled) return currentVersion ?? null;
-  return null;
-}
-
 ipcMain.handle("check-update", async () => {
   const results: {
     tool: string;
@@ -646,16 +625,12 @@ ipcMain.handle("check-update", async () => {
     entries = getCachedInventory() ?? [];
   }
 
-  const installedToolIds = new Set(
-    entries.filter((e) => e.available).map((e) => e.tool),
-  );
+  const installedEntries = entries.filter((e) => e.available);
   const latestVersionMap: Record<string, string | null> = {};
   await Promise.all(
-    Object.entries(TOOL_NPM_PACKAGE)
-      .filter(([tool]) => installedToolIds.has(tool))
-      .map(async ([tool, pkg]) => {
-        latestVersionMap[tool] = fetchLatestNpmVersion(pkg);
-      }),
+    installedEntries.map(async (entry) => {
+      latestVersionMap[entry.tool] = await fetchRemoteLatestVersion(entry.tool);
+    }),
   );
 
   for (const entry of entries) {
@@ -669,6 +644,7 @@ ipcMain.handle("check-update", async () => {
         entry.available,
         entry.version ?? null,
         latestVersionMap[entry.tool],
+        true,
       ),
       available: entry.available,
       updateCommand: cfg ? cfg.update.join(" ") : "",
@@ -683,7 +659,7 @@ ipcMain.handle("check-update", async () => {
   return { tools: results };
 });
 
-/** Re-detect one tool's installed version and npm latest (after a single-tool update). */
+/** Re-detect one tool's installed version and remote latest (after a single-tool update). */
 ipcMain.handle("refresh-tool-update-info", async (_event, tool: string) => {
   if (tool === "ai-shelf") {
     const selfLatest = app.isPackaged ? await resolveDesktopSelfLatestVersion() : null;
@@ -694,13 +670,12 @@ ipcMain.handle("refresh-tool-update-info", async (_event, tool: string) => {
   if (!detected) return null;
 
   const cfg = TOOL_UPDATE_COMMANDS[detected.tool] ?? TOOL_UPDATE_COMMANDS[tool];
-  const pkg = TOOL_NPM_PACKAGE[detected.tool] ?? TOOL_NPM_PACKAGE[tool];
-  const npmLatest = pkg ? fetchLatestNpmVersion(pkg) : null;
+  const remoteLatest = await fetchRemoteLatestVersion(detected.tool);
   const latestVersion = resolveToolLatestVersion(
     detected.tool,
     detected.available,
     detected.version ?? null,
-    npmLatest,
+    remoteLatest,
     true,
   );
 
@@ -788,7 +763,7 @@ ipcMain.handle("start-update-scan", async (event) => {
     } catch { /* skip failed detectors */ }
   }));
 
-  // Now check npm latest (or desktop updater for ai-shelf) — installed tools only
+  // Now check npm / GitHub latest (or desktop updater for ai-shelf) — installed tools only
   await Promise.all(allTools.map(async (info) => {
     const { tool, available } = info;
     if (tool !== "ai-shelf" && !available) {
@@ -798,9 +773,8 @@ ipcMain.handle("start-update-scan", async (event) => {
     let latestVersion: string | null = null;
     if (tool === "ai-shelf" && app.isPackaged) {
       latestVersion = await resolveDesktopSelfLatestVersion();
-    } else {
-      const pkg = TOOL_NPM_PACKAGE[tool];
-      latestVersion = pkg ? fetchLatestNpmVersion(pkg) : null;
+    } else if (tool !== "ai-shelf") {
+      latestVersion = await fetchRemoteLatestVersion(tool);
     }
     push("tool-latest", { tool, latestVersion });
   }));

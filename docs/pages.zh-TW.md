@@ -278,7 +278,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 | OpenCode | `opencode upgrade` |
 | AI Shelf（self / desktop） | **安裝版**：啟動後檢查 GitHub Release，確認後在 App 內下載並重啟安裝（Update 分頁 **Download & upgrade desktop**）。**開發／原始碼**：依環境顯示 `pnpm` / `yarn` / `npm` 全域更新指令 |
 
-對列在 `TOOL_NPM_PACKAGE` 的 CLI，程式會請 npm registry 協助決定是否有較新版本；桌面安裝版改以 `electron-updater` 比對 GitHub 上的 `latest.yml`。
+對列在 `TOOL_NPM_PACKAGE` 的 CLI，程式會請 npm registry 協助決定是否有較新版本；沒有 npm 套件的工具（Aider、OpenCode、Crush、Goose）則查 GitHub Releases（`TOOL_GITHUB_REPO`）；桌面安裝版改以 `electron-updater` 比對 GitHub 上的 `latest.yml`。
 
 ---
 

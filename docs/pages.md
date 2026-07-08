@@ -283,7 +283,7 @@ The desktop UI ultimately runs `node dist/cli.js update <tool>` (`ai update …`
 | OpenCode | `opencode upgrade` |
 | AI Shelf (**self** / **desktop**) | **Installed NSIS app**: GitHub Release check on startup; in-app download with progress and restart to install (**Download & upgrade desktop** on the Update tab). **From source / dev**: `pnpm` / `yarn` / `npm` global update command as detected |
 
-Packaged CLIs use npm registry metadata (`TOOL_NPM_PACKAGE`). The installed desktop app uses `electron-updater` and `latest.yml` on GitHub Releases.
+Packaged CLIs use npm registry metadata (`TOOL_NPM_PACKAGE`). Tools without npm packages (Aider, OpenCode, Crush, Goose) use GitHub Releases (`TOOL_GITHUB_REPO`). The installed desktop app uses `electron-updater` and `latest.yml` on GitHub Releases.
 
 ### Per-Tool Cards
 Each card shows:

@@ -8,7 +8,7 @@ import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { toolIcon, toolLabel } from "../utils";
-import { toolHasNpmLatest } from "../../tools.js";
+import { toolHasRemoteLatest } from "../../tools.js";
 import { versionsEqual } from "../../utils/version.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { ToolInstallPanel } from "./ToolInstallPanel";
@@ -18,7 +18,10 @@ function updateMessageIndicatesUpToDate(message: string): boolean {
   return /already up to date|no update available|nothing to update|已是最新/i.test(message);
 }
 
-/** For tools without npm registry, treat current as latest after a successful update check. */
+/**
+ * Prefer remote latest (npm / GitHub Releases). For tools without a remote source,
+ * treat current as latest after a successful update check.
+ */
 function effectiveLatestVersion(
   tool: string,
   currentVersion: string | null,
@@ -29,7 +32,7 @@ function effectiveLatestVersion(
   if (
     syncedAfterUpdate &&
     currentVersion &&
-    (!toolHasNpmLatest(tool) ||
+    (!toolHasRemoteLatest(tool) ||
       (updateMessage != null && updateMessageIndicatesUpToDate(updateMessage)))
   ) {
     return currentVersion;
@@ -50,7 +53,8 @@ function buildToolUpdateInfo(
   const rawLatest = meta[entry.tool]?.latestVersion ?? null;
   const syncedAfterUpdate =
     results[entry.tool]?.success &&
-    (!toolHasNpmLatest(entry.tool) || updateMessageIndicatesUpToDate(results[entry.tool]!.message));
+    (!toolHasRemoteLatest(entry.tool) ||
+      updateMessageIndicatesUpToDate(results[entry.tool]!.message));
   const latestVersion = effectiveLatestVersion(
     entry.tool,
     currentVersion,
