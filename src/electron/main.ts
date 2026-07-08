@@ -1488,17 +1488,24 @@ ipcMain.handle(
   try {
     const plat = process.platform;
     if (plat === "win32") {
-      if (terminal === "wt" || terminal === "auto") {
+      const hasWt = (() => {
         try {
+          execSync("where.exe wt", { stdio: "ignore" });
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      if (terminal === "wt" || terminal === "auto") {
+        if (hasWt) {
           const wtArgs = cwd
             ? ["new-tab", "--startingDirectory", cwd, "--", "pwsh.exe", "-NoExit", "-Command", cmd]
             : ["new-tab", "--", "pwsh.exe", "-NoExit", "-Command", cmd];
           spawn("wt", wtArgs, { detached: true, stdio: "ignore" }).unref();
           return { success: true };
-        } catch {
-          if (terminal === "wt") return { success: false, error: "Windows Terminal (wt) not found in PATH" };
-          // auto: fall through to pwsh/cmd
         }
+        if (terminal === "wt") return { success: false, error: "Windows Terminal (wt) not found in PATH" };
+        // auto: fall through to pwsh/cmd
       }
       if (terminal === "pwsh") {
         spawn("cmd", ["/c", "start", "pwsh.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`], { detached: true, stdio: "ignore" }).unref();
