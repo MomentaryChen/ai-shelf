@@ -76,6 +76,27 @@ function parseStringListField(raw: unknown): string[] | undefined {
   return items.length > 0 ? items : undefined;
 }
 
+const HTTP_FLOW_METHODS = new Set(["GET", "HEAD"]);
+
+export function isValidHttpFlowUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function parseHttpMethod(raw: unknown): "GET" | "HEAD" | { error: string } {
+  if (raw === undefined || raw === null || raw === "") return "HEAD";
+  if (typeof raw !== "string") {
+    return { error: "Frontmatter field 'method' must be GET or HEAD" };
+  }
+  const method = raw.trim().toUpperCase();
+  if (HTTP_FLOW_METHODS.has(method)) return method as "GET" | "HEAD";
+  return { error: `Frontmatter field 'method' must be GET or HEAD (got '${raw.trim()}')` };
+}
+
 function parseSimpleFrontmatter(yaml: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   const lines = yaml.split(/\r?\n/);
@@ -184,7 +205,22 @@ export function parseFlowDocument(
   const extraMcpServers = parseStringListField(fm.extra_mcp_servers);
   const agentAllowedTools = parseStringListField(fm.allowed_tools);
   const httpUrl = typeof fm.url === "string" ? fm.url.trim() : undefined;
-  const httpMethod = fm.method === "GET" ? "GET" : "HEAD";
+  let httpMethod: "GET" | "HEAD";
+  if (runner === "http") {
+    const httpMethodParsed = parseHttpMethod(fm.method);
+    if (typeof httpMethodParsed === "object") {
+      return httpMethodParsed;
+    }
+    httpMethod = httpMethodParsed;
+    if (!httpUrl) {
+      return { error: "HTTP runner requires frontmatter field 'url'" };
+    }
+    if (!isValidHttpFlowUrl(httpUrl)) {
+      return { error: "Frontmatter field 'url' must be an absolute http or https URL" };
+    }
+  } else {
+    httpMethod = fm.method === "GET" ? "GET" : "HEAD";
+  }
 
   return {
     schema: FLOW_DEFINITION_SCHEMA,
