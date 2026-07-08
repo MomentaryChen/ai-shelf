@@ -56,16 +56,34 @@ export function buildFlowMcpConfigJson(
   return JSON.stringify(config);
 }
 
+export function flowMcpConfigTempPath(runId: string): string {
+  return join(tmpdir(), `ai-shelf-flow-mcp-${runId}.json`);
+}
+
+/** Best-effort delete of a per-run MCP config temp file. */
+export function deleteFlowMcpConfigFile(path: string): void {
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Write MCP config to a temp file for `claude -p --mcp-config`. */
 export function writeFlowMcpConfigFile(
   runId: string,
   outputPath: string,
   extraServerNames: string[] = [],
 ): string {
-  const path = join(tmpdir(), `ai-shelf-flow-mcp-${runId}.json`);
+  const path = flowMcpConfigTempPath(runId);
   writeFileSync(path, buildFlowMcpConfigJson(runId, outputPath, extraServerNames), "utf8");
   return path;
 }
+
+export type FlowAgentSpawnOptions = {
+  /** When false, args reference the temp path but no file is written (preview only). */
+  writeMcpConfig?: boolean;
+};
 
 export function flowMcpAllowedTools(): string[] {
   return [
@@ -173,26 +191,38 @@ export function flowAgentMcpSpawnArgs(
   runId: string,
   outputPath: string,
   scope: FlowAgentSpawnScope = {},
-): string[] {
+  options: FlowAgentSpawnOptions = {},
+): { args: string[]; mcpConfigPath?: string } {
+  const writeMcpConfig = options.writeMcpConfig !== false;
   const canonical = canonicalToolId(tool);
   if (canonical === "claude") {
     const extraMcp = scope.extraMcpServers ?? [];
-    const mcpConfigPath = writeFlowMcpConfigFile(runId, outputPath, extraMcp);
+    const mcpConfigPath = flowMcpConfigTempPath(runId);
+    if (writeMcpConfig) {
+      writeFileSync(
+        mcpConfigPath,
+        buildFlowMcpConfigJson(runId, outputPath, extraMcp),
+        "utf8",
+      );
+    }
     const allowed = buildFlowAgentAllowedTools(extraMcp, scope.agentAllowedTools ?? []);
-    return [
-      "--strict-mcp-config",
-      "--mcp-config",
-      mcpConfigPath,
-      "--tools",
-      "",
-      "--allowedTools",
-      ...allowed,
-    ];
+    return {
+      args: [
+        "--strict-mcp-config",
+        "--mcp-config",
+        mcpConfigPath,
+        "--tools",
+        "",
+        "--allowedTools",
+        ...allowed,
+      ],
+      mcpConfigPath: writeMcpConfig ? mcpConfigPath : undefined,
+    };
   }
   if (canonical === "cursor") {
-    return ["--approve-mcps", "--trust", "--force"];
+    return { args: ["--approve-mcps", "--trust", "--force"] };
   }
-  return [];
+  return { args: [] };
 }
 
 export function prepareFlowAgentSpawn(
@@ -201,14 +231,28 @@ export function prepareFlowAgentSpawn(
   outputPath: string,
   cwd: string,
   scope: FlowAgentSpawnScope = {},
+  options: FlowAgentSpawnOptions = {},
 ): {
   mcpMount: FlowMcpMount;
   printPrefix: string[];
   extraArgs: string[];
 } {
+  const agentMount = mountFlowMcpForAgent(tool, runId, outputPath, cwd);
+  const { args: extraArgs, mcpConfigPath } = flowAgentMcpSpawnArgs(
+    tool,
+    runId,
+    outputPath,
+    scope,
+    options,
+  );
   return {
-    mcpMount: mountFlowMcpForAgent(tool, runId, outputPath, cwd),
+    mcpMount: {
+      cleanup: () => {
+        agentMount.cleanup();
+        if (mcpConfigPath) deleteFlowMcpConfigFile(mcpConfigPath);
+      },
+    },
     printPrefix: flowAgentPrintPrefix(tool),
-    extraArgs: flowAgentMcpSpawnArgs(tool, runId, outputPath, scope),
+    extraArgs,
   };
 }
