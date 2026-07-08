@@ -33,6 +33,7 @@ function applyPaneShortcutAction(
     panes,
     focusedPaneId,
     onFocusPane,
+    onFocusRecentTerminal,
     onClosePane,
     onSplitPane,
     onClearPane,
@@ -44,6 +45,10 @@ function applyPaneShortcutAction(
 
   switch (action.type) {
     case "focus-next": {
+      if (onFocusRecentTerminal) {
+        onFocusRecentTerminal();
+        break;
+      }
       const id = cyclePaneId(panes, focusedPaneId, "next");
       if (id) onFocusPane(id);
       break;
@@ -78,6 +83,8 @@ export interface PaneShortcutHandlers {
   focusedPaneId: string | null;
   enabled?: boolean;
   onFocusPane: (paneId: string) => void;
+  /** Ctrl+Tab — jump to previous terminal in global MRU (cross profile/workspace). */
+  onFocusRecentTerminal?: () => void;
   onClosePane: (paneId: string) => void;
   onClearPane?: (paneId: string) => void;
   onRestartPane?: (paneId: string) => void;

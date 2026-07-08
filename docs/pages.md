@@ -122,7 +122,7 @@ Ignored while typing in inputs (e.g. profile rename).
 
 | Shortcut | Action |
 |---|---|
-| **Ctrl+Tab** (default) | Next pane — customizable in **Settings → Pane shortcuts** |
+| **Ctrl+Tab** (default) | Return to the previously used terminal (any profile or workspace) — customizable in **Settings → Pane shortcuts** |
 | **Ctrl+Shift+Tab** (default) | Previous pane — customizable in Settings |
 | **Ctrl+1 … Ctrl+9** (default) | Focus pane N (tree order) — modifier customizable in Settings |
 | **Ctrl+W** | Close focused pane |

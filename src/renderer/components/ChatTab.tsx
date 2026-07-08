@@ -26,6 +26,7 @@ import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneAgentAwareness } from "../hooks/usePaneAgentAwareness";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
+import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
 import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
@@ -246,6 +247,7 @@ function ChatTabInner({
     getProfileDefaultCwd,
     getProfilePanes,
     getProfileFocusedPaneId,
+    isPaneLive,
     canAddPane,
     maxPanes,
     minimizedPaneIds,
@@ -965,6 +967,22 @@ function ChatTabInner({
     },
   });
 
+  const { focusPreviousTerminal } = useTerminalFocusMru({
+    activeProfile,
+    focusedPaneId,
+    enabled: active && !profileBusy && !restoring,
+    isPaneLive: (ref) => isPaneLive(ref.workspaceId, ref.profileId, ref.paneId),
+    onActivate: async (ref) => {
+      const group = sidebarForest?.groups.find((g) =>
+        g.profiles.some(
+          (p) => p.id === ref.profileId && p.workspaceId === ref.workspaceId,
+        ),
+      );
+      if (group) setSelectedGroupId(group.id);
+      await restorePaneToDisplayById(ref.profileId, ref.paneId);
+    },
+  });
+
   usePaneShortcuts({
     panes,
     focusedPaneId,
@@ -972,6 +990,9 @@ function ChatTabInner({
     onFocusPane: (paneId) => {
       if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
       else setFocusedPaneId(paneId);
+    },
+    onFocusRecentTerminal: () => {
+      void focusPreviousTerminal();
     },
     onClosePane: closePane,
     onClearPane: clearPaneScreen,
