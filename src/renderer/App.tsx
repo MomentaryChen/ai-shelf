@@ -28,6 +28,7 @@ import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
+import type { ProviderEntry } from "./types";
 import { registerShortcutCheatsheetOpener } from "./shortcuts/open-shortcuts";
 import { cheatsheetToggleKeys } from "./shortcuts/shortcut-registry";
 import {

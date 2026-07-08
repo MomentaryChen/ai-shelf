@@ -9,6 +9,29 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-07-08
+
+Onboarding, inventory UX, and profile productivity improvements across desktop and CLI.
+
+### Added
+
+- **First-launch onboarding** — Added a 3-step setup wizard for initial tool and workflow configuration.
+- **Saved terminal snippets** — Added per-profile command snippet library for quick command reuse in terminal workflows.
+- **Inventory global search** — Unified cross-tab command/search coverage for configs, skills, and MCP servers.
+- **Flow template marketplace** — Added curated flow template gallery to accelerate flow authoring.
+- **MCP registry quick add** — Added registry picker to install MCP servers without manual JSON editing.
+- **Doctor one-click install** — Added install actions for missing tools directly inside Doctor.
+- **Usage daily rollup** — Added unified daily usage aggregation across paid CLI providers.
+
+### Changed
+
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIF for the current UI.
+- **Empty-state guidance and shortcuts** — Improved in-app empty states and added shortcut discovery hints.
+
+### Fixed
+
+- **Release-build cloud sync config** — Embedded Firebase project ID for the main process in packaged builds.
+
 ## [3.6.0] - 2026-07-08
 
 Terminal focus shortcuts and flow scheduler reliability fixes.
@@ -26,6 +49,7 @@ Terminal focus shortcuts and flow scheduler reliability fixes.
 - **Flow Windows agent args** — Windows cmd shim no longer drops empty or metacharacter agent arguments.
 
 [3.6.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.6.0
+[3.7.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.7.0
 
 ## [3.5.0] - 2026-07-07
 

@@ -43,12 +43,28 @@ async function waitForAppReady(page: Page) {
   await expect(inventoryTab).toBeEnabled({ timeout: CONTENT_TIMEOUT });
 }
 
+async function dismissBlockingDialog(page: Page) {
+  const overlay = page.locator('[data-slot="dialog-overlay"][data-state="open"]');
+  if ((await overlay.count()) === 0) return;
+
+  const closeButton = page.getByRole("button", { name: /Close|Skip|Later|關閉|略過|稍後|之後/i });
+  if (await closeButton.first().isVisible().catch(() => false)) {
+    await closeButton.first().click();
+  } else {
+    await page.keyboard.press("Escape");
+  }
+
+  await expect(overlay).toHaveCount(0, { timeout: 10_000 });
+}
+
 async function switchToTerminal(page: Page) {
+  await dismissBlockingDialog(page);
   await page.getByRole("tab", { name: /Terminal|終端/i }).click();
   await waitForTerminalPane(page, CONTENT_TIMEOUT);
 }
 
 async function switchToInventory(page: Page) {
+  await dismissBlockingDialog(page);
   await page.getByRole("tab", { name: /Inventory|清單/i }).click();
   const overview = page.getByRole("button", { name: INVENTORY_NAV[0].nav });
   await expect(overview).toBeVisible({ timeout: CONTENT_TIMEOUT });
