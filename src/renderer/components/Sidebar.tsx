@@ -63,7 +63,15 @@ export interface SidebarProfileItem {
   terminalCount: number;
   broadcastInput?: boolean;
   accentColor?: string | null;
+  savedCommands?: SidebarSavedCommandItem[];
   terminals?: SidebarTerminalItem[];
+}
+
+export interface SidebarSavedCommandItem {
+  id: string;
+  name: string;
+  command: string;
+  broadcast?: boolean;
 }
 
 export interface SidebarTerminalItem {
@@ -112,6 +120,11 @@ interface SidebarProps {
     dropTerminalId: string,
     zone: "above" | "below",
   ) => void;
+  onSavedCommandRun?: (
+    profileId: string,
+    command: string,
+    broadcast: boolean,
+  ) => void;
   onProfilePaneDragChange?: (active: boolean) => void;
   onNavChange?: (itemId: string) => void;
 }
@@ -145,6 +158,7 @@ export function Sidebar({
   onTerminalMinimize,
   onTerminalRestore,
   onTerminalReorder,
+  onSavedCommandRun,
   onProfilePaneDragChange,
   onNavChange,
 }: SidebarProps) {
@@ -665,6 +679,33 @@ export function Sidebar({
                             </button>
                           );
                         })}
+                        {(item.savedCommands ?? []).length > 0 && (
+                          <div className="mt-1 space-y-0.5 border-t border-chrome-border-subtle/60 pt-1">
+                            <p className="px-2 text-[9px] font-medium uppercase tracking-wide text-chrome-text-dim">
+                              {t("sidebar.savedCommands")}
+                            </p>
+                            {(item.savedCommands ?? []).map((snippet) => (
+                              <button
+                                key={snippet.id}
+                                type="button"
+                                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-[11px] text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
+                                title={snippet.command}
+                                onClick={() =>
+                                  onSavedCommandRun?.(
+                                    item.id,
+                                    snippet.command,
+                                    snippet.broadcast ?? false,
+                                  )
+                                }
+                              >
+                                <span className="shrink-0 text-[10px]" aria-hidden>
+                                  {snippet.broadcast ? "📡" : "⚡"}
+                                </span>
+                                <span className="truncate">{snippet.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

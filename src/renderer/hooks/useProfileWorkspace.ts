@@ -140,6 +140,7 @@ export function useProfileWorkspace(
       layout: collected.length > 1 ? serialized : null,
       broadcastInput: broadcastRef.current,
       accentColor: existing?.accentColor ?? profile.accentColor ?? null,
+      savedCommands: existing?.savedCommands ?? profile.savedCommands ?? [],
       updatedAt: new Date().toISOString(),
     };
     await saveGroupSnapshot(profile.workspaceId, profile.id, snapshot);
@@ -438,8 +439,8 @@ export function useProfileWorkspace(
 
   const getProfilePanes = useCallback(
     (profileId: string): PaneInfo[] => {
-      if (activeProfile?.id === profileId) {
-        return layout ? collectPanes(layout) : [];
+      if (activeProfileRef.current?.id === profileId) {
+        return layoutRef.current ? collectPanes(layoutRef.current) : [];
       }
       const cached =
         Array.from(profileLiveCacheRef.current.entries()).find(([key]) =>
@@ -447,12 +448,12 @@ export function useProfileWorkspace(
         )?.[1] ?? null;
       return cached ? collectPanes(cached.layout) : [];
     },
-    [activeProfile, layout],
+    [activeProfile],
   );
 
   const getProfileFocusedPaneId = useCallback(
     (profileId: string): string | null => {
-      if (activeProfile?.id === profileId) return focusedPaneId;
+      if (activeProfileRef.current?.id === profileId) return focusedPaneIdRef.current;
       const cached =
         Array.from(profileLiveCacheRef.current.entries()).find(([key]) =>
           key.endsWith(`:${profileId}`),
