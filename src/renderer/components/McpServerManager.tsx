@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useLocale } from "../i18n/LocaleProvider";
 import { ConfigFileEditorModal } from "./ConfigFileEditorModal";
 import { McpServerEditorModal } from "./McpServerEditorModal";
+import { McpRegistryPickerModal } from "./McpRegistryPickerModal";
 
 /** Interactive add / edit / enable-disable / delete for one tool's MCP servers. */
 export function McpServerManager({ tool }: { tool: string }) {
@@ -12,6 +13,7 @@ export function McpServerManager({ tool }: { tool: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editing, setEditing] = useState<McpServerRecord | "new" | null>(null);
+  const [registryOpen, setRegistryOpen] = useState(false);
   const [rawEdit, setRawEdit] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +63,9 @@ export function McpServerManager({ tool }: { tool: string }) {
               📝 {t("mcpManage.editRaw")}
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => setRegistryOpen(true)}>
+            {t("mcpManage.addFromRegistry")}
+          </Button>
           <Button size="sm" variant="default" onClick={() => setEditing("new")}>
             ＋ {t("mcpManage.add")}
           </Button>
@@ -138,6 +143,14 @@ export function McpServerManager({ tool }: { tool: string }) {
           tool={tool}
           initial={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
+          onSaved={load}
+        />
+      )}
+      {registryOpen && (
+        <McpRegistryPickerModal
+          tool={tool}
+          existingNames={list.servers.map((s) => s.name)}
+          onClose={() => setRegistryOpen(false)}
           onSaved={load}
         />
       )}
