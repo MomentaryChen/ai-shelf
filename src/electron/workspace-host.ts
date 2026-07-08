@@ -1,4 +1,5 @@
 import { bootstrap, type AppContext, type CreateProfileInput, type GroupLayoutSnapshot } from "ai-shelf";
+import { PREF_ONBOARDING_COMPLETED } from "../shared/onboarding-pref.js";
 
 let ctx: AppContext | null = null;
 
@@ -59,6 +60,16 @@ export function saveGroupLayout(workspaceId: string, groupId: string, snapshot: 
 
 export function setLastActiveGroup(workspaceId: string, groupId: string) {
   getWorkspaceContext().groupLayoutService.setLastActiveGroup(workspaceId, groupId);
+}
+
+export function getOnboardingCompleted(): boolean {
+  return (
+    getWorkspaceContext().groupLayoutService.getPreference(PREF_ONBOARDING_COMPLETED) === "1"
+  );
+}
+
+export function setOnboardingCompleted(): void {
+  getWorkspaceContext().groupLayoutService.setPreference(PREF_ONBOARDING_COMPLETED, "1");
 }
 
 export function getProfileForest() {

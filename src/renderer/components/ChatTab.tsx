@@ -46,6 +46,7 @@ import {
   type SplitDirection,
 } from "../terminal/split-tree";
 import { normalizePaneTitle, paneDisplayLabel } from "../utils/pane-label";
+import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -380,7 +381,14 @@ function ChatTabInner({
     const unsub = window.api.onSyncDataApplied(() => {
       void refreshSidebarForest();
     });
-    return unsub;
+    const onProfilesChanged = () => {
+      void refreshSidebarForest();
+    };
+    window.addEventListener(PROFILES_CHANGED_EVENT, onProfilesChanged);
+    return () => {
+      unsub();
+      window.removeEventListener(PROFILES_CHANGED_EVENT, onProfilesChanged);
+    };
   }, [refreshSidebarForest]);
 
   useEffect(() => {

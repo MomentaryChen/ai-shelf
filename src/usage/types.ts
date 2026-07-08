@@ -37,6 +37,21 @@ export interface UsageDayBucket {
   outputTokens?: number;
 }
 
+export interface UsageDailyToolSlice {
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+/** Per-day rollup across all configured tools with cost/token data. */
+export interface UsageDailyUnifiedRow {
+  date: string;
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  byTool: Partial<Record<UsageToolId, UsageDailyToolSlice>>;
+}
+
 export interface UsageModelBreakdown {
   model: string;
   costUsd: number;
@@ -78,8 +93,11 @@ export interface UsageDashboardResult {
   tools: UsageToolSnapshot[];
   summary: {
     totalCostUsd: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
     configuredCount: number;
     supportedCount: number;
+    dailyUnified: UsageDailyUnifiedRow[];
   };
 }
 

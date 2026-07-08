@@ -13,7 +13,7 @@ import {
 } from "../inventory/index.js";
 import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
-import { TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
+import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
@@ -37,6 +37,7 @@ import {
   setMcpServerEnabled,
   upsertMcpServer,
 } from "../utils/mcp-edit.js";
+import { getMcpRegistryInstallPreview, listMcpRegistryServers } from "../utils/mcp-registry.js";
 import { pingToolServers } from "../utils/mcp-ping.js";
 import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
@@ -61,6 +62,8 @@ import {
   getGroupLayout,
   saveGroupLayout,
   setLastActiveGroup,
+  getOnboardingCompleted,
+  setOnboardingCompleted,
   getProfileForest,
   getProfileTree,
   createProfileGroup,
@@ -856,6 +859,19 @@ ipcMain.handle("run-update", async (_event, tool: string) => {
   return { success: false, message: result.stderr || result.stdout || "Update failed" };
 });
 
+ipcMain.handle("run-install", async (_event, tool: string) => {
+  const cliPath = join(import.meta.dirname, "..", "cli.js");
+  const cliArg = canonicalToolId(tool);
+  const result = await run(process.execPath, [cliPath, "install", cliArg], 180_000, {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+  });
+  if (result.ok) {
+    inventoryCache = null;
+    return { success: true, message: result.stdout || "Install completed" };
+  }
+  return { success: false, message: result.stderr || result.stdout || "Install failed" };
+});
+
 function detectSelfUpdateCmd(): string {
   for (const pm of ["pnpm", "yarn", "npm"] as const) {
     try {
@@ -1091,6 +1107,22 @@ ipcMain.handle(
 );
 
 ipcMain.handle("mcp-ping-tool", (_event, tool: string) => pingToolServers(tool));
+
+ipcMain.handle(
+  "mcp-registry-list",
+  (_event, opts: { search?: string; cursor?: string; limit?: number }) =>
+    listMcpRegistryServers(opts),
+);
+
+ipcMain.handle(
+  "mcp-registry-preview",
+  (
+    _event,
+    tool: string,
+    registryId: string,
+    values?: { env?: Record<string, string>; packageArgs?: Record<string, string> },
+  ) => getMcpRegistryInstallPreview(registryId, tool, values),
+);
 
 function normalizeOpenPath(raw: string): string {
   let p = raw.trim();
@@ -1674,6 +1706,23 @@ ipcMain.handle("profile-get-tree", () => {
 ipcMain.handle("profile-group-get-forest", () => {
   try {
     return { success: true, forest: getProfileForest() };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("get-onboarding-completed", () => {
+  try {
+    return { success: true, completed: getOnboardingCompleted() };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message, completed: false };
+  }
+});
+
+ipcMain.handle("set-onboarding-completed", () => {
+  try {
+    setOnboardingCompleted();
+    return { success: true };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
   }

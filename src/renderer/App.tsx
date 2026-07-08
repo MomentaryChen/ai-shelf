@@ -47,6 +47,9 @@ const UsageTab = lazy(() =>
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
+const OnboardingModal = lazy(() =>
+  import("./components/OnboardingModal").then((m) => ({ default: m.OnboardingModal })),
+);
 const ChatTab = lazy(() => import("./components/ChatTab").then((m) => ({ default: m.ChatTab })));
 const FlowTab = lazy(() => import("./components/FlowTab").then((m) => ({ default: m.FlowTab })));
 const CommandPalette = lazy(() =>
@@ -94,6 +97,7 @@ export function App() {
   const [appMode, setAppMode] = useState<AppMode>("terminal");
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   /** Bumped when the palette opens so `commands` re-reads the latest terminal ref. */
   const [paletteCommandsRev, setPaletteCommandsRev] = useState(0);
   const paletteOpenRef = useRef(false);
@@ -151,6 +155,20 @@ export function App() {
 
   const tabsEnabled = ready;
   const showSpinner = scanning && !hasData && !error;
+
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    void window.api.getOnboardingCompleted().then((res) => {
+      if (cancelled) return;
+      if (res.success && !res.completed) setOnboardingOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready]);
+
+  const dismissOnboarding = useCallback(() => setOnboardingOpen(false), []);
 
   // Cmd/Ctrl+K toggles the command palette from anywhere (capture so xterm does not eat it).
   useEffect(() => {
@@ -301,6 +319,16 @@ export function App() {
       <Suspense fallback={null}>
         <AppUpdateModal />
       </Suspense>
+      {onboardingOpen && (
+        <Suspense fallback={null}>
+          <OnboardingModal
+            open
+            data={data}
+            onComplete={dismissOnboarding}
+            onSwitchMode={handleModeChange}
+          />
+        </Suspense>
+      )}
       {paletteOpen && (
         <Suspense fallback={null}>
           <CommandPalette open commands={commands} onClose={closePalette} />
@@ -420,6 +448,7 @@ export function App() {
                           onGoDoctor={() => goTo("doctor")}
                           onGoUpdate={() => goTo("update")}
                           onRefreshHealth={refreshHealth}
+                          onRefresh={reload}
                         />
                       )}
                       {activeTab === "models" && <ModelsTab data={data} />}
@@ -428,8 +457,8 @@ export function App() {
                       )}
                       {activeTab === "mcp" && <McpTab data={data} />}
                       {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
-                      {activeTab === "doctor" && <DoctorTab data={data} />}
-                      {activeTab === "update" && <UpdateTab data={data} />}
+                      {activeTab === "doctor" && <DoctorTab data={data} onRefresh={reload} />}
+                      {activeTab === "update" && <UpdateTab data={data} onRefresh={reload} />}
                     </Suspense>
                   )}
                   {activeTab === "usage" && (

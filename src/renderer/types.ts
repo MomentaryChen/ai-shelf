@@ -197,6 +197,51 @@ export interface McpEditResult {
   error?: string;
 }
 
+export type McpRegistryTransport = "stdio" | "remote";
+
+export interface McpRegistryServerItem {
+  id: string;
+  title?: string;
+  description?: string;
+  version: string;
+  transport: McpRegistryTransport;
+  websiteUrl?: string;
+  repositoryUrl?: string;
+}
+
+export interface McpRegistryListResult {
+  servers: McpRegistryServerItem[];
+  nextCursor?: string;
+  error?: string;
+}
+
+export interface McpRegistryEnvVar {
+  name: string;
+  description?: string;
+  isRequired?: boolean;
+  isSecret?: boolean;
+  default?: string;
+}
+
+export interface McpRegistryArg {
+  name: string;
+  description?: string;
+  isRequired?: boolean;
+  default?: string;
+  type?: string;
+}
+
+export interface McpRegistryInstallPreview {
+  registryId: string;
+  suggestedName: string;
+  title?: string;
+  description?: string;
+  transport: McpRegistryTransport;
+  entry: Record<string, unknown>;
+  envVars: McpRegistryEnvVar[];
+  packageArgs: McpRegistryArg[];
+}
+
 export type McpTransport = "stdio" | "http" | "unknown";
 
 export interface McpPingResult {
@@ -418,6 +463,20 @@ export interface UsageDayBucket {
   outputTokens?: number;
 }
 
+export interface UsageDailyToolSlice {
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export interface UsageDailyUnifiedRow {
+  date: string;
+  costUsd: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  byTool: Partial<Record<UsageToolId, UsageDailyToolSlice>>;
+}
+
 export interface UsageModelBreakdown {
   model: string;
   costUsd: number;
@@ -457,8 +516,11 @@ export interface UsageDashboardResult {
   tools: UsageToolSnapshot[];
   summary: {
     totalCostUsd: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
     configuredCount: number;
     supportedCount: number;
+    dailyUnified: UsageDailyUnifiedRow[];
   };
 }
 
@@ -500,6 +562,7 @@ export interface ElectronAPI {
   onScanComplete: (cb: () => void) => void;
   offScanListeners: () => void;
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
+  runInstall: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
   syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
   previewMcpSync: (opts: {
@@ -525,6 +588,16 @@ export interface ElectronAPI {
   ) => Promise<McpEditResult>;
   mcpDeleteServer: (tool: string, name: string) => Promise<McpEditResult>;
   mcpSetServerEnabled: (tool: string, name: string, enabled: boolean) => Promise<McpEditResult>;
+  mcpRegistryList: (opts: {
+    search?: string;
+    cursor?: string;
+    limit?: number;
+  }) => Promise<McpRegistryListResult>;
+  mcpRegistryPreview: (
+    tool: string,
+    registryId: string,
+    values?: { env?: Record<string, string>; packageArgs?: Record<string, string> },
+  ) => Promise<McpRegistryInstallPreview | { error: string }>;
   mcpPingTool: (tool: string) => Promise<McpPingToolResult>;
   openPath: (filePath: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
@@ -593,6 +666,8 @@ export interface ElectronAPI {
   ) => Promise<{ success: boolean; error?: string }>;
   profileGetTree: () => Promise<{ success: boolean; tree?: ProfileTree; error?: string }>;
   profileGroupGetForest: () => Promise<{ success: boolean; forest?: ProfileForest; error?: string }>;
+  getOnboardingCompleted: () => Promise<{ success: boolean; completed?: boolean; error?: string }>;
+  setOnboardingCompleted: () => Promise<{ success: boolean; error?: string }>;
   profileGroupCreate: (
     name: string,
   ) => Promise<{ success: boolean; group?: ProfileGroupInfo; error?: string }>;
