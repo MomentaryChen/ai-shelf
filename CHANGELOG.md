@@ -9,6 +9,29 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-07-07
+
+AI Flow advances to a full in-app workflow with scheduler, DAG inspection, and MCP-backed runner execution.
+
+### Added
+
+- **AI Flow end-to-end workflow** — Added flow authoring, runner settings, source/output dialogs, run history/detail, and dedicated Flow tab UX for staged execution.
+- **Flow scheduling and execution engine** — Added shared flow parsing/runtime modules, Electron flow service/scheduler handlers, and CLI flow commands for generate/run/status workflows.
+- **DAG and command visibility** — Added DAG visualization with node detail and next-run visibility, including agent CLI command inspection from flow nodes.
+- **Flow system skills and runner integrations** — Added always-output system skill injection, MCP runner resolution/config handling, and safer agent tool argument shaping.
+- **Usage insights for Cursor** — Added billing-cycle Cursor spending provider and remaining allowance display in usage views.
+
+### Changed
+
+- **Flow defaults and settings UX** — Unified per-flow settings editing in dialog, moved scheduled-run controls into flow settings, and defaulted Claude agent model toward haiku for generated flows.
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIF for current UI.
+
+### Fixed
+
+- **Flow scheduler correctness** — Fixed cron minute matching and in-app schedule matching so due runs trigger at the expected times.
+- **Flow theme/readability** — Aligned Flow UI colors with global theme tokens for consistent contrast.
+- **Clipboard reliability and notifications** — Improved clipboard write verification/retry and reduced pane-agent ready notification spam.
+
 ## [3.4.0] - 2026-06-30
 
 Terminal layout reliability and copy-on-select setting sync.
@@ -18,6 +41,7 @@ Terminal layout reliability and copy-on-select setting sync.
 - **Terminal refit** — xterm refits reliably after layout settle and font changes; removed CSS override that fought FitAddon.
 - **Copy-on-select sync** — Settings saved in Terminal Settings now propagate to all Electron windows via IPC.
 
+[3.5.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.5.0
 [3.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.4.0
 
 ## [3.3.0] - 2026-06-29
