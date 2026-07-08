@@ -17,6 +17,8 @@ import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
+import { registerShortcutCheatsheetOpener } from "./shortcuts/open-shortcuts";
+import { cheatsheetToggleKeys } from "./shortcuts/shortcut-registry";
 import type { ProviderEntry } from "./types";
 
 const OverviewTab = lazy(() =>
@@ -48,6 +50,9 @@ const ChatTab = lazy(() => import("./components/ChatTab").then((m) => ({ default
 const FlowTab = lazy(() => import("./components/FlowTab").then((m) => ({ default: m.FlowTab })));
 const CommandPalette = lazy(() =>
   import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
+);
+const ShortcutCheatsheet = lazy(() =>
+  import("./components/ShortcutCheatsheet").then((m) => ({ default: m.ShortcutCheatsheet })),
 );
 
 type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update" | "usage";
@@ -156,6 +161,7 @@ export function App() {
   const [appMode, setAppMode] = useState<AppMode>("terminal");
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
   /** Bumped when the palette opens so `commands` re-reads the latest terminal ref. */
   const [paletteCommandsRev, setPaletteCommandsRev] = useState(0);
   const terminalCommandsRef = useRef<Command[]>([]);
@@ -165,16 +171,27 @@ export function App() {
   const [, startTransition] = useTransition();
 
   const openPalette = useCallback(() => {
+    setCheatsheetOpen(false);
     setPaletteCommandsRev((r) => r + 1);
     setPaletteOpen(true);
   }, []);
 
   const togglePalette = useCallback(() => {
     setPaletteOpen((open) => {
-      if (!open) setPaletteCommandsRev((r) => r + 1);
+      if (!open) {
+        setCheatsheetOpen(false);
+        setPaletteCommandsRev((r) => r + 1);
+      }
       return !open;
     });
   }, []);
+
+  const openCheatsheet = useCallback(() => {
+    setPaletteOpen(false);
+    setCheatsheetOpen(true);
+  }, []);
+
+  const closeCheatsheet = useCallback(() => setCheatsheetOpen(false), []);
 
   function handleModeChange(mode: AppMode) {
     startTransition(() => setAppMode(mode));
@@ -211,18 +228,30 @@ export function App() {
   const tabsEnabled = ready;
   const showSpinner = scanning && !hasData && !error;
 
-  // Cmd/Ctrl+K toggles the command palette from anywhere (capture so xterm does not eat it).
+  // Cmd/Ctrl+K toggles the command palette; Cmd/Ctrl+/ opens the shortcuts cheatsheet.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      if (e.key === "k" || e.key === "K") {
         e.preventDefault();
         e.stopPropagation();
         togglePalette();
+        return;
+      }
+      if (e.key === "/") {
+        e.preventDefault();
+        e.stopPropagation();
+        openCheatsheet();
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [togglePalette]);
+  }, [togglePalette, openCheatsheet]);
+
+  useEffect(() => {
+    registerShortcutCheatsheetOpener(openCheatsheet);
+    return () => registerShortcutCheatsheetOpener(null);
+  }, [openCheatsheet]);
 
   useEffect(() => {
     if (appMode === "terminal") {
@@ -298,10 +327,19 @@ export function App() {
         keywords: "mcp sync servers",
         run: () => goTo("mcp"),
       },
+      {
+        id: "show-shortcuts",
+        title: t("cmd.action.shortcuts"),
+        group: t("cmd.group.actions"),
+        icon: "⌨️",
+        keywords: "keyboard shortcuts cheatsheet help",
+        shortcut: cheatsheetToggleKeys(),
+        run: () => openCheatsheet(),
+      },
     ];
     return [...navigate, ...actions];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t]);
+  }, [t, openCheatsheet]);
 
   const sharedModeCommands = useMemo<Command[]>(
     () => [
@@ -326,8 +364,17 @@ export function App() {
         icon: "🧭",
         run: () => handleModeChange("flow"),
       },
+      {
+        id: "show-shortcuts",
+        title: t("cmd.action.shortcuts"),
+        group: t("cmd.group.actions"),
+        icon: "⌨️",
+        keywords: "keyboard shortcuts cheatsheet help",
+        shortcut: cheatsheetToggleKeys(),
+        run: () => openCheatsheet(),
+      },
     ],
-    [t],
+    [t, openCheatsheet],
   );
 
   // Built only while the palette is open
@@ -358,6 +405,15 @@ export function App() {
       {paletteOpen && (
         <Suspense fallback={null}>
           <CommandPalette open commands={commands} onClose={closePalette} />
+        </Suspense>
+      )}
+      {cheatsheetOpen && (
+        <Suspense fallback={null}>
+          <ShortcutCheatsheet
+            open
+            tone={appMode === "terminal" ? "chrome" : "default"}
+            onClose={closeCheatsheet}
+          />
         </Suspense>
       )}
 

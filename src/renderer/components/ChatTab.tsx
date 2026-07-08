@@ -28,6 +28,7 @@ import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
 import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
+import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
   formatFocusPaneBinding,
@@ -1383,6 +1384,13 @@ function ChatTabInner({
             {t("chat.profileShortcutHint", paneShortcutLabels)}
           </p>
           <p className="mt-1 text-[11px] text-chrome-text-dim">{t("chat.debugHint")}</p>
+          <button
+            type="button"
+            onClick={openShortcutCheatsheet}
+            className="mt-2 text-[11px] text-chrome-accent-text underline-offset-2 hover:underline"
+          >
+            {t("shortcuts.openLink")}
+          </button>
         </div>
       ) : (
         <EmptyState
