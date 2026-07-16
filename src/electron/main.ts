@@ -147,6 +147,8 @@ import {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  approveFlowGate,
+  rejectFlowGate,
   saveFlowSchedule,
   saveFlowRunner,
   saveFlowChat,
@@ -2123,6 +2125,18 @@ ipcMain.handle("flow-cancel-run", (_event, flowId: unknown) => {
     return { ok: false, error: "Invalid flow id" };
   }
   return cancelFlowRun(flowId.trim());
+});
+ipcMain.handle("flow-approve-gate", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return approveFlowGate(flowId.trim());
+});
+ipcMain.handle("flow-reject-gate", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return rejectFlowGate(flowId.trim());
 });
 ipcMain.handle("flow-get-task-scheduler-status", () => getFlowTaskSchedulerStatus());
 ipcMain.handle("flow-install-task-scheduler", () => installFlowTaskScheduler());

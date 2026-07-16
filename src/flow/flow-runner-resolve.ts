@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { bootstrap } from "ai-shelf";
-import type { FlowDefinition } from "../shared/flow-types.js";
+import type { FlowDefinition, FlowPhaseDef } from "../shared/flow-types.js";
 import { applyFlowClaudeDefaultModel } from "../shared/claude-tool-args.js";
 import {
   buildToolLaunchCommand,
@@ -8,9 +8,7 @@ import {
   type ToolLaunchArgs,
 } from "../tool-launch.js";
 import { TOOL_LAUNCH_CMD, canonicalToolId } from "../tools.js";
-import {
-  flowAgentSupportsMcp,
-} from "../shared/flow-runner-tools.js";
+import { flowAgentSupportsMcp } from "../shared/flow-runner-tools.js";
 
 export { flowAgentSupportsMcp, FLOW_MCP_AGENT_TOOLS } from "../shared/flow-runner-tools.js";
 
@@ -38,15 +36,23 @@ function resolveProfileDefaults(profileId: string): { cwd?: string; tool?: strin
   }
 }
 
+export type ResolveFlowRunnerOptions = {
+  globalToolLaunchArgs?: ToolLaunchArgs;
+  /** Override tool for a single phase (orchestration). */
+  phaseTool?: string;
+  /** Override tool_args for a single phase. */
+  phaseToolArgs?: string;
+};
+
 export function resolveFlowRunner(
   flow: FlowDefinition,
-  options: { globalToolLaunchArgs?: ToolLaunchArgs } = {},
+  options: ResolveFlowRunnerOptions = {},
 ): ResolvedFlowRunner | { error: string } {
   if (flow.runner !== "claude") {
     return { error: "Runner environment applies only to agent (claude) flows" };
   }
 
-  let tool = flow.agentTool || "claude";
+  let tool = options.phaseTool?.trim() || flow.agentTool || "claude";
   let cwd = flow.cwd?.trim() || "";
 
   if (flow.profileId?.trim()) {
@@ -55,7 +61,9 @@ export function resolveFlowRunner(
       return { error: `Profile not found: ${flow.profileId}` };
     }
     if (!flow.cwd?.trim() && fromProfile.cwd) cwd = fromProfile.cwd;
-    if (flow.profileInheritsTool && fromProfile.tool) tool = fromProfile.tool;
+    if (!options.phaseTool?.trim() && flow.profileInheritsTool && fromProfile.tool) {
+      tool = fromProfile.tool;
+    }
   }
 
   if (!cwd) cwd = process.cwd();
@@ -64,7 +72,7 @@ export function resolveFlowRunner(
   const canonical = canonicalToolId(tool);
   if (!flowAgentSupportsMcp(canonical)) {
     return {
-      error: `Tool "${tool}" is not supported for AI Flow yet. Use claude or cursor agent.`,
+      error: `Tool "${tool}" is not supported for AI Flow yet. Use claude, cursor, codex, or gemini.`,
     };
   }
 
@@ -83,7 +91,9 @@ export function resolveFlowRunner(
         options.globalToolLaunchArgs.agent)
     : undefined;
 
-  let mergedExtra = [globalExtra?.trim(), flow.toolArgs?.trim()].filter(Boolean).join(" ");
+  const phaseExtra = options.phaseToolArgs?.trim();
+  const flowExtra = phaseExtra !== undefined ? phaseExtra : flow.toolArgs?.trim();
+  let mergedExtra = [globalExtra?.trim(), flowExtra].filter(Boolean).join(" ");
   if (canonical === "claude") {
     mergedExtra = applyFlowClaudeDefaultModel(mergedExtra);
   }
@@ -92,4 +102,17 @@ export function resolveFlowRunner(
     buildToolLaunchCommand(launchBase, mergedExtra);
 
   return { tool: canonical, launchCommand, cwd };
+}
+
+/** Resolve runner for one orchestrated phase (inherits flow defaults). */
+export function resolvePhaseRunner(
+  flow: FlowDefinition,
+  phase: FlowPhaseDef,
+  options: { globalToolLaunchArgs?: ToolLaunchArgs } = {},
+): ResolvedFlowRunner | { error: string } {
+  return resolveFlowRunner(flow, {
+    globalToolLaunchArgs: options.globalToolLaunchArgs,
+    phaseTool: phase.tool,
+    phaseToolArgs: phase.toolArgs,
+  });
 }
