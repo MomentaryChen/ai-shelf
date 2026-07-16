@@ -36,6 +36,26 @@ import {
   writeSkillsToTool,
 } from "../utils/skills-sync.js";
 import {
+  evaluateTeamPolicy,
+  filterAllowedMcpNames,
+  filterAllowedSkillNames,
+  type TeamPolicy,
+} from "../shared/team-policy.js";
+import {
+  exportTeamPolicyToPath,
+  getTeamPolicyPath,
+  importTeamPolicyFromPath,
+  readTeamPolicy,
+  writeTeamPolicy,
+} from "../utils/team-policy-store.js";
+import {
+  buildConfigAlignGaps,
+  mcpMissingFromTargets,
+  resolveMcpSource,
+  resolveSkillsSource,
+  skillsMissingFromTargets,
+} from "../utils/config-policy-diff.js";
+import {
   deleteMcpServer,
   listMcpServersDetailed,
   setMcpServerEnabled,
@@ -961,13 +981,16 @@ ipcMain.handle("get-mcp-raw", async () => {
 ipcMain.handle("sync-mcp", async (_event, opts: {
   serverNames: string[];
   targetTools: string[];
+  sourceTool?: string;
 }) => {
-  const { serverNames, targetTools } = opts;
-  const allServers = collectAllMcpServers();
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveMcpSource(policy);
+  const serverNames = filterAllowedMcpNames(policy, opts.serverNames);
+  const allServers = collectAllMcpServers(sourceTool);
 
   const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
-  for (const tool of targetTools) {
+  for (const tool of opts.targetTools) {
     results.push({ tool, ...writeMcpServers(tool, serverNames, allServers) });
   }
 
@@ -977,7 +1000,96 @@ ipcMain.handle("sync-mcp", async (_event, opts: {
 ipcMain.handle("preview-mcp-sync", (_event, opts: {
   serverNames: string[];
   targetTools: string[];
-}) => previewMcpSync(opts));
+  sourceTool?: string;
+}) => {
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveMcpSource(policy);
+  return previewMcpSync({ ...opts, sourceTool, policy });
+});
+
+// --- Team config policy ---
+
+ipcMain.handle("get-team-policy", () => ({
+  policy: readTeamPolicy(),
+  path: getTeamPolicyPath(),
+}));
+
+ipcMain.handle("set-team-policy", (_event, policy: unknown) => {
+  if (!policy || typeof policy !== "object") {
+    return { ok: false, policy: readTeamPolicy(), path: getTeamPolicyPath(), error: "Invalid policy" };
+  }
+  const next = writeTeamPolicy(policy as TeamPolicy);
+  return { ok: true, policy: next, path: getTeamPolicyPath() };
+});
+
+ipcMain.handle("evaluate-team-policy", () => {
+  const policy = readTeamPolicy();
+  const mcpByTool = Object.fromEntries(
+    SYNC_TOOLS.map((tool) => [tool, Object.keys(readMcpServers(tool))]),
+  );
+  const skillsByTool = Object.fromEntries(
+    SYNC_SKILL_TOOLS.map((tool) => [tool, Object.keys(readSkillsForTool(tool))]),
+  );
+  return {
+    policy,
+    path: getTeamPolicyPath(),
+    violations: evaluateTeamPolicy(policy, mcpByTool, skillsByTool),
+  };
+});
+
+ipcMain.handle("get-config-align-gaps", (_event, opts?: {
+  mcpSourceTool?: string;
+  skillsSourceTool?: string;
+  mcpTargets?: string[];
+  skillTargets?: string[];
+}) => {
+  const policy = readTeamPolicy();
+  return {
+    policy,
+    gaps: buildConfigAlignGaps({
+      policy,
+      mcpSourceTool: opts?.mcpSourceTool,
+      skillsSourceTool: opts?.skillsSourceTool,
+      mcpTargets: opts?.mcpTargets,
+      skillTargets: opts?.skillTargets,
+    }),
+    mcpSource: resolveMcpSource(policy, opts?.mcpSourceTool),
+    skillsSource: resolveSkillsSource(policy, opts?.skillsSourceTool),
+  };
+});
+
+ipcMain.handle("import-team-policy", async () => {
+  const parent = BrowserWindow.getFocusedWindow();
+  const options = {
+    title: "Import team policy",
+    filters: [{ name: "JSON", extensions: ["json"] }],
+    properties: ["openFile" as const],
+  };
+  const result = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options);
+  if (result.canceled || !result.filePaths[0]) {
+    return { ok: false, policy: readTeamPolicy(), path: getTeamPolicyPath(), canceled: true };
+  }
+  const imported = importTeamPolicyFromPath(result.filePaths[0]);
+  return { ...imported, path: getTeamPolicyPath(), canceled: false };
+});
+
+ipcMain.handle("export-team-policy", async () => {
+  const parent = BrowserWindow.getFocusedWindow();
+  const options = {
+    title: "Export team policy",
+    defaultPath: "ai-shelf-team-policy.json",
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  };
+  const result = parent
+    ? await dialog.showSaveDialog(parent, options)
+    : await dialog.showSaveDialog(options);
+  if (result.canceled || !result.filePath) {
+    return { ok: false, canceled: true };
+  }
+  return { ...exportTeamPolicyToPath(result.filePath), canceled: false };
+});
 
 // --- Health monitor ---
 
@@ -1018,17 +1130,80 @@ ipcMain.handle("get-skills-raw", async () => {
 ipcMain.handle("sync-skills", async (_event, opts: {
   skillNames: string[];
   targetTools: string[];
+  sourceTool?: string;
 }) => {
-  const { skillNames, targetTools } = opts;
-  const allSkills = collectAllSkills();
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveSkillsSource(policy);
+  const skillNames = filterAllowedSkillNames(policy, opts.skillNames);
+  const allSkills = collectAllSkills(sourceTool);
 
   const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
-  for (const tool of targetTools) {
+  for (const tool of opts.targetTools) {
     results.push({ tool, ...writeSkillsToTool(tool, skillNames, allSkills) });
   }
 
   return results;
+});
+
+/** Align missing MCP/skills from source of truth onto targets (missing-only). */
+ipcMain.handle("align-config-from-source", async (_event, opts?: {
+  mcpSourceTool?: string;
+  skillsSourceTool?: string;
+  mcpTargets?: string[];
+  skillTargets?: string[];
+  syncMcp?: boolean;
+  syncSkills?: boolean;
+}) => {
+  const policy = readTeamPolicy();
+  const mcpSource = resolveMcpSource(policy, opts?.mcpSourceTool);
+  const skillsSource = resolveSkillsSource(policy, opts?.skillsSourceTool);
+  const syncMcp = opts?.syncMcp !== false;
+  const syncSkills = opts?.syncSkills !== false;
+
+  const mcpTargets = (opts?.mcpTargets ?? [...SYNC_TOOLS]).filter((t) => t !== mcpSource);
+  const skillTargets = (opts?.skillTargets ?? [...SYNC_SKILL_TOOLS]).filter(
+    (t) => t !== skillsSource,
+  );
+
+  const mcpResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+  const skillResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+
+  if (syncMcp) {
+    const { byTarget } = mcpMissingFromTargets({
+      sourceTool: mcpSource,
+      targetTools: mcpTargets,
+      policy,
+    });
+    const allServers = collectAllMcpServers(mcpSource);
+    for (const tool of mcpTargets) {
+      const names = byTarget[tool] ?? [];
+      if (names.length === 0) {
+        mcpResults.push({ tool, added: [], skipped: [] });
+        continue;
+      }
+      mcpResults.push({ tool, ...writeMcpServers(tool, names, allServers) });
+    }
+  }
+
+  if (syncSkills) {
+    const { byTarget } = skillsMissingFromTargets({
+      sourceTool: skillsSource,
+      targetTools: skillTargets,
+      policy,
+    });
+    const allSkills = collectAllSkills(skillsSource);
+    for (const tool of skillTargets) {
+      const names = byTarget[tool] ?? [];
+      if (names.length === 0) {
+        skillResults.push({ tool, added: [], skipped: [] });
+        continue;
+      }
+      skillResults.push({ tool, ...writeSkillsToTool(tool, names, allSkills) });
+    }
+  }
+
+  return { mcpSource, skillsSource, mcpResults, skillResults };
 });
 
 // --- In-app config editing & MCP server management ---
