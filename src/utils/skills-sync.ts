@@ -58,10 +58,21 @@ export function readSkillsForTool(tool: string): SkillsMap {
   return map;
 }
 
-/** Collect the union of all skills across sync-enabled tools (first path wins). */
-export function collectAllSkills(): SkillsMap {
+/**
+ * Collect the union of all skills across sync-enabled tools.
+ * When `sourceTool` is set, that tool's entries win for content (source of truth).
+ */
+export function collectAllSkills(sourceTool?: string): SkillsMap {
   const all: SkillsMap = {};
-  for (const tool of SYNC_SKILL_TOOLS) {
+  const preferred =
+    sourceTool && (SYNC_SKILL_TOOLS as readonly string[]).includes(sourceTool)
+      ? sourceTool
+      : undefined;
+  const order = preferred
+    ? [preferred, ...SYNC_SKILL_TOOLS.filter((t) => t !== preferred)]
+    : [...SYNC_SKILL_TOOLS];
+
+  for (const tool of order) {
     const skills = readSkillsForTool(tool);
     for (const [name, entry] of Object.entries(skills)) {
       if (!all[name]) all[name] = entry;

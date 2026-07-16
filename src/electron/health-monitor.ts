@@ -1,9 +1,8 @@
 import { app, Notification, type BrowserWindow } from "electron";
-import { execSync } from "node:child_process";
 import { detectAll } from "../inventory/index.js";
 import type { ProviderEntry } from "../inventory/types.js";
-import { TOOL_NPM_PACKAGE } from "../tools.js";
 import { isVersionOlder } from "../utils/version.js";
+import { fetchRemoteLatestVersion } from "../utils/latest-version.js";
 import { runChecksForEntry, type DoctorToolResult } from "./doctor-checks.js";
 import {
   getDesktopSelfLatestVersion,
@@ -73,38 +72,27 @@ function broadcastState(): void {
   }
 }
 
-function fetchLatestNpmVersion(pkg: string): string | null {
-  try {
-    return execSync(`npm view ${pkg} version`, {
-      encoding: "utf-8",
-      timeout: 10_000,
-    }).trim();
-  } catch {
-    return null;
-  }
-}
-
-function buildUpdateAlerts(entries: ProviderEntry[]): HealthAlert[] {
+async function buildUpdateAlerts(entries: ProviderEntry[]): Promise<HealthAlert[]> {
   const alerts: HealthAlert[] = [];
   const outdated: HealthMonitorState["outdatedTools"] = [];
 
   const installed = entries.filter((e) => e.available);
-  for (const entry of installed) {
-    const pkg = TOOL_NPM_PACKAGE[entry.tool];
-    if (!pkg) continue;
-    const latest = fetchLatestNpmVersion(pkg);
-    const current = entry.version ?? null;
-    if (latest && current && isVersionOlder(current, latest)) {
-      outdated.push({ tool: entry.tool, current, latest });
-      alerts.push({
-        id: `update:${entry.tool}`,
-        kind: "update",
-        severity: "warn",
-        tool: entry.tool,
-        message: `${entry.tool} update available (${current} → ${latest})`,
-      });
-    }
-  }
+  await Promise.all(
+    installed.map(async (entry) => {
+      const latest = await fetchRemoteLatestVersion(entry.tool);
+      const current = entry.version ?? null;
+      if (latest && current && isVersionOlder(current, latest)) {
+        outdated.push({ tool: entry.tool, current, latest });
+        alerts.push({
+          id: `update:${entry.tool}`,
+          kind: "update",
+          severity: "warn",
+          tool: entry.tool,
+          message: `${entry.tool} update available (${current} → ${latest})`,
+        });
+      }
+    }),
+  );
 
   if (app.isPackaged && isDesktopAutoUpdateEnabled()) {
     const selfVersion = app.getVersion();
@@ -234,7 +222,7 @@ export async function runHealthCheck(): Promise<HealthMonitorState> {
     }
 
     const entries = await detectAll({ quick: true });
-    const updateAlerts = buildUpdateAlerts(entries);
+    const updateAlerts = await buildUpdateAlerts(entries);
     const doctorResults = entries.map(runChecksForEntry);
     const { alerts: doctorAlerts, summary } = buildDoctorAlerts(doctorResults);
 

@@ -25,7 +25,7 @@ export type FlowPromptLogEntry = {
   kind: FlowPromptLogKind;
   flowId: string;
   runId?: string;
-  inputFormat: "text";
+  inputFormat: "text" | "arg";
   prompt: string;
   cliArgs?: string[];
 };

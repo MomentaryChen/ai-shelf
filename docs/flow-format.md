@@ -48,10 +48,31 @@ phases:
 | `runner` | no | `claude` (default) or `http` for direct fetch checks |
 | `url` | when `runner: http` | Request URL |
 | `method` | no | `HEAD` (default) or `GET` when `runner: http` |
-| `phases` | no | UI checklist; auto-derived from `【phase-id】` in body if omitted |
+| `phases` | no | UI checklist / orchestration nodes; auto-derived from `【phase-id】` in body if omitted |
+| `orchestration` | no | Force multi-node mode; also auto when phases set `tool` / `kind` / `retry` / gate / `next` / `on_fail` |
 | `tool_args` | no | CLI flags for the agent; default `--model haiku` when omitted |
 | `extra_mcp_servers` | no | MCP server names merged from Claude config (strict scope — only these + `ai-shelf-flow`) |
 | `allowed_tools` | no | Extra `--allowedTools` patterns for external MCP |
+
+### Per-phase fields (under `phases:`)
+
+| Field | Description |
+|-------|-------------|
+| `id` / `label` | Required id; label defaults from id |
+| `tool` | `claude` / `cursor` / `codex` / `gemini` for this node |
+| `tool_args` | Per-node CLI flags |
+| `kind` | `agent` (default) / `gate` (human approve) / `http` |
+| `retry` | Extra attempts after failure (0–10) |
+| `on_fail` | `fail` (default) / `skip` / phase id to jump to |
+| `require_approval` | Pause for approve before running the node |
+| `next` | Next phase id after success (omit = next in list; empty = end) |
+| `on_reject` | Branch when a gate is rejected (`fail` / `skip` / phase id) |
+
+## Multi-node orchestration
+
+When enabled, each phase runs as a separate process. Upstream `runs/{runId}/phases/{id}/output.md` is injected into the next prompt. Human gates use run status `waiting_approval` and IPC `flow-approve-gate` / `flow-reject-gate`.
+
+Legacy flows without per-phase orchestration fields still run as a single agent for the whole body.
 
 ## Run state (`runs/{runId}/state.json`)
 

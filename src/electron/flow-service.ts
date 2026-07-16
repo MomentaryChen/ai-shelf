@@ -24,6 +24,8 @@ import {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  approveFlowGate,
+  rejectFlowGate,
   saveFlowSchedule,
   saveFlowRunner,
 } from "../flow/core.js";
@@ -63,6 +65,8 @@ export {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  approveFlowGate,
+  rejectFlowGate,
   saveFlowChat,
   saveFlowSchedule,
   saveFlowRunner,

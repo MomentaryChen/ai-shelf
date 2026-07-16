@@ -169,6 +169,25 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 **Skills** 分頁顯示各工具回報的技能。
 
+### 團隊設定政策
+
+分頁上方可編輯共用的 **team policy**（應用程式資料目錄下的 `team-policy.json`）：
+
+- **Source of truth** — 對齊／同步時預設採用的 MCP／技能來源工具
+- **禁止／必備** MCP Server 名稱與技能名稱
+- **匯入／匯出** JSON，方便團隊共用同一套規則
+- **政策檢查** 會列出同步支援工具上的禁止／必備違規
+
+禁止名稱會被擋下、無法寫入同步（MCP 預覽中顯示為 `blocked`）。
+
+### 依來源對齊設定
+
+在政策卡下方選擇 MCP／技能來源工具、檢視其他工具的缺口，再 **一鍵對齊缺少項目**（只補缺、不覆寫）。政策預設會帶入來源選項。
+
+### 技能同步矩陣
+
+跨工具複製缺少的 `SKILL.md` 資料夾，並可選擇 source of truth 決定內容來源偏好。
+
 ### 各工具卡片
 
 每個工具一張卡：圖示、名稱、技能數量徽章，以及技能標籤（例如 `bash`、`file-edit`、`mcp` 等）。
@@ -203,10 +222,12 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 在同一矩陣卡內可操作 JSON MCP 項目複製／補齊：
 
+- **Source:** 同名伺服器存在於多個工具時，以此工具的內容為準（預設來自團隊政策）
 - **Sync to:** 勾選寫入目標（程式內對應 `claude`、`copilot`、`cursor`、`codex`、`gemini`、`opencode`）
 - Codex 寫入 `~/.codex/config.toml` 的 `[mcp_servers.*]`；Aider 不支援 MCP。新工具建議優先使用 JSON MCP 設定以降低同步成本。
 - **Sync Selected (`n`)** — 僅對第一欄勾選的伺服器套用
 - **Sync All Missing (`n`)** — 對所有仍需補齊的列一次套用
+- 預覽會顯示新增、略過、衝突，以及被政策 **封鎖** 的禁止伺服器
 - 執行中按鈕顯示 **Syncing…**，完成後可依工具列出 `added`、`skipped` 或錯誤訊息
 - 已全面配置之列會以較淡樣式顯示；矩陣底部註腳統計總伺服器數、**need sync**、**fully synced**
 
@@ -278,7 +299,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 | OpenCode | `opencode upgrade` |
 | AI Shelf（self / desktop） | **安裝版**：啟動後檢查 GitHub Release，確認後在 App 內下載並重啟安裝（Update 分頁 **Download & upgrade desktop**）。**開發／原始碼**：依環境顯示 `pnpm` / `yarn` / `npm` 全域更新指令 |
 
-對列在 `TOOL_NPM_PACKAGE` 的 CLI，程式會請 npm registry 協助決定是否有較新版本；桌面安裝版改以 `electron-updater` 比對 GitHub 上的 `latest.yml`。
+對列在 `TOOL_NPM_PACKAGE` 的 CLI，程式會請 npm registry 協助決定是否有較新版本；沒有 npm 套件的工具（Aider、OpenCode、Crush、Goose）則查 GitHub Releases（`TOOL_GITHUB_REPO`）；桌面安裝版改以 `electron-updater` 比對 GitHub 上的 `latest.yml`。
 
 ---
 

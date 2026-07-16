@@ -1,7 +1,9 @@
 import {
   FLOW_DEFINITION_SCHEMA,
   type FlowDefinition,
+  type FlowPhaseBranch,
   type FlowPhaseDef,
+  type FlowPhaseKind,
 } from "./flow-types.js";
 
 const PHASE_TAG_RE = /【([a-z0-9][a-z0-9_-]*)】/gi;
@@ -27,6 +29,42 @@ export function extractPhaseIdsFromBody(body: string): string[] {
   return ids;
 }
 
+function parsePhaseKind(raw: unknown): FlowPhaseKind | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim().toLowerCase();
+  if (v === "agent" || v === "gate" || v === "http") return v;
+  return undefined;
+}
+
+function parsePhaseBranch(raw: unknown): FlowPhaseBranch | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim();
+  return v || undefined;
+}
+
+function parsePhaseFields(rec: Record<string, unknown>, id: string, label: string): FlowPhaseDef {
+  const phase: FlowPhaseDef = { id, label };
+  const kind = parsePhaseKind(rec.kind);
+  if (kind) phase.kind = kind;
+  if (typeof rec.tool === "string" && rec.tool.trim()) phase.tool = rec.tool.trim();
+  if (typeof rec.tool_args === "string" && rec.tool_args.trim()) {
+    phase.toolArgs = rec.tool_args.trim();
+  }
+  if (typeof rec.timeout_sec === "number" && rec.timeout_sec > 0) {
+    phase.timeoutSec = rec.timeout_sec;
+  }
+  if (typeof rec.retry === "number" && rec.retry >= 0) {
+    phase.retry = Math.floor(rec.retry);
+  }
+  const onFail = parsePhaseBranch(rec.on_fail);
+  if (onFail) phase.onFail = onFail;
+  if (rec.require_approval === true) phase.requireApproval = true;
+  if (typeof rec.next === "string") phase.next = rec.next.trim();
+  const onReject = parsePhaseBranch(rec.on_reject);
+  if (onReject) phase.onReject = onReject;
+  return phase;
+}
+
 function parsePhasesFromFrontmatter(raw: unknown): FlowPhaseDef[] {
   if (!Array.isArray(raw)) return [];
   const phases: FlowPhaseDef[] = [];
@@ -37,7 +75,7 @@ function parsePhasesFromFrontmatter(raw: unknown): FlowPhaseDef[] {
     if (!id) continue;
     const label =
       typeof rec.label === "string" && rec.label.trim() ? rec.label.trim() : slugLabel(id);
-    phases.push({ id, label });
+    phases.push(parsePhaseFields(rec, id, label));
   }
   return phases;
 }
@@ -113,25 +151,36 @@ function parseSimpleFrontmatter(yaml: string): Record<string, unknown> {
     const rest = keyMatch[2]!.trim();
 
     if (key === "phases" && rest === "") {
-      const phases: { id: string; label?: string }[] = [];
+      const phases: Record<string, unknown>[] = [];
       i += 1;
+      let current: Record<string, unknown> | null = null;
       while (i < lines.length) {
         const phaseLine = lines[i]!;
         if (!phaseLine.startsWith("  ")) break;
         const idMatch = /^\s+-\s+id:\s*(.+)$/.exec(phaseLine);
         if (idMatch) {
-          const phase: { id: string; label?: string } = { id: unquoteYamlScalar(idMatch[1]!.trim()) };
-          if (i + 1 < lines.length) {
-            const labelMatch = /^\s+label:\s*(.+)$/.exec(lines[i + 1]!);
-            if (labelMatch) {
-              phase.label = unquoteYamlScalar(labelMatch[1]!.trim());
-              i += 1;
+          if (current) phases.push(current);
+          current = { id: unquoteYamlScalar(idMatch[1]!.trim()) };
+          i += 1;
+          continue;
+        }
+        if (current) {
+          const fieldMatch = /^\s+([a-zA-Z0-9_]+):\s*(.*)$/.exec(phaseLine);
+          if (fieldMatch) {
+            const fieldKey = fieldMatch[1]!;
+            const fieldRest = fieldMatch[2]!.trim();
+            if (fieldRest === "true" || fieldRest === "false") {
+              current[fieldKey] = fieldRest === "true";
+            } else if (/^-?\d+$/.test(fieldRest)) {
+              current[fieldKey] = Number(fieldRest);
+            } else if (fieldRest !== "") {
+              current[fieldKey] = unquoteYamlScalar(fieldRest);
             }
           }
-          phases.push(phase);
         }
         i += 1;
       }
+      if (current) phases.push(current);
       result.phases = phases;
       continue;
     }
@@ -194,6 +243,7 @@ export function parseFlowDocument(
     typeof fm.timeout_sec === "number" && fm.timeout_sec > 0 ? fm.timeout_sec : 600;
   const onFail = fm.on_fail === "slack" ? "slack" : "none";
   const runner = fm.runner === "http" ? "http" : "claude";
+  const orchestration = fm.orchestration === true ? true : undefined;
   const agentTool =
     typeof fm.tool === "string" && fm.tool.trim() ? fm.tool.trim() : "claude";
   const profileInheritsTool = !(typeof fm.tool === "string" && fm.tool.trim());
@@ -229,6 +279,7 @@ export function parseFlowDocument(
     filePath,
     enabled,
     runner,
+    orchestration,
     httpUrl,
     httpMethod,
     schedule: typeof fm.schedule === "string" ? fm.schedule : undefined,

@@ -4,6 +4,7 @@ import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
 import { DataTable, Td } from "./DataTable";
 import { Badge, InstallStatusBadge } from "./Badge";
+import { ConfigPolicyPanel } from "./ConfigPolicyPanel";
 import { SkillsMcpDiffPanel } from "./SkillsMcpDiffPanel";
 import { SkillsSyncPanel } from "./SkillsSyncPanel";
 import { SkillTags, resolveSkillDetails } from "./SkillTags";
@@ -53,7 +54,9 @@ export function SkillsTab({
     <>
       <SectionHeading icon={Zap}>{t("app.tab.skills")}</SectionHeading>
 
-      <SkillsMcpDiffPanel data={data} onOpenMcpSync={onOpenMcpSync} />
+      <ConfigPolicyPanel />
+
+      <SkillsMcpDiffPanel onOpenMcpSync={onOpenMcpSync} />
 
       <SkillsSyncPanel />
 

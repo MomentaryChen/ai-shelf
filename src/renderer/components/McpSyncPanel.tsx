@@ -21,6 +21,7 @@ export function McpSyncPanel() {
   const [targetTools, setTargetTools] = useState<Set<string>>(new Set(TOOLS));
   const [syncing, setSyncing] = useState(false);
   const [results, setResults] = useState<McpSyncResult[] | null>(null);
+  const [sourceTool, setSourceTool] = useState<string>("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItems, setPreviewItems] = useState<McpSyncPreviewItem[]>([]);
   const [pendingSync, setPendingSync] = useState<{
@@ -31,8 +32,12 @@ export function McpSyncPanel() {
   const load = useCallback(async () => {
     setResults(null);
     try {
-      const data = await window.api.getMcpRaw();
+      const [data, policyRes] = await Promise.all([
+        window.api.getMcpRaw(),
+        window.api.getTeamPolicy(),
+      ]);
       setRawData(data);
+      setSourceTool((prev) => prev || policyRes.policy.sourceOfTruth?.mcp || "claude");
     } catch (err) {
       console.error("[McpSyncPanel] load error:", err);
     }
@@ -73,7 +78,11 @@ export function McpSyncPanel() {
     setSyncing(true);
     setResults(null);
     try {
-      const res = await window.api.syncMcp({ serverNames, targetTools: tools });
+      const res = await window.api.syncMcp({
+        serverNames,
+        targetTools: tools,
+        sourceTool: sourceTool || undefined,
+      });
       setResults(res);
       await load();
     } catch {
@@ -92,16 +101,10 @@ export function McpSyncPanel() {
       const preview = await window.api.previewMcpSync({
         serverNames,
         targetTools: tools,
+        sourceTool: sourceTool || undefined,
       });
       if (preview.length === 0) {
         setResults([{ tool: "all", added: [], skipped: [], error: "No matching servers" }]);
-        return;
-      }
-      const adds = preview.filter((p) => p.action === "add");
-      if (adds.length === 0) {
-        setPreviewItems(preview);
-        setPendingSync({ serverNames, targetTools: tools });
-        setPreviewOpen(true);
         return;
       }
       setPreviewItems(preview);
@@ -168,6 +171,20 @@ export function McpSyncPanel() {
       {/* Controls row */}
       {syncableServers.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-bg-primary px-3 py-2.5">
+          <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <span className="font-semibold uppercase tracking-wider">{t("inventory.mcpSync.sourceOfTruth")}</span>
+            <select
+              value={sourceTool}
+              onChange={(e) => setSourceTool(e.target.value)}
+              className="rounded border border-border bg-bg-card px-2 py-1 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              {TOOLS.map((tool) => (
+                <option key={tool} value={tool}>
+                  {tool}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="flex items-center gap-2 text-xs text-text-secondary">
             <span className="font-semibold uppercase tracking-wider">{t("inventory.mcpSync.syncTo")}</span>
             {TOOLS.map((tool) => (

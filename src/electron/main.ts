@@ -13,10 +13,14 @@ import {
 } from "../inventory/index.js";
 import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
-import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_NPM_PACKAGE, TOOL_UPDATE } from "../tools.js";
+import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
+import {
+  fetchRemoteLatestVersion,
+  resolveToolLatestVersion,
+} from "../utils/latest-version.js";
 import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
 import {
   collectAllMcpServers,
@@ -31,6 +35,26 @@ import {
   SYNC_SKILL_TOOLS,
   writeSkillsToTool,
 } from "../utils/skills-sync.js";
+import {
+  evaluateTeamPolicy,
+  filterAllowedMcpNames,
+  filterAllowedSkillNames,
+  type TeamPolicy,
+} from "../shared/team-policy.js";
+import {
+  exportTeamPolicyToPath,
+  getTeamPolicyPath,
+  importTeamPolicyFromPath,
+  readTeamPolicy,
+  writeTeamPolicy,
+} from "../utils/team-policy-store.js";
+import {
+  buildConfigAlignGaps,
+  mcpMissingFromTargets,
+  resolveMcpSource,
+  resolveSkillsSource,
+  skillsMissingFromTargets,
+} from "../utils/config-policy-diff.js";
 import {
   deleteMcpServer,
   listMcpServersDetailed,
@@ -143,6 +167,8 @@ import {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  approveFlowGate,
+  rejectFlowGate,
   saveFlowSchedule,
   saveFlowRunner,
   saveFlowChat,
@@ -603,31 +629,6 @@ ipcMain.handle("get-env-vars", () => {
   ];
 });
 
-function fetchLatestNpmVersion(pkg: string): string | null {
-  try {
-    return execSync(`npm view ${pkg} version`, {
-      encoding: "utf-8",
-      timeout: 10000,
-    }).trim();
-  } catch {
-    return null;
-  }
-}
-
-/** npm registry when available; optional baseline from installed version (single-tool refresh). */
-function resolveToolLatestVersion(
-  tool: string,
-  available: boolean,
-  currentVersion: string | null,
-  npmLatest: string | null | undefined,
-  inferNonNpmFromInstalled = false,
-): string | null {
-  if (!available) return null;
-  if (tool in TOOL_NPM_PACKAGE) return npmLatest ?? null;
-  if (inferNonNpmFromInstalled) return currentVersion ?? null;
-  return null;
-}
-
 ipcMain.handle("check-update", async () => {
   const results: {
     tool: string;
@@ -646,16 +647,12 @@ ipcMain.handle("check-update", async () => {
     entries = getCachedInventory() ?? [];
   }
 
-  const installedToolIds = new Set(
-    entries.filter((e) => e.available).map((e) => e.tool),
-  );
+  const installedEntries = entries.filter((e) => e.available);
   const latestVersionMap: Record<string, string | null> = {};
   await Promise.all(
-    Object.entries(TOOL_NPM_PACKAGE)
-      .filter(([tool]) => installedToolIds.has(tool))
-      .map(async ([tool, pkg]) => {
-        latestVersionMap[tool] = fetchLatestNpmVersion(pkg);
-      }),
+    installedEntries.map(async (entry) => {
+      latestVersionMap[entry.tool] = await fetchRemoteLatestVersion(entry.tool);
+    }),
   );
 
   for (const entry of entries) {
@@ -669,6 +666,7 @@ ipcMain.handle("check-update", async () => {
         entry.available,
         entry.version ?? null,
         latestVersionMap[entry.tool],
+        true,
       ),
       available: entry.available,
       updateCommand: cfg ? cfg.update.join(" ") : "",
@@ -683,7 +681,7 @@ ipcMain.handle("check-update", async () => {
   return { tools: results };
 });
 
-/** Re-detect one tool's installed version and npm latest (after a single-tool update). */
+/** Re-detect one tool's installed version and remote latest (after a single-tool update). */
 ipcMain.handle("refresh-tool-update-info", async (_event, tool: string) => {
   if (tool === "ai-shelf") {
     const selfLatest = app.isPackaged ? await resolveDesktopSelfLatestVersion() : null;
@@ -694,13 +692,12 @@ ipcMain.handle("refresh-tool-update-info", async (_event, tool: string) => {
   if (!detected) return null;
 
   const cfg = TOOL_UPDATE_COMMANDS[detected.tool] ?? TOOL_UPDATE_COMMANDS[tool];
-  const pkg = TOOL_NPM_PACKAGE[detected.tool] ?? TOOL_NPM_PACKAGE[tool];
-  const npmLatest = pkg ? fetchLatestNpmVersion(pkg) : null;
+  const remoteLatest = await fetchRemoteLatestVersion(detected.tool);
   const latestVersion = resolveToolLatestVersion(
     detected.tool,
     detected.available,
     detected.version ?? null,
-    npmLatest,
+    remoteLatest,
     true,
   );
 
@@ -788,7 +785,7 @@ ipcMain.handle("start-update-scan", async (event) => {
     } catch { /* skip failed detectors */ }
   }));
 
-  // Now check npm latest (or desktop updater for ai-shelf) — installed tools only
+  // Now check npm / GitHub latest (or desktop updater for ai-shelf) — installed tools only
   await Promise.all(allTools.map(async (info) => {
     const { tool, available } = info;
     if (tool !== "ai-shelf" && !available) {
@@ -798,9 +795,8 @@ ipcMain.handle("start-update-scan", async (event) => {
     let latestVersion: string | null = null;
     if (tool === "ai-shelf" && app.isPackaged) {
       latestVersion = await resolveDesktopSelfLatestVersion();
-    } else {
-      const pkg = TOOL_NPM_PACKAGE[tool];
-      latestVersion = pkg ? fetchLatestNpmVersion(pkg) : null;
+    } else if (tool !== "ai-shelf") {
+      latestVersion = await fetchRemoteLatestVersion(tool);
     }
     push("tool-latest", { tool, latestVersion });
   }));
@@ -987,13 +983,16 @@ ipcMain.handle("get-mcp-raw", async () => {
 ipcMain.handle("sync-mcp", async (_event, opts: {
   serverNames: string[];
   targetTools: string[];
+  sourceTool?: string;
 }) => {
-  const { serverNames, targetTools } = opts;
-  const allServers = collectAllMcpServers();
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveMcpSource(policy);
+  const serverNames = filterAllowedMcpNames(policy, opts.serverNames);
+  const allServers = collectAllMcpServers(sourceTool);
 
   const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
-  for (const tool of targetTools) {
+  for (const tool of opts.targetTools) {
     results.push({ tool, ...writeMcpServers(tool, serverNames, allServers) });
   }
 
@@ -1003,7 +1002,96 @@ ipcMain.handle("sync-mcp", async (_event, opts: {
 ipcMain.handle("preview-mcp-sync", (_event, opts: {
   serverNames: string[];
   targetTools: string[];
-}) => previewMcpSync(opts));
+  sourceTool?: string;
+}) => {
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveMcpSource(policy);
+  return previewMcpSync({ ...opts, sourceTool, policy });
+});
+
+// --- Team config policy ---
+
+ipcMain.handle("get-team-policy", () => ({
+  policy: readTeamPolicy(),
+  path: getTeamPolicyPath(),
+}));
+
+ipcMain.handle("set-team-policy", (_event, policy: unknown) => {
+  if (!policy || typeof policy !== "object") {
+    return { ok: false, policy: readTeamPolicy(), path: getTeamPolicyPath(), error: "Invalid policy" };
+  }
+  const next = writeTeamPolicy(policy as TeamPolicy);
+  return { ok: true, policy: next, path: getTeamPolicyPath() };
+});
+
+ipcMain.handle("evaluate-team-policy", () => {
+  const policy = readTeamPolicy();
+  const mcpByTool = Object.fromEntries(
+    SYNC_TOOLS.map((tool) => [tool, Object.keys(readMcpServers(tool))]),
+  );
+  const skillsByTool = Object.fromEntries(
+    SYNC_SKILL_TOOLS.map((tool) => [tool, Object.keys(readSkillsForTool(tool))]),
+  );
+  return {
+    policy,
+    path: getTeamPolicyPath(),
+    violations: evaluateTeamPolicy(policy, mcpByTool, skillsByTool),
+  };
+});
+
+ipcMain.handle("get-config-align-gaps", (_event, opts?: {
+  mcpSourceTool?: string;
+  skillsSourceTool?: string;
+  mcpTargets?: string[];
+  skillTargets?: string[];
+}) => {
+  const policy = readTeamPolicy();
+  return {
+    policy,
+    gaps: buildConfigAlignGaps({
+      policy,
+      mcpSourceTool: opts?.mcpSourceTool,
+      skillsSourceTool: opts?.skillsSourceTool,
+      mcpTargets: opts?.mcpTargets,
+      skillTargets: opts?.skillTargets,
+    }),
+    mcpSource: resolveMcpSource(policy, opts?.mcpSourceTool),
+    skillsSource: resolveSkillsSource(policy, opts?.skillsSourceTool),
+  };
+});
+
+ipcMain.handle("import-team-policy", async () => {
+  const parent = BrowserWindow.getFocusedWindow();
+  const options = {
+    title: "Import team policy",
+    filters: [{ name: "JSON", extensions: ["json"] }],
+    properties: ["openFile" as const],
+  };
+  const result = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options);
+  if (result.canceled || !result.filePaths[0]) {
+    return { ok: false, policy: readTeamPolicy(), path: getTeamPolicyPath(), canceled: true };
+  }
+  const imported = importTeamPolicyFromPath(result.filePaths[0]);
+  return { ...imported, path: getTeamPolicyPath(), canceled: false };
+});
+
+ipcMain.handle("export-team-policy", async () => {
+  const parent = BrowserWindow.getFocusedWindow();
+  const options = {
+    title: "Export team policy",
+    defaultPath: "ai-shelf-team-policy.json",
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  };
+  const result = parent
+    ? await dialog.showSaveDialog(parent, options)
+    : await dialog.showSaveDialog(options);
+  if (result.canceled || !result.filePath) {
+    return { ok: false, canceled: true };
+  }
+  return { ...exportTeamPolicyToPath(result.filePath), canceled: false };
+});
 
 // --- Health monitor ---
 
@@ -1044,17 +1132,80 @@ ipcMain.handle("get-skills-raw", async () => {
 ipcMain.handle("sync-skills", async (_event, opts: {
   skillNames: string[];
   targetTools: string[];
+  sourceTool?: string;
 }) => {
-  const { skillNames, targetTools } = opts;
-  const allSkills = collectAllSkills();
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveSkillsSource(policy);
+  const skillNames = filterAllowedSkillNames(policy, opts.skillNames);
+  const allSkills = collectAllSkills(sourceTool);
 
   const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
-  for (const tool of targetTools) {
+  for (const tool of opts.targetTools) {
     results.push({ tool, ...writeSkillsToTool(tool, skillNames, allSkills) });
   }
 
   return results;
+});
+
+/** Align missing MCP/skills from source of truth onto targets (missing-only). */
+ipcMain.handle("align-config-from-source", async (_event, opts?: {
+  mcpSourceTool?: string;
+  skillsSourceTool?: string;
+  mcpTargets?: string[];
+  skillTargets?: string[];
+  syncMcp?: boolean;
+  syncSkills?: boolean;
+}) => {
+  const policy = readTeamPolicy();
+  const mcpSource = resolveMcpSource(policy, opts?.mcpSourceTool);
+  const skillsSource = resolveSkillsSource(policy, opts?.skillsSourceTool);
+  const syncMcp = opts?.syncMcp !== false;
+  const syncSkills = opts?.syncSkills !== false;
+
+  const mcpTargets = (opts?.mcpTargets ?? [...SYNC_TOOLS]).filter((t) => t !== mcpSource);
+  const skillTargets = (opts?.skillTargets ?? [...SYNC_SKILL_TOOLS]).filter(
+    (t) => t !== skillsSource,
+  );
+
+  const mcpResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+  const skillResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+
+  if (syncMcp) {
+    const { byTarget } = mcpMissingFromTargets({
+      sourceTool: mcpSource,
+      targetTools: mcpTargets,
+      policy,
+    });
+    const allServers = collectAllMcpServers(mcpSource);
+    for (const tool of mcpTargets) {
+      const names = byTarget[tool] ?? [];
+      if (names.length === 0) {
+        mcpResults.push({ tool, added: [], skipped: [] });
+        continue;
+      }
+      mcpResults.push({ tool, ...writeMcpServers(tool, names, allServers) });
+    }
+  }
+
+  if (syncSkills) {
+    const { byTarget } = skillsMissingFromTargets({
+      sourceTool: skillsSource,
+      targetTools: skillTargets,
+      policy,
+    });
+    const allSkills = collectAllSkills(skillsSource);
+    for (const tool of skillTargets) {
+      const names = byTarget[tool] ?? [];
+      if (names.length === 0) {
+        skillResults.push({ tool, added: [], skipped: [] });
+        continue;
+      }
+      skillResults.push({ tool, ...writeSkillsToTool(tool, names, allSkills) });
+    }
+  }
+
+  return { mcpSource, skillsSource, mcpResults, skillResults };
 });
 
 // --- In-app config editing & MCP server management ---
@@ -1282,12 +1433,14 @@ function clipboardTextMatches(expected: string): boolean {
 // fall back instead of assuming the copy succeeded.
 ipcMain.handle("clipboard-write-text", async (_event, text: string) => {
   const value = text ?? "";
-  const maxAttempts = 3;
+  // Clipboard History / RDP / Office often hold the lock longer than a short
+  // burst of retries; give Windows more chances before the renderer falls back.
+  const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     clipboard.writeText(value);
     if (clipboardTextMatches(value)) return true;
     if (attempt < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 30 * attempt));
+      await new Promise((resolve) => setTimeout(resolve, 40 * attempt));
     }
   }
   return false;
@@ -1488,17 +1641,24 @@ ipcMain.handle(
   try {
     const plat = process.platform;
     if (plat === "win32") {
-      if (terminal === "wt" || terminal === "auto") {
+      const hasWt = (() => {
         try {
+          execSync("where.exe wt", { stdio: "ignore" });
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      if (terminal === "wt" || terminal === "auto") {
+        if (hasWt) {
           const wtArgs = cwd
             ? ["new-tab", "--startingDirectory", cwd, "--", "pwsh.exe", "-NoExit", "-Command", cmd]
             : ["new-tab", "--", "pwsh.exe", "-NoExit", "-Command", cmd];
           spawn("wt", wtArgs, { detached: true, stdio: "ignore" }).unref();
           return { success: true };
-        } catch {
-          if (terminal === "wt") return { success: false, error: "Windows Terminal (wt) not found in PATH" };
-          // auto: fall through to pwsh/cmd
         }
+        if (terminal === "wt") return { success: false, error: "Windows Terminal (wt) not found in PATH" };
+        // auto: fall through to pwsh/cmd
       }
       if (terminal === "pwsh") {
         spawn("cmd", ["/c", "start", "pwsh.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`], { detached: true, stdio: "ignore" }).unref();
@@ -2140,6 +2300,18 @@ ipcMain.handle("flow-cancel-run", (_event, flowId: unknown) => {
     return { ok: false, error: "Invalid flow id" };
   }
   return cancelFlowRun(flowId.trim());
+});
+ipcMain.handle("flow-approve-gate", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return approveFlowGate(flowId.trim());
+});
+ipcMain.handle("flow-reject-gate", (_event, flowId: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  return rejectFlowGate(flowId.trim());
 });
 ipcMain.handle("flow-get-task-scheduler-status", () => getFlowTaskSchedulerStatus());
 ipcMain.handle("flow-install-task-scheduler", () => installFlowTaskScheduler());

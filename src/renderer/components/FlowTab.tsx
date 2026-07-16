@@ -27,7 +27,7 @@ import { loadSettings } from "../chat-settings";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 
 function isLiveRunStatus(status: FlowRunStatus | undefined): boolean {
-  return status === "running" || status === "pending";
+  return status === "running" || status === "pending" || status === "waiting_approval";
 }
 
 function mergeActiveRuns(
@@ -204,6 +204,7 @@ export function FlowTab() {
   const selected = flows.find((f) => f.id === selectedId) ?? null;
   const settingsFlow = flows.find((f) => f.id === settingsFlowId) ?? null;
   const selectedRunning = selectedId ? isFlowLive(selectedId) : false;
+  const selectedWaitingApproval = selectedActiveRun?.status === "waiting_approval";
   const selectedCancelling = selectedId ? cancellingFlowIds.has(selectedId) : false;
   const selectedError = selectedId ? errorsByFlowId[selectedId] : errorsByFlowId.__global__;
 
@@ -218,15 +219,26 @@ export function FlowTab() {
   const dagPhases = useMemo((): FlowDagPhase[] => {
     const base = flowDef?.phases ?? [];
     if (!selectedActiveRun || selectedActiveRun.flowId !== selectedId || !isLiveRunStatus(selectedActiveRun.status)) {
-      return base.map((p) => ({ id: p.id, label: p.label, status: "pending" as const }));
+      return base.map((p) => ({
+        id: p.id,
+        label: p.label,
+        status: "pending" as const,
+        message: [p.tool ? `@${p.tool}` : null, p.kind === "gate" ? "gate" : null]
+          .filter(Boolean)
+          .join(" · ") || undefined,
+      }));
     }
     return base.map((p) => {
       const live = selectedActiveRun.phases.find((x) => x.id === p.id);
+      const toolHint = live?.tool || p.tool;
+      const parts = [live?.message, toolHint ? `@${toolHint}` : null, p.kind === "gate" ? "gate" : null]
+        .filter(Boolean)
+        .join(" · ");
       return {
         id: p.id,
         label: p.label,
         status: live?.status ?? "pending",
-        message: live?.message,
+        message: parts || undefined,
       };
     });
   }, [flowDef, selectedActiveRun, selectedId]);
@@ -285,6 +297,28 @@ export function FlowTab() {
       setErrorsByFlowId((prev) => ({
         ...prev,
         [selectedId]: res.error ?? t("flow.cancel.failed"),
+      }));
+    }
+  };
+
+  const handleApproveGate = async () => {
+    if (!selectedId) return;
+    const res = await window.api.flowApproveGate(selectedId);
+    if (!res.ok) {
+      setErrorsByFlowId((prev) => ({
+        ...prev,
+        [selectedId]: res.error ?? t("flow.gate.approveFailed"),
+      }));
+    }
+  };
+
+  const handleRejectGate = async () => {
+    if (!selectedId) return;
+    const res = await window.api.flowRejectGate(selectedId);
+    if (!res.ok) {
+      setErrorsByFlowId((prev) => ({
+        ...prev,
+        [selectedId]: res.error ?? t("flow.gate.rejectFailed"),
       }));
     }
   };
@@ -596,6 +630,27 @@ export function FlowTab() {
                   >
                     {selectedRunning ? t("flow.running") : t("flow.run")}
                   </Button>
+                  {selectedWaitingApproval && (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => void handleApproveGate()}
+                        className="rounded-[22px]"
+                      >
+                        {t("flow.gate.approve")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleRejectGate()}
+                        className="rounded-[22px] border-fail/40 text-fail hover:bg-fail/10"
+                      >
+                        {t("flow.gate.reject")}
+                      </Button>
+                    </>
+                  )}
                   {selectedRunning && (
                     <Button
                       type="button"

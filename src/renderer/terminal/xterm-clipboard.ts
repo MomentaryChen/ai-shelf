@@ -14,21 +14,37 @@ function runClipboardOp<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+function normalizeClipboardText(s: string): string {
+  return s.replace(/\r\n/g, "\n");
+}
+
+function clipboardTextsMatch(a: string, b: string): boolean {
+  return normalizeClipboardText(a) === normalizeClipboardText(b);
+}
+
+/**
+ * Selection text scheduled for copy-on-select but not yet passed to writeClipboardText.
+ * Module-scoped so a paste in another pane can flush it before reading the OS clipboard.
+ */
+let pendingSelectionCopy: { text: string; at: number } | null = null;
+
 /** Last write completed through our queue; paste prefers this briefly after copy. */
-let lastOurWrite = { text: "", at: 0, seq: 0 };
-let lastPasteSeq = 0;
+let lastOurWrite = { text: "", at: 0, seq: 0, osConfirmed: false };
 let writeSeq = 0;
 
-/** After copy, paste within this window skips a stale OS / navigator read. */
-const PASTE_AFTER_WRITE_MS = 200;
+/** After copy, paste within this window can skip a stale OS / navigator read. */
+const PASTE_AFTER_WRITE_MS = 1000;
+/** How long a debounced copy-on-select may still be flushed by paste. */
+const PENDING_COPY_MAX_MS = 2000;
 
-/** Copy-on-select text captured but not yet written; paste can use this immediately. */
-let pendingAutoCopy = { text: "", at: 0 };
-const PENDING_AUTO_COPY_MS = 2000;
+function notePendingSelectionCopy(text: string): void {
+  pendingSelectionCopy = { text, at: Date.now() };
+}
 
-function clearPendingAutoCopy(text?: string): void {
-  if (!text || pendingAutoCopy.text === text) {
-    pendingAutoCopy = { text: "", at: 0 };
+function clearPendingSelectionCopy(text?: string): void {
+  if (!pendingSelectionCopy) return;
+  if (text === undefined || pendingSelectionCopy.text === text) {
+    pendingSelectionCopy = null;
   }
 }
 
@@ -49,27 +65,29 @@ function runOsClipboardRead(): Promise<string> {
 }
 
 async function readClipboardText(): Promise<string> {
+  // Copy-on-select debounces 50ms before queueing a write. Paste in that gap
+  // used to read the previous OS clipboard and look like "copy did nothing".
+  const pending = pendingSelectionCopy;
+  if (pending?.text && Date.now() - pending.at < PENDING_COPY_MAX_MS) {
+    await writeClipboardText(pending.text);
+  }
+
   return runClipboardOp(async () => {
-    const pendingAge = Date.now() - pendingAutoCopy.at;
-    if (pendingAutoCopy.text && pendingAge < PENDING_AUTO_COPY_MS) {
-      const pending = pendingAutoCopy.text;
-      // Sync the OS clipboard after returning so external paste still works.
-      void writeClipboardText(pending);
-      return pending;
-    }
     const age = Date.now() - lastOurWrite.at;
-    if (
-      lastOurWrite.text &&
-      lastOurWrite.seq > lastPasteSeq &&
-      age < PASTE_AFTER_WRITE_MS
-    ) {
-      lastPasteSeq = lastOurWrite.seq;
-      return lastOurWrite.text;
+    if (lastOurWrite.text && age < PASTE_AFTER_WRITE_MS) {
+      // Unconfirmed writes (navigator fallback / locked clipboard): always prefer
+      // our text for the whole window — not just the first paste.
+      if (!lastOurWrite.osConfirmed) return lastOurWrite.text;
+
+      const osText = await runOsClipboardRead();
+      // OS matched at write time; if it still matches or is empty, use our text.
+      // If it differs, the user copied elsewhere after us — prefer OS.
+      if (!osText || clipboardTextsMatch(osText, lastOurWrite.text)) {
+        return lastOurWrite.text;
+      }
+      return osText;
     }
-    const text = await runOsClipboardRead();
-    if (text) return text;
-    if (lastOurWrite.text && age < PASTE_AFTER_WRITE_MS) return lastOurWrite.text;
-    return "";
+    return (await runOsClipboardRead()) || "";
   });
 }
 
@@ -79,21 +97,34 @@ export async function writeClipboardText(text: string): Promise<boolean> {
   return runClipboardOp(async () => {
     // Main process verifies the write and reports false when the OS clipboard
     // stayed locked; treat that the same as an IPC error and try navigator.
-    let ok = false;
+    let osConfirmed = false;
     try {
-      ok = (await window.api.clipboardWriteText(text)) !== false;
+      osConfirmed = (await window.api.clipboardWriteText(text)) !== false;
     } catch {
-      ok = false;
+      osConfirmed = false;
     }
-    if (!ok) {
+    if (!osConfirmed) {
       try {
         await navigator.clipboard.writeText(text);
-        ok = true;
       } catch {
+        clearPendingSelectionCopy();
         return false;
       }
+      // Don't trust navigator alone — confirm via main-process read when possible.
+      try {
+        const readBack = await window.api.clipboardReadText();
+        osConfirmed = clipboardTextsMatch(readBack, text);
+      } catch {
+        osConfirmed = false;
+      }
+      // Navigator wrote something we couldn't verify; still expose it to paste
+      // via lastOurWrite, but keep preferring it until the paste window ends.
+      lastOurWrite = { text, at: Date.now(), seq, osConfirmed };
+      clearPendingSelectionCopy();
+      return true;
     }
-    lastOurWrite = { text, at: Date.now(), seq };
+    lastOurWrite = { text, at: Date.now(), seq, osConfirmed: true };
+    clearPendingSelectionCopy();
     return true;
   });
 }
@@ -209,23 +240,20 @@ export function bindTerminalClipboard(
     pendingCopyText = "";
     if (!(options.getCopyOnSelect?.() ?? false)) return;
     if (isRecentAutoCopy(text)) {
-      clearPendingAutoCopy(text);
+      clearPendingSelectionCopy(text);
       return;
     }
     void writeClipboardText(text).then((ok) => {
-      if (ok) {
-        lastAutoCopied = { text, at: Date.now() };
-        clearPendingAutoCopy(text);
-      }
+      if (ok) lastAutoCopied = { text, at: Date.now() };
     });
   };
 
-  const cancelPendingAutoCopy = () => {
-    if (pendingCopyText) clearPendingAutoCopy(pendingCopyText);
+  const cancelPendingAutoCopy = (clearPending = false) => {
     pendingCopyText = "";
     selCopyGeneration += 1;
     window.clearTimeout(selCopyTimer);
     selCopyTimer = 0;
+    if (clearPending) clearPendingSelectionCopy();
   };
 
   const copyTerminalSelection = async (): Promise<boolean> => {
@@ -239,6 +267,8 @@ export function bindTerminalClipboard(
     // below on failure so the guard cannot mask a failed write as copied.
     lastExplicitCopy = { text, at: now };
     cancelPendingAutoCopy();
+    // Keep paste-flush aware of this text while the async write is in flight.
+    notePendingSelectionCopy(text);
     const ok = await writeClipboardText(text);
     if (ok) {
       lastAutoCopied = { text, at: Date.now() };
@@ -393,6 +423,8 @@ export function bindTerminalClipboard(
     const rightClickPaste = options.getRightClickPaste?.() ?? true;
     if (!rightClickPaste || ev.shiftKey) return;
 
+    // Right-click can fire both mousedown (Firefox path) and contextmenu for
+    // the same physical click; dedupe so paste doesn't double-fire.
     const now = Date.now();
     if (now - lastPointerPasteAt < POINTER_PASTE_DEDUPE_MS) return;
     lastPointerPasteAt = now;
@@ -434,7 +466,7 @@ export function bindTerminalClipboard(
    */
   const onSelectionChange = () => {
     if (!(options.getCopyOnSelect?.() ?? false)) {
-      cancelPendingAutoCopy();
+      cancelPendingAutoCopy(true);
       return;
     }
     const text = term.getSelection();
@@ -442,11 +474,14 @@ export function bindTerminalClipboard(
     // copy of the previous selection alone — cancelling it here is what made a
     // quick copy-then-switch lose the text before it reached the clipboard.
     if (!text || isRecentAutoCopy(text)) return;
+    // Publish immediately so a paste in another pane can flush before the
+    // debounce timer queues the OS write.
+    notePendingSelectionCopy(text);
     // Capture `text` now and write that exact value; re-reading on the timer
-    // could see an already-cleared selection after the pane lost focus.
+    // could see an already-cleared selection after the pane lost focus. Also
+    // tracked in `pendingCopyText` so mouseup can flush it immediately below.
     const gen = ++selCopyGeneration;
     pendingCopyText = text;
-    pendingAutoCopy = { text, at: Date.now() };
     window.clearTimeout(selCopyTimer);
     selCopyTimer = window.setTimeout(() => {
       if (gen !== selCopyGeneration) return;
@@ -467,6 +502,11 @@ export function bindTerminalClipboard(
     if (isFirefox && ev.button === 2) onPointerPaste(ev);
   };
 
+  /**
+   * A selection that just settled (mouse released) should be on the clipboard
+   * immediately rather than after the 50ms debounce — otherwise a fast
+   * select-then-paste into another pane can read a stale clipboard value.
+   */
   const onMouseUp = (ev: MouseEvent) => {
     if (ev.button !== 0 || !selCopyTimer || !pendingCopyText) return;
     const text = pendingCopyText;
