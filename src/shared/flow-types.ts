@@ -122,6 +122,18 @@ export interface FlowRunState {
   orchestration?: boolean;
   /** Phase waiting for human approve/reject (when status is waiting_approval). */
   pendingGatePhaseId?: string | null;
+  /** Profile linked from the flow definition (cost attribution). */
+  profileId?: string | null;
+  /** Canonical agent tool id used for the run (e.g. claude, cursor). */
+  agentTool?: string | null;
+  /** When the run reached a terminal status. */
+  completedAt?: string | null;
+  /** Measured or estimated USD cost for this run. */
+  costUsd?: number | null;
+  /** True when costUsd was inferred (duration share), not parsed from the agent. */
+  costEstimated?: boolean;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
 }
 
 export interface FlowProgressEvent {

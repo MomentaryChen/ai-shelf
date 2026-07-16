@@ -193,6 +193,8 @@ contextBridge.exposeInMainWorld("api", {
   usageClearCredential: (tool) => ipcRenderer.invoke("usage-clear-credential", tool),
   usageTestCredential: (tool, fieldKey) => ipcRenderer.invoke("usage-test-credential", tool, fieldKey),
   usageFetchDashboard: (opts) => ipcRenderer.invoke("usage-fetch-dashboard", opts),
+  usageGetBudget: () => ipcRenderer.invoke("usage-get-budget"),
+  usageSetBudget: (partial) => ipcRenderer.invoke("usage-set-budget", partial),
   authReportSession: (report) => ipcRenderer.invoke("auth-report-session", report),
   authClearSession: () => ipcRenderer.invoke("auth-clear-session"),
   authGetState: (configured) => ipcRenderer.invoke("auth-get-state", configured),

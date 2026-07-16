@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type {
+  UsageAttributionRow,
+  UsageCostInsights,
   UsageCredentialStatus,
   UsageDailyUnifiedRow,
   UsageDashboardResult,
@@ -621,6 +623,248 @@ function UsageUnifiedDaily({
   );
 }
 
+function AttributionList({
+  rows,
+  emptyLabel,
+}: {
+  rows: UsageAttributionRow[];
+  emptyLabel: string;
+}) {
+  const { t } = useLocale();
+  if (rows.length === 0) {
+    return <p className="text-[13px] text-[var(--muted)]">{emptyLabel}</p>;
+  }
+  const max = Math.max(...rows.map((r) => r.costUsd), 0.01);
+  return (
+    <div className="flex flex-col gap-2">
+      {rows.map((row) => (
+        <div key={row.id} className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2 text-[13px]">
+            <span className="min-w-0 truncate font-medium text-[var(--ink)]">
+              {row.label}
+              {row.estimated && row.costUsd > 0 && (
+                <span className="ml-1.5 rounded-full bg-[var(--sand-deep)] px-1.5 py-0.5 text-[10px] font-normal text-[var(--muted)]">
+                  {t("usage.attribution.estimatedBadge")}
+                </span>
+              )}
+            </span>
+            <span className="shrink-0 tabular-nums text-[var(--ink)]">
+              {row.costUsd > 0 ? formatUsd(row.costUsd) : "—"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--sand-deep)]">
+              <div
+                className="h-full rounded-full bg-[var(--clay)] transition-all duration-300"
+                style={{ width: `${Math.min(100, (row.costUsd / max) * 100)}%` }}
+              />
+            </div>
+            {row.runCount > 0 && (
+              <span className="w-14 shrink-0 text-right text-[11px] text-[var(--muted)]">
+                {t("usage.attribution.runs", { count: String(row.runCount) })}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CostDecisionsPanel({
+  insights,
+  onBudgetSaved,
+}: {
+  insights: UsageCostInsights;
+  onBudgetSaved?: () => void;
+}) {
+  const { t } = useLocale();
+  const [attrTab, setAttrTab] = useState<"tool" | "profile" | "flow">("flow");
+  const [budgetInput, setBudgetInput] = useState(
+    insights.budget.weeklyBudgetUsd != null ? String(insights.budget.weeklyBudgetUsd) : "",
+  );
+  const [alertAt, setAlertAt] = useState(String(insights.budget.alertAtPercent));
+  const [budgetMsg, setBudgetMsg] = useState("");
+  const [budgetBusy, setBudgetBusy] = useState(false);
+
+  useEffect(() => {
+    setBudgetInput(
+      insights.budget.weeklyBudgetUsd != null ? String(insights.budget.weeklyBudgetUsd) : "",
+    );
+    setAlertAt(String(insights.budget.alertAtPercent));
+  }, [insights.budget.weeklyBudgetUsd, insights.budget.alertAtPercent]);
+
+  const alert = insights.alert;
+  const alertBg =
+    alert.level === "over"
+      ? "border-[var(--clay)]/40 bg-[var(--clay)]/10"
+      : alert.level === "warn"
+        ? "border-[var(--clay)]/25 bg-[var(--sand)]"
+        : "border-[var(--sand)] bg-[var(--cream)]/80";
+
+  const hottest = insights.weekHottestFlow;
+  const attrRows =
+    attrTab === "tool" ? insights.byTool : attrTab === "profile" ? insights.byProfile : insights.byFlow;
+
+  const saveBudget = async (clear = false) => {
+    setBudgetBusy(true);
+    setBudgetMsg("");
+    const weeklyBudgetUsd = clear
+      ? null
+      : budgetInput.trim() === ""
+        ? null
+        : Number(budgetInput);
+    const alertAtPercent = Number(alertAt);
+    const res = await window.api.usageSetBudget({
+      weeklyBudgetUsd,
+      alertAtPercent: Number.isFinite(alertAtPercent) ? alertAtPercent : 80,
+    });
+    setBudgetBusy(false);
+    if (res.ok) {
+      setBudgetMsg(t("usage.budget.saved"));
+      onBudgetSaved?.();
+    } else {
+      setBudgetMsg(res.error ?? t("usage.budget.saveFailed"));
+    }
+  };
+
+  return (
+    <div className="mb-5 flex flex-col gap-3">
+      <div className={`rounded-[28px] border px-4 py-4 shadow-[var(--shadow-card)] ${alertBg}`}>
+        <div className="mb-3 text-[11px] font-medium tracking-wide text-[var(--muted)]">
+          {t("usage.decisions.title")}
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
+          <div>
+            <div className="text-[12px] text-[var(--muted)]">{t("usage.decisions.hottest")}</div>
+            {hottest ? (
+              <>
+                <div className="mt-1 truncate text-[17px] font-semibold text-[var(--ink)]">
+                  {hottest.label}
+                </div>
+                <p className="mt-1 text-[13px] text-[var(--muted)]">
+                  {t("usage.decisions.hottestHint", {
+                    runs: String(hottest.runCount),
+                    cost: formatUsd(hottest.costUsd),
+                  })}
+                </p>
+                {hottest.estimated && hottest.costUsd > 0 && (
+                  <p className="mt-1 text-[11px] text-[var(--muted)]">{t("usage.decisions.estimated")}</p>
+                )}
+              </>
+            ) : (
+              <p className="mt-1 text-[13px] leading-relaxed text-[var(--muted)]">
+                {t("usage.decisions.hottestEmpty")}
+              </p>
+            )}
+          </div>
+          <div>
+            <div className="text-[12px] text-[var(--muted)]">{t("usage.decisions.weekSpend")}</div>
+            <div className="mt-1 text-[22px] font-semibold tabular-nums text-[var(--clay)]">
+              {formatUsd(insights.weekSpendUsd)}
+            </div>
+            <p className="mt-1 text-[13px] text-[var(--ink)]">{t(alert.messageKey)}</p>
+            {alert.weeklyBudgetUsd != null && (
+              <>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--sand-deep)]">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      alert.level === "over" ? "bg-[var(--clay-deep)]" : "bg-[var(--clay)]"
+                    }`}
+                    style={{ width: `${Math.min(100, alert.usedPercent)}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+                  {t("usage.budget.progress", {
+                    spent: formatUsd(alert.weekSpendUsd),
+                    budget: formatUsd(alert.weeklyBudgetUsd),
+                  })}
+                </p>
+              </>
+            )}
+            {alert.weeklyBudgetUsd == null && (
+              <p className="mt-1 text-[11px] text-[var(--muted)]">{t("usage.budget.unset")}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Card title={t("usage.attribution.title")}>
+        <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">
+          {t("usage.attribution.hint")}
+        </p>
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {(
+            [
+              ["flow", "usage.attribution.byFlow"],
+              ["profile", "usage.attribution.byProfile"],
+              ["tool", "usage.attribution.byTool"],
+            ] as const
+          ).map(([id, key]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setAttrTab(id)}
+              className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] transition-colors duration-200 ${
+                attrTab === id
+                  ? "bg-[var(--clay)] font-medium text-white shadow-[var(--shadow-accent)]"
+                  : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
+              }`}
+            >
+              {t(key)}
+            </button>
+          ))}
+        </div>
+        <AttributionList rows={attrRows} emptyLabel={t("usage.attribution.empty")} />
+      </Card>
+
+      <Card title={t("usage.budget.title")} collapsible defaultCollapsed>
+        <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.budget.hint")}</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex min-w-[140px] flex-col gap-1.5">
+            <Label className="text-[13px] text-[var(--ink)]">{t("usage.budget.amount")}</Label>
+            <Input
+              type="number"
+              min={0}
+              step="1"
+              placeholder={t("usage.budget.amountPlaceholder")}
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value)}
+              className="border-[var(--sand)] bg-[var(--cream)]"
+            />
+          </div>
+          <div className="flex w-[100px] flex-col gap-1.5">
+            <Label className="text-[13px] text-[var(--ink)]">{t("usage.budget.alertAt")}</Label>
+            <Input
+              type="number"
+              min={1}
+              max={100}
+              value={alertAt}
+              onChange={(e) => setAlertAt(e.target.value)}
+              className="border-[var(--sand)] bg-[var(--cream)]"
+            />
+          </div>
+          <Button size="sm" disabled={budgetBusy} onClick={() => void saveBudget(false)}>
+            {budgetBusy ? "…" : t("usage.budget.save")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={budgetBusy}
+            onClick={() => {
+              setBudgetInput("");
+              void saveBudget(true);
+            }}
+          >
+            {t("usage.budget.clear")}
+          </Button>
+        </div>
+        {budgetMsg && <p className="mt-2 text-[12px] text-[var(--muted)]">{budgetMsg}</p>}
+      </Card>
+    </div>
+  );
+}
+
 function UsageComparisonTable({
   tools,
   onSelectTool,
@@ -777,6 +1021,13 @@ export function UsageTab() {
 
       {scope === "all" && dashboard && (
         <>
+          {dashboard.insights && (
+            <CostDecisionsPanel
+              insights={dashboard.insights}
+              onBudgetSaved={() => void fetchDashboard()}
+            />
+          )}
+
           <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
             <StatCard
               value={formatUsd(dashboard.summary.totalCostUsd)}
