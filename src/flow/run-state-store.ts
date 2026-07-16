@@ -75,8 +75,11 @@ export function applyProgressEventToState(
       phase.status = "failed";
       phase.completedAt = now;
       phase.message = event.message ?? "failed";
-      state.status = "failed";
-      state.error = event.message ?? `Phase ${event.phaseId} failed`;
+      // Orchestrated runs decide fail/retry/branch themselves — MCP must not abort the run.
+      if (!state.orchestration) {
+        state.status = "failed";
+        state.error = event.message ?? `Phase ${event.phaseId} failed`;
+      }
       break;
     case "phase.skipped":
       phase.status = "skipped";

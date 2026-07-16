@@ -36,6 +36,8 @@ function phaseStatusLabel(status: FlowPhaseStatus, t: (key: MessageKey) => strin
       return t("flow.phase.failed");
     case "skipped":
       return t("flow.phase.skipped");
+    case "waiting_approval":
+      return t("flow.phase.waitingApproval");
     default:
       return status;
   }
@@ -45,6 +47,8 @@ function nodeStyles(status: FlowPhaseStatus = "pending"): string {
   switch (status) {
     case "running":
       return "border-accent bg-bg-secondary ring-2 ring-accent/35";
+    case "waiting_approval":
+      return "border-accent/70 bg-accent/10 ring-2 ring-accent/25";
     case "done":
       return "border-ok/50 bg-bg-secondary";
     case "failed":
@@ -82,6 +86,9 @@ function DagNode({
         <span className="text-[11px] text-text-secondary">{phaseStatusLabel(status, t)}</span>
         {status === "running" && (
           <span className="h-2 w-2 animate-pulse rounded-full bg-accent" aria-hidden />
+        )}
+        {status === "waiting_approval" && (
+          <span className="h-2 w-2 rounded-full bg-accent" aria-hidden />
         )}
         {status === "done" && <span className="h-2 w-2 rounded-full bg-ok" aria-hidden />}
       </div>
@@ -207,7 +214,9 @@ export function FlowDagView({
                 ? "text-ok"
                 : runStatus === "failed" || runStatus === "cancelled"
                   ? "text-fail"
-                  : "text-accent"
+                  : runStatus === "waiting_approval"
+                    ? "text-accent"
+                    : "text-accent"
             }`}
           >
             {progressStatus}
@@ -215,7 +224,7 @@ export function FlowDagView({
         )}
       </div>
 
-      {(runStatus === "running" || runStatus === "pending") && (
+      {(runStatus === "running" || runStatus === "pending" || runStatus === "waiting_approval") && (
         <FlowPhaseProgressBar
           phases={phases}
           runStatus={runStatus}
@@ -224,7 +233,13 @@ export function FlowDagView({
         />
       )}
 
-      {progressMessage && runStatus === "running" && (
+      {runStatus === "waiting_approval" && (
+        <p className="-mt-4 mb-4 text-[12px] leading-relaxed text-accent">
+          {t("flow.gate.waitingHint")}
+        </p>
+      )}
+
+      {progressMessage && (runStatus === "running" || runStatus === "waiting_approval") && (
         <p className="-mt-4 mb-4 text-[12px] leading-relaxed text-text-secondary">{progressMessage}</p>
       )}
 
@@ -234,7 +249,7 @@ export function FlowDagView({
             title={triggerLabel}
             subtitle={triggerSubtitle}
             status={
-              runStatus === "running"
+              runStatus === "running" || runStatus === "waiting_approval"
                 ? "running"
                 : runStatus === "completed" || runStatus === "failed"
                   ? "done"

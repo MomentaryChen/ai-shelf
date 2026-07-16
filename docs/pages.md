@@ -167,6 +167,22 @@ Inventory merges quick detection with optional enrichment (for example **Cursor*
 
 The **Skills** tab shows which capabilities each tool supports.
 
+### Team config policy
+At the top of the Skills tab you can edit a shared **team policy** (`team-policy.json` under the app data directory):
+
+- **Source of truth** — default MCP / skills tool used when aligning or syncing content
+- **Forbidden / required** MCP server names and skill names
+- **Import / export** JSON so a team can share the same rules
+- A **policy check** lists forbid/require violations across sync-capable tools
+
+Forbidden names are blocked from sync writes (shown as `blocked` in the MCP sync preview).
+
+### Config align from source
+Below the policy card, pick MCP and skills source tools, review gaps on other tools, then **Align all missing** (missing-only; never overwrites). Policy defaults seed the source selectors.
+
+### Skill sync matrix
+Copy missing `SKILL.md` folders across tools, with an optional source-of-truth picker for content preference.
+
 ### Per-Tool Skill Cards
 Each tool gets a card with:
 - Tool logo and name
@@ -203,10 +219,12 @@ A full matrix at the bottom where:
 ### MCP Sync
 The matrix card includes tooling to copy entries between JSON MCP configs:
 
+- **Source:** pick which tool’s entry wins when the same server name exists in more than one place (defaults from team policy)
 - **Sync to:** checkboxes choose which inventory tools (`claude`, `copilot`, `cursor`, `codex`, `gemini`, `opencode`) receive writes
 - Codex writes `[mcp_servers.*]` tables into `~/.codex/config.toml`; Aider is excluded (no MCP). New tools should prefer JSON MCP configs when possible.
 - **Sync Selected (`n`)** applies only servers ticked in the first column (use the header checkbox to select every “missing” row)
 - **Sync All Missing (`n`)** applies every server row that still has gaps
+- Preview surfaces adds, skips, conflicts, and **policy-blocked** forbidden servers
 - While work is in-flight the buttons read **Syncing…**; summaries list `added`, `skipped`, or errors per tool when finished
 - Rows with every target already configured are dimmed; the footer counts **servers total**, **need sync**, and **fully synced**
 

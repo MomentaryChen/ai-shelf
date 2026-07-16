@@ -236,10 +236,24 @@ export function mountFlowMcpForAgent(
 }
 
 export function flowAgentPrintPrefix(tool: string): string[] {
-  if (canonicalToolId(tool) === "cursor") {
+  const canonical = canonicalToolId(tool);
+  if (canonical === "cursor") {
     return ["-p", "--output-format", "text"];
   }
+  if (canonical === "codex") {
+    return ["exec", "--skip-git-repo-check"];
+  }
+  if (canonical === "gemini") {
+    return ["-p"];
+  }
   return ["-p", "--input-format", "text"];
+}
+
+/** How the prompt is delivered to the agent CLI. */
+export function flowAgentPromptDelivery(tool: string): "stdin" | "arg" {
+  const canonical = canonicalToolId(tool);
+  if (canonical === "gemini") return "arg";
+  return "stdin";
 }
 
 export function flowAgentMcpSpawnArgs(
@@ -292,6 +306,7 @@ export function prepareFlowAgentSpawn(
   mcpMount: FlowMcpMount;
   printPrefix: string[];
   extraArgs: string[];
+  promptDelivery: "stdin" | "arg";
 } {
   const writeMcpConfig = options.writeMcpConfig !== false;
   const agentMount = writeMcpConfig
@@ -313,5 +328,6 @@ export function prepareFlowAgentSpawn(
     },
     printPrefix: flowAgentPrintPrefix(tool),
     extraArgs,
+    promptDelivery: flowAgentPromptDelivery(tool),
   };
 }

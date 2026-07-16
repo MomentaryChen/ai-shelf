@@ -27,9 +27,11 @@ export function summarizeFlowPhaseProgress(
   const completed = phases.filter(
     (p) => p.status === "done" || p.status === "skipped",
   ).length;
-  const running = phases.find((p) => p.status === "running") ?? null;
+  const waiting = phases.find((p) => p.status === "waiting_approval") ?? null;
+  const running = phases.find((p) => p.status === "running") ?? waiting;
   const failed = phases.find((p) => p.status === "failed") ?? null;
-  const isLive = runStatus === "running" || runStatus === "pending";
+  const isLive =
+    runStatus === "running" || runStatus === "pending" || runStatus === "waiting_approval";
 
   return {
     total,
@@ -63,6 +65,12 @@ export function formatFlowProgressStatus(
   if (runStatus === "failed" || runStatus === "cancelled") {
     const status = t(`flow.status.${runStatus}` as MessageKey);
     return summary.total > 0 ? `${status} · ${steps}` : status;
+  }
+  if (runStatus === "waiting_approval") {
+    const label = summary.running?.label;
+    return label
+      ? `${t("flow.status.waitingApproval")} · ${label}`
+      : t("flow.status.waitingApproval");
   }
   if (runStatus !== "running" && runStatus !== "pending") {
     return steps;

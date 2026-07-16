@@ -24,8 +24,22 @@ function statusLabel(
   status: FlowRunState["status"],
   t: (key: import("../i18n/messages/en.js").MessageKey) => string,
 ): string {
-  const key = `flow.status.${status}` as const;
-  return t(key);
+  switch (status) {
+    case "waiting_approval":
+      return t("flow.status.waitingApproval");
+    case "pending":
+      return t("flow.status.pending");
+    case "running":
+      return t("flow.status.running");
+    case "completed":
+      return t("flow.status.completed");
+    case "failed":
+      return t("flow.status.failed");
+    case "cancelled":
+      return t("flow.status.cancelled");
+    default:
+      return status;
+  }
 }
 
 function eventSummary(

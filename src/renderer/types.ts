@@ -132,7 +132,7 @@ export interface McpSyncResult {
   error?: string;
 }
 
-export type McpSyncPreviewAction = "add" | "skip" | "conflict";
+export type McpSyncPreviewAction = "add" | "skip" | "conflict" | "blocked";
 
 export interface McpSyncPreviewItem {
   serverName: string;
@@ -141,6 +141,43 @@ export interface McpSyncPreviewItem {
   sourceTool?: string;
   incomingJson?: string;
   existingJson?: string;
+  reason?: string;
+}
+
+export interface TeamPolicy {
+  version: 1;
+  name?: string;
+  sourceOfTruth?: {
+    mcp?: string;
+    skills?: string;
+  };
+  mcp?: {
+    required?: string[];
+    forbidden?: string[];
+  };
+  skills?: {
+    required?: string[];
+    forbidden?: string[];
+  };
+}
+
+export type PolicyViolationKind =
+  | "mcp-forbidden"
+  | "mcp-required"
+  | "skill-forbidden"
+  | "skill-required";
+
+export interface PolicyViolation {
+  kind: PolicyViolationKind;
+  name: string;
+  tool: string;
+}
+
+export interface ConfigAlignGap {
+  kind: "mcp" | "skill";
+  name: string;
+  sourceTool: string;
+  missingIn: string[];
 }
 
 export type HealthAlertKind = "update" | "doctor-fail" | "doctor-warn" | "auth";
@@ -177,6 +214,13 @@ export interface SkillsRawData {
 }
 
 export type SkillSyncResult = McpSyncResult;
+
+export interface ConfigAlignResult {
+  mcpSource: string;
+  skillsSource: string;
+  mcpResults: McpSyncResult[];
+  skillResults: SkillSyncResult[];
+}
 
 export type McpConfigFormat = "json" | "toml" | "unknown";
 
@@ -626,11 +670,52 @@ export interface ElectronAPI {
   runUpdate: (tool: string) => Promise<UpdateRunResult>;
   runInstall: (tool: string) => Promise<UpdateRunResult>;
   getMcpRaw: () => Promise<McpRawData>;
-  syncMcp: (opts: { serverNames: string[]; targetTools: string[] }) => Promise<McpSyncResult[]>;
+  syncMcp: (opts: {
+    serverNames: string[];
+    targetTools: string[];
+    sourceTool?: string;
+  }) => Promise<McpSyncResult[]>;
   previewMcpSync: (opts: {
     serverNames: string[];
     targetTools: string[];
+    sourceTool?: string;
   }) => Promise<McpSyncPreviewItem[]>;
+  getTeamPolicy: () => Promise<{ policy: TeamPolicy; path: string }>;
+  setTeamPolicy: (
+    policy: TeamPolicy,
+  ) => Promise<{ ok: boolean; policy: TeamPolicy; path: string; error?: string }>;
+  evaluateTeamPolicy: () => Promise<{
+    policy: TeamPolicy;
+    path: string;
+    violations: PolicyViolation[];
+  }>;
+  getConfigAlignGaps: (opts?: {
+    mcpSourceTool?: string;
+    skillsSourceTool?: string;
+    mcpTargets?: string[];
+    skillTargets?: string[];
+  }) => Promise<{
+    policy: TeamPolicy;
+    gaps: ConfigAlignGap[];
+    mcpSource: string;
+    skillsSource: string;
+  }>;
+  alignConfigFromSource: (opts?: {
+    mcpSourceTool?: string;
+    skillsSourceTool?: string;
+    mcpTargets?: string[];
+    skillTargets?: string[];
+    syncMcp?: boolean;
+    syncSkills?: boolean;
+  }) => Promise<ConfigAlignResult>;
+  importTeamPolicy: () => Promise<{
+    ok: boolean;
+    policy: TeamPolicy;
+    path: string;
+    canceled?: boolean;
+    error?: string;
+  }>;
+  exportTeamPolicy: () => Promise<{ ok: boolean; canceled?: boolean; error?: string }>;
   getHealthMonitorState: () => Promise<HealthMonitorState>;
   runHealthCheck: () => Promise<HealthMonitorState>;
   setHealthMonitorPrefs: (
@@ -638,7 +723,11 @@ export interface ElectronAPI {
   ) => Promise<{ ok: boolean; prefs: HealthMonitorPrefs }>;
   onHealthMonitorState: (cb: (state: HealthMonitorState) => void) => () => void;
   getSkillsRaw: () => Promise<SkillsRawData>;
-  syncSkills: (opts: { skillNames: string[]; targetTools: string[] }) => Promise<SkillSyncResult[]>;
+  syncSkills: (opts: {
+    skillNames: string[];
+    targetTools: string[];
+    sourceTool?: string;
+  }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
   mcpListServers: (tool: string) => Promise<McpListResult>;
@@ -901,6 +990,8 @@ export interface ElectronAPI {
     options?: { globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs },
   ) => Promise<{ ok: boolean; runId?: string; error?: string }>;
   flowCancelRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
+  flowApproveGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
+  flowRejectGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowGetTaskSchedulerStatus: () => Promise<{
     supported: boolean;
     installed: boolean;

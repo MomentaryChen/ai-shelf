@@ -132,10 +132,19 @@ export function writeMcpServers(
   }
 }
 
-/** Collect the union of all MCP servers across sync-enabled tools. */
-export function collectAllMcpServers(): McpServersMap {
+/**
+ * Collect the union of all MCP servers across sync-enabled tools.
+ * When `sourceTool` is set, that tool's entries win for content (source of truth).
+ */
+export function collectAllMcpServers(sourceTool?: string): McpServersMap {
   const allServers: McpServersMap = {};
-  for (const tool of SYNC_TOOLS) {
+  const preferred =
+    sourceTool && (SYNC_TOOLS as readonly string[]).includes(sourceTool) ? sourceTool : undefined;
+  const order = preferred
+    ? [preferred, ...SYNC_TOOLS.filter((t) => t !== preferred)]
+    : [...SYNC_TOOLS];
+
+  for (const tool of order) {
     const servers = readMcpServers(tool);
     for (const [name, config] of Object.entries(servers)) {
       if (!allServers[name]) allServers[name] = config;

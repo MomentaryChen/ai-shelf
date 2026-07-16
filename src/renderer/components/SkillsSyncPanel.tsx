@@ -20,14 +20,19 @@ export function SkillsSyncPanel() {
   const [rawData, setRawData] = useState<SkillsRawData | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetTools, setTargetTools] = useState<Set<string>>(new Set(TOOLS));
+  const [sourceTool, setSourceTool] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [results, setResults] = useState<SkillSyncResult[] | null>(null);
 
   const load = useCallback(async () => {
     setResults(null);
     try {
-      const data = await window.api.getSkillsRaw();
+      const [data, policyRes] = await Promise.all([
+        window.api.getSkillsRaw(),
+        window.api.getTeamPolicy(),
+      ]);
       setRawData(data);
+      setSourceTool((prev) => prev || policyRes.policy.sourceOfTruth?.skills || "claude");
     } catch (err) {
       console.error("[SkillsSyncPanel] load error:", err);
     }
@@ -68,7 +73,11 @@ export function SkillsSyncPanel() {
     setSyncing(true);
     setResults(null);
     try {
-      const res = await window.api.syncSkills({ skillNames, targetTools: [...targetTools] });
+      const res = await window.api.syncSkills({
+        skillNames,
+        targetTools: [...targetTools],
+        sourceTool: sourceTool || undefined,
+      });
       setResults(res);
       await load();
       await window.api.startInventoryScan();
@@ -126,6 +135,22 @@ export function SkillsSyncPanel() {
 
       {syncableSkills.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-bg-primary px-3 py-2.5">
+          <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <span className="font-semibold uppercase tracking-wider">
+              {t("inventory.skillsSync.sourceOfTruth")}
+            </span>
+            <select
+              value={sourceTool}
+              onChange={(e) => setSourceTool(e.target.value)}
+              className="rounded border border-border bg-bg-card px-2 py-1 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              {TOOLS.map((tool) => (
+                <option key={tool} value={tool}>
+                  {TOOL_ICONS[tool]} {tool}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
             <span className="font-semibold uppercase tracking-wider">{t("inventory.skillsSync.syncTo")}</span>
             {TOOLS.map((tool) => (

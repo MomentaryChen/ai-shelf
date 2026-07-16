@@ -38,9 +38,37 @@ schedule: "0 9 * * 1-5"   # cron, Asia/Taipei unless timezone set (min 1h betwee
 timezone: Asia/Taipei
 runner: claude            # default | http for simple checks
 tool_args: --model haiku  # default for claude runner when omitted
+orchestration: true       # force multi-node mode (also auto when phases set tool/kind/retry/gate)
 extra_mcp_servers:        # optional — external MCP from Claude config
   - atlassian
 ```
+
+## Multi-agent orchestration (per-phase nodes)
+
+When any phase sets `tool`, `kind`, `retry`, `require_approval`, `next`, `on_fail`, or `on_reject` (or `orchestration: true`), the runner executes **one process per phase**:
+
+```yaml
+orchestration: true
+phases:
+  - id: research
+    label: Research with Claude
+    tool: claude
+  - id: review
+    label: Human review
+    kind: gate
+    on_reject: fail
+  - id: draft
+    label: Draft with Codex
+    tool: codex
+    retry: 1
+    on_fail: skip
+```
+
+- Node output is written to `runs/{runId}/phases/{id}/output.md` and injected into the next phase prompt.
+- `kind: gate` pauses for Approve / Reject in the UI.
+- Supported tools: `claude`, `cursor` (or `agent`), `codex`, `gemini`.
+
+Legacy flows without these fields still run as a **single agent** for the whole body.
 
 ## Claude runner protocol
 
@@ -76,5 +104,6 @@ phases:
 - Daily report: `schedule: "0 8 * * *"`, multiple phases, `on_fail: slack`
 - Weekly cleanup: `schedule: "0 3 * * 0"`
 - Manual only: omit `schedule`
+- Multi-agent pipeline: per-phase `tool` + optional `kind: gate`
 
-Do not invent n8n-style nodes. One markdown file = one DAG defined by `phases` order.
+One markdown file = one DAG defined by `phases` order (and optional `next` / `on_fail` branches).
