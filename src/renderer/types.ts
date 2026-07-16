@@ -935,6 +935,8 @@ export interface ElectronAPI {
     options?: { globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs },
   ) => Promise<{ ok: boolean; runId?: string; error?: string }>;
   flowCancelRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
+  flowApproveGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
+  flowRejectGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowGetTaskSchedulerStatus: () => Promise<{
     supported: boolean;
     installed: boolean;

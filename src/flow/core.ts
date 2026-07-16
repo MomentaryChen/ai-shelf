@@ -59,6 +59,12 @@ import {
   runsDir as flowRunsDir,
   writeRunState,
 } from "./run-state-store.js";
+import {
+  cancelFlowGateWait,
+  executeOrchestratedFlowRun,
+  flowUsesNodeOrchestration,
+  resolveFlowGate,
+} from "./flow-orchestrator.js";
 
 type RunStateListener = (state: FlowRunState) => void;
 
@@ -222,6 +228,7 @@ function spawnAgentPrompt(
       env,
       printPrefix: prep.printPrefix,
       args: prep.extraArgs,
+      promptDelivery: prep.promptDelivery,
       promptLog: { flowId: flow.id, kind: "run", runId },
     });
     return { child, mcpCleanup: prep.mcpMount.cleanup };
@@ -321,7 +328,12 @@ export function listActiveFlowRuns(): FlowRunState[] {
       continue;
     }
     for (const state of activeRuns.values()) {
-      if (state.flowId === flowId && (state.status === "running" || state.status === "pending")) {
+      if (
+        state.flowId === flowId &&
+        (state.status === "running" ||
+          state.status === "pending" ||
+          state.status === "waiting_approval")
+      ) {
         states.push(state);
         break;
       }
@@ -343,9 +355,10 @@ export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; er
   if (ctx.timeout) clearTimeout(ctx.timeout);
   ctx.abortHttp?.abort();
   if (ctx.child) killRunChild(ctx.child);
+  cancelFlowGateWait(flowId);
 
   for (const phase of ctx.state.phases) {
-    if (phase.status === "running") {
+    if (phase.status === "running" || phase.status === "waiting_approval") {
       phase.status = "skipped";
       phase.completedAt = new Date().toISOString();
       phase.message = "Cancelled";
@@ -356,11 +369,20 @@ export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; er
   ctx.state.status = "cancelled";
   ctx.state.error = "Cancelled by user";
   ctx.state.currentPhaseId = null;
+  ctx.state.pendingGatePhaseId = null;
   recomputeRunProgress(ctx.state);
   appendEvent(ctx.runDir, { type: "run.cancelled" });
   writeState(ctx.runDir, ctx.state);
 
   return { ok: true, runId: ctx.runId };
+}
+
+export function approveFlowGate(flowId: string): { ok: boolean; error?: string } {
+  return resolveFlowGate(flowId, "approve");
+}
+
+export function rejectFlowGate(flowId: string): { ok: boolean; error?: string } {
+  return resolveFlowGate(flowId, "reject");
 }
 
 export type RunFlowOptions = {
@@ -621,6 +643,37 @@ async function executeFlowRun(
 
   if (flow.runner === "http") {
     await executeHttpFlow(flow, runDir, state, outputPath, ctx);
+    return;
+  }
+
+  if (flowUsesNodeOrchestration(flow)) {
+    await executeOrchestratedFlowRun(
+      flow,
+      ctx,
+      {
+        broadcastState,
+        killChild: killRunChild,
+        watchStateFile: watchRunStateFile,
+      },
+      { globalToolLaunchArgs: runOptions.globalToolLaunchArgs },
+    );
+    // Copy assembled output to template path when configured.
+    if (
+      flow.outputTemplate &&
+      state.status === "completed" &&
+      state.outputPath &&
+      existsSync(state.outputPath) &&
+      outputPath !== state.outputPath
+    ) {
+      try {
+        mkdirSync(dirname(outputPath), { recursive: true });
+        writeFileSync(outputPath, readFileSync(state.outputPath, "utf8"), "utf8");
+        state.outputPath = outputPath;
+        writeState(runDir, state);
+      } catch {
+        /* keep runDir output */
+      }
+    }
     return;
   }
 

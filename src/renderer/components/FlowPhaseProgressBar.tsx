@@ -5,8 +5,10 @@ function segmentClass(status: FlowPhaseStatus | undefined, runStatus?: FlowRunSt
   if (status === "done") return "bg-ok";
   if (status === "skipped") return "bg-bg-elevated";
   if (status === "failed") return "bg-fail";
-  if (status === "running") return "flow-phase-segment-active bg-accent";
-  if (runStatus === "running" || runStatus === "pending") return "bg-transparent";
+  if (status === "running" || status === "waiting_approval") return "flow-phase-segment-active bg-accent";
+  if (runStatus === "running" || runStatus === "pending" || runStatus === "waiting_approval") {
+    return "bg-transparent";
+  }
   return "bg-transparent";
 }
 
@@ -20,7 +22,8 @@ type Props = {
 };
 
 export function FlowPhaseProgressBar({ phases, runStatus, finishing = false, starting = false }: Props) {
-  const isLive = runStatus === "running" || runStatus === "pending";
+  const isLive =
+    runStatus === "running" || runStatus === "pending" || runStatus === "waiting_approval";
 
   if (phases.length === 0) {
     if (!isLive) return null;
@@ -35,7 +38,7 @@ export function FlowPhaseProgressBar({ phases, runStatus, finishing = false, sta
     <div className="mb-6 flex h-1.5 gap-1" role="progressbar" aria-valuemin={0} aria-valuemax={phases.length}>
       {phases.map((phase, index) => {
         const status = phase.status;
-        let active = status === "running";
+        let active = status === "running" || status === "waiting_approval";
         if (starting && index === 0 && status === "pending") active = true;
         if (finishing && index === phases.length - 1 && status === "done") active = true;
 
@@ -44,6 +47,7 @@ export function FlowPhaseProgressBar({ phases, runStatus, finishing = false, sta
           status === "skipped" ||
           status === "failed" ||
           status === "running" ||
+          status === "waiting_approval" ||
           active;
 
         return (

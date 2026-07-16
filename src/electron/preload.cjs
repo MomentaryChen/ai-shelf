@@ -238,6 +238,8 @@ contextBridge.exposeInMainWorld("api", {
   flowGetLatestRunOutput: (flowId) => ipcRenderer.invoke("flow-get-latest-run-output", flowId),
   flowRun: (flowId, options) => ipcRenderer.invoke("flow-run", flowId, options),
   flowCancelRun: (flowId) => ipcRenderer.invoke("flow-cancel-run", flowId),
+  flowApproveGate: (flowId) => ipcRenderer.invoke("flow-approve-gate", flowId),
+  flowRejectGate: (flowId) => ipcRenderer.invoke("flow-reject-gate", flowId),
   flowGetTaskSchedulerStatus: () => ipcRenderer.invoke("flow-get-task-scheduler-status"),
   flowInstallTaskScheduler: () => ipcRenderer.invoke("flow-install-task-scheduler"),
   flowRemoveTaskScheduler: () => ipcRenderer.invoke("flow-remove-task-scheduler"),

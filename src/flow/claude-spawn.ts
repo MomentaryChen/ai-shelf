@@ -19,6 +19,8 @@ export type SpawnAgentPrintOptions = {
   printPrefix?: string[];
   /** Flags after print mode (e.g. `--mcp-config`, path). */
   args?: string[];
+  /** Deliver prompt on stdin (default) or as a trailing CLI argument (gemini). */
+  promptDelivery?: "stdin" | "arg";
   promptLog?: {
     flowId: string;
     kind: "generate" | "run";
@@ -27,7 +29,7 @@ export type SpawnAgentPrintOptions = {
 };
 
 /**
- * Run an agent CLI in print mode with the prompt on stdin.
+ * Run an agent CLI in print mode with the prompt on stdin (or as a trailing arg).
  * Uses a cmd.exe shim on Windows for bare command names (same as terminal).
  */
 export function spawnAgentPrint(options: SpawnAgentPrintOptions): ChildProcess {
@@ -38,17 +40,21 @@ export function spawnAgentPrint(options: SpawnAgentPrintOptions): ChildProcess {
     cwd,
     printPrefix = ["-p", "--input-format", "text"],
     args = [],
+    promptDelivery = "stdin",
     promptLog,
   } = options;
-  const printArgs = [...printPrefix, ...args];
+  const printArgs =
+    promptDelivery === "arg"
+      ? [...printPrefix, ...args, prompt]
+      : [...printPrefix, ...args];
 
   if (promptLog?.flowId) {
     appendFlowPromptLog(promptLog.flowId, {
       kind: promptLog.kind,
       runId: promptLog.runId,
-      inputFormat: "text",
+      inputFormat: promptDelivery === "arg" ? "arg" : "text",
       prompt,
-      cliArgs: [...launchCommand.split(/\s+/), ...printArgs],
+      cliArgs: [...launchCommand.split(/\s+/), ...printArgs.map((a) => (a === prompt ? "<prompt>" : a))],
     });
   }
 
@@ -75,7 +81,9 @@ export function spawnAgentPrint(options: SpawnAgentPrintOptions): ChildProcess {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
-  child.stdin?.write(prompt);
+  if (promptDelivery === "stdin") {
+    child.stdin?.write(prompt);
+  }
   child.stdin?.end();
 
   return child;

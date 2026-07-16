@@ -3,7 +3,9 @@ import type { FlowRunStatus } from "../../shared/flow-types.js";
 export function formatRunDuration(startedAt: string, updatedAt: string, status: FlowRunStatus): string {
   const start = Date.parse(startedAt);
   const end =
-    status === "running" || status === "pending" ? Date.now() : Date.parse(updatedAt);
+    status === "running" || status === "pending" || status === "waiting_approval"
+      ? Date.now()
+      : Date.parse(updatedAt);
   if (!Number.isFinite(start) || !Number.isFinite(end)) return "—";
   const sec = Math.max(0, Math.round((end - start) / 1000));
   if (sec < 60) return `${sec}s`;
@@ -49,6 +51,7 @@ export function runStatusTone(
     case "cancelled":
       return "failed";
     case "running":
+    case "waiting_approval":
       return "running";
     default:
       return "neutral";
