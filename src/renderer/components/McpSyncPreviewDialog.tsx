@@ -27,6 +27,7 @@ export function McpSyncPreviewDialog({
   const adds = items.filter((i) => i.action === "add");
   const skips = items.filter((i) => i.action === "skip");
   const conflicts = items.filter((i) => i.action === "conflict");
+  const blocked = items.filter((i) => i.action === "blocked");
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
@@ -36,6 +37,22 @@ export function McpSyncPreviewDialog({
         </DialogHeader>
 
         <p className="text-sm text-text-secondary">{t("healthMonitor.mcpPreviewHint")}</p>
+
+        {blocked.length > 0 && (
+          <section className="rounded-lg border border-fail/40 bg-fail/5 p-3">
+            <p className="mb-2 text-xs font-medium text-fail">
+              {t("healthMonitor.mcpPreviewBlocked", { count: blocked.length })}
+            </p>
+            <ul className="space-y-1 text-xs text-text-primary">
+              {blocked.map((item) => (
+                <li key={`blocked:${item.targetTool}:${item.serverName}`}>
+                  {item.serverName} → {item.targetTool}
+                  {item.reason ? ` (${item.reason})` : ""}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {conflicts.length > 0 && (
           <section className="rounded-lg border border-warn/40 bg-warn/5 p-3">

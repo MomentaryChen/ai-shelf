@@ -2,6 +2,7 @@ import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { DataTable, Td } from "./DataTable";
 import { Badge, InstallStatusBadge } from "./Badge";
+import { ConfigPolicyPanel } from "./ConfigPolicyPanel";
 import { SkillsMcpDiffPanel } from "./SkillsMcpDiffPanel";
 import { SkillsSyncPanel } from "./SkillsSyncPanel";
 import { SkillTags, resolveSkillDetails } from "./SkillTags";
@@ -50,7 +51,9 @@ export function SkillsTab({
     <>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">⚡ {t("app.tab.skills")}</h2>
 
-      <SkillsMcpDiffPanel data={data} onOpenMcpSync={onOpenMcpSync} />
+      <ConfigPolicyPanel />
+
+      <SkillsMcpDiffPanel onOpenMcpSync={onOpenMcpSync} />
 
       <SkillsSyncPanel />
 
