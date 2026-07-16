@@ -9,6 +9,28 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-07-16
+
+Multi-agent Flow orchestration, Usage cost decisions, and team config policy for MCP/skills sync.
+
+### Added
+
+- **Flow multi-agent orchestration** — Per-node runners and gates so a single flow can coordinate multiple agents with structured handoffs.
+- **Usage cost decisions** — Attribution and budgets so Usage helps decide where spend goes, not only show totals.
+- **Team config policy** — Source-of-truth policy for cross-tool MCP and skills sync across inventory tools.
+
+### Changed
+
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIF for the current UI.
+
+### Fixed
+
+- **Terminal copy-on-select paste** — Stopped paste from reading a stale clipboard after auto-copy.
+- **Non-npm update versions** — Resolve latest versions for non-npm tools via GitHub Releases.
+- **Windows Terminal launch** — Avoid crash when `wt` is unavailable; fall back safely.
+
+[3.8.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.8.0
+
 ## [3.7.0] - 2026-07-08
 
 Onboarding, inventory UX, and profile productivity improvements across desktop and CLI.
