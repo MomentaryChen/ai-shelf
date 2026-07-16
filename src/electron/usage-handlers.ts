@@ -7,6 +7,7 @@ import {
   listUsageCredentialStatus,
   setUsageCredential,
 } from "../usage/credential-store.js";
+import { readUsageBudgetPrefs, writeUsageBudgetPrefs } from "../usage/budget-store.js";
 import { fetchUsageDashboard } from "../usage/fetch-dashboard.js";
 import { fetchClaudeAdminUsage } from "../usage/providers/claude.js";
 import { fetchCopilotUsage, testCopilotPat } from "../usage/providers/copilot.js";
@@ -157,4 +158,26 @@ export function registerUsageHandlers(): void {
       return { ok: false as const, error: (err as Error).message };
     }
   });
+
+  ipcMain.handle("usage-get-budget", () => ({
+    budget: readUsageBudgetPrefs(),
+  }));
+
+  ipcMain.handle(
+    "usage-set-budget",
+    (_event, partial?: { weeklyBudgetUsd?: number | null; alertAtPercent?: number }) => {
+      if (!partial || typeof partial !== "object") {
+        return { ok: false as const, error: "Invalid budget" };
+      }
+      try {
+        const budget = writeUsageBudgetPrefs({
+          weeklyBudgetUsd: partial.weeklyBudgetUsd,
+          alertAtPercent: partial.alertAtPercent,
+        });
+        return { ok: true as const, budget };
+      } catch (err: unknown) {
+        return { ok: false as const, error: (err as Error).message };
+      }
+    },
+  );
 }

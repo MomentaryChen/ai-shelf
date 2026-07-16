@@ -42,6 +42,7 @@ import { resolveFlowRunner } from "./flow-runner-resolve.js";
 import { buildFallbackOutputMarkdown, writeRunOutputIfMissing } from "./flow-output.js";
 import { buildFlowRunPrompt } from "./flow-system-skills.js";
 import { spawnAgentPrint } from "./claude-spawn.js";
+import { parseAgentCostFromText } from "../usage/parse-agent-cost.js";
 import {
   deleteFlowChatData,
   deleteRunsForFlow,
@@ -140,6 +141,20 @@ function appendEvent(runDir: string, event: Record<string, unknown>): void {
   appendRunEvent(runDir, event);
 }
 
+function markRunFinished(state: FlowRunState): void {
+  state.completedAt = state.completedAt ?? new Date().toISOString();
+}
+
+function applyParsedAgentCost(state: FlowRunState, stdout: string, stderr: string): void {
+  const parsed = parseAgentCostFromText(stdout, stderr);
+  if (parsed.costUsd != null && parsed.costUsd >= 0) {
+    state.costUsd = parsed.costUsd;
+    state.costEstimated = false;
+  }
+  if (parsed.inputTokens != null) state.inputTokens = parsed.inputTokens;
+  if (parsed.outputTokens != null) state.outputTokens = parsed.outputTokens;
+}
+
 function initialRunState(flow: FlowDefinition, runId: string, runDir: string): FlowRunState {
   const phases = flow.phases.map((p) => ({
     id: p.id,
@@ -162,6 +177,13 @@ function initialRunState(flow: FlowDefinition, runId: string, runDir: string): F
     outputPath: null,
     error: null,
     logPath: join(runDir, "events.jsonl"),
+    profileId: flow.profileId ?? null,
+    agentTool: flow.runner === "http" ? "http" : (flow.agentTool || "claude"),
+    completedAt: null,
+    costUsd: null,
+    costEstimated: false,
+    inputTokens: null,
+    outputTokens: null,
   };
 }
 
@@ -195,7 +217,7 @@ function spawnAgentPrompt(
   runId: string,
   outputPath: string,
   runOptions: RunFlowOptions,
-): { child: ChildProcess; mcpCleanup: () => void } {
+): { child: ChildProcess; mcpCleanup: () => void; agentTool: string } {
   const resolved = resolveFlowRunner(flow, {
     globalToolLaunchArgs: runOptions.globalToolLaunchArgs,
   });
@@ -224,7 +246,7 @@ function spawnAgentPrompt(
       args: prep.extraArgs,
       promptLog: { flowId: flow.id, kind: "run", runId },
     });
-    return { child, mcpCleanup: prep.mcpMount.cleanup };
+    return { child, mcpCleanup: prep.mcpMount.cleanup, agentTool: resolved.tool };
   } catch (err) {
     prep.mcpMount.cleanup();
     throw err;
@@ -569,6 +591,7 @@ async function executeHttpFlow(
     state.status = res.ok ? "completed" : "failed";
     state.error = res.ok ? null : `HTTP ${res.status}`;
     state.currentPhaseId = null;
+    markRunFinished(state);
     appendEvent(runDir, {
       type: res.ok ? "run.completed" : "run.failed",
       outputPath: state.outputPath,
@@ -586,6 +609,7 @@ async function executeHttpFlow(
     }
     state.status = "failed";
     state.error = message;
+    markRunFinished(state);
     ensureRunOutput(flow, state, outputPath, runDir, { status: "failed", error: message });
     appendEvent(runDir, { type: "run.failed", error: message });
   }
@@ -595,6 +619,7 @@ async function executeHttpFlow(
     ensureRunOutput(flow, state, outputPath, runDir, { status: "failed", error: state.error });
   }
   ensureOutputPathOnState(state, runDir);
+  markRunFinished(state);
   writeState(runDir, state);
 }
 
@@ -672,10 +697,13 @@ async function executeFlowRun(
       const spawned = spawnAgentPrompt(prompt, flow, state.runId, outputPath, runOptions);
       child = spawned.child;
       ctx.mcpCleanup = spawned.mcpCleanup;
+      state.agentTool = spawned.agentTool;
+      writeState(runDir, state);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       state.status = "failed";
       state.error = message;
+      markRunFinished(state);
       ensureRunOutput(flow, state, outputPath, runDir, { status: "failed", error: message });
       appendEvent(runDir, { type: "run.failed", error: message });
       writeState(runDir, state);
@@ -690,6 +718,8 @@ async function executeFlowRun(
       killRunChild(child);
       state.status = "failed";
       state.error = `Timed out after ${flow.timeoutSec}s`;
+      applyParsedAgentCost(state, stdoutBuf, stderr);
+      markRunFinished(state);
       ensureRunOutput(flow, state, outputPath, runDir, {
         status: "failed",
         error: state.error,
@@ -739,6 +769,8 @@ async function executeFlowRun(
         state.outputPath = outputPath;
       }
       ensureOutputPathOnState(state, runDir);
+      applyParsedAgentCost(state, `${body}\n${stdoutBuf}`, stderr);
+      markRunFinished(state);
 
       if (code !== 0 || state.status === "failed") {
         if (state.status !== "failed") {
@@ -751,7 +783,11 @@ async function executeFlowRun(
           stderr,
           partialStdout: body || stdoutBuf.trim(),
         });
-        appendEvent(runDir, { type: "run.failed", error: state.error });
+        appendEvent(runDir, {
+          type: "run.failed",
+          error: state.error,
+          costUsd: state.costUsd,
+        });
       } else {
         for (const phase of state.phases) {
           if (phase.status === "pending" || phase.status === "running") {
@@ -776,7 +812,11 @@ async function executeFlowRun(
               }),
           );
         }
-        appendEvent(runDir, { type: "run.completed", outputPath: state.outputPath });
+        appendEvent(runDir, {
+          type: "run.completed",
+          outputPath: state.outputPath,
+          costUsd: state.costUsd,
+        });
       }
 
       writeState(runDir, state);
@@ -796,6 +836,8 @@ async function executeFlowRun(
       runSettled = true;
       state.status = "failed";
       state.error = err.message;
+      applyParsedAgentCost(state, stdoutBuf, stderr);
+      markRunFinished(state);
       ensureRunOutput(flow, state, outputPath, runDir, {
         status: "failed",
         error: err.message,

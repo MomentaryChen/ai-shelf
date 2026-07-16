@@ -521,6 +521,55 @@ export interface UsageToolSnapshot {
   quotas?: UsageQuotaWindow[];
 }
 
+export interface UsageAttributionRow {
+  id: string;
+  label: string;
+  costUsd: number;
+  runCount: number;
+  estimated: boolean;
+  toolId?: UsageToolId;
+  durationMs: number;
+}
+
+export interface UsageHottestFlow {
+  flowId: string;
+  label: string;
+  costUsd: number;
+  runCount: number;
+  estimated: boolean;
+}
+
+export interface UsageBudgetAlert {
+  level: "ok" | "warn" | "over";
+  weekSpendUsd: number;
+  weeklyBudgetUsd: number | null;
+  alertAtPercent: number;
+  usedPercent: number;
+  messageKey: "usage.budget.ok" | "usage.budget.warn" | "usage.budget.over" | "usage.budget.quotaWarn";
+  quotaAlerts: Array<{
+    toolId: UsageToolId;
+    labelKey: string;
+    label?: string;
+    usedPercent: number;
+  }>;
+}
+
+export interface UsageBudgetPrefs {
+  weeklyBudgetUsd: number | null;
+  alertAtPercent: number;
+}
+
+export interface UsageCostInsights {
+  byTool: UsageAttributionRow[];
+  byProfile: UsageAttributionRow[];
+  byFlow: UsageAttributionRow[];
+  hottestFlow: UsageHottestFlow | null;
+  weekHottestFlow: UsageHottestFlow | null;
+  weekSpendUsd: number;
+  budget: UsageBudgetPrefs;
+  alert: UsageBudgetAlert;
+}
+
 export interface UsageDashboardResult {
   rangeDays: number;
   fetchedAt: string;
@@ -534,6 +583,7 @@ export interface UsageDashboardResult {
     supportedCount: number;
     dailyUnified: UsageDailyUnifiedRow[];
   };
+  insights: UsageCostInsights;
 }
 
 export interface ElectronAPI {
@@ -800,6 +850,11 @@ export interface ElectronAPI {
     | { ok: true; dashboard: UsageDashboardResult }
     | { ok: false; error: string }
   >;
+  usageGetBudget: () => Promise<{ budget: UsageBudgetPrefs }>;
+  usageSetBudget: (partial: {
+    weeklyBudgetUsd?: number | null;
+    alertAtPercent?: number;
+  }) => Promise<{ ok: true; budget: UsageBudgetPrefs } | { ok: false; error: string }>;
   authReportSession: (
     report: AuthSessionReport,
   ) => Promise<{ ok: true; state: AuthStatePublic } | { ok: false; error: string }>;

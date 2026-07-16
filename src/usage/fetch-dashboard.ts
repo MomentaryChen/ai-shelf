@@ -1,4 +1,15 @@
+import {
+  attributeRunCosts,
+  buildAttributionInsights,
+  collectProviderQuotaAlerts,
+  evaluateBudgetAlert,
+  rangeWindowMs,
+  sumAttributedCost,
+  weekWindowMs,
+} from "./attribution.js";
+import { readUsageBudgetPrefs } from "./budget-store.js";
 import { getUsageCredential, isUsageEncryptionAvailable, isUsageToolConfigured, listUsageCredentialStatus } from "./credential-store.js";
+import { scanRecentFlowRunsForAttribution } from "./flow-run-scan.js";
 import { fetchClaudeUsage } from "./providers/claude.js";
 import { fetchCopilotUsage } from "./providers/copilot.js";
 import { fetchCursorUsage } from "./providers/cursor.js";
@@ -6,7 +17,44 @@ import { fetchGeminiUsage } from "./providers/gemini.js";
 import { fetchOpenAiUsage } from "./providers/openai.js";
 import { aggregateUsageDashboard } from "./aggregate-daily.js";
 import { USAGE_PROVIDERS } from "./registry.js";
-import type { UsageDashboardResult, UsageFetchOptions, UsageToolSnapshot } from "./types.js";
+import type { UsageCostInsights, UsageDashboardResult, UsageFetchOptions, UsageToolSnapshot } from "./types.js";
+
+function buildCostInsights(tools: UsageToolSnapshot[], days: number): UsageCostInsights {
+  const budget = readUsageBudgetPrefs();
+  const runs = scanRecentFlowRunsForAttribution(500);
+  const period = rangeWindowMs(days);
+  const week = weekWindowMs();
+
+  const periodAttr = attributeRunCosts(runs, tools, period.startMs, period.endMs);
+  const weekAttr = attributeRunCosts(runs, tools, week.startMs, week.endMs);
+  const periodInsights = buildAttributionInsights(periodAttr, tools);
+  const weekInsights = buildAttributionInsights(weekAttr, tools);
+
+  // Week spend prefers provider rollups for the 7-day window when daily data exists.
+  const weekFromDaily = tools
+    .filter((t) => t.status === "ok")
+    .reduce((sum, t) => {
+      const inWeek = t.daily
+        .filter((d) => {
+          const ms = Date.parse(`${d.date}T12:00:00.000Z`);
+          return Number.isFinite(ms) && ms >= week.startMs && ms <= week.endMs;
+        })
+        .reduce((s, d) => s + d.costUsd, 0);
+      return sum + inWeek;
+    }, 0);
+  const weekSpendUsd =
+    weekFromDaily > 0 ? weekFromDaily : sumAttributedCost(weekAttr) || periodInsights.byTool.reduce((s, r) => s + r.costUsd, 0);
+
+  const alert = evaluateBudgetAlert(weekSpendUsd, budget, collectProviderQuotaAlerts(tools));
+
+  return {
+    ...periodInsights,
+    weekHottestFlow: weekInsights.hottestFlow,
+    weekSpendUsd,
+    budget,
+    alert,
+  };
+}
 
 async function fetchToolSnapshot(
   provider: (typeof USAGE_PROVIDERS)[number],
@@ -113,5 +161,6 @@ export async function fetchUsageDashboard(opts: UsageFetchOptions = {}): Promise
     encryptionAvailable: isUsageEncryptionAvailable(),
     tools,
     summary: aggregateUsageDashboard(tools, configuredCount, supported.length),
+    insights: buildCostInsights(tools, days),
   };
 }
