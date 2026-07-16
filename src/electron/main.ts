@@ -1256,12 +1256,14 @@ function clipboardTextMatches(expected: string): boolean {
 // fall back instead of assuming the copy succeeded.
 ipcMain.handle("clipboard-write-text", async (_event, text: string) => {
   const value = text ?? "";
-  const maxAttempts = 3;
+  // Clipboard History / RDP / Office often hold the lock longer than a short
+  // burst of retries; give Windows more chances before the renderer falls back.
+  const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     clipboard.writeText(value);
     if (clipboardTextMatches(value)) return true;
     if (attempt < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 30 * attempt));
+      await new Promise((resolve) => setTimeout(resolve, 40 * attempt));
     }
   }
   return false;
