@@ -221,3 +221,8 @@ export function tickPaneAgentState(
 export function paneNeedsAttention(status: PaneAgentStatus): boolean {
   return status === "waiting_input" || status === "stalled";
 }
+
+/** Agent is still active — closing will kill the process. */
+export function isPaneAgentBusy(status: PaneAgentStatus): boolean {
+  return status === "running" || status === "waiting_input" || status === "stalled";
+}

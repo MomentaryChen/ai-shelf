@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **WebGL terminal renderer** — Optional GPU-accelerated xterm rendering (on by default) to keep multi-pane layouts and large scrollback smoother; falls back to canvas when WebGL is unavailable.
+
 ## [3.6.0] - 2026-07-08
 
 Terminal focus shortcuts and flow scheduler reliability fixes.

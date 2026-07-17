@@ -65,6 +65,8 @@ export const en = {
   "cmd.group.savedCommands": "Saved commands",
   "cmd.action.terminal": "Switch to Terminal",
   "status.live": "Live",
+  "status.exited": "Exited",
+  "status.stale": "Stale",
   "cmd.action.inventory": "Switch to Inventory",
   "cmd.action.refresh": "Refresh inventory",
   "cmd.terminal.openClaudeCursor": "Open Claude + Cursor",
@@ -163,6 +165,9 @@ export const en = {
   "settings.copyOnSelect": "Copy on selection",
   "settings.copyOnSelectHint":
     "When enabled, selecting text with the mouse copies it to the clipboard automatically — so you can paste it straight into another terminal.",
+  "settings.webgl": "WebGL renderer",
+  "settings.webglHint":
+    "Faster drawing with the GPU — helps with many panes and large scrollback. Falls back to canvas if WebGL is unavailable. Open panes reload on change.",
   "settings.systemTray": "System tray",
   "healthMonitor.settingsTitle": "Environment health",
   "healthMonitor.settingsHint":
@@ -585,6 +590,8 @@ export const en = {
   "pane.splitRight": "Split right",
   "pane.splitDown": "Split down",
   "pane.close": "Close pane",
+  "pane.closeBusyConfirm":
+    "This pane still has an agent running or waiting for input. Close it and stop the process?",
   "pane.minimize": "Minimize to sidebar",
   "pane.dropAbove": "Place above",
   "pane.dropBelow": "Place below",
