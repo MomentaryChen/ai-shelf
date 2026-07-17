@@ -147,7 +147,7 @@ export const zh: Record<MessageKey, string> = {
   "settings.resetDefault": "重設為預設",
   "settings.fontSize": "字型大小（{size}px）",
   "settings.scrollback": "捲動緩衝",
-  "settings.scrollbackHint": "行 — 變更後已開啟的窗格會重新載入",
+  "settings.scrollbackHint": "行 — 已開啟窗格會立即套用",
   "settings.ptyBuffer": "輸出緩衝",
   "settings.ptyBufferHint": "字元 — 匯出、搜尋與 pty-logs 尾端",
   "settings.rightClickPaste": "右鍵貼上",

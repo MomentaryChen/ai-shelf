@@ -568,7 +568,8 @@ function EmbeddedTerminalInner({
       searchAddon.dispose();
       disposeTerminal(term);
     };
-  }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback, webglEnabled]);
+    // fontFamily / fontSize / scrollback: applied live below — do not remount xterm
+  }, [sessionId, stableOnExit, bg, webglEnabled]);
 
   useEffect(() => {
     const term = termRef.current;
@@ -581,6 +582,23 @@ function EmbeddedTerminalInner({
     window.addEventListener("app-theme-change", applyTheme);
     return () => window.removeEventListener("app-theme-change", applyTheme);
   }, [bg]);
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    term.options.fontFamily = fontFamily;
+    term.options.fontSize = fontSize;
+    term.options.scrollback = scrollback;
+    // Remeasure cell size after font metrics change (or trim buffer after scrollback).
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => fitRef.current?.());
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [fontFamily, fontSize, scrollback]);
 
   useEffect(() => {
     const term = termRef.current;
