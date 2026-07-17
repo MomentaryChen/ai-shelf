@@ -64,7 +64,11 @@ import {
 import { getMcpRegistryInstallPreview, listMcpRegistryServers } from "../utils/mcp-registry.js";
 import { pingToolServers } from "../utils/mcp-ping.js";
 import { setCodexModel } from "../utils/mcp-codex-toml.js";
-import type { GroupLayoutSnapshot } from "ai-shelf";
+import {
+  NO_SUITABLE_SHELL_ERROR,
+  resolvePtySpawnPlan,
+  type GroupLayoutSnapshot,
+} from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
 import {
   checkAppUpdate,
@@ -1465,95 +1469,79 @@ ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
   return canceled ? null : filePaths[0];
 });
 
-ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string, extraArgs?: string) => {
-  let pty: PtyModule;
-  try {
-    pty = await getPty();
-  } catch (err: unknown) {
-    return { success: false, error: (err as Error).message };
-  }
-  const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
-  const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
-  if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
-
-  const sessionId = `${tool}-${Date.now()}`;
-  const isWin = process.platform === "win32";
-  const workDirResult = resolvePtyWorkDir(cwd);
-  if (!workDirResult.ok) {
-    return { success: false, error: workDirResult.error };
-  }
-  const workDir = workDirResult.dir;
-
-  // On Windows: prefer pwsh (loads $PROFILE for prompt themes) → powershell → cmd
-  const windowsCandidates: [string, string[]][] = shellOnly
-    ? [
-        ["pwsh.exe", ["-NoLogo", "-NoExit"]],
-        ["powershell.exe", ["-NoLogo", "-NoExit"]],
-        ["cmd.exe", ["/k"]],
-      ]
-    : [
-        ["pwsh.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
-        ["powershell.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
-        ["cmd.exe", ["/k", cmd]],
-      ];
-  const unixShell = "/bin/bash";
-  const unixArgs = shellOnly ? [] : ["-c", `${cmd}; exec bash`];
-
-  const ptyOpts = {
-    name: "xterm-256color",
-    cols: 120,
-    rows: 30,
-    cwd: workDir,
-    // COLORTERM=truecolor enables 24-bit color; TERM is set by node-pty via `name`
-    // TERM_PROGRAM tells Oh My Posh / Starship this is a recognised terminal (enables icons/glyphs)
-    // WT_SESSION mimics Windows Terminal so pwsh prompt themes activate fully
-    env: {
-      ...process.env,
-      COLORTERM: "truecolor",
-      TERM_PROGRAM: "vscode",
-      WT_SESSION: process.env.WT_SESSION ?? "electron-pty",
-    } as Record<string, string>,
-  };
-
-  try {
-    let proc: import("node-pty").IPty | undefined;
-
-    if (isWin) {
-      for (const [sh, args] of windowsCandidates) {
-        try { proc = pty.spawn(sh, args, ptyOpts); break; }
-        catch { /* try next */ }
-      }
-      if (!proc) throw new Error("No suitable shell found (pwsh / powershell / cmd)");
-    } else {
-      proc = pty.spawn(unixShell, unixArgs, ptyOpts);
-    }
-
-    PTY_OUTPUT_BUFFERS.set(sessionId, "");
-
-    PTY_SESSIONS.set(sessionId, proc);
-
-    proc.onData((data) => {
-      broadcastPtyData(sessionId, data);
-    });
-
-    // Kick the shell to emit a prompt after attach (some shells wait for first resize).
+ipcMain.handle(
+  "pty-spawn",
+  async (_event, tool: string, cwd?: string, extraArgs?: string, shell?: string) => {
+    let pty: PtyModule;
     try {
-      proc.resize(ptyOpts.cols, ptyOpts.rows);
-    } catch {
-      /* ignore */
+      pty = await getPty();
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
     }
+    const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
+    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
+    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
 
-    proc.onExit(({ exitCode }) => {
-      PTY_SESSIONS.delete(sessionId);
-      clearPtyBuffer(sessionId);
-      broadcastPtyExit(sessionId, exitCode);
-    });
+    const sessionId = `${tool}-${Date.now()}`;
+    const workDirResult = resolvePtyWorkDir(cwd);
+    if (!workDirResult.ok) {
+      return { success: false, error: workDirResult.error };
+    }
+    const workDir = workDirResult.dir;
+    const plan = resolvePtySpawnPlan({ command: cmd, shell });
 
-    return { success: true, sessionId };
-  } catch (err: unknown) {
-    return { success: false, error: (err as Error).message };
-  }
-});
+    const ptyOpts = {
+      name: "xterm-256color",
+      cols: 120,
+      rows: 30,
+      cwd: workDir,
+      env: plan.env,
+    };
+
+    try {
+      let proc: import("node-pty").IPty | undefined;
+
+      if (plan.platform === "win32") {
+        for (const [sh, args] of plan.windowsCandidates) {
+          try {
+            proc = pty.spawn(sh, args, ptyOpts);
+            break;
+          } catch {
+            /* try next */
+          }
+        }
+        if (!proc) throw new Error(NO_SUITABLE_SHELL_ERROR);
+      } else {
+        proc = pty.spawn(plan.unix.file, plan.unix.args, ptyOpts);
+      }
+
+      PTY_OUTPUT_BUFFERS.set(sessionId, "");
+
+      PTY_SESSIONS.set(sessionId, proc);
+
+      proc.onData((data) => {
+        broadcastPtyData(sessionId, data);
+      });
+
+      // Kick the shell to emit a prompt after attach (some shells wait for first resize).
+      try {
+        proc.resize(ptyOpts.cols, ptyOpts.rows);
+      } catch {
+        /* ignore */
+      }
+
+      proc.onExit(({ exitCode }) => {
+        PTY_SESSIONS.delete(sessionId);
+        clearPtyBuffer(sessionId);
+        broadcastPtyExit(sessionId, exitCode);
+      });
+
+      return { success: true, sessionId };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
 
 ipcMain.handle("pty-attach", (_event, sessionId: string) => {
   const alive = PTY_SESSIONS.has(sessionId);

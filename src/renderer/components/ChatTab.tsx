@@ -216,7 +216,13 @@ function ChatTabInner({
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
-    const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs);
+    const shell =
+      settings.externalTerminal === "pwsh" ||
+      settings.externalTerminal === "powershell" ||
+      settings.externalTerminal === "cmd"
+        ? settings.externalTerminal
+        : undefined;
+    const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs, shell);
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
@@ -225,7 +231,7 @@ function ChatTabInner({
     }
     setTerminalError(null);
     return { id: result.sessionId, tool, sessionId: result.sessionId, cwd: cwd || "" };
-  }, [settings.toolLaunchArgs, t]);
+  }, [settings.externalTerminal, settings.toolLaunchArgs, t]);
 
   const spawnPaneResilient = useCallback(
     async (tool: string, cwd: string): Promise<PaneInfo | null> => {
