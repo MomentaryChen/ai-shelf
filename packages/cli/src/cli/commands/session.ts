@@ -18,7 +18,10 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     .argument("<group>", "Group name")
     .argument("<name>", "Session name")
     .option("--cwd <path>", "Working directory")
-    .option("--shell <shell>", "Shell type (pwsh, powershell, cmd)")
+    .option(
+      "--shell <shell>",
+      "Shell preference (auto, pwsh, powershell, cmd, bash, zsh, fish, sh)",
+    )
     .option("--tool <tool>", "AI tool to launch (claude, copilot, cursor, codex, gemini, aider, opencode)")
     .option("--no-start", "Only create metadata, do not spawn PTY")
     .description("Create session and optionally start PTY")

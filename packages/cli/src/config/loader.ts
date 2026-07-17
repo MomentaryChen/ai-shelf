@@ -6,7 +6,7 @@ import { AppConfigSchema, type AppConfig, APP_NAME } from "./config.js";
 
 const DEFAULT_CONFIG = {
   workspaceRoot: "",
-  defaultShell: "pwsh",
+  defaultShell: "auto",
   logLevel: "info",
 } as const;
 

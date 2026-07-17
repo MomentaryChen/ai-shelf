@@ -1,4 +1,4 @@
 # ai-shelf default configuration
 workspaceRoot: ""
-defaultShell: pwsh
+defaultShell: auto
 logLevel: info

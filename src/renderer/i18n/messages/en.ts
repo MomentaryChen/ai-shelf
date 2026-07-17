@@ -131,6 +131,15 @@ export const en = {
   "settings.browse": "Browse…",
   "settings.clearHistory": "Clear history",
   "settings.externalTerminal": "External terminal preference",
+  "settings.preferredShell": "Embedded shell preference",
+  "settings.preferredShellHint":
+    "Used for in-app terminal panes. Auto follows $SHELL on macOS/Linux, or PowerShell first on Windows.",
+  "shell.auto": "Auto ($SHELL / system)",
+  "shell.bash": "Bash",
+  "shell.zsh": "Zsh",
+  "shell.fish": "Fish",
+  "shell.sh": "sh",
+
   "settings.toolLaunchArgs.title": "Tool launch arguments",
   "settings.toolLaunchArgs.subtitle":
     "Per-tool CLI flags when starting in embedded or external terminals. Claude includes a model picker (--model).",
