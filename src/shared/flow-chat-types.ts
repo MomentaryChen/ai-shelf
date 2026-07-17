@@ -28,4 +28,8 @@ export type FlowPromptLogEntry = {
   inputFormat: "text" | "arg";
   prompt: string;
   cliArgs?: string[];
+  /** Measured generate/run cost when stdout exposes it (USD). */
+  costUsd?: number;
+  inputTokens?: number;
+  outputTokens?: number;
 };

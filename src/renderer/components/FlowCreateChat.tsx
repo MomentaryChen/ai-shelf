@@ -113,16 +113,21 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, generating, draft]);
 
-  const turnsForApi = useCallback(
-    () =>
-      messages
-        .filter((m) => m.id !== "welcome" && !m.error)
-        .map((m) => ({
-          role: m.role,
-          content: m.role === "assistant" && m.draft ? m.draft : m.content,
-        })),
-    [messages],
-  );
+  /** Users + a single latest draft — older assistant drafts stay in UI only. */
+  const turnsForApi = useCallback(() => {
+    const relevant = messages.filter((m) => m.id !== "welcome" && !m.error);
+    const turns: Array<{ role: "user" | "assistant"; content: string }> = [];
+    let lastDraft: string | null = null;
+    for (const m of relevant) {
+      if (m.role === "user") {
+        turns.push({ role: "user", content: m.content });
+      } else if (m.draft?.trim()) {
+        lastDraft = m.draft;
+      }
+    }
+    if (lastDraft) turns.push({ role: "assistant", content: lastDraft });
+    return turns;
+  }, [messages]);
 
   const send = async () => {
     const text = input.trim();

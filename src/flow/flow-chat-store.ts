@@ -74,6 +74,35 @@ export function appendFlowPromptLog(flowId: string, entry: Omit<FlowPromptLogEnt
   appendFileSync(promptsFilePath(flowId), `${JSON.stringify(line)}\n`, "utf8");
 }
 
+/** Patch cost fields onto the latest prompt log entry of the given kind. */
+export function patchLatestFlowPromptLog(
+  flowId: string,
+  kind: FlowPromptLogEntry["kind"],
+  patch: Pick<FlowPromptLogEntry, "costUsd" | "inputTokens" | "outputTokens">,
+): void {
+  const path = promptsFilePath(flowId);
+  if (!existsSync(path)) return;
+  const lines = readFileSync(path, "utf8").split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const raw = lines[i]?.trim();
+    if (!raw) continue;
+    try {
+      const entry = JSON.parse(raw) as FlowPromptLogEntry;
+      if (entry.kind !== kind) continue;
+      const next: FlowPromptLogEntry = { ...entry };
+      if (patch.costUsd != null) next.costUsd = patch.costUsd;
+      if (patch.inputTokens != null) next.inputTokens = patch.inputTokens;
+      if (patch.outputTokens != null) next.outputTokens = patch.outputTokens;
+      lines[i] = JSON.stringify(next);
+      const body = lines.join("\n").replace(/\n+$/u, "");
+      writeFileSync(path, body ? `${body}\n` : "", "utf8");
+      return;
+    } catch {
+      /* skip malformed */
+    }
+  }
+}
+
 export function listFlowPromptLogs(flowId: string, limit = 50): FlowPromptLogEntry[] {
   const path = promptsFilePath(flowId);
   if (!existsSync(path)) return [];
@@ -89,38 +118,96 @@ export function listFlowPromptLogs(flowId: string, limit = 50): FlowPromptLogEnt
   return entries;
 }
 
+function rewritePromptLogFlowIds(flowId: string): void {
+  const promptsPath = promptsFilePath(flowId);
+  if (!existsSync(promptsPath)) return;
+  const lines = readFileSync(promptsPath, "utf8").split(/\r?\n/).filter(Boolean);
+  const updated = lines
+    .map((line) => {
+      try {
+        const entry = JSON.parse(line) as FlowPromptLogEntry;
+        return JSON.stringify({ ...entry, flowId });
+      } catch {
+        return line;
+      }
+    })
+    .join("\n");
+  writeFileSync(promptsPath, updated ? `${updated}\n` : "", "utf8");
+}
+
+function promptLogFingerprint(entry: FlowPromptLogEntry): string {
+  return `${entry.t}|${entry.kind}|${entry.prompt?.length ?? 0}|${entry.costUsd ?? ""}|${entry.runId ?? ""}`;
+}
+
+function appendPromptLogFile(fromFlowId: string, toFlowId: string): void {
+  const fromPath = promptsFilePath(fromFlowId);
+  if (!existsSync(fromPath)) return;
+  const fromLines = readFileSync(fromPath, "utf8").split(/\r?\n/).filter(Boolean);
+  if (fromLines.length === 0) return;
+  ensureChatDir(toFlowId);
+
+  const toPath = promptsFilePath(toFlowId);
+  const seen = new Set<string>();
+  if (existsSync(toPath)) {
+    for (const line of readFileSync(toPath, "utf8").split(/\r?\n/).filter(Boolean)) {
+      try {
+        seen.add(promptLogFingerprint(JSON.parse(line) as FlowPromptLogEntry));
+      } catch {
+        seen.add(line);
+      }
+    }
+  }
+
+  const rewritten: string[] = [];
+  for (const line of fromLines) {
+    try {
+      const entry = { ...(JSON.parse(line) as FlowPromptLogEntry), flowId: toFlowId };
+      const fp = promptLogFingerprint(entry);
+      if (seen.has(fp)) continue;
+      seen.add(fp);
+      rewritten.push(JSON.stringify(entry));
+    } catch {
+      if (seen.has(line)) continue;
+      seen.add(line);
+      rewritten.push(line);
+    }
+  }
+  if (rewritten.length === 0) return;
+  appendFileSync(toPath, `${rewritten.join("\n")}\n`, "utf8");
+}
+
 export function migrateFlowChat(fromFlowId: string, toFlowId: string): void {
   if (fromFlowId === toFlowId) return;
   const fromDir = flowChatDir(fromFlowId);
   const toDir = flowChatDir(toFlowId);
   if (!existsSync(fromDir)) return;
 
-  if (existsSync(toDir)) {
-    rmSync(toDir, { recursive: true, force: true });
-  }
   mkdirSync(flowChatRoot(), { recursive: true });
+
+  if (existsSync(toDir)) {
+    // Overwrite / re-save: keep existing chat + prompts, merge draft session on top.
+    const fromChat = readFlowChat(fromFlowId);
+    const toChat = readFlowChat(toFlowId);
+    if (fromChat?.messages?.length) {
+      const existingIds = new Set((toChat?.messages ?? []).map((m) => m.id));
+      const merged = [
+        ...(toChat?.messages ?? []),
+        ...fromChat.messages.filter((m) => !existingIds.has(m.id)),
+      ];
+      saveFlowChat(toFlowId, merged.map((m) => ({ ...m })));
+    }
+    appendPromptLogFile(fromFlowId, toFlowId);
+    rmSync(fromDir, { recursive: true, force: true });
+    return;
+  }
+
   renameSync(fromDir, toDir);
 
   const chat = readFlowChat(toFlowId);
   if (chat) {
     saveFlowChat(toFlowId, chat.messages.map((m) => ({ ...m })));
   }
-
-  const promptsPath = promptsFilePath(toFlowId);
-  if (existsSync(promptsPath)) {
-    const lines = readFileSync(promptsPath, "utf8").split(/\r?\n/).filter(Boolean);
-    const updated = lines
-      .map((line) => {
-        try {
-          const entry = JSON.parse(line) as FlowPromptLogEntry;
-          return JSON.stringify({ ...entry, flowId: toFlowId });
-        } catch {
-          return line;
-        }
-      })
-      .join("\n");
-    writeFileSync(promptsPath, updated ? `${updated}\n` : "", "utf8");
-  }
+  rewritePromptLogFlowIds(toFlowId);
 }
 
 export function deleteFlowChatData(flowId: string): void {
