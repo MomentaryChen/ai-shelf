@@ -1596,7 +1596,13 @@ ipcMain.handle(
     _event,
     sessionId: string,
     query: string,
-    opts?: { caseSensitive?: boolean; maxMatches?: number; contextChars?: number },
+    opts?: {
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      regex?: boolean;
+      maxMatches?: number;
+      contextChars?: number;
+    },
   ) => {
     const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
     return searchPtyOutput(buffer, query ?? "", opts ?? {});
