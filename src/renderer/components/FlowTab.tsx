@@ -25,6 +25,7 @@ import { Spinner } from "./Spinner";
 import { useLocale } from "../i18n/LocaleProvider";
 import { loadSettings } from "../chat-settings";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
+import { FLOW_CHAT_DRAFT_ID } from "../../shared/flow-chat-types.js";
 
 function isLiveRunStatus(status: FlowRunStatus | undefined): boolean {
   return status === "running" || status === "pending" || status === "waiting_approval";
@@ -62,6 +63,8 @@ export function FlowTab() {
   const [createOpen, setCreateOpen] = useState(false);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [chatFlowId, setChatFlowId] = useState<string | undefined>(undefined);
+  /** Bumps on New so a cleared `__draft__` chat remounts instead of reusing UI state. */
+  const [draftChatEpoch, setDraftChatEpoch] = useState(0);
   const [historyRun, setHistoryRun] = useState<FlowRunState | null>(null);
   const [historyRefreshByFlowId, setHistoryRefreshByFlowId] = useState<Record<string, number>>({});
   const [taskScheduler, setTaskScheduler] = useState<{
@@ -440,8 +443,12 @@ export function FlowTab() {
           variant="outline"
           className="mb-1 w-full shrink-0 rounded-[22px] border-border text-[13px]"
           onClick={() => {
-            setChatFlowId(undefined);
-            setCreateOpen(true);
+            // Fresh New session: never resume a dirty shared __draft__ chat.
+            void window.api.flowClearChat(FLOW_CHAT_DRAFT_ID).finally(() => {
+              setChatFlowId(undefined);
+              setDraftChatEpoch((n) => n + 1);
+              setCreateOpen(true);
+            });
           }}
         >
           <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden />
@@ -533,6 +540,7 @@ export function FlowTab() {
         <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
           {showCreate && (
             <FlowCreateChat
+              key={chatFlowId ?? `draft-${draftChatEpoch}`}
               flowId={chatFlowId}
               onSaved={(flowId) => {
                 setCreateOpen(false);

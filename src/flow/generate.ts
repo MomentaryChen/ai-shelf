@@ -7,6 +7,7 @@ import {
 import { buildToolLaunchCommand } from "../tool-launch.js";
 import { TOOL_LAUNCH_CMD } from "../tools.js";
 import { spawnClaudePrint } from "./claude-spawn.js";
+import { readFlowFile } from "./core.js";
 import { FLOW_CHAT_DRAFT_ID } from "./flow-chat-store.js";
 
 const GENERATE_TIMEOUT_MS = 120_000;
@@ -14,11 +15,20 @@ const GENERATE_TIMEOUT_MS = 120_000;
 export type GenerateFlowOptions = {
   /** Flow id for prompt logs; defaults to draft bucket before first save. */
   flowId?: string;
+  /** Optional override; when omitted, loaded from disk for existing flows. */
+  currentFlowMd?: string | null;
 };
 
 export type GenerateFlowResult =
   | { ok: true; content: string; raw: string }
   | { ok: false; error: string; raw?: string };
+
+function resolveCurrentFlowMd(flowId: string | undefined, override?: string | null): string | null {
+  if (typeof override === "string" && override.trim()) return override.trim();
+  const id = flowId?.trim();
+  if (!id || id === FLOW_CHAT_DRAFT_ID) return null;
+  return readFlowFile(id)?.content ?? null;
+}
 
 export async function generateFlowFromChat(
   turns: FlowGenerateTurn[],
@@ -28,8 +38,9 @@ export async function generateFlowFromChat(
     return { ok: false, error: "Describe the automation you want" };
   }
 
-  const prompt = buildFlowGeneratePrompt(turns);
   const logFlowId = options.flowId?.trim() || FLOW_CHAT_DRAFT_ID;
+  const currentFlowMd = resolveCurrentFlowMd(logFlowId, options.currentFlowMd);
+  const prompt = buildFlowGeneratePrompt(turns, { currentFlowMd });
 
   return new Promise((resolve) => {
     let stdout = "";
