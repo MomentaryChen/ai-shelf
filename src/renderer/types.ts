@@ -775,7 +775,13 @@ export interface ElectronAPI {
   ptySearchOutput: (
     sessionId: string,
     query: string,
-    opts?: { caseSensitive?: boolean; maxMatches?: number; contextChars?: number },
+    opts?: {
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      regex?: boolean;
+      maxMatches?: number;
+      contextChars?: number;
+    },
   ) => Promise<PtySearchResult>;
   ptyGetLogPath: (sessionId: string)                                => Promise<{ path: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;

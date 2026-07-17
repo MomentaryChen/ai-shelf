@@ -11,6 +11,7 @@ import {
   clearTerminalSearch,
   jumpToSessionMatch,
   type ResolvedSessionMatch,
+  type TerminalSearchFlags,
   SEARCH_DEBOUNCE_MS,
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
@@ -94,21 +95,30 @@ function EmbeddedTerminalInner({
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
+  const [regex, setRegex] = useState(false);
   const [matchCount, setMatchCount] = useState(0);
   const [matchIndex, setMatchIndex] = useState(0);
   const [matchCapped, setMatchCapped] = useState(false);
+  const [outsideScrollback, setOutsideScrollback] = useState(0);
+  const [outsideCapped, setOutsideCapped] = useState(false);
+  const [invalidRegex, setInvalidRegex] = useState(false);
   const [findInputFocusKey, setFindInputFocusKey] = useState(0);
 
   const findOpenRef = useRef(false);
   const findQueryRef = useRef(findQuery);
-  const caseSensitiveRef = useRef(caseSensitive);
+  const searchFlagsRef = useRef<TerminalSearchFlags>({
+    caseSensitive: false,
+    wholeWord: false,
+    regex: false,
+  });
   const matchIndexRef = useRef(0);
   const matchCountRef = useRef(0);
   const sessionMatchesRef = useRef<ResolvedSessionMatch[]>([]);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
   findQueryRef.current = findQuery;
-  caseSensitiveRef.current = caseSensitive;
+  searchFlagsRef.current = { caseSensitive, wholeWord, regex };
   matchIndexRef.current = matchIndex;
   matchCountRef.current = matchCount;
 
@@ -120,6 +130,9 @@ function EmbeddedTerminalInner({
     setMatchCount(0);
     setMatchIndex(0);
     setMatchCapped(false);
+    setOutsideScrollback(0);
+    setOutsideCapped(false);
+    setInvalidRegex(false);
     matchIndexRef.current = 0;
     matchCountRef.current = 0;
     sessionMatchesRef.current = [];
@@ -145,7 +158,7 @@ function EmbeddedTerminalInner({
         term,
         session[idx - 1]!,
         findQueryRef.current,
-        caseSensitiveRef.current,
+        searchFlagsRef.current,
         searchRef.current,
         idx,
       ) === "ok";
@@ -173,13 +186,16 @@ function EmbeddedTerminalInner({
         sessionIdRef.current,
         term,
         q,
-        caseSensitiveRef.current,
+        searchFlagsRef.current,
         searchRef.current,
       );
       sessionMatchesRef.current = snapshot.session;
       const total = snapshot.session.length;
       setMatchCount(total);
       setMatchCapped(snapshot.sessionCapped);
+      setOutsideScrollback(snapshot.outsideScrollback);
+      setOutsideCapped(snapshot.outsideCapped);
+      setInvalidRegex(snapshot.invalidRegex);
       matchCountRef.current = total;
       if (total === 0) {
         setMatchIndex(0);
@@ -555,7 +571,7 @@ function EmbeddedTerminalInner({
       void runFindQuery();
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [findQuery, caseSensitive, findOpen, runFindQuery, clearMatchStats]);
+  }, [findQuery, caseSensitive, wholeWord, regex, findOpen, runFindQuery, clearMatchStats]);
 
   useEffect(() => {
     if (!focused && findOpen) closeFind();
@@ -600,11 +616,18 @@ function EmbeddedTerminalInner({
           focusKey={findInputFocusKey}
           query={findQuery}
           caseSensitive={caseSensitive}
+          wholeWord={wholeWord}
+          regex={regex}
           matchIndex={matchIndex}
           matchCount={matchCount}
           matchCapped={matchCapped}
+          outsideScrollback={outsideScrollback}
+          outsideCapped={outsideCapped}
+          invalidRegex={invalidRegex}
           onQueryChange={setFindQuery}
           onCaseSensitiveChange={setCaseSensitive}
+          onWholeWordChange={setWholeWord}
+          onRegexChange={setRegex}
           onNext={() => void runSearch("next")}
           onPrevious={() => void runSearch("prev")}
           onClose={closeFind}
