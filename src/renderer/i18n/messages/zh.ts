@@ -58,6 +58,8 @@ export const zh: Record<MessageKey, string> = {
   "cmd.group.savedCommands": "已儲存指令",
   "cmd.action.terminal": "切換到終端機",
   "status.live": "連線中",
+  "status.exited": "已結束",
+  "status.stale": "已斷線",
   "cmd.action.inventory": "切換到清單",
   "cmd.action.refresh": "重新整理清單",
   "cmd.terminal.openClaudeCursor": "開啟 Claude + Cursor",
