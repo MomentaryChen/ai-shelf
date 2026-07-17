@@ -562,6 +562,7 @@ export const zh: Record<MessageKey, string> = {
   "pane.splitRight": "向右分割",
   "pane.splitDown": "向下分割",
   "pane.close": "關閉窗格",
+  "pane.closeBusyConfirm": "此窗格的代理仍在執行或等待輸入。關閉並結束程序？",
   "pane.minimize": "縮到側欄",
   "pane.dropAbove": "放到上方",
   "pane.dropBelow": "放到下方",
