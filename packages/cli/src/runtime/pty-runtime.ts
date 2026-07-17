@@ -2,6 +2,10 @@ import { homedir } from "node:os";
 import type { IPty } from "node-pty";
 import { RuntimeError } from "../core/errors/app-error.js";
 import type { OutputBuffer } from "./output-buffer.js";
+import {
+  NO_SUITABLE_SHELL_ERROR,
+  resolvePtySpawnPlan,
+} from "./pty-shell.js";
 
 export const PLAIN_SHELL_TOOL_ID = "shell";
 
@@ -53,51 +57,24 @@ export class PtyRuntime {
     }
 
     const pty = await this.getPty();
-    const isWin = process.platform === "win32";
     const workDir = options.cwd || homedir();
     const cmd = options.command ?? resolveLaunchCommand(options.tool);
-    const interactive = cmd === "";
-
-    const winArgs = (shell: string): string[] =>
-      interactive
-        ? ["-NoLogo", "-NoExit"]
-        : shell === "cmd.exe"
-          ? ["/k", cmd]
-          : ["-NoLogo", "-NoExit", "-Command", cmd];
-
-    const windowsCandidates: [string, string[]][] = [
-      ["pwsh.exe", winArgs("pwsh.exe")],
-      ["powershell.exe", winArgs("powershell.exe")],
-      ["cmd.exe", winArgs("cmd.exe")],
-    ];
-    const unixShell = "/bin/bash";
-    const unixArgs = interactive ? [] : ["-c", `${cmd}; exec bash`];
+    const plan = resolvePtySpawnPlan({
+      command: cmd,
+      shell: options.shell,
+    });
 
     const ptyOpts = {
       name: "xterm-256color",
       cols: options.cols ?? 120,
       rows: options.rows ?? 30,
       cwd: workDir,
-      env: {
-        ...process.env,
-        COLORTERM: "truecolor",
-        TERM_PROGRAM: "vscode",
-        WT_SESSION: process.env.WT_SESSION ?? "ai-shelf",
-      } as Record<string, string>,
+      env: plan.env,
     };
 
     let proc: IPty | undefined;
-    if (isWin) {
-      const shellPref = options.shell ?? "pwsh";
-      const ordered =
-        shellPref === "cmd"
-          ? [...windowsCandidates].reverse()
-          : shellPref === "powershell"
-            ? [windowsCandidates[1], windowsCandidates[0], windowsCandidates[2]].filter(
-                (x): x is [string, string[]] => x !== undefined,
-              )
-            : windowsCandidates;
-      for (const [sh, args] of ordered) {
+    if (plan.platform === "win32") {
+      for (const [sh, args] of plan.windowsCandidates) {
         try {
           proc = pty.spawn(sh, args, ptyOpts);
           break;
@@ -105,9 +82,9 @@ export class PtyRuntime {
           /* try next shell */
         }
       }
-      if (!proc) throw new RuntimeError("No suitable shell found (pwsh / powershell / cmd)");
+      if (!proc) throw new RuntimeError(NO_SUITABLE_SHELL_ERROR);
     } else {
-      proc = pty.spawn(unixShell, unixArgs.length ? unixArgs : [], ptyOpts);
+      proc = pty.spawn(plan.unix.file, plan.unix.args, ptyOpts);
     }
 
     this.processes.set(runtimeId, proc);

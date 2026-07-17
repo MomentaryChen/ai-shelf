@@ -11,6 +11,7 @@ import {
   clearTerminalSearch,
   jumpToSessionMatch,
   type ResolvedSessionMatch,
+  type TerminalSearchFlags,
   SEARCH_DEBOUNCE_MS,
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
@@ -22,6 +23,7 @@ import {
 import { getXtermTheme } from "../app-theme";
 import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
+import { attachTerminalWebgl } from "../terminal/xterm-webgl";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { useLocale } from "../i18n/LocaleProvider";
 
@@ -31,6 +33,8 @@ interface Props {
   fontFamily: string;
   fontSize: number;
   scrollback: number;
+  /** Use WebGL renderer when the GPU allows it (falls back to canvas). */
+  webglEnabled?: boolean;
   rightClickPaste?: boolean;
   copyOnSelect?: boolean;
   active?: boolean;
@@ -68,6 +72,7 @@ function EmbeddedTerminalInner({
   fontFamily,
   fontSize,
   scrollback,
+  webglEnabled = true,
   rightClickPaste = true,
   copyOnSelect = true,
   active = true,
@@ -94,21 +99,30 @@ function EmbeddedTerminalInner({
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
+  const [regex, setRegex] = useState(false);
   const [matchCount, setMatchCount] = useState(0);
   const [matchIndex, setMatchIndex] = useState(0);
   const [matchCapped, setMatchCapped] = useState(false);
+  const [outsideScrollback, setOutsideScrollback] = useState(0);
+  const [outsideCapped, setOutsideCapped] = useState(false);
+  const [invalidRegex, setInvalidRegex] = useState(false);
   const [findInputFocusKey, setFindInputFocusKey] = useState(0);
 
   const findOpenRef = useRef(false);
   const findQueryRef = useRef(findQuery);
-  const caseSensitiveRef = useRef(caseSensitive);
+  const searchFlagsRef = useRef<TerminalSearchFlags>({
+    caseSensitive: false,
+    wholeWord: false,
+    regex: false,
+  });
   const matchIndexRef = useRef(0);
   const matchCountRef = useRef(0);
   const sessionMatchesRef = useRef<ResolvedSessionMatch[]>([]);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
   findQueryRef.current = findQuery;
-  caseSensitiveRef.current = caseSensitive;
+  searchFlagsRef.current = { caseSensitive, wholeWord, regex };
   matchIndexRef.current = matchIndex;
   matchCountRef.current = matchCount;
 
@@ -120,6 +134,9 @@ function EmbeddedTerminalInner({
     setMatchCount(0);
     setMatchIndex(0);
     setMatchCapped(false);
+    setOutsideScrollback(0);
+    setOutsideCapped(false);
+    setInvalidRegex(false);
     matchIndexRef.current = 0;
     matchCountRef.current = 0;
     sessionMatchesRef.current = [];
@@ -145,7 +162,7 @@ function EmbeddedTerminalInner({
         term,
         session[idx - 1]!,
         findQueryRef.current,
-        caseSensitiveRef.current,
+        searchFlagsRef.current,
         searchRef.current,
         idx,
       ) === "ok";
@@ -173,13 +190,16 @@ function EmbeddedTerminalInner({
         sessionIdRef.current,
         term,
         q,
-        caseSensitiveRef.current,
+        searchFlagsRef.current,
         searchRef.current,
       );
       sessionMatchesRef.current = snapshot.session;
       const total = snapshot.session.length;
       setMatchCount(total);
       setMatchCapped(snapshot.sessionCapped);
+      setOutsideScrollback(snapshot.outsideScrollback);
+      setOutsideCapped(snapshot.outsideCapped);
+      setInvalidRegex(snapshot.invalidRegex);
       matchCountRef.current = total;
       if (total === 0) {
         setMatchIndex(0);
@@ -291,12 +311,36 @@ function EmbeddedTerminalInner({
     term.loadAddon(fitAddon);
     term.open(el);
     termRef.current = term;
+    const detachWebgl = webglEnabled ? attachTerminalWebgl(term) : () => {};
     const searchAddon = attachTerminalSearch(term);
     searchRef.current = searchAddon;
 
+    let exited = false;
+    let cancelled = false;
+
+    const markExited = () => {
+      if (cancelled || exited) return;
+      exited = true;
+      const wasAtBottom = isTerminalAtBottom(term);
+      term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
+      if (!wasAtBottom) setHasNewOutput(true);
+      const d = term.onKey(() => {
+        d.dispose();
+        stableOnExit();
+      });
+    };
+
+    const writePty = (data: string) => {
+      if (cancelled || exited) return;
+      void window.api.ptyWrite(sessionId, data).then((r) => {
+        if (cancelled || r.success) return;
+        markExited();
+      });
+    };
+
     const doClear = () => {
       term.clear();
-      window.api.ptyWrite(sessionId, "\x0c");
+      writePty("\x0c");
     };
     const doExportOutput = () => {
       void exportTerminalOutput(sessionId, sessionId);
@@ -369,9 +413,13 @@ function EmbeddedTerminalInner({
     scrollToBottomRef.current = scrollToBottom;
 
     const syncPtySize = () => {
+      if (cancelled || exited) return;
       const cols = Math.max(term.cols, 2);
       const rows = Math.max(term.rows, 2);
-      window.api.ptyResize(sessionId, cols, rows);
+      void window.api.ptyResize(sessionId, cols, rows).then((r) => {
+        if (cancelled || r.success) return;
+        markExited();
+      });
     };
 
     const fit = () => {
@@ -433,26 +481,20 @@ function EmbeddedTerminalInner({
 
     const offExit = window.api.onPtyExit(({ sessionId: sid }) => {
       if (sid !== sessionId) return;
-      const wasAtBottom = isTerminalAtBottom(term);
-      term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
-      if (!wasAtBottom) setHasNewOutput(true);
-      const d = term.onKey(() => {
-        d.dispose();
-        stableOnExit();
-      });
+      markExited();
     });
 
     term.onData((data) => {
+      if (cancelled || exited) return;
       if (pasteToThisPaneOnly) {
-        window.api.ptyWrite(sessionId, data);
+        writePty(data);
         return;
       }
       const write = onWriteRef.current;
       if (write) write(data, sessionId);
-      else window.api.ptyWrite(sessionId, data);
+      else writePty(data);
     });
 
-    let cancelled = false;
     void window.api.ptyAttach(sessionId).then((r) => {
       if (cancelled) return;
       if (!r.alive) {
@@ -467,8 +509,8 @@ function EmbeddedTerminalInner({
       scheduleFit();
 
       wakeTimer = window.setTimeout(() => {
-        if (cancelled || receivedBytes > 0) return;
-        window.api.ptyWrite(sessionId, "\r");
+        if (cancelled || exited || receivedBytes > 0) return;
+        writePty("\r");
         scheduleFit();
       }, 400);
 
@@ -521,12 +563,13 @@ function EmbeddedTerminalInner({
       unregisterClear();
       unbindClipboard();
       unbindLinks();
+      detachWebgl();
       ro.disconnect();
       searchAddon.dispose();
       disposeTerminal(term);
     };
     // fontFamily / fontSize / scrollback: applied live below — do not remount xterm
-  }, [sessionId, stableOnExit, bg]);
+  }, [sessionId, stableOnExit, bg, webglEnabled]);
 
   useEffect(() => {
     const term = termRef.current;
@@ -573,7 +616,7 @@ function EmbeddedTerminalInner({
       void runFindQuery();
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [findQuery, caseSensitive, findOpen, runFindQuery, clearMatchStats]);
+  }, [findQuery, caseSensitive, wholeWord, regex, findOpen, runFindQuery, clearMatchStats]);
 
   useEffect(() => {
     if (!focused && findOpen) closeFind();
@@ -618,11 +661,18 @@ function EmbeddedTerminalInner({
           focusKey={findInputFocusKey}
           query={findQuery}
           caseSensitive={caseSensitive}
+          wholeWord={wholeWord}
+          regex={regex}
           matchIndex={matchIndex}
           matchCount={matchCount}
           matchCapped={matchCapped}
+          outsideScrollback={outsideScrollback}
+          outsideCapped={outsideCapped}
+          invalidRegex={invalidRegex}
           onQueryChange={setFindQuery}
           onCaseSensitiveChange={setCaseSensitive}
+          onWholeWordChange={setWholeWord}
+          onRegexChange={setRegex}
           onNext={() => void runSearch("next")}
           onPrevious={() => void runSearch("prev")}
           onClose={closeFind}
@@ -655,6 +705,7 @@ export const EmbeddedTerminal = memo(
     prev.fontFamily === next.fontFamily &&
     prev.fontSize === next.fontSize &&
     prev.scrollback === next.scrollback &&
+    prev.webglEnabled === next.webglEnabled &&
     prev.rightClickPaste === next.rightClickPaste &&
     prev.copyOnSelect === next.copyOnSelect &&
     prev.active === next.active &&

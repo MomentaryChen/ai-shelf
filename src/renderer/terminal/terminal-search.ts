@@ -1,7 +1,12 @@
 import type { Terminal } from "@xterm/xterm";
 import type { IBufferRange } from "@xterm/xterm";
 import { SearchAddon, type ISearchOptions } from "@xterm/addon-search";
-import { MATCH_COUNT_CAP, type PtyTextMatch } from "../../shared/pty-output-search";
+import {
+  MATCH_COUNT_CAP,
+  collectLineMatches,
+  isValidSearchRegex,
+  type PtyTextMatch,
+} from "../../shared/pty-output-search";
 
 /** Internal 3rd arg on findNext/findPrevious (not in public .d.ts). */
 interface InternalSearchOptions {
@@ -44,6 +49,12 @@ export { MATCH_COUNT_CAP };
 /** Align with main process PTY_OUTPUT_BUFFERS rolling tail. */
 export const XTERM_SCROLLBACK_LINES = 20_000;
 
+export interface TerminalSearchFlags {
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+}
+
 export interface TerminalMatch {
   line: number;
   col: number;
@@ -61,14 +72,79 @@ export interface ResolvedSessionMatch {
 export interface SearchSnapshot {
   session: ResolvedSessionMatch[];
   sessionCapped: boolean;
+  /**
+   * Extra matches in the PTY char buffer vs the same matcher on xterm buffer
+   * text (trimmed history / cleared viewport). Apples-to-apples — not SearchAddon delta.
+   */
+  outsideScrollback: number;
+  /** True when the PTY side hit MATCH_COUNT_CAP while computing outsideScrollback. */
+  outsideCapped: boolean;
+  /** Regex mode is on but the query is not a valid RegExp. */
+  invalidRegex: boolean;
+}
+
+function emptySnapshot(partial?: Partial<SearchSnapshot>): SearchSnapshot {
+  return {
+    session: [],
+    sessionCapped: false,
+    outsideScrollback: 0,
+    outsideCapped: false,
+    invalidRegex: false,
+    ...partial,
+  };
+}
+
+/** Logical lines from xterm (unwrap wrapped rows), matching SearchAddon line model. */
+export function xtermLogicalLines(term: Terminal): string[] {
+  const buffer = term.buffer.active;
+  const lines: string[] = [];
+  let y = 0;
+  while (y < buffer.length) {
+    const first = buffer.getLine(y);
+    if (!first) {
+      y += 1;
+      continue;
+    }
+    if (first.isWrapped) {
+      y += 1;
+      continue;
+    }
+    let text = first.translateToString(true);
+    let nextY = y + 1;
+    while (nextY < buffer.length) {
+      const next = buffer.getLine(nextY);
+      if (!next?.isWrapped) break;
+      text += next.translateToString(true);
+      nextY += 1;
+    }
+    lines.push(text);
+    y = nextY;
+  }
+  return lines;
+}
+
+function countMatchesInLines(
+  lines: string[],
+  query: string,
+  flags: TerminalSearchFlags,
+): { total: number; capped: boolean } {
+  let total = 0;
+  for (const line of lines) {
+    const remaining = MATCH_COUNT_CAP - total;
+    if (remaining <= 0) return { total, capped: true };
+    total += collectLineMatches(line, query, flags, remaining).length;
+  }
+  return { total, capped: total >= MATCH_COUNT_CAP };
 }
 
 export function searchOptions(
-  caseSensitive: boolean,
+  flags: TerminalSearchFlags,
   incremental = false,
 ): ISearchOptions {
   return {
-    caseSensitive,
+    caseSensitive: flags.caseSensitive,
+    wholeWord: flags.wholeWord,
+    regex: flags.regex,
     incremental,
   };
 }
@@ -105,17 +181,19 @@ export function collectAllMatchesViaAddon(
   addon: SearchAddon,
   term: Terminal,
   query: string,
-  caseSensitive: boolean,
+  flags: TerminalSearchFlags,
 ): { matches: TerminalMatch[]; capped: boolean } {
   if (!query) return { matches: [], capped: false };
+  if (flags.regex && !isValidSearchRegex(query)) {
+    return { matches: [], capped: false };
+  }
 
-  const opts = searchOptions(caseSensitive);
+  const opts = searchOptions(flags);
   addon.clearDecorations();
   term.clearSelection();
 
   const matches: TerminalMatch[] = [];
   const seen = new Set<string>();
-  let capped = false;
 
   for (let i = 0; i < MATCH_COUNT_CAP; i++) {
     if (!findNextInternal(addon, query, opts, { noScroll: true })) {
@@ -137,21 +215,19 @@ export function collectAllMatchesViaAddon(
   term.clearSelection();
   addon.clearDecorations();
 
-  if (matches.length >= MATCH_COUNT_CAP) {
-    capped = true;
-  }
-
-  return { matches: sortTerminalMatches(matches), capped };
+  return {
+    matches: sortTerminalMatches(matches),
+    capped: matches.length >= MATCH_COUNT_CAP,
+  };
 }
 
 /** Fallback when SearchAddon finds nothing (per-row translateToString). */
 function collectFallbackLineMatches(
   term: Terminal,
   query: string,
-  caseSensitive: boolean,
+  flags: TerminalSearchFlags,
 ): TerminalMatch[] {
   const buffer = term.buffer.active;
-  const needle = caseSensitive ? query : query.toLowerCase();
   const matches: TerminalMatch[] = [];
 
   for (let y = 0; y < buffer.length; y++) {
@@ -159,15 +235,12 @@ function collectFallbackLineMatches(
     if (!line) continue;
     const text = line.translateToString(true);
     if (!text) continue;
-    const haystack = caseSensitive ? text : text.toLowerCase();
-    let idx = 0;
-    while (idx <= haystack.length) {
-      const at = haystack.indexOf(needle, idx);
-      if (at < 0) break;
-      matches.push({ line: y, col: at, size: query.length });
-      if (matches.length >= MATCH_COUNT_CAP) return matches;
-      idx = at + 1;
+    const remaining = MATCH_COUNT_CAP - matches.length;
+    const lineMatches = collectLineMatches(text, query, flags, remaining);
+    for (const m of lineMatches) {
+      matches.push({ line: y, col: m.col, size: m.size });
     }
+    if (matches.length >= MATCH_COUNT_CAP) return matches;
   }
 
   return matches;
@@ -181,11 +254,12 @@ export function jumpToMatchViaAddon(
   term: Terminal,
   index: number,
   query: string,
-  caseSensitive: boolean,
+  flags: TerminalSearchFlags,
 ): boolean {
   if (!query || index < 1) return false;
+  if (flags.regex && !isValidSearchRegex(query)) return false;
 
-  const opts = searchOptions(caseSensitive);
+  const opts = searchOptions(flags);
   addon.clearDecorations();
   term.clearSelection();
 
@@ -203,32 +277,55 @@ export function jumpToMatchViaAddon(
   return found;
 }
 
+async function countPtyMatches(
+  sessionId: string,
+  query: string,
+  flags: TerminalSearchFlags,
+): Promise<{ total: number; capped: boolean }> {
+  try {
+    const result = await window.api.ptySearchOutput(sessionId, query, {
+      caseSensitive: flags.caseSensitive,
+      wholeWord: flags.wholeWord,
+      regex: flags.regex,
+      maxMatches: MATCH_COUNT_CAP,
+    });
+    return { total: result.total, capped: result.capped };
+  } catch {
+    return { total: 0, capped: false };
+  }
+}
+
 export async function buildSearchSnapshot(
-  _sessionId: string,
+  sessionId: string,
   term: Terminal | null,
   query: string,
-  caseSensitive: boolean,
+  flags: TerminalSearchFlags,
   addon: SearchAddon | null,
 ): Promise<SearchSnapshot> {
   if (!term || !query) {
-    return { session: [], sessionCapped: false };
+    return emptySnapshot();
   }
 
   if (!addon) {
-    return { session: [], sessionCapped: false };
+    return emptySnapshot();
   }
 
-  let { matches, capped } = collectAllMatchesViaAddon(
-    addon,
-    term,
-    query,
-    caseSensitive,
-  );
+  if (flags.regex && !isValidSearchRegex(query)) {
+    return emptySnapshot({ invalidRegex: true });
+  }
+
+  let { matches, capped } = collectAllMatchesViaAddon(addon, term, query, flags);
 
   if (matches.length === 0) {
-    matches = collectFallbackLineMatches(term, query, caseSensitive);
+    matches = collectFallbackLineMatches(term, query, flags);
     capped = matches.length >= MATCH_COUNT_CAP;
   }
+
+  // Same matcher on both buffers — avoids false "beyond" from SearchAddon vs PTY deltas.
+  const xtermText = countMatchesInLines(xtermLogicalLines(term), query, flags);
+  const pty = await countPtyMatches(sessionId, query, flags);
+  const outsideScrollback = Math.max(0, pty.total - xtermText.total);
+  const outsideCapped = outsideScrollback > 0 && pty.capped;
 
   const session: ResolvedSessionMatch[] = matches.map((m) => ({
     pty: m,
@@ -236,7 +333,13 @@ export async function buildSearchSnapshot(
     xterm: m,
   }));
 
-  return { session, sessionCapped: capped };
+  return {
+    session,
+    sessionCapped: capped,
+    outsideScrollback,
+    outsideCapped,
+    invalidRegex: false,
+  };
 }
 
 /** Scroll-only jump using coordinates from SearchAddon selection. */
@@ -244,7 +347,7 @@ export function jumpToSessionMatch(
   term: Terminal,
   entry: ResolvedSessionMatch,
   query: string,
-  caseSensitive: boolean,
+  flags: TerminalSearchFlags,
   addon: SearchAddon | null,
   matchIndex: number,
 ): MatchScrollStatus {
@@ -253,42 +356,46 @@ export function jumpToSessionMatch(
     return "out-of-scrollback";
   }
 
-  if (jumpToMatchViaAddon(addon, term, matchIndex, query, caseSensitive)) {
+  if (!entry.xterm) {
+    term.clearSelection();
+    return "out-of-scrollback";
+  }
+
+  if (jumpToMatchViaAddon(addon, term, matchIndex, query, flags)) {
     return "ok";
   }
 
   const fallback = entry.xterm;
-  if (fallback) {
-    const buffer = term.buffer.active;
-    const vy = buffer.viewportY;
-    const half = Math.floor(term.rows / 2);
-    const targetY = Math.max(0, fallback.line - half);
-    if (fallback.line < vy) {
-      const toTop = -buffer.viewportY;
-      if (toTop !== 0) term.scrollLines(toTop);
-    }
-    const scrollAmt = targetY - term.buffer.active.viewportY;
-    if (scrollAmt !== 0) term.scrollLines(scrollAmt);
-    term.select(fallback.col, fallback.line, fallback.size);
-    return "ok";
+  const buffer = term.buffer.active;
+  const vy = buffer.viewportY;
+  const half = Math.floor(term.rows / 2);
+  const targetY = Math.max(0, fallback.line - half);
+  if (fallback.line < vy) {
+    const toTop = -buffer.viewportY;
+    if (toTop !== 0) term.scrollLines(toTop);
   }
-
-  term.clearSelection();
-  return "out-of-scrollback";
+  const scrollAmt = targetY - term.buffer.active.viewportY;
+  if (scrollAmt !== 0) term.scrollLines(scrollAmt);
+  term.select(fallback.col, fallback.line, fallback.size);
+  return "ok";
 }
 
 export function runTerminalSearch(
   addon: SearchAddon,
   direction: "next" | "prev",
   query: string,
-  caseSensitive: boolean,
+  flags: TerminalSearchFlags,
   incremental = false,
 ): boolean {
   if (!query) {
     clearTerminalSearch(addon);
     return false;
   }
-  const opts = searchOptions(caseSensitive, incremental);
+  if (flags.regex && !isValidSearchRegex(query)) {
+    clearTerminalSearch(addon);
+    return false;
+  }
+  const opts = searchOptions(flags, incremental);
   const internal: InternalSearchOptions | undefined = incremental
     ? { noScroll: true }
     : undefined;
@@ -303,7 +410,7 @@ export function resolvePtyMatchInXterm(
   _lineText: string,
   _ptyMatch: PtyTextMatch,
   _query: string,
-  _caseSensitive: boolean,
+  _flags: TerminalSearchFlags,
 ): TerminalMatch | null {
   return null;
 }
