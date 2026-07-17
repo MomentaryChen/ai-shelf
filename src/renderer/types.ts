@@ -765,7 +765,16 @@ export interface ElectronAPI {
     /** Embedded PTY shell preference: pwsh | powershell | cmd (falls back through cascade). */
     shell?: string,
   ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
-  ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
+  ptyAttach: (sessionId: string) => Promise<{
+    success: boolean;
+    alive: boolean;
+    buffer: string;
+    pid: number | null;
+    shell: string | null;
+    cols: number | null;
+    rows: number | null;
+    exitCode: number | null;
+  }>;
   ptyGetOutputBuffer: (sessionId: string)                            => Promise<{ buffer: string }>;
   ptyExportOutput: (
     sessionId: string,
@@ -794,6 +803,17 @@ export interface ElectronAPI {
   ptyKill:   (sessionId: string)                           => void;
   onPtyData: (cb: (p: { sessionId: string; data: string })     => void) => (() => void);
   onPtyExit: (cb: (p: { sessionId: string; exitCode: number }) => void) => (() => void);
+  onPtyMeta: (
+    cb: (p: {
+      sessionId: string;
+      alive: boolean;
+      pid: number | null;
+      shell: string;
+      cols: number;
+      rows: number;
+      exitCode: number | null;
+    }) => void,
+  ) => (() => void);
   setDefaultModel: (tool: string, model: string) => Promise<{ success: boolean; error?: string }>;
   getEnvVars: () => Promise<EnvVarGroup[]>;
   wsGetTree: () => Promise<WorkspaceTree>;
