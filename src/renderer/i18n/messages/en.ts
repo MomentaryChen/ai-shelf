@@ -65,6 +65,8 @@ export const en = {
   "cmd.group.savedCommands": "Saved commands",
   "cmd.action.terminal": "Switch to Terminal",
   "status.live": "Live",
+  "status.exited": "Exited",
+  "status.stale": "Stale",
   "cmd.action.inventory": "Switch to Inventory",
   "cmd.action.refresh": "Refresh inventory",
   "cmd.terminal.openClaudeCursor": "Open Claude + Cursor",
