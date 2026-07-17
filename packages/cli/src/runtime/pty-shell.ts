@@ -111,21 +111,48 @@ export function ptyShellFromExternalTerminal(terminal?: string): PtyShellPrefere
   }
 }
 
-function windowsArgsForShell(shell: string, command: string): string[] {
+export function psSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+export function bashSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function windowsArgsForShell(
+  shell: string,
+  command: string,
+  pwshIntegrationCommand?: string,
+): string[] {
   const interactive = command === "";
   if (shell === "cmd.exe") {
     return interactive ? ["/k"] : ["/k", command];
   }
-  return interactive
-    ? ["-NoLogo", "-NoExit"]
-    : ["-NoLogo", "-NoExit", "-Command", command];
+  const inject = pwshIntegrationCommand?.trim() || "";
+  if (interactive) {
+    return inject
+      ? ["-NoLogo", "-NoExit", "-Command", inject]
+      : ["-NoLogo", "-NoExit"];
+  }
+  return [
+    "-NoLogo",
+    "-NoExit",
+    "-Command",
+    inject ? `${inject}; ${command}` : command,
+  ];
 }
 
 /** Build the default Windows shell cascade (pwsh → powershell → cmd). */
-export function buildWindowsPtyCandidates(command: string): PtyShellCandidate[] {
+export function buildWindowsPtyCandidates(
+  command: string,
+  pwshIntegrationCommand?: string,
+): PtyShellCandidate[] {
   return [
-    ["pwsh.exe", windowsArgsForShell("pwsh.exe", command)],
-    ["powershell.exe", windowsArgsForShell("powershell.exe", command)],
+    ["pwsh.exe", windowsArgsForShell("pwsh.exe", command, pwshIntegrationCommand)],
+    [
+      "powershell.exe",
+      windowsArgsForShell("powershell.exe", command, pwshIntegrationCommand),
+    ],
     ["cmd.exe", windowsArgsForShell("cmd.exe", command)],
   ];
 }
@@ -183,7 +210,28 @@ function posixSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-export function unixShellArgs(shellPath: string, command: string): string[] {
+/**
+ * Args for a Unix shell candidate.
+ * When `bashInitFile` is set, bash gets OSC 7 via `--init-file` / source; other shells stay plain.
+ */
+export function unixShellArgs(
+  shellPath: string,
+  command: string,
+  bashInitFile?: string,
+): string[] {
+  const init = bashInitFile?.trim() || "";
+  const isBash = shellBasename(shellPath) === "bash";
+
+  if (init && isBash) {
+    if (!command) return ["--init-file", init];
+    const quotedInit = bashSingleQuote(init);
+    const quotedShell = posixSingleQuote(shellPath);
+    return [
+      "-c",
+      `source ${quotedInit}; ${command}; exec ${quotedShell} --init-file ${quotedInit}`,
+    ];
+  }
+
   if (!command) return [];
   return ["-c", `${command}; exec ${posixSingleQuote(shellPath)}`];
 }
@@ -197,6 +245,7 @@ export function buildUnixPtyCandidates(
   command: string,
   shellPref?: string,
   envShell: string | undefined = process.env.SHELL,
+  bashInitFile?: string,
 ): PtyShellCandidate[] {
   const preferred = effectiveUnixShellPref(shellPref);
   const env = envShell?.trim() ?? "";
@@ -221,7 +270,9 @@ export function buildUnixPtyCandidates(
     for (const p of pathsForUnixFamily(family)) add(p);
   }
 
-  return files.map((file) => [file, unixShellArgs(file, command)] as const);
+  return files.map(
+    (file) => [file, unixShellArgs(file, command, bashInitFile)] as const,
+  );
 }
 
 /** @deprecated Prefer {@link buildUnixPtyCandidates}; kept for callers that want a single target. */
@@ -229,8 +280,9 @@ export function buildUnixPtySpawn(
   command: string,
   shellPref?: string,
   envShell?: string,
+  bashInitFile?: string,
 ): { file: string; args: string[] } {
-  const [first] = buildUnixPtyCandidates(command, shellPref, envShell);
+  const [first] = buildUnixPtyCandidates(command, shellPref, envShell, bashInitFile);
   return first ? { file: first[0], args: [...first[1]] } : { file: "/bin/bash", args: [] };
 }
 
@@ -267,16 +319,27 @@ export function resolvePtySpawnPlan(options: {
   platform?: NodeJS.Platform;
   env?: NodeJS.ProcessEnv;
   wtSessionFallback?: string;
+  /**
+   * Optional OSC 7 hooks: pwsh/powershell dot-source command, bash init-file path.
+   * cmd.exe and non-bash Unix shells are left unchanged.
+   */
+  shellIntegration?: {
+    pwshCommand?: string;
+    bashInitFile?: string;
+  };
 }): ResolvedPtySpawnPlan {
   const platform = options.platform ?? process.platform;
   const env = buildPtyEnv({
     env: options.env,
     wtSessionFallback: options.wtSessionFallback,
   });
+  const pwshCommand = options.shellIntegration?.pwshCommand;
+  const bashInitFile = options.shellIntegration?.bashInitFile;
   const unixCandidates = buildUnixPtyCandidates(
     options.command,
     options.shell,
     options.env?.SHELL ?? process.env.SHELL,
+    bashInitFile,
   );
   const unixFirst = unixCandidates[0];
   const unix = unixFirst
@@ -287,7 +350,7 @@ export function resolvePtySpawnPlan(options: {
     return {
       platform: "win32",
       windowsCandidates: orderWindowsPtyCandidates(
-        buildWindowsPtyCandidates(options.command),
+        buildWindowsPtyCandidates(options.command, pwshCommand),
         options.shell,
       ),
       unixCandidates,

@@ -72,6 +72,10 @@ import {
 } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
 import {
+  ensureShellIntegrationScripts,
+  psSingleQuote,
+} from "./shell-integration.js";
+import {
   checkAppUpdate,
   downloadAppUpdate,
   getAppUpdateState,
@@ -1525,7 +1529,21 @@ ipcMain.handle(
       return { success: false, error: workDirResult.error };
     }
     const workDir = workDirResult.dir;
-    const plan = resolvePtySpawnPlan({ command: cmd, shell });
+
+    // OSC 7 hooks so `cd` updates the status bar without respawning the PTY.
+    // If script install fails, still spawn — cwd just won't track until restart succeeds.
+    let shellIntegration: { pwshCommand?: string; bashInitFile?: string } | undefined;
+    try {
+      const integration = ensureShellIntegrationScripts(app.getPath("userData"));
+      shellIntegration = {
+        pwshCommand: `. ${psSingleQuote(integration.pwsh)}`,
+        bashInitFile: integration.bash,
+      };
+    } catch (err) {
+      console.warn("[pty-spawn] shell integration unavailable:", err);
+    }
+
+    const plan = resolvePtySpawnPlan({ command: cmd, shell, shellIntegration });
 
     const ptyOpts = {
       name: "xterm-256color",
@@ -1588,7 +1606,7 @@ ipcMain.handle(
       });
 
       broadcastPtyMeta(sessionId);
-      return { success: true, sessionId };
+      return { success: true, sessionId, cwd: workDir };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }

@@ -35,6 +35,14 @@ describe("unixShellArgs", () => {
   it("returns empty args for interactive shells", () => {
     assert.deepEqual(unixShellArgs("/bin/zsh", ""), []);
   });
+
+  it("injects bash init-file for OSC 7 when provided", () => {
+    assert.deepEqual(unixShellArgs("/bin/bash", "", "/tmp/osc7.sh"), [
+      "--init-file",
+      "/tmp/osc7.sh",
+    ]);
+    assert.deepEqual(unixShellArgs("/bin/zsh", "", "/tmp/osc7.sh"), []);
+  });
 });
 
 describe("effective prefs", () => {

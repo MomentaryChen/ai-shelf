@@ -764,7 +764,7 @@ export interface ElectronAPI {
     extraArgs?: string,
     /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | bash | zsh | fish | sh. */
     shell?: string,
-  ) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
+  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
   ptyAttach: (sessionId: string) => Promise<{
     success: boolean;
     alive: boolean;
