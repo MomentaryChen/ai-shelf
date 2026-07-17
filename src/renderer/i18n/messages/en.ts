@@ -581,6 +581,8 @@ export const en = {
   "pane.splitRight": "Split right",
   "pane.splitDown": "Split down",
   "pane.close": "Close pane",
+  "pane.closeBusyConfirm":
+    "This pane still has an agent running or waiting for input. Close it and stop the process?",
   "pane.minimize": "Minimize to sidebar",
   "pane.dropAbove": "Place above",
   "pane.dropBelow": "Place below",

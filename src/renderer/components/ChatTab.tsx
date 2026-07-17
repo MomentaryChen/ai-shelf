@@ -24,6 +24,7 @@ import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneAgentAwareness } from "../hooks/usePaneAgentAwareness";
+import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
@@ -677,7 +678,13 @@ function ChatTabInner({
   );
 
   const closePane = useCallback(
-    (paneId: string) => {
+    (paneId: string, opts?: { skipConfirm?: boolean }) => {
+      if (!opts?.skipConfirm) {
+        const status = paneAgentStates[paneId];
+        if (status && isPaneAgentBusy(status)) {
+          if (!confirm(t("pane.closeBusyConfirm"))) return;
+        }
+      }
       if (activeProfile) forgetMinimizedPane(activeProfile.id, paneId);
       setLayout((prev) => {
         if (prev) {
@@ -688,7 +695,7 @@ function ChatTabInner({
       });
       setFocusedPaneId((prev) => (prev === paneId ? null : prev));
     },
-    [activeProfile, forgetMinimizedPane],
+    [activeProfile, forgetMinimizedPane, paneAgentStates, t],
   );
 
   const splitPane = useCallback(
@@ -1409,7 +1416,7 @@ function ChatTabInner({
               void respawnPane(pane.id);
             }}
             onRestart={() => void respawnPane(pane.id)}
-            onExit={() => closePane(pane.id)}
+            onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
       />
