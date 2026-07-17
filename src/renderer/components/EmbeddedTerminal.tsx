@@ -22,6 +22,7 @@ import {
 import { getXtermTheme } from "../app-theme";
 import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
+import { attachTerminalWebgl } from "../terminal/xterm-webgl";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { useLocale } from "../i18n/LocaleProvider";
 
@@ -31,6 +32,8 @@ interface Props {
   fontFamily: string;
   fontSize: number;
   scrollback: number;
+  /** Use WebGL renderer when the GPU allows it (falls back to canvas). */
+  webglEnabled?: boolean;
   rightClickPaste?: boolean;
   copyOnSelect?: boolean;
   active?: boolean;
@@ -68,6 +71,7 @@ function EmbeddedTerminalInner({
   fontFamily,
   fontSize,
   scrollback,
+  webglEnabled = true,
   rightClickPaste = true,
   copyOnSelect = true,
   active = true,
@@ -291,6 +295,7 @@ function EmbeddedTerminalInner({
     term.loadAddon(fitAddon);
     term.open(el);
     termRef.current = term;
+    const detachWebgl = webglEnabled ? attachTerminalWebgl(term) : () => {};
     const searchAddon = attachTerminalSearch(term);
     searchRef.current = searchAddon;
 
@@ -542,11 +547,12 @@ function EmbeddedTerminalInner({
       unregisterClear();
       unbindClipboard();
       unbindLinks();
+      detachWebgl();
       ro.disconnect();
       searchAddon.dispose();
       disposeTerminal(term);
     };
-  }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback]);
+  }, [sessionId, stableOnExit, bg, fontFamily, fontSize, scrollback, webglEnabled]);
 
   useEffect(() => {
     const term = termRef.current;
@@ -658,6 +664,7 @@ export const EmbeddedTerminal = memo(
     prev.fontFamily === next.fontFamily &&
     prev.fontSize === next.fontSize &&
     prev.scrollback === next.scrollback &&
+    prev.webglEnabled === next.webglEnabled &&
     prev.rightClickPaste === next.rightClickPaste &&
     prev.copyOnSelect === next.copyOnSelect &&
     prev.active === next.active &&

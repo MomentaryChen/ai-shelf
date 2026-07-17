@@ -231,15 +231,28 @@ export function usePaneAgentAwareness(
       return;
     }
 
-    const off = window.api.onPtyData(({ sessionId, data }) => {
+    const offData = window.api.onPtyData(({ sessionId, data }) => {
       const now = Date.now();
       updateSession(sessionId, (prev) =>
         applyPaneAgentOutput(prev, data, now, stateOptions(settings)),
       );
     });
 
-    return off;
-  }, [settings, updateSession]);
+    const offExit = window.api.onPtyExit(({ sessionId }) => {
+      const pane = paneBySession.current.get(sessionId);
+      if (pane) {
+        readyNotifiedRef.current[pane.id] = false;
+        clearReadyPending(pane.id);
+      }
+      // Process is gone — do not treat as busy for close-confirm / status dots.
+      updateSession(sessionId, () => createPaneAgentState());
+    });
+
+    return () => {
+      offData();
+      offExit();
+    };
+  }, [clearReadyPending, settings, updateSession]);
 
   useEffect(() => {
     const paneIds = new Set(panes.map((p) => p.id));
