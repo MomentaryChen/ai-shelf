@@ -1,5 +1,10 @@
 export type FlowGenerateTurn = { role: "user" | "assistant"; content: string };
 
+export type BuildFlowGeneratePromptOptions = {
+  /** Canonical `.flow.md` on disk when editing an existing flow. */
+  currentFlowMd?: string | null;
+};
+
 const SYSTEM = `You are an AI Shelf flow authoring assistant. Output exactly one valid \`.flow.md\` file per reply.
 
 Schema: ai-shelf.flow/definition/v1
@@ -35,7 +40,10 @@ Output format:
 - No commentary outside the fence
 - Use Traditional Chinese in labels/body when the user writes in Chinese`;
 
-export function buildFlowGeneratePrompt(turns: FlowGenerateTurn[]): string {
+export function buildFlowGeneratePrompt(
+  turns: FlowGenerateTurn[],
+  options: BuildFlowGeneratePromptOptions = {},
+): string {
   const history =
     turns.length === 0
       ? ""
@@ -44,10 +52,14 @@ export function buildFlowGeneratePrompt(turns: FlowGenerateTurn[]): string {
           .join("\n\n");
 
   const latest = turns.filter((t) => t.role === "user").at(-1)?.content ?? "";
+  const current = options.currentFlowMd?.trim();
+  const currentBlock = current
+    ? `Current .flow.md on disk (canonical source of truth — revise this file; keep the same id unless the user explicitly asks to rename):\n\`\`\`markdown\n${current}\n\`\`\`\n\n`
+    : "";
 
   return `${SYSTEM}
 
-${history ? `Conversation so far:\n${history}\n\n` : ""}User request (latest):
+${currentBlock}${history ? `Conversation so far:\n${history}\n\n` : ""}User request (latest):
 ${latest}
 
 Generate or revise the .flow.md file.`;

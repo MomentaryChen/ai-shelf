@@ -143,6 +143,7 @@ import {
 } from "./health-monitor.js";
 import {
   deleteFlow,
+  deleteFlowChatData,
   createFlowFromContent,
   FLOW_CHAT_DRAFT_ID,
   getFlowDagNodeCommand,
@@ -2529,6 +2530,13 @@ ipcMain.handle("flow-save-chat", (_event, flowId: unknown, messages: unknown) =>
   return { ok: true };
 });
 
+ipcMain.handle("flow-clear-chat", (_event, flowId: unknown) => {
+  const id = normalizeChatFlowId(flowId);
+  if (!id) return { ok: false, error: "Invalid flow id" };
+  deleteFlowChatData(id);
+  return { ok: true };
+});
+
 ipcMain.handle("flow-list-prompt-logs", (_event, flowId: unknown, limit: unknown) => {
   const id = normalizeChatFlowId(flowId);
   if (!id) return [];
@@ -2536,13 +2544,18 @@ ipcMain.handle("flow-list-prompt-logs", (_event, flowId: unknown, limit: unknown
   return listFlowPromptLogs(id, n);
 });
 
-ipcMain.handle("flow-create", (_event, content: unknown, overwrite: unknown) => {
+ipcMain.handle("flow-create", (_event, content: unknown, options: unknown) => {
   if (typeof content !== "string" || !content.trim()) {
     return { ok: false, error: "Invalid flow content" };
   }
+  // Backward compatible: second arg was `overwrite: boolean`.
+  const opts =
+    options && typeof options === "object"
+      ? (options as { overwrite?: unknown; migrateChatFromDraft?: unknown })
+      : { overwrite: options === true };
   return createFlowFromContent(content, {
-    overwrite: overwrite === true,
-    migrateChatFromDraft: overwrite !== true,
+    overwrite: opts.overwrite === true,
+    migrateChatFromDraft: opts.migrateChatFromDraft !== false,
   });
 });
 

@@ -1054,6 +1054,7 @@ export interface ElectronAPI {
     flowId: string,
     messages: FlowChatMessage[],
   ) => Promise<{ ok: boolean; error?: string }>;
+  flowClearChat: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowListPromptLogs: (
     flowId: string,
     limit?: number,
@@ -1074,7 +1075,7 @@ export interface ElectronAPI {
   ) => Promise<FlowDagNodeCommandDetail | { error: string }>;
   flowCreate: (
     content: string,
-    overwrite?: boolean,
+    overwriteOrOptions?: boolean | { overwrite?: boolean; migrateChatFromDraft?: boolean },
   ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
   flowListTemplates: () => Promise<FlowTemplateListItem[]>;
   flowInstallTemplate: (
