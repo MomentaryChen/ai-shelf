@@ -294,9 +294,32 @@ function EmbeddedTerminalInner({
     const searchAddon = attachTerminalSearch(term);
     searchRef.current = searchAddon;
 
+    let exited = false;
+    let cancelled = false;
+
+    const markExited = () => {
+      if (cancelled || exited) return;
+      exited = true;
+      const wasAtBottom = isTerminalAtBottom(term);
+      term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
+      if (!wasAtBottom) setHasNewOutput(true);
+      const d = term.onKey(() => {
+        d.dispose();
+        stableOnExit();
+      });
+    };
+
+    const writePty = (data: string) => {
+      if (cancelled || exited) return;
+      void window.api.ptyWrite(sessionId, data).then((r) => {
+        if (cancelled || r.success) return;
+        markExited();
+      });
+    };
+
     const doClear = () => {
       term.clear();
-      window.api.ptyWrite(sessionId, "\x0c");
+      writePty("\x0c");
     };
     const doExportOutput = () => {
       void exportTerminalOutput(sessionId, sessionId);
@@ -369,9 +392,13 @@ function EmbeddedTerminalInner({
     scrollToBottomRef.current = scrollToBottom;
 
     const syncPtySize = () => {
+      if (cancelled || exited) return;
       const cols = Math.max(term.cols, 2);
       const rows = Math.max(term.rows, 2);
-      window.api.ptyResize(sessionId, cols, rows);
+      void window.api.ptyResize(sessionId, cols, rows).then((r) => {
+        if (cancelled || r.success) return;
+        markExited();
+      });
     };
 
     const fit = () => {
@@ -433,26 +460,20 @@ function EmbeddedTerminalInner({
 
     const offExit = window.api.onPtyExit(({ sessionId: sid }) => {
       if (sid !== sessionId) return;
-      const wasAtBottom = isTerminalAtBottom(term);
-      term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
-      if (!wasAtBottom) setHasNewOutput(true);
-      const d = term.onKey(() => {
-        d.dispose();
-        stableOnExit();
-      });
+      markExited();
     });
 
     term.onData((data) => {
+      if (cancelled || exited) return;
       if (pasteToThisPaneOnly) {
-        window.api.ptyWrite(sessionId, data);
+        writePty(data);
         return;
       }
       const write = onWriteRef.current;
       if (write) write(data, sessionId);
-      else window.api.ptyWrite(sessionId, data);
+      else writePty(data);
     });
 
-    let cancelled = false;
     void window.api.ptyAttach(sessionId).then((r) => {
       if (cancelled) return;
       if (!r.alive) {
@@ -467,8 +488,8 @@ function EmbeddedTerminalInner({
       scheduleFit();
 
       wakeTimer = window.setTimeout(() => {
-        if (cancelled || receivedBytes > 0) return;
-        window.api.ptyWrite(sessionId, "\r");
+        if (cancelled || exited || receivedBytes > 0) return;
+        writePty("\r");
         scheduleFit();
       }, 400);
 

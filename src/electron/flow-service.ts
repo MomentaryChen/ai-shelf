@@ -32,6 +32,7 @@ import {
 import { setFlowNotifyHooks } from "../flow/flow-notify.js";
 import {
   FLOW_CHAT_DRAFT_ID,
+  deleteFlowChatData,
   listFlowPromptLogs,
   readFlowChat,
   saveFlowChat,
@@ -45,6 +46,7 @@ import {
 export {
   createFlowFromContent,
   deleteFlow,
+  deleteFlowChatData,
   FLOW_CHAT_DRAFT_ID,
   getFlowDagNodeCommand,
   getFlowFilePath,
