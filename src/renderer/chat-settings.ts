@@ -49,6 +49,8 @@ export interface ChatSettings {
   terminalRightClickPaste: boolean;
   /** Copy the selection to the clipboard as soon as a mouse drag finishes. */
   terminalCopyOnSelect: boolean;
+  /** Prefer WebGL terminal renderer; falls back to canvas if unavailable. */
+  terminalWebglEnabled: boolean;
   workingDir: string;
   dirHistory: string[];
   /** Pane split / focus shortcuts (Ctrl/Cmd combinations). */
@@ -145,6 +147,11 @@ function normalizeCopyOnSelect(raw: unknown): boolean {
   return true;
 }
 
+function normalizeWebglEnabled(raw: unknown): boolean {
+  if (typeof raw === "boolean") return raw;
+  return true;
+}
+
 const MIN_PANE_AGENT_STALL_SEC = 0;
 const MAX_PANE_AGENT_STALL_SEC = 600;
 const DEFAULT_PANE_AGENT_STALL_SEC = 120;
@@ -176,6 +183,7 @@ const DEFAULTS: ChatSettings = {
   terminalPtyBufferChars: DEFAULT_TERMINAL_PTY_BUFFER_CHARS,
   terminalRightClickPaste: true,
   terminalCopyOnSelect: true,
+  terminalWebglEnabled: true,
   workingDir: "",
   dirHistory: [],
   paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
@@ -219,6 +227,7 @@ export function loadSettings(): ChatSettings {
       ),
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
+      terminalWebglEnabled: normalizeWebglEnabled(stored.terminalWebglEnabled),
       paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
       systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
       paneAgentAwarenessEnabled: normalizePaneAgentBool(stored.paneAgentAwarenessEnabled, true),

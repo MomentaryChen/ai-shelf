@@ -150,6 +150,9 @@ export const zh: Record<MessageKey, string> = {
   "settings.copyOnSelect": "選取即複製",
   "settings.copyOnSelectHint":
     "啟用後，用滑鼠選取文字會自動複製到剪貼簿——這樣就能直接貼到另一個終端機。",
+  "settings.webgl": "WebGL 渲染",
+  "settings.webglHint":
+    "用 GPU 加速繪製——多分屏與大捲動緩衝時較順。WebGL 不可用時會退回 canvas。變更後已開啟的窗格會重新載入。",
   "settings.systemTray": "系統匣",
   "healthMonitor.settingsTitle": "環境健康",
   "healthMonitor.settingsHint":
