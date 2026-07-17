@@ -314,11 +314,11 @@ function ChatTabInner({
       const current = panesRef.current;
       if (broadcastInput && current.length > 1) {
         for (const p of current) {
-          window.api.ptyWrite(p.sessionId, data);
+          void window.api.ptyWrite(p.sessionId, data);
           recordPaneAgentInput(p.sessionId);
         }
       } else {
-        window.api.ptyWrite(sessionId, data);
+        void window.api.ptyWrite(sessionId, data);
         recordPaneAgentInput(sessionId);
       }
     },
@@ -334,7 +334,7 @@ function ChatTabInner({
     if (current.length === 0) return;
     const line = text.endsWith("\n") || text.endsWith("\r") ? text : `${text}\r`;
     for (const p of current) {
-      window.api.ptyWrite(p.sessionId, line);
+      void window.api.ptyWrite(p.sessionId, line);
       recordPaneAgentInput(p.sessionId);
     }
   }, [recordPaneAgentInput]);
@@ -875,7 +875,7 @@ function ChatTabInner({
       const line = command.endsWith("\n") || command.endsWith("\r") ? command : `${command}\r`;
       if (broadcast) {
         for (const p of targetPanes) {
-          window.api.ptyWrite(p.sessionId, line);
+          void window.api.ptyWrite(p.sessionId, line);
           recordPaneAgentInput(p.sessionId);
         }
         return;
@@ -885,7 +885,7 @@ function ChatTabInner({
       const target =
         (focusId ? targetPanes.find((p) => p.id === focusId) : null) ?? targetPanes[0];
       if (!target) return;
-      window.api.ptyWrite(target.sessionId, line);
+      void window.api.ptyWrite(target.sessionId, line);
       recordPaneAgentInput(target.sessionId);
     },
     [sidebarForest, activeProfile?.id, getProfilePanes, getProfileFocusedPaneId, recordPaneAgentInput],
