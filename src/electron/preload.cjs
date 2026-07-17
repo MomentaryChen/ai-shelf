@@ -262,10 +262,17 @@ contextBridge.exposeInMainWorld("api", {
   flowGenerate: (turns, flowId) => ipcRenderer.invoke("flow-generate", { turns, flowId }),
   flowGetChat: (flowId) => ipcRenderer.invoke("flow-get-chat", flowId),
   flowSaveChat: (flowId, messages) => ipcRenderer.invoke("flow-save-chat", flowId, messages),
+  flowClearChat: (flowId) => ipcRenderer.invoke("flow-clear-chat", flowId),
   flowListPromptLogs: (flowId, limit) => ipcRenderer.invoke("flow-list-prompt-logs", flowId, limit),
   flowGetDagNodeCommand: (flowId, node, options) =>
     ipcRenderer.invoke("flow-get-dag-node-command", flowId, node, options),
-  flowCreate: (content, overwrite) => ipcRenderer.invoke("flow-create", content, overwrite),
+  flowCreate: (content, overwriteOrOptions) => {
+    const options =
+      overwriteOrOptions && typeof overwriteOrOptions === "object"
+        ? overwriteOrOptions
+        : { overwrite: overwriteOrOptions === true };
+    return ipcRenderer.invoke("flow-create", content, options);
+  },
   flowListTemplates: () => ipcRenderer.invoke("flow-list-templates"),
   flowInstallTemplate: (templateId) => ipcRenderer.invoke("flow-install-template", templateId),
   onFlowRunState: (cb) => {

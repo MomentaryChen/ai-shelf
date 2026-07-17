@@ -74,16 +74,30 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoadingChat(true);
+    setDraft(null);
+    setMessages([welcomeMessage(t("flow.create.welcome"))]);
+    const diskPromise =
+      isExisting && flowId
+        ? window.api.flowReadFile(flowId)
+        : Promise.resolve(null);
     void Promise.all([
       window.api.flowGetChat(chatKey),
       window.api.flowListPromptLogs(chatKey, 200),
+      diskPromise,
     ])
-      .then(([stored, logs]) => {
+      .then(([stored, logs, diskFile]) => {
         if (cancelled) return;
         if (stored && stored.length > 0) {
           setMessages([welcomeMessage(t("flow.create.welcome")), ...stored]);
           const lastDraft = [...stored].reverse().find((m) => m.draft)?.draft;
-          if (lastDraft) setDraft(lastDraft);
+          if (lastDraft) {
+            setDraft(lastDraft);
+          } else if (diskFile?.content) {
+            setDraft(diskFile.content);
+          }
+        } else if (diskFile?.content) {
+          // Editing an existing flow with no prior chat: seed preview from disk.
+          setDraft(diskFile.content);
         }
         setPromptLogCount(logs.length);
       })
@@ -93,7 +107,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [chatKey, t]);
+  }, [chatKey, flowId, isExisting, t]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -174,7 +188,11 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
     if (!draft) return;
     setSaving(true);
     setSaveError(null);
-    const res = await window.api.flowCreate(draft, overwrite || isExisting);
+    // One chat line per flow: migrate __draft__ → id only when this session is the draft.
+    const res = await window.api.flowCreate(draft, {
+      overwrite: overwrite || isExisting,
+      migrateChatFromDraft: chatKey === FLOW_CHAT_DRAFT_ID,
+    });
     setSaving(false);
     if (!res.ok) {
       if (!overwrite && res.error?.includes("already exists")) {
