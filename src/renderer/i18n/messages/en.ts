@@ -145,7 +145,7 @@ export const en = {
   "settings.resetDefault": "Reset to default",
   "settings.fontSize": "Font size ({size}px)",
   "settings.scrollback": "Scrollback",
-  "settings.scrollbackHint": "lines — open panes reload on change",
+  "settings.scrollbackHint": "lines of history kept in open panes",
   "settings.ptyBuffer": "Output buffer",
   "settings.ptyBufferHint": "chars — export, search, and pty-logs tail",
   "settings.rightClickPaste": "Right-click to paste",
