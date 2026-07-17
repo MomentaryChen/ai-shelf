@@ -255,6 +255,7 @@ contextBridge.exposeInMainWorld("api", {
   flowListRecentRuns: (limit) => ipcRenderer.invoke("flow-list-recent-runs", limit),
   flowListRunsForFlow: (flowId, limit) => ipcRenderer.invoke("flow-list-runs-for-flow", flowId, limit),
   flowGetRunEvents: (runId) => ipcRenderer.invoke("flow-get-run-events", runId),
+  flowGetConsoleBuffer: (runId) => ipcRenderer.invoke("flow-get-console-buffer", runId),
   flowOpenRunArtifact: (runId, artifact) => ipcRenderer.invoke("flow-open-run-artifact", runId, artifact),
   flowOpenFlowsDir: () => ipcRenderer.invoke("flow-open-flows-dir"),
   flowDelete: (flowId) => ipcRenderer.invoke("flow-delete", flowId),
@@ -285,5 +286,10 @@ contextBridge.exposeInMainWorld("api", {
     const handler = (_e, state) => cb(state);
     ipcRenderer.on("flow-run-state", handler);
     return () => ipcRenderer.off("flow-run-state", handler);
+  },
+  onFlowConsoleChunk: (cb) => {
+    const handler = (_e, chunk) => cb(chunk);
+    ipcRenderer.on("flow-console-chunk", handler);
+    return () => ipcRenderer.off("flow-console-chunk", handler);
   },
 });

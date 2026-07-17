@@ -1,5 +1,6 @@
 import { type ChildProcess, execFile } from "node:child_process";
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -29,8 +30,15 @@ import {
   type FlowRunState,
 } from "../shared/flow-types.js";
 import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
+import type { FlowConsoleChunk } from "../shared/flow-console-types.js";
 import type { ToolLaunchArgs } from "../tool-launch.js";
 import { notifyFlowRunFailed, notifyFlowRunCompleted } from "./flow-notify.js";
+import {
+  appendFlowConsole,
+  beginFlowConsole,
+  getFlowConsoleBuffer,
+  markFlowConsoleFinished,
+} from "./flow-console-buffer.js";
 import { patchFlowScheduleInContent, patchFlowRunnerInContent, ensureFlowDefaultsInContent } from "../shared/flow-frontmatter-patch.js";
 import {
   getFlowDagNodeCommandDetail,
@@ -68,9 +76,11 @@ import {
 } from "./flow-orchestrator.js";
 
 type RunStateListener = (state: FlowRunState) => void;
+type ConsoleChunkListener = (chunk: FlowConsoleChunk) => void;
 
 const activeRuns = new Map<string, FlowRunState>();
 const runListeners = new Set<RunStateListener>();
+const consoleListeners = new Set<ConsoleChunkListener>();
 const runsInFlight = new Set<string>();
 
 type ActiveRunContext = {
@@ -284,6 +294,34 @@ export function onFlowRunState(listener: RunStateListener): () => void {
   return () => runListeners.delete(listener);
 }
 
+export function onFlowConsoleChunk(listener: ConsoleChunkListener): () => void {
+  consoleListeners.add(listener);
+  return () => consoleListeners.delete(listener);
+}
+
+export { getFlowConsoleBuffer };
+
+function emitFlowConsole(
+  ctx: { runId: string; flowId: string; runDir: string },
+  stream: "stdout" | "stderr",
+  data: string,
+  phaseId: string | null = null,
+): void {
+  if (!data) return;
+  const chunk = appendFlowConsole(ctx.runId, {
+    flowId: ctx.flowId,
+    phaseId,
+    stream,
+    data,
+  });
+  try {
+    appendFileSync(join(ctx.runDir, "console.log"), data, "utf8");
+  } catch {
+    /* ignore disk mirror failures */
+  }
+  for (const listener of consoleListeners) listener(chunk);
+}
+
 export function listFlows(): FlowListItem[] {
   initFlowDirs();
   const files = readdirSync(flowsDir()).filter((f) => f.endsWith(".flow.md"));
@@ -446,6 +484,7 @@ export async function runFlow(
   const runPromise = executeFlowRun(flow, runDir, state, options).finally(() => {
     runsInFlight.delete(flowId);
     activeRunContexts.delete(flowId);
+    markFlowConsoleFinished(runId);
     const done = getFlowRunState(runId) ?? state;
     if (done.status === "failed") {
       void notifyFlowRunFailed(flow, done);
@@ -665,6 +704,7 @@ async function executeFlowRun(
     cancelled: false,
   };
   activeRunContexts.set(flow.id, ctx);
+  beginFlowConsole(flow.id, state.runId);
 
   if (flow.runner === "http") {
     await executeHttpFlow(flow, runDir, state, outputPath, ctx);
@@ -679,6 +719,9 @@ async function executeFlowRun(
         broadcastState,
         killChild: killRunChild,
         watchStateFile: watchRunStateFile,
+        emitConsole: (payload) => {
+          emitFlowConsole(ctx, payload.stream, payload.data, payload.phaseId);
+        },
       },
       { globalToolLaunchArgs: runOptions.globalToolLaunchArgs },
     );
@@ -786,14 +829,18 @@ async function executeFlowRun(
     ctx.timeout = timeout;
 
     child.stdout?.on("data", (chunk: Buffer) => {
-      stdoutBuf += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      emitFlowConsole(ctx, "stdout", text, state.currentPhaseId);
+      stdoutBuf += text;
       const lines = stdoutBuf.split(/\r?\n/);
       stdoutBuf = lines.pop() ?? "";
       for (const line of lines) handleLine(line);
     });
 
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      emitFlowConsole(ctx, "stderr", text, state.currentPhaseId);
+      stderr += text;
     });
 
     child.on("close", (code) => {

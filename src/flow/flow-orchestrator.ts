@@ -49,6 +49,11 @@ export type OrchestratorHooks = {
   broadcastState: (state: FlowRunState) => void;
   killChild: (child: ChildProcess) => void;
   watchStateFile: (runId: string, state: FlowRunState) => () => void;
+  emitConsole?: (payload: {
+    phaseId: string | null;
+    stream: "stdout" | "stderr";
+    data: string;
+  }) => void;
 };
 
 type GateDecision = "approve" | "reject";
@@ -320,6 +325,12 @@ async function runAgentPhaseOnce(
     }
     ctx.child = child;
 
+    hooks.emitConsole?.({
+      phaseId: phase.id,
+      stream: "stdout",
+      data: `\n── ${phase.id}${phase.label ? ` · ${phase.label}` : ""} ──\n`,
+    });
+
     ctx.timeout = setTimeout(() => {
       if (settled || ctx.cancelled) return;
       hooks.killChild(child);
@@ -347,14 +358,18 @@ async function runAgentPhaseOnce(
     };
 
     child.stdout?.on("data", (chunk: Buffer) => {
-      stdoutBuf += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      hooks.emitConsole?.({ phaseId: phase.id, stream: "stdout", data: text });
+      stdoutBuf += text;
       const lines = stdoutBuf.split(/\r?\n/);
       stdoutBuf = lines.pop() ?? "";
       for (const line of lines) handleLine(line);
     });
 
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      hooks.emitConsole?.({ phaseId: phase.id, stream: "stderr", data: text });
+      stderr += text;
     });
 
     child.on("close", (code) => {

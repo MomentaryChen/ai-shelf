@@ -5,6 +5,10 @@ import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../sha
 
 import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
 import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
+import type {
+  FlowConsoleBufferSnapshot,
+  FlowConsoleChunk,
+} from "../shared/flow-console-types.js";
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
@@ -1040,6 +1044,7 @@ export interface ElectronAPI {
   flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;
   flowListRunsForFlow: (flowId: string, limit?: number) => Promise<FlowRunState[]>;
   flowGetRunEvents: (runId: string) => Promise<FlowRunEvent[]>;
+  flowGetConsoleBuffer: (runId: string) => Promise<FlowConsoleBufferSnapshot>;
   flowOpenRunArtifact: (
     runId: string,
     artifact: FlowRunArtifact,
@@ -1110,6 +1115,7 @@ export interface ElectronAPI {
     templateId: string,
   ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
+  onFlowConsoleChunk: (cb: (chunk: FlowConsoleChunk) => void) => () => void;
 }
 
 declare global {
