@@ -137,7 +137,3 @@ export function ensureShellIntegrationScripts(baseDir: string): ShellIntegration
 export function psSingleQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
-
-export function bashSingleQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}

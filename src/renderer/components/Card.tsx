@@ -34,7 +34,7 @@ export function Card({
   const interactive = hoverable
     ? "transition-[border-color,box-shadow,transform] duration-200 hover:shadow-pop"
     : "";
-  const cardClass = cn("warm-rise rounded-[28px] warm-shadow-card", interactive);
+  const cardClass = cn("warm-rise rounded-[28px] shadow-card", interactive);
 
   if (!collapsible) {
     return (
