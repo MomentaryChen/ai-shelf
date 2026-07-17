@@ -121,6 +121,15 @@ export const zh: Record<MessageKey, string> = {
   "settings.browse": "瀏覽…",
   "settings.clearHistory": "清除紀錄",
   "settings.externalTerminal": "外部終端機偏好",
+  "settings.preferredShell": "內嵌 Shell 偏好",
+  "settings.preferredShellHint":
+    "用於 App 內終端機面板。自動：macOS/Linux 跟隨 $SHELL；Windows 優先 PowerShell。",
+  "shell.auto": "自動（$SHELL / 系統）",
+  "shell.bash": "Bash",
+  "shell.zsh": "Zsh",
+  "shell.fish": "Fish",
+  "shell.sh": "sh",
+
   "settings.toolLaunchArgs.title": "工具啟動參數",
   "settings.toolLaunchArgs.subtitle":
     "在內嵌或外部終端機啟動各工具時附加的 CLI 參數。Claude 可在此指定模型（--model）。",

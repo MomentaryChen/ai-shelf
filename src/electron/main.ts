@@ -65,7 +65,8 @@ import { getMcpRegistryInstallPreview, listMcpRegistryServers } from "../utils/m
 import { pingToolServers } from "../utils/mcp-ping.js";
 import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import {
-  NO_SUITABLE_SHELL_ERROR,
+  NO_SUITABLE_UNIX_SHELL_ERROR,
+  NO_SUITABLE_WINDOWS_SHELL_ERROR,
   resolvePtySpawnPlan,
   type GroupLayoutSnapshot,
 } from "ai-shelf";
@@ -1501,19 +1502,22 @@ ipcMain.handle(
 
     try {
       let proc: import("node-pty").IPty | undefined;
-
-      if (plan.platform === "win32") {
-        for (const [sh, args] of plan.windowsCandidates) {
-          try {
-            proc = pty.spawn(sh, args, ptyOpts);
-            break;
-          } catch {
-            /* try next */
-          }
+      const candidates =
+        plan.platform === "win32" ? plan.windowsCandidates : plan.unixCandidates;
+      for (const [sh, args] of candidates) {
+        try {
+          proc = pty.spawn(sh, args, ptyOpts);
+          break;
+        } catch {
+          /* try next */
         }
-        if (!proc) throw new Error(NO_SUITABLE_SHELL_ERROR);
-      } else {
-        proc = pty.spawn(plan.unix.file, plan.unix.args, ptyOpts);
+      }
+      if (!proc) {
+        throw new Error(
+          plan.platform === "win32"
+            ? NO_SUITABLE_WINDOWS_SHELL_ERROR
+            : NO_SUITABLE_UNIX_SHELL_ERROR,
+        );
       }
 
       PTY_OUTPUT_BUFFERS.set(sessionId, "");

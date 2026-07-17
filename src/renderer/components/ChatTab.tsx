@@ -216,12 +216,15 @@ function ChatTabInner({
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
+    // Prefer explicit embedded-shell setting; fall back to Windows external-terminal mapping.
     const shell =
-      settings.externalTerminal === "pwsh" ||
-      settings.externalTerminal === "powershell" ||
-      settings.externalTerminal === "cmd"
-        ? settings.externalTerminal
-        : undefined;
+      settings.preferredShell !== "auto"
+        ? settings.preferredShell
+        : settings.externalTerminal === "pwsh" ||
+            settings.externalTerminal === "powershell" ||
+            settings.externalTerminal === "cmd"
+          ? settings.externalTerminal
+          : "auto";
     const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs, shell);
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
@@ -231,7 +234,7 @@ function ChatTabInner({
     }
     setTerminalError(null);
     return { id: result.sessionId, tool, sessionId: result.sessionId, cwd: cwd || "" };
-  }, [settings.externalTerminal, settings.toolLaunchArgs, t]);
+  }, [settings.externalTerminal, settings.preferredShell, settings.toolLaunchArgs, t]);
 
   const spawnPaneResilient = useCallback(
     async (tool: string, cwd: string): Promise<PaneInfo | null> => {

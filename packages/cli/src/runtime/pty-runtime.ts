@@ -3,7 +3,8 @@ import type { IPty } from "node-pty";
 import { RuntimeError } from "../core/errors/app-error.js";
 import type { OutputBuffer } from "./output-buffer.js";
 import {
-  NO_SUITABLE_SHELL_ERROR,
+  NO_SUITABLE_UNIX_SHELL_ERROR,
+  NO_SUITABLE_WINDOWS_SHELL_ERROR,
   resolvePtySpawnPlan,
 } from "./pty-shell.js";
 
@@ -73,18 +74,22 @@ export class PtyRuntime {
     };
 
     let proc: IPty | undefined;
-    if (plan.platform === "win32") {
-      for (const [sh, args] of plan.windowsCandidates) {
-        try {
-          proc = pty.spawn(sh, args, ptyOpts);
-          break;
-        } catch {
-          /* try next shell */
-        }
+    const candidates =
+      plan.platform === "win32" ? plan.windowsCandidates : plan.unixCandidates;
+    for (const [sh, args] of candidates) {
+      try {
+        proc = pty.spawn(sh, args, ptyOpts);
+        break;
+      } catch {
+        /* try next shell */
       }
-      if (!proc) throw new RuntimeError(NO_SUITABLE_SHELL_ERROR);
-    } else {
-      proc = pty.spawn(plan.unix.file, plan.unix.args, ptyOpts);
+    }
+    if (!proc) {
+      throw new RuntimeError(
+        plan.platform === "win32"
+          ? NO_SUITABLE_WINDOWS_SHELL_ERROR
+          : NO_SUITABLE_UNIX_SHELL_ERROR,
+      );
     }
 
     this.processes.set(runtimeId, proc);

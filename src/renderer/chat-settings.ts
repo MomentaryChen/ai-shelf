@@ -19,6 +19,17 @@ export type { AppColorTheme, AppLocale, LocalePreference };
 
 export type ExternalTerminal = "auto" | "wt" | "pwsh" | "powershell" | "cmd";
 
+/** In-app PTY shell preference (platform-specific options shown in settings). */
+export type PreferredShell =
+  | "auto"
+  | "pwsh"
+  | "powershell"
+  | "cmd"
+  | "bash"
+  | "zsh"
+  | "fish"
+  | "sh";
+
 export const DEFAULT_TERMINAL_FONT_FAMILY =
   "'CaskaydiaCove Nerd Font', 'CaskaydiaMono Nerd Font', 'Cascadia Code NF', 'FiraCode Nerd Font', 'JetBrainsMono Nerd Font', 'MesloLGS NF', 'Hack Nerd Font', 'Consolas', 'Courier New', monospace";
 
@@ -39,6 +50,8 @@ export interface ChatSettings {
   /** App UI color theme (light / dark / high contrast). */
   appTheme: AppColorTheme;
   externalTerminal: ExternalTerminal;
+  /** Preferred shell for embedded PTY panes (`auto` uses $SHELL on Unix / pwsh-first on Windows). */
+  preferredShell: PreferredShell;
   terminalBg: string;
   terminalFontFamily: string;
   terminalFontSize: number;
@@ -85,6 +98,39 @@ export const TERMINAL_OPTIONS: { value: ExternalTerminal; label: string }[] = [
   { value: "powershell", label: "💙 PowerShell 5 (built-in)" },
   { value: "cmd", label: "⬛ Command Prompt" },
 ];
+
+const PREFERRED_SHELL_SET = new Set<string>([
+  "auto",
+  "pwsh",
+  "powershell",
+  "cmd",
+  "bash",
+  "zsh",
+  "fish",
+  "sh",
+]);
+
+export const WINDOWS_PREFERRED_SHELL_OPTIONS: PreferredShell[] = [
+  "auto",
+  "pwsh",
+  "powershell",
+  "cmd",
+];
+
+export const UNIX_PREFERRED_SHELL_OPTIONS: PreferredShell[] = [
+  "auto",
+  "bash",
+  "zsh",
+  "fish",
+  "sh",
+];
+
+function normalizePreferredShell(raw: unknown): PreferredShell {
+  if (typeof raw === "string" && PREFERRED_SHELL_SET.has(raw)) {
+    return raw as PreferredShell;
+  }
+  return "auto";
+}
 
 /** Stored in settings when terminal background should follow the active app theme. */
 export const APP_THEME_TERMINAL_BG = "@app-theme";
@@ -169,6 +215,7 @@ const DEFAULTS: ChatSettings = {
   locale: DEFAULT_LOCALE_PREFERENCE,
   appTheme: DEFAULT_APP_THEME,
   externalTerminal: "auto",
+  preferredShell: "auto",
   terminalBg: "#2c2420",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
@@ -197,6 +244,7 @@ export function loadSettings(): ChatSettings {
       ...stored,
       locale: normalizeLocalePreference(stored.locale ?? DEFAULTS.locale),
       appTheme: normalizeAppTheme(stored.appTheme),
+      preferredShell: normalizePreferredShell(stored.preferredShell),
       terminalBg: normalizeTerminalBg(stored.terminalBg),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),
       terminalFontSize: clampInt(

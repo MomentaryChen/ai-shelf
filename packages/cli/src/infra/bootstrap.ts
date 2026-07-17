@@ -62,6 +62,7 @@ export function bootstrap(): AppContext {
     sessions,
     eventBus,
     sessionRuntime,
+    config.defaultShell,
   );
   const groupLayoutService = new GroupLayoutService(workspaces, groups, groupLayouts);
   const profileService = new ProfileService(workspaces, groups, groupLayouts, eventBus);
