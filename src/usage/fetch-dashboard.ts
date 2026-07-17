@@ -9,6 +9,7 @@ import {
 } from "./attribution.js";
 import { readUsageBudgetPrefs } from "./budget-store.js";
 import { getUsageCredential, isUsageEncryptionAvailable, isUsageToolConfigured, listUsageCredentialStatus } from "./credential-store.js";
+import { scanFlowGenerateCostsForAttribution } from "./flow-generate-scan.js";
 import { scanRecentFlowRunsForAttribution } from "./flow-run-scan.js";
 import { fetchClaudeUsage } from "./providers/claude.js";
 import { fetchCopilotUsage } from "./providers/copilot.js";
@@ -21,7 +22,10 @@ import type { UsageCostInsights, UsageDashboardResult, UsageFetchOptions, UsageT
 
 function buildCostInsights(tools: UsageToolSnapshot[], days: number): UsageCostInsights {
   const budget = readUsageBudgetPrefs();
-  const runs = scanRecentFlowRunsForAttribution(500);
+  const runs = [
+    ...scanRecentFlowRunsForAttribution(500),
+    ...scanFlowGenerateCostsForAttribution(500),
+  ];
   const period = rangeWindowMs(days);
   const week = weekWindowMs();
 

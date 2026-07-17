@@ -1,7 +1,7 @@
 {
   "name": "ai-shelf-workspace",
   "private": true,
-  "version": "3.8.0",
+  "version": "3.9.0",
   "description": "AI Shelf monorepo — inventory, workspace orchestration, and desktop app",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -138,6 +138,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "^0.16.0",
     "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/addon-webgl": "0.20.0-beta.287",
     "@xterm/xterm": "6.1.0-beta.287",
     "ai-shelf": "workspace:*",
     "class-variance-authority": "^0.7.1",

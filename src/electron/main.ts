@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
-import { join, normalize, dirname } from "node:path";
+import { join, normalize, dirname, basename } from "node:path";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
@@ -64,8 +64,17 @@ import {
 import { getMcpRegistryInstallPreview, listMcpRegistryServers } from "../utils/mcp-registry.js";
 import { pingToolServers } from "../utils/mcp-ping.js";
 import { setCodexModel } from "../utils/mcp-codex-toml.js";
-import type { GroupLayoutSnapshot } from "ai-shelf";
+import {
+  NO_SUITABLE_UNIX_SHELL_ERROR,
+  NO_SUITABLE_WINDOWS_SHELL_ERROR,
+  resolvePtySpawnPlan,
+  type GroupLayoutSnapshot,
+} from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
+import {
+  ensureShellIntegrationScripts,
+  psSingleQuote,
+} from "./shell-integration.js";
 import {
   checkAppUpdate,
   downloadAppUpdate,
@@ -143,6 +152,7 @@ import {
 } from "./health-monitor.js";
 import {
   deleteFlow,
+  deleteFlowChatData,
   createFlowFromContent,
   FLOW_CHAT_DRAFT_ID,
   getFlowDagNodeCommand,
@@ -1322,6 +1332,17 @@ const PLAIN_SHELL_TOOL_ID = "shell";
 
 const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
 const PTY_OUTPUT_BUFFERS = new Map<string, string>();
+
+/** Session metadata kept after exit so the status bar can show pid / shell / size / exit. */
+type PtySessionMeta = {
+  pid: number | null;
+  shell: string;
+  cols: number;
+  rows: number;
+  exitCode: number | null;
+};
+const PTY_META = new Map<string, PtySessionMeta>();
+
 const DEFAULT_PTY_BUFFER_MAX_CHARS = 4 * 1024 * 1024;
 const MIN_PTY_BUFFER_MAX_CHARS = 256 * 1024;
 const MAX_PTY_BUFFER_MAX_CHARS = 64 * 1024 * 1024;
@@ -1411,6 +1432,30 @@ function broadcastPtyExit(sessionId: string, exitCode: number) {
   }
 }
 
+function ptyMetaPayload(sessionId: string) {
+  const meta = PTY_META.get(sessionId);
+  if (!meta) return null;
+  return {
+    sessionId,
+    alive: PTY_SESSIONS.has(sessionId),
+    pid: meta.pid,
+    shell: meta.shell,
+    cols: meta.cols,
+    rows: meta.rows,
+    exitCode: meta.exitCode,
+  };
+}
+
+function broadcastPtyMeta(sessionId: string) {
+  const payload = ptyMetaPayload(sessionId);
+  if (!payload) return;
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("pty-meta", payload);
+    }
+  }
+}
+
 function resolvePtyWorkDir(cwd?: string): { ok: true; dir: string } | { ok: false; error: string } {
   const trimmed = cwd?.trim();
   if (!trimmed) return { ok: true, dir: homedir() };
@@ -1465,102 +1510,121 @@ ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
   return canceled ? null : filePaths[0];
 });
 
-ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string, extraArgs?: string) => {
-  let pty: PtyModule;
-  try {
-    pty = await getPty();
-  } catch (err: unknown) {
-    return { success: false, error: (err as Error).message };
-  }
-  const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
-  const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
-  if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
-
-  const sessionId = `${tool}-${Date.now()}`;
-  const isWin = process.platform === "win32";
-  const workDirResult = resolvePtyWorkDir(cwd);
-  if (!workDirResult.ok) {
-    return { success: false, error: workDirResult.error };
-  }
-  const workDir = workDirResult.dir;
-
-  // On Windows: prefer pwsh (loads $PROFILE for prompt themes) → powershell → cmd
-  const windowsCandidates: [string, string[]][] = shellOnly
-    ? [
-        ["pwsh.exe", ["-NoLogo", "-NoExit"]],
-        ["powershell.exe", ["-NoLogo", "-NoExit"]],
-        ["cmd.exe", ["/k"]],
-      ]
-    : [
-        ["pwsh.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
-        ["powershell.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
-        ["cmd.exe", ["/k", cmd]],
-      ];
-  const unixShell = "/bin/bash";
-  const unixArgs = shellOnly ? [] : ["-c", `${cmd}; exec bash`];
-
-  const ptyOpts = {
-    name: "xterm-256color",
-    cols: 120,
-    rows: 30,
-    cwd: workDir,
-    // COLORTERM=truecolor enables 24-bit color; TERM is set by node-pty via `name`
-    // TERM_PROGRAM tells Oh My Posh / Starship this is a recognised terminal (enables icons/glyphs)
-    // WT_SESSION mimics Windows Terminal so pwsh prompt themes activate fully
-    env: {
-      ...process.env,
-      COLORTERM: "truecolor",
-      TERM_PROGRAM: "vscode",
-      WT_SESSION: process.env.WT_SESSION ?? "electron-pty",
-    } as Record<string, string>,
-  };
-
-  try {
-    let proc: import("node-pty").IPty | undefined;
-
-    if (isWin) {
-      for (const [sh, args] of windowsCandidates) {
-        try { proc = pty.spawn(sh, args, ptyOpts); break; }
-        catch { /* try next */ }
-      }
-      if (!proc) throw new Error("No suitable shell found (pwsh / powershell / cmd)");
-    } else {
-      proc = pty.spawn(unixShell, unixArgs, ptyOpts);
-    }
-
-    PTY_OUTPUT_BUFFERS.set(sessionId, "");
-
-    PTY_SESSIONS.set(sessionId, proc);
-
-    proc.onData((data) => {
-      broadcastPtyData(sessionId, data);
-    });
-
-    // Kick the shell to emit a prompt after attach (some shells wait for first resize).
+ipcMain.handle(
+  "pty-spawn",
+  async (_event, tool: string, cwd?: string, extraArgs?: string, shell?: string) => {
+    let pty: PtyModule;
     try {
-      proc.resize(ptyOpts.cols, ptyOpts.rows);
-    } catch {
-      /* ignore */
+      pty = await getPty();
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+    const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
+    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
+    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
+
+    const sessionId = `${tool}-${Date.now()}`;
+    const workDirResult = resolvePtyWorkDir(cwd);
+    if (!workDirResult.ok) {
+      return { success: false, error: workDirResult.error };
+    }
+    const workDir = workDirResult.dir;
+
+    // OSC 7 hooks so `cd` updates the status bar without respawning the PTY.
+    // If script install fails, still spawn — cwd just won't track until restart succeeds.
+    let shellIntegration: { pwshCommand?: string; bashInitFile?: string } | undefined;
+    try {
+      const integration = ensureShellIntegrationScripts(app.getPath("userData"));
+      shellIntegration = {
+        pwshCommand: `. ${psSingleQuote(integration.pwsh)}`,
+        bashInitFile: integration.bash,
+      };
+    } catch (err) {
+      console.warn("[pty-spawn] shell integration unavailable:", err);
     }
 
-    proc.onExit(({ exitCode }) => {
-      PTY_SESSIONS.delete(sessionId);
-      clearPtyBuffer(sessionId);
-      broadcastPtyExit(sessionId, exitCode);
-    });
+    const plan = resolvePtySpawnPlan({ command: cmd, shell, shellIntegration });
 
-    return { success: true, sessionId };
-  } catch (err: unknown) {
-    return { success: false, error: (err as Error).message };
-  }
-});
+    const ptyOpts = {
+      name: "xterm-256color",
+      cols: 120,
+      rows: 30,
+      cwd: workDir,
+      env: plan.env,
+    };
+
+    try {
+      let proc: import("node-pty").IPty | undefined;
+      let shellPath = "";
+      const candidates =
+        plan.platform === "win32" ? plan.windowsCandidates : plan.unixCandidates;
+      for (const [sh, args] of candidates) {
+        try {
+          proc = pty.spawn(sh, args, ptyOpts);
+          shellPath = sh;
+          break;
+        } catch {
+          /* try next */
+        }
+      }
+      if (!proc) {
+        throw new Error(
+          plan.platform === "win32"
+            ? NO_SUITABLE_WINDOWS_SHELL_ERROR
+            : NO_SUITABLE_UNIX_SHELL_ERROR,
+        );
+      }
+
+      PTY_OUTPUT_BUFFERS.set(sessionId, "");
+      PTY_SESSIONS.set(sessionId, proc);
+      PTY_META.set(sessionId, {
+        pid: typeof proc.pid === "number" ? proc.pid : null,
+        shell: basename(shellPath) || shellPath,
+        cols: ptyOpts.cols,
+        rows: ptyOpts.rows,
+        exitCode: null,
+      });
+
+      proc.onData((data) => {
+        broadcastPtyData(sessionId, data);
+      });
+
+      // Kick the shell to emit a prompt after attach (some shells wait for first resize).
+      try {
+        proc.resize(ptyOpts.cols, ptyOpts.rows);
+      } catch {
+        /* ignore */
+      }
+
+      proc.onExit(({ exitCode }) => {
+        PTY_SESSIONS.delete(sessionId);
+        clearPtyBuffer(sessionId);
+        const meta = PTY_META.get(sessionId);
+        if (meta) meta.exitCode = exitCode;
+        broadcastPtyExit(sessionId, exitCode);
+        broadcastPtyMeta(sessionId);
+      });
+
+      broadcastPtyMeta(sessionId);
+      return { success: true, sessionId, cwd: workDir };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
 
 ipcMain.handle("pty-attach", (_event, sessionId: string) => {
   const alive = PTY_SESSIONS.has(sessionId);
+  const meta = PTY_META.get(sessionId);
   return {
     success: true,
     alive,
     buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
+    pid: meta?.pid ?? null,
+    shell: meta?.shell ?? null,
+    cols: meta?.cols ?? null,
+    rows: meta?.rows ?? null,
+    exitCode: meta?.exitCode ?? null,
   };
 });
 
@@ -1603,7 +1667,13 @@ ipcMain.handle(
     _event,
     sessionId: string,
     query: string,
-    opts?: { caseSensitive?: boolean; maxMatches?: number; contextChars?: number },
+    opts?: {
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      regex?: boolean;
+      maxMatches?: number;
+      contextChars?: number;
+    },
   ) => {
     const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
     return searchPtyOutput(buffer, query ?? "", opts ?? {});
@@ -1614,12 +1684,65 @@ ipcMain.handle("pty-get-log-path", (_event, sessionId: string) => ({
   path: join(ptyLogDir(), `${sessionId}.log`),
 }));
 
-ipcMain.on("pty-write",  (_e, sessionId: string, data: string)                    => { PTY_SESSIONS.get(sessionId)?.write(data); });
-ipcMain.on("pty-resize", (_e, sessionId: string, cols: number, rows: number)       => { PTY_SESSIONS.get(sessionId)?.resize(cols, rows); });
-ipcMain.on("pty-kill",   (_e, sessionId: string)                                   => {
-  try { PTY_SESSIONS.get(sessionId)?.kill(); } catch { /* already dead */ }
+/** Dead session write/resize must not silently no-op — return + re-emit exit so the UI can stop accepting input. */
+function ptySessionGoneResult(sessionId: string): { success: false; error: string } {
+  const meta = PTY_META.get(sessionId);
+  if (meta && meta.exitCode == null) meta.exitCode = -1;
+  broadcastPtyExit(sessionId, -1);
+  broadcastPtyMeta(sessionId);
+  return { success: false, error: "PTY session is not alive" };
+}
+
+function markPtySessionDead(sessionId: string, exitCode: number) {
   PTY_SESSIONS.delete(sessionId);
   clearPtyBuffer(sessionId);
+  const meta = PTY_META.get(sessionId);
+  if (meta && meta.exitCode == null) meta.exitCode = exitCode;
+  broadcastPtyExit(sessionId, exitCode);
+  broadcastPtyMeta(sessionId);
+}
+
+ipcMain.handle("pty-write", (_e, sessionId: string, data: string) => {
+  const proc = PTY_SESSIONS.get(sessionId);
+  if (!proc) return ptySessionGoneResult(sessionId);
+  try {
+    proc.write(data);
+    return { success: true as const };
+  } catch (err: unknown) {
+    markPtySessionDead(sessionId, -1);
+    return { success: false as const, error: (err as Error).message || "PTY write failed" };
+  }
+});
+
+ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number) => {
+  const proc = PTY_SESSIONS.get(sessionId);
+  if (!proc) return ptySessionGoneResult(sessionId);
+  try {
+    proc.resize(cols, rows);
+    const meta = PTY_META.get(sessionId);
+    if (meta) {
+      meta.cols = cols;
+      meta.rows = rows;
+      broadcastPtyMeta(sessionId);
+    }
+    return { success: true as const };
+  } catch (err: unknown) {
+    markPtySessionDead(sessionId, -1);
+    return { success: false as const, error: (err as Error).message || "PTY resize failed" };
+  }
+});
+
+ipcMain.on("pty-kill", (_e, sessionId: string) => {
+  try {
+    PTY_SESSIONS.get(sessionId)?.kill();
+  } catch {
+    /* already dead */
+  }
+  PTY_SESSIONS.delete(sessionId);
+  clearPtyBuffer(sessionId);
+  // Keep PTY_META so the status bar can still show shell / last size / exit.
+  // Broadcast immediately so UI leaves "live" before onExit arrives with exitCode.
+  broadcastPtyMeta(sessionId);
 });
 
 // --- Launch in Terminal ---
@@ -2529,6 +2652,13 @@ ipcMain.handle("flow-save-chat", (_event, flowId: unknown, messages: unknown) =>
   return { ok: true };
 });
 
+ipcMain.handle("flow-clear-chat", (_event, flowId: unknown) => {
+  const id = normalizeChatFlowId(flowId);
+  if (!id) return { ok: false, error: "Invalid flow id" };
+  deleteFlowChatData(id);
+  return { ok: true };
+});
+
 ipcMain.handle("flow-list-prompt-logs", (_event, flowId: unknown, limit: unknown) => {
   const id = normalizeChatFlowId(flowId);
   if (!id) return [];
@@ -2536,13 +2666,18 @@ ipcMain.handle("flow-list-prompt-logs", (_event, flowId: unknown, limit: unknown
   return listFlowPromptLogs(id, n);
 });
 
-ipcMain.handle("flow-create", (_event, content: unknown, overwrite: unknown) => {
+ipcMain.handle("flow-create", (_event, content: unknown, options: unknown) => {
   if (typeof content !== "string" || !content.trim()) {
     return { ok: false, error: "Invalid flow content" };
   }
+  // Backward compatible: second arg was `overwrite: boolean`.
+  const opts =
+    options && typeof options === "object"
+      ? (options as { overwrite?: unknown; migrateChatFromDraft?: unknown })
+      : { overwrite: options === true };
   return createFlowFromContent(content, {
-    overwrite: overwrite === true,
-    migrateChatFromDraft: overwrite !== true,
+    overwrite: opts.overwrite === true,
+    migrateChatFromDraft: opts.migrateChatFromDraft !== false,
   });
 });
 

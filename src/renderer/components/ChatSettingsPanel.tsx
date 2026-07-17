@@ -15,6 +15,8 @@ import {
   PTY_BUFFER_PRESETS,
   SCROLLBACK_PRESETS,
   TERMINAL_OPTIONS,
+  UNIX_PREFERRED_SHELL_OPTIONS,
+  WINDOWS_PREFERRED_SHELL_OPTIONS,
   getAppBg,
   isAppThemeTerminalBg,
   bumpDirHistory,
@@ -23,6 +25,7 @@ import {
   subscribeSettingsChanges,
   type ChatSettings,
   type ExternalTerminal,
+  type PreferredShell,
 } from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
 import { PaneShortcutBindingsEditor } from "./PaneShortcutBindingsEditor";
@@ -32,6 +35,7 @@ import type { LocalePreference } from "../i18n/index";
 import type { MessageKey } from "../i18n/messages/en";
 import { syncMainProcessFromSettings } from "../system-tray-sync";
 import { useHealthMonitor } from "../hooks/useHealthMonitor";
+import { installPlatform } from "../utils/install-platform";
 
 interface ChatSettingsPanelProps {
   compact?: boolean;
@@ -43,6 +47,17 @@ const TERMINAL_LABEL_KEYS: Record<ExternalTerminal, MessageKey> = {
   pwsh: "terminal.pwsh",
   powershell: "terminal.powershell",
   cmd: "terminal.cmd",
+};
+
+const SHELL_LABEL_KEYS: Record<PreferredShell, MessageKey> = {
+  auto: "shell.auto",
+  pwsh: "terminal.pwsh",
+  powershell: "terminal.powershell",
+  cmd: "terminal.cmd",
+  bash: "shell.bash",
+  zsh: "shell.zsh",
+  fish: "shell.fish",
+  sh: "shell.sh",
 };
 
 const BG_LABEL_KEYS: Record<string, MessageKey> = {
@@ -313,6 +328,30 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         </ToggleGroup>
       </div>
 
+      {/* Embedded PTY shell preference */}
+      <div>
+        <p className={sectionTitle}>{t("settings.preferredShell")}</p>
+        <p className="mb-3 text-[11px] leading-snug text-text-tertiary">
+          {t("settings.preferredShellHint")}
+        </p>
+        <ToggleGroup
+          type="single"
+          value={settings.preferredShell}
+          onValueChange={(value) => {
+            if (value) updateSettings({ preferredShell: value as PreferredShell });
+          }}
+        >
+          {(installPlatform() === "win32"
+            ? WINDOWS_PREFERRED_SHELL_OPTIONS
+            : UNIX_PREFERRED_SHELL_OPTIONS
+          ).map((value) => (
+            <ToggleGroupItem key={value} value={value}>
+              {t(SHELL_LABEL_KEYS[value])}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+
       {/* Tool launch arguments */}
       <div>
         <p className={sectionTitle}>{t("settings.toolLaunchArgs.title")}</p>
@@ -552,6 +591,20 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
               <span className="text-[13px] text-text-primary">{t("settings.copyOnSelect")}</span>
               <span className="text-[11px] leading-snug text-text-tertiary">
                 {t("settings.copyOnSelectHint")}
+              </span>
+            </span>
+          </Label>
+
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
+              checked={settings.terminalWebglEnabled}
+              onCheckedChange={(v) => updateSettings({ terminalWebglEnabled: v === true })}
+              className="mt-0.5"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">{t("settings.webgl")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("settings.webglHint")}
               </span>
             </span>
           </Label>

@@ -16,6 +16,7 @@ export class SessionService {
     private readonly sessions: SessionRepositoryPort,
     private readonly eventBus: EventBus,
     private readonly sessionRuntime: SessionRuntime,
+    private readonly defaultShell: string = "auto",
   ) {}
 
   async create(
@@ -45,7 +46,7 @@ export class SessionService {
       group_id: group.id,
       name: sessionName,
       cwd,
-      shell: options?.shell,
+      shell: options?.shell ?? this.defaultShell,
       tool: options?.tool,
     });
 

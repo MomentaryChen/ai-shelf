@@ -762,8 +762,19 @@ export interface ElectronAPI {
     tool: string,
     cwd?: string,
     extraArgs?: string,
-  ) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
-  ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
+    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | bash | zsh | fish | sh. */
+    shell?: string,
+  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
+  ptyAttach: (sessionId: string) => Promise<{
+    success: boolean;
+    alive: boolean;
+    buffer: string;
+    pid: number | null;
+    shell: string | null;
+    cols: number | null;
+    rows: number | null;
+    exitCode: number | null;
+  }>;
   ptyGetOutputBuffer: (sessionId: string)                            => Promise<{ buffer: string }>;
   ptyExportOutput: (
     sessionId: string,
@@ -775,17 +786,34 @@ export interface ElectronAPI {
   ptySearchOutput: (
     sessionId: string,
     query: string,
-    opts?: { caseSensitive?: boolean; maxMatches?: number; contextChars?: number },
+    opts?: {
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      regex?: boolean;
+      maxMatches?: number;
+      contextChars?: number;
+    },
   ) => Promise<PtySearchResult>;
   ptyGetLogPath: (sessionId: string)                                => Promise<{ path: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;
   clipboardReadText: ()                                             => Promise<string>;
   clipboardWriteText: (text: string)                                => Promise<boolean>;
-  ptyWrite:  (sessionId: string, data: string)             => void;
-  ptyResize: (sessionId: string, cols: number, rows: number) => void;
+  ptyWrite:  (sessionId: string, data: string)             => Promise<{ success: boolean; error?: string }>;
+  ptyResize: (sessionId: string, cols: number, rows: number) => Promise<{ success: boolean; error?: string }>;
   ptyKill:   (sessionId: string)                           => void;
   onPtyData: (cb: (p: { sessionId: string; data: string })     => void) => (() => void);
   onPtyExit: (cb: (p: { sessionId: string; exitCode: number }) => void) => (() => void);
+  onPtyMeta: (
+    cb: (p: {
+      sessionId: string;
+      alive: boolean;
+      pid: number | null;
+      shell: string;
+      cols: number;
+      rows: number;
+      exitCode: number | null;
+    }) => void,
+  ) => (() => void);
   setDefaultModel: (tool: string, model: string) => Promise<{ success: boolean; error?: string }>;
   getEnvVars: () => Promise<EnvVarGroup[]>;
   wsGetTree: () => Promise<WorkspaceTree>;
@@ -1054,6 +1082,7 @@ export interface ElectronAPI {
     flowId: string,
     messages: FlowChatMessage[],
   ) => Promise<{ ok: boolean; error?: string }>;
+  flowClearChat: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowListPromptLogs: (
     flowId: string,
     limit?: number,
@@ -1074,7 +1103,7 @@ export interface ElectronAPI {
   ) => Promise<FlowDagNodeCommandDetail | { error: string }>;
   flowCreate: (
     content: string,
-    overwrite?: boolean,
+    overwriteOrOptions?: boolean | { overwrite?: boolean; migrateChatFromDraft?: boolean },
   ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
   flowListTemplates: () => Promise<FlowTemplateListItem[]>;
   flowInstallTemplate: (

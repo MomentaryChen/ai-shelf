@@ -4,6 +4,31 @@ export { openDatabase } from "./database/db.js";
 export { bootstrap, type AppContext } from "./infra/bootstrap.js";
 export type { BroadcastExecResult, ExecResult } from "./services/exec-service.js";
 export { PtyRuntime, TOOL_LAUNCH_CMD } from "./runtime/pty-runtime.js";
+export {
+  DEFAULT_PTY_SHELL,
+  DEFAULT_PTY_WT_SESSION,
+  NO_SUITABLE_SHELL_ERROR,
+  NO_SUITABLE_UNIX_SHELL_ERROR,
+  NO_SUITABLE_WINDOWS_SHELL_ERROR,
+  PTY_SHELL_PREFERENCE_VALUES,
+  buildPtyEnv,
+  buildUnixPtyCandidates,
+  buildUnixPtySpawn,
+  buildWindowsPtyCandidates,
+  effectiveUnixShellPref,
+  effectiveWindowsShellPref,
+  normalizePtyShellPreference,
+  orderWindowsPtyCandidates,
+  ptyShellFromExternalTerminal,
+  resolvePtySpawnPlan,
+  shellBasename,
+  unixShellArgs,
+  type PtyShellCandidate,
+  type PtyShellPreference,
+  type ResolvedPtySpawnPlan,
+  type UnixShellFamily,
+  type WindowsShellFamily,
+} from "./runtime/pty-shell.js";
 export type { WorkspaceModel } from "./models/workspace.js";
 export type { GroupModel } from "./models/group.js";
 export type { SessionModel } from "./models/session.js";

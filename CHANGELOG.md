@@ -9,6 +9,32 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-07-17
+
+Terminal directory tracking, GPU rendering, richer find and status bar, plus smarter Flow authoring.
+
+### Added
+
+- **WebGL terminal renderer** — Optional GPU-accelerated xterm rendering (on by default) to keep multi-pane layouts and large scrollback smoother; falls back to canvas when WebGL is unavailable.
+- **Terminal directory tracking** — Terminals report the working directory via OSC 7 shell integration, so the status bar follows `cd` without respawning the shell.
+- **Terminal find upgrades** — Added regex and whole-word matching, with match counts reconciled against the full PTY scrollback (not just the visible viewport).
+- **Terminal status bar details** — Shows the process id, the shell actually launched, terminal size, and the exit code when a session ends.
+- **Unix shell selection** — Terminal spawn now respects `$SHELL` and a preferred shell (bash / zsh / fish / sh), cascading to the next available shell when one is missing.
+- **Busy-pane close confirmation** — Prompts before closing a pane that is still running an active agent.
+
+### Changed
+
+- **Flow authoring prompts** — Generate prompts are smaller, inject your live Claude MCP inventory (and team policy constraints), and attribute authoring cost back to Usage.
+- **Flow chat binding** — Chat is bound one-to-one to a flow and injects the on-disk `.flow.md` when revising an existing flow.
+- **Live terminal display settings** — Font family, font size, and scrollback changes apply without remounting the terminal.
+
+### Fixed
+
+- **Usage readability across themes** — The Usage page is legible across light and dark app themes.
+- **Dead terminal sessions** — Writing to or resizing an exited PTY now surfaces the exit instead of silently no-opping.
+
+[3.9.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v3.9.0
+
 ## [3.8.0] - 2026-07-16
 
 Multi-agent Flow orchestration, Usage cost decisions, and team config policy for MCP/skills sync.

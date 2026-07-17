@@ -339,11 +339,11 @@ function formatResetAt(iso?: string): string {
 }
 
 const USAGE_TOOL_BAR_COLORS: Record<UsageToolId, string> = {
-  claude: "var(--clay)",
-  codex: "var(--success)",
-  cursor: "var(--muted)",
-  gemini: "var(--clay-soft)",
-  copilot: "var(--clay-deep)",
+  claude: "var(--color-accent)",
+  codex: "var(--color-ok)",
+  cursor: "var(--color-text-secondary)",
+  gemini: "var(--color-accent-hover)",
+  copilot: "var(--color-warn)",
 };
 
 function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
@@ -504,7 +504,7 @@ function UsageUnifiedDaily({
   if (rows.length === 0) {
     return (
       <Card title={t("usage.unified.title")}>
-        <p className="text-[13px] text-[var(--muted)]">
+        <p className="text-[13px] text-text-secondary">
           {activeToolIds.length > 0 ? t("usage.unified.noDaily") : t("usage.unified.empty")}
         </p>
       </Card>
@@ -513,20 +513,20 @@ function UsageUnifiedDaily({
 
   return (
     <Card title={t("usage.unified.title")}>
-      <p className="mb-4 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.unified.hint")}</p>
+      <p className="mb-4 text-[13px] leading-relaxed text-text-secondary">{t("usage.unified.hint")}</p>
       {quotaOnlyToolIds.length > 0 && (
-        <p className="mb-4 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.unified.quotaNote")}</p>
+        <p className="mb-4 text-[13px] leading-relaxed text-text-secondary">{t("usage.unified.quotaNote")}</p>
       )}
 
       {maxCost > 0 && (
         <div className="mb-5 flex flex-col gap-2">
           {rows.map((row) => (
             <div key={row.date} className="flex items-center gap-3">
-              <span className="w-[4.5rem] shrink-0 font-mono text-[11px] text-[var(--muted)]">
+              <span className="w-[4.5rem] shrink-0 font-mono text-[11px] text-text-secondary">
                 {row.date.slice(5)}
               </span>
               <div
-                className="flex h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--sand-deep)]"
+                className="flex h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-accent-surface"
                 style={{ maxWidth: `${(row.costUsd / maxCost) * 100}%` }}
               >
                 {activeToolIds.map((toolId) => {
@@ -548,7 +548,7 @@ function UsageUnifiedDaily({
                   );
                 })}
               </div>
-              <span className="w-16 shrink-0 text-right text-[12px] tabular-nums text-[var(--ink)]">
+              <span className="w-16 shrink-0 text-right text-[12px] tabular-nums text-text-primary">
                 {formatUsd(row.costUsd)}
               </span>
             </div>
@@ -562,7 +562,7 @@ function UsageUnifiedDaily({
             key={toolId}
             type="button"
             onClick={() => onSelectTool(toolId)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--sand)]/60 px-2.5 py-1 text-[11px] text-[var(--ink)] hover:bg-[var(--sand)]"
+            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-secondary/60 px-2.5 py-1 text-[11px] text-text-primary hover:bg-secondary"
           >
             <span
               className="h-2 w-2 rounded-full"
@@ -603,10 +603,10 @@ function UsageUnifiedDaily({
                       key={toolId}
                       type="button"
                       onClick={() => onSelectTool(toolId)}
-                      className="cursor-pointer rounded-full bg-[var(--sand)] px-2 py-0.5 text-[11px] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
+                      className="cursor-pointer rounded-full bg-secondary px-2 py-0.5 text-[11px] text-text-primary hover:bg-accent-surface"
                     >
                       {toolLabel(toolId)}{" "}
-                      <span className="tabular-nums text-[var(--muted)]">
+                      <span className="tabular-nums text-text-secondary">
                         {slice.costUsd > 0
                           ? formatUsd(slice.costUsd)
                           : formatTokens((slice.inputTokens ?? 0) + (slice.outputTokens ?? 0))}
@@ -632,7 +632,7 @@ function AttributionList({
 }) {
   const { t } = useLocale();
   if (rows.length === 0) {
-    return <p className="text-[13px] text-[var(--muted)]">{emptyLabel}</p>;
+    return <p className="text-[13px] text-text-secondary">{emptyLabel}</p>;
   }
   const max = Math.max(...rows.map((r) => r.costUsd), 0.01);
   return (
@@ -640,27 +640,27 @@ function AttributionList({
       {rows.map((row) => (
         <div key={row.id} className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-2 text-[13px]">
-            <span className="min-w-0 truncate font-medium text-[var(--ink)]">
+            <span className="min-w-0 truncate font-medium text-text-primary">
               {row.label}
               {row.estimated && row.costUsd > 0 && (
-                <span className="ml-1.5 rounded-full bg-[var(--sand-deep)] px-1.5 py-0.5 text-[10px] font-normal text-[var(--muted)]">
+                <span className="ml-1.5 rounded-full bg-accent-surface px-1.5 py-0.5 text-[10px] font-normal text-text-secondary">
                   {t("usage.attribution.estimatedBadge")}
                 </span>
               )}
             </span>
-            <span className="shrink-0 tabular-nums text-[var(--ink)]">
+            <span className="shrink-0 tabular-nums text-text-primary">
               {row.costUsd > 0 ? formatUsd(row.costUsd) : "—"}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--sand-deep)]">
+            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-accent-surface">
               <div
-                className="h-full rounded-full bg-[var(--clay)] transition-all duration-300"
+                className="h-full rounded-full bg-accent transition-all duration-300"
                 style={{ width: `${Math.min(100, (row.costUsd / max) * 100)}%` }}
               />
             </div>
             {row.runCount > 0 && (
-              <span className="w-14 shrink-0 text-right text-[11px] text-[var(--muted)]">
+              <span className="w-14 shrink-0 text-right text-[11px] text-text-secondary">
                 {t("usage.attribution.runs", { count: String(row.runCount) })}
               </span>
             )}
@@ -697,10 +697,10 @@ function CostDecisionsPanel({
   const alert = insights.alert;
   const alertBg =
     alert.level === "over"
-      ? "border-[var(--clay)]/40 bg-[var(--clay)]/10"
+      ? "border-accent/40 bg-accent/10"
       : alert.level === "warn"
-        ? "border-[var(--clay)]/25 bg-[var(--sand)]"
-        : "border-[var(--sand)] bg-[var(--cream)]/80";
+        ? "border-accent/25 bg-secondary"
+        : "border-border bg-bg-primary/80";
 
   const hottest = insights.weekHottestFlow;
   const attrRows =
@@ -730,51 +730,51 @@ function CostDecisionsPanel({
 
   return (
     <div className="mb-5 flex flex-col gap-3">
-      <div className={`rounded-[28px] border px-4 py-4 shadow-[var(--shadow-card)] ${alertBg}`}>
-        <div className="mb-3 text-[11px] font-medium tracking-wide text-[var(--muted)]">
+      <div className={`rounded-[28px] border px-4 py-4 shadow-card ${alertBg}`}>
+        <div className="mb-3 text-[11px] font-medium tracking-wide text-text-secondary">
           {t("usage.decisions.title")}
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
           <div>
-            <div className="text-[12px] text-[var(--muted)]">{t("usage.decisions.hottest")}</div>
+            <div className="text-[12px] text-text-secondary">{t("usage.decisions.hottest")}</div>
             {hottest ? (
               <>
-                <div className="mt-1 truncate text-[17px] font-semibold text-[var(--ink)]">
+                <div className="mt-1 truncate text-[17px] font-semibold text-text-primary">
                   {hottest.label}
                 </div>
-                <p className="mt-1 text-[13px] text-[var(--muted)]">
+                <p className="mt-1 text-[13px] text-text-secondary">
                   {t("usage.decisions.hottestHint", {
                     runs: String(hottest.runCount),
                     cost: formatUsd(hottest.costUsd),
                   })}
                 </p>
                 {hottest.estimated && hottest.costUsd > 0 && (
-                  <p className="mt-1 text-[11px] text-[var(--muted)]">{t("usage.decisions.estimated")}</p>
+                  <p className="mt-1 text-[11px] text-text-secondary">{t("usage.decisions.estimated")}</p>
                 )}
               </>
             ) : (
-              <p className="mt-1 text-[13px] leading-relaxed text-[var(--muted)]">
+              <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
                 {t("usage.decisions.hottestEmpty")}
               </p>
             )}
           </div>
           <div>
-            <div className="text-[12px] text-[var(--muted)]">{t("usage.decisions.weekSpend")}</div>
-            <div className="mt-1 text-[22px] font-semibold tabular-nums text-[var(--clay)]">
+            <div className="text-[12px] text-text-secondary">{t("usage.decisions.weekSpend")}</div>
+            <div className="mt-1 text-[22px] font-semibold tabular-nums text-accent">
               {formatUsd(insights.weekSpendUsd)}
             </div>
-            <p className="mt-1 text-[13px] text-[var(--ink)]">{t(alert.messageKey)}</p>
+            <p className="mt-1 text-[13px] text-text-primary">{t(alert.messageKey)}</p>
             {alert.weeklyBudgetUsd != null && (
               <>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--sand-deep)]">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-accent-surface">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      alert.level === "over" ? "bg-[var(--clay-deep)]" : "bg-[var(--clay)]"
+                      alert.level === "over" ? "bg-fail" : "bg-accent"
                     }`}
                     style={{ width: `${Math.min(100, alert.usedPercent)}%` }}
                   />
                 </div>
-                <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+                <p className="mt-1.5 text-[11px] text-text-secondary">
                   {t("usage.budget.progress", {
                     spent: formatUsd(alert.weekSpendUsd),
                     budget: formatUsd(alert.weeklyBudgetUsd),
@@ -783,14 +783,14 @@ function CostDecisionsPanel({
               </>
             )}
             {alert.weeklyBudgetUsd == null && (
-              <p className="mt-1 text-[11px] text-[var(--muted)]">{t("usage.budget.unset")}</p>
+              <p className="mt-1 text-[11px] text-text-secondary">{t("usage.budget.unset")}</p>
             )}
           </div>
         </div>
       </div>
 
       <Card title={t("usage.attribution.title")}>
-        <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">
+        <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">
           {t("usage.attribution.hint")}
         </p>
         <div className="mb-3 flex flex-wrap gap-1.5">
@@ -807,8 +807,8 @@ function CostDecisionsPanel({
               onClick={() => setAttrTab(id)}
               className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] transition-colors duration-200 ${
                 attrTab === id
-                  ? "bg-[var(--clay)] font-medium text-white shadow-[var(--shadow-accent)]"
-                  : "bg-[var(--sand)] text-[var(--ink)] hover:bg-[var(--sand-deep)]"
+                  ? "bg-accent font-medium text-on-accent warm-shadow-accent"
+                  : "bg-secondary text-text-primary hover:bg-accent-surface"
               }`}
             >
               {t(key)}
@@ -819,10 +819,10 @@ function CostDecisionsPanel({
       </Card>
 
       <Card title={t("usage.budget.title")} collapsible defaultCollapsed>
-        <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">{t("usage.budget.hint")}</p>
+        <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">{t("usage.budget.hint")}</p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex min-w-[140px] flex-col gap-1.5">
-            <Label className="text-[13px] text-[var(--ink)]">{t("usage.budget.amount")}</Label>
+            <Label className="text-[13px] text-text-primary">{t("usage.budget.amount")}</Label>
             <Input
               type="number"
               min={0}
@@ -830,18 +830,18 @@ function CostDecisionsPanel({
               placeholder={t("usage.budget.amountPlaceholder")}
               value={budgetInput}
               onChange={(e) => setBudgetInput(e.target.value)}
-              className="border-[var(--sand)] bg-[var(--cream)]"
+              className="border-border bg-bg-primary"
             />
           </div>
           <div className="flex w-[100px] flex-col gap-1.5">
-            <Label className="text-[13px] text-[var(--ink)]">{t("usage.budget.alertAt")}</Label>
+            <Label className="text-[13px] text-text-primary">{t("usage.budget.alertAt")}</Label>
             <Input
               type="number"
               min={1}
               max={100}
               value={alertAt}
               onChange={(e) => setAlertAt(e.target.value)}
-              className="border-[var(--sand)] bg-[var(--cream)]"
+              className="border-border bg-bg-primary"
             />
           </div>
           <Button size="sm" disabled={budgetBusy} onClick={() => void saveBudget(false)}>
@@ -859,7 +859,7 @@ function CostDecisionsPanel({
             {t("usage.budget.clear")}
           </Button>
         </div>
-        {budgetMsg && <p className="mt-2 text-[12px] text-[var(--muted)]">{budgetMsg}</p>}
+        {budgetMsg && <p className="mt-2 text-[12px] text-text-secondary">{budgetMsg}</p>}
       </Card>
     </div>
   );

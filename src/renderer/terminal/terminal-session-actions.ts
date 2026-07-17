@@ -17,5 +17,5 @@ export function clearTerminalSession(sessionId: string): void {
     fn();
     return;
   }
-  window.api.ptyWrite(sessionId, "\x0c");
+  void window.api.ptyWrite(sessionId, "\x0c");
 }

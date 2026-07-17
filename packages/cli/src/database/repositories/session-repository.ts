@@ -22,7 +22,7 @@ export class SessionRepository implements SessionRepositoryPort {
       group_id: parsed.group_id,
       name: parsed.name,
       cwd: parsed.cwd ?? homedir(),
-      shell: parsed.shell ?? "pwsh",
+      shell: parsed.shell ?? "auto",
       tool: parsed.tool ?? null,
       pid: null,
       status: "pending" as const,

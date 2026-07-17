@@ -612,6 +612,18 @@ html[data-app-theme="dark"] {
   --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.4);
   --color-sidebar-accent: rgb(255 255 255 / 0.06);
   --color-terminal-bg: #0c0c0c;
+  /* Warm alias bridge — keep legacy var(--ink)/var(--sand) readable in dark */
+  --cream: var(--color-bg-primary);
+  --surface: var(--color-bg-card);
+  --sand: var(--color-bg-card);
+  --sand-deep: var(--color-border);
+  --ink: var(--color-text-primary);
+  --clay: var(--color-accent);
+  --clay-soft: var(--color-accent-hover);
+  --clay-deep: var(--color-accent-hover);
+  --success: var(--color-ok);
+  --shadow-warm-card: var(--shadow-card);
+  --shadow-warm-accent: 0 4px 14px -6px rgb(56 189 248 / 0.35);
 }
 
 html[data-app-theme="light"] {
@@ -683,11 +695,23 @@ html[data-app-theme="light"] {
   --popover-foreground: var(--color-text-primary);
   --primary: var(--color-accent);
   --primary-foreground: var(--color-on-accent);
-  --secondary: var(--color-sand, #f1e8da);
+  --secondary: var(--color-bg-card);
   --secondary-foreground: var(--color-text-primary);
   --input: var(--color-border);
   --ring: var(--color-accent);
   --color-terminal-bg: #1e1e1e;
+  /* Warm alias bridge — light theme */
+  --cream: var(--color-bg-primary);
+  --surface: var(--color-bg-secondary);
+  --sand: var(--color-bg-card);
+  --sand-deep: var(--color-border);
+  --ink: var(--color-text-primary);
+  --clay: var(--color-accent);
+  --clay-soft: var(--color-accent-hover);
+  --clay-deep: var(--color-accent-hover);
+  --success: var(--color-ok);
+  --shadow-warm-card: var(--shadow-card);
+  --shadow-warm-accent: 0 4px 14px -6px rgb(2 132 199 / 0.35);
 }
 
 /* Warm glow focus — all surfaces including terminal chrome */
@@ -779,6 +803,18 @@ html[data-app-theme="contrast"] {
   --input: var(--color-border);
   --ring: var(--color-accent);
   --color-terminal-bg: #000000;
+  /* Warm alias bridge — high-contrast */
+  --cream: var(--color-bg-primary);
+  --surface: var(--color-bg-card);
+  --sand: var(--color-bg-card);
+  --sand-deep: var(--color-border);
+  --ink: var(--color-text-primary);
+  --clay: var(--color-accent);
+  --clay-soft: var(--color-accent-hover);
+  --clay-deep: var(--color-accent-hover);
+  --success: var(--color-ok);
+  --shadow-warm-card: var(--shadow-card);
+  --shadow-warm-accent: 0 0 0 1px var(--color-accent);
 }
 
 /* Terminal workspace — warm scrollbars + portaled menus inherit chrome tokens */

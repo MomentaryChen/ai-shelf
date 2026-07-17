@@ -24,6 +24,7 @@ import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
 import { usePaneAgentAwareness } from "../hooks/usePaneAgentAwareness";
+import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
@@ -216,7 +217,16 @@ function ChatTabInner({
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
-    const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs);
+    // Prefer explicit embedded-shell setting; fall back to Windows external-terminal mapping.
+    const shell =
+      settings.preferredShell !== "auto"
+        ? settings.preferredShell
+        : settings.externalTerminal === "pwsh" ||
+            settings.externalTerminal === "powershell" ||
+            settings.externalTerminal === "cmd"
+          ? settings.externalTerminal
+          : "auto";
+    const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs, shell);
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
@@ -224,8 +234,13 @@ function ChatTabInner({
       return null;
     }
     setTerminalError(null);
-    return { id: result.sessionId, tool, sessionId: result.sessionId, cwd: cwd || "" };
-  }, [settings.toolLaunchArgs, t]);
+    return {
+      id: result.sessionId,
+      tool,
+      sessionId: result.sessionId,
+      cwd: result.cwd || cwd || "",
+    };
+  }, [settings.externalTerminal, settings.preferredShell, settings.toolLaunchArgs, t]);
 
   const spawnPaneResilient = useCallback(
     async (tool: string, cwd: string): Promise<PaneInfo | null> => {
@@ -308,11 +323,11 @@ function ChatTabInner({
       const current = panesRef.current;
       if (broadcastInput && current.length > 1) {
         for (const p of current) {
-          window.api.ptyWrite(p.sessionId, data);
+          void window.api.ptyWrite(p.sessionId, data);
           recordPaneAgentInput(p.sessionId);
         }
       } else {
-        window.api.ptyWrite(sessionId, data);
+        void window.api.ptyWrite(sessionId, data);
         recordPaneAgentInput(sessionId);
       }
     },
@@ -328,7 +343,7 @@ function ChatTabInner({
     if (current.length === 0) return;
     const line = text.endsWith("\n") || text.endsWith("\r") ? text : `${text}\r`;
     for (const p of current) {
-      window.api.ptyWrite(p.sessionId, line);
+      void window.api.ptyWrite(p.sessionId, line);
       recordPaneAgentInput(p.sessionId);
     }
   }, [recordPaneAgentInput]);
@@ -614,6 +629,21 @@ function ChatTabInner({
     );
   }, []);
 
+  /** Update pane cwd from OSC 7 without killing the session. */
+  const reportPaneCwd = useCallback((sessionId: string, nextCwd: string) => {
+    const cwd = nextCwd.trim();
+    if (!cwd) return;
+    setLayout((prev) => {
+      if (!prev) return prev;
+      const panes = collectPanes(prev);
+      const hit = panes.find((p) => p.sessionId === sessionId);
+      if (!hit || hit.cwd === cwd) return prev;
+      return mapPanesInTree(prev, (p) =>
+        p.sessionId === sessionId ? { ...p, cwd } : p,
+      );
+    });
+  }, []);
+
   const changePaneCwd = useCallback(
     async (paneId: string) => {
       const layoutNow = layoutRef.current;
@@ -671,7 +701,13 @@ function ChatTabInner({
   );
 
   const closePane = useCallback(
-    (paneId: string) => {
+    (paneId: string, opts?: { skipConfirm?: boolean }) => {
+      if (!opts?.skipConfirm) {
+        const status = paneAgentStates[paneId];
+        if (status && isPaneAgentBusy(status)) {
+          if (!confirm(t("pane.closeBusyConfirm"))) return;
+        }
+      }
       if (activeProfile) forgetMinimizedPane(activeProfile.id, paneId);
       setLayout((prev) => {
         if (prev) {
@@ -682,7 +718,7 @@ function ChatTabInner({
       });
       setFocusedPaneId((prev) => (prev === paneId ? null : prev));
     },
-    [activeProfile, forgetMinimizedPane],
+    [activeProfile, forgetMinimizedPane, paneAgentStates, t],
   );
 
   const splitPane = useCallback(
@@ -869,7 +905,7 @@ function ChatTabInner({
       const line = command.endsWith("\n") || command.endsWith("\r") ? command : `${command}\r`;
       if (broadcast) {
         for (const p of targetPanes) {
-          window.api.ptyWrite(p.sessionId, line);
+          void window.api.ptyWrite(p.sessionId, line);
           recordPaneAgentInput(p.sessionId);
         }
         return;
@@ -879,7 +915,7 @@ function ChatTabInner({
       const target =
         (focusId ? targetPanes.find((p) => p.id === focusId) : null) ?? targetPanes[0];
       if (!target) return;
-      window.api.ptyWrite(target.sessionId, line);
+      void window.api.ptyWrite(target.sessionId, line);
       recordPaneAgentInput(target.sessionId);
     },
     [sidebarForest, activeProfile?.id, getProfilePanes, getProfileFocusedPaneId, recordPaneAgentInput],
@@ -1392,17 +1428,19 @@ function ChatTabInner({
             fontFamily={terminalFontFamily}
             fontSize={terminalFontSize}
             scrollback={terminalScrollback}
+            webglEnabled={settings.terminalWebglEnabled}
             rightClickPaste={settings.terminalRightClickPaste}
             copyOnSelect={settings.terminalCopyOnSelect}
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}
+            onCwdReport={reportPaneCwd}
             onSessionLost={() => {
               if (respawningPaneIdsRef.current.has(pane.id)) return;
               void respawnPane(pane.id);
             }}
             onRestart={() => void respawnPane(pane.id)}
-            onExit={() => closePane(pane.id)}
+            onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
       />

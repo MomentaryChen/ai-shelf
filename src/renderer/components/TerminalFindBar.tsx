@@ -11,12 +11,20 @@ interface Props {
   focusKey: number;
   query: string;
   caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
   matchIndex: number;
-  /** Matches in full PTY session transcript. */
+  /** Matches in xterm scrollback (navigable). */
   matchCount: number;
   matchCapped: boolean;
+  /** Extra hits in the PTY char buffer outside the current xterm view. */
+  outsideScrollback: number;
+  outsideCapped: boolean;
+  invalidRegex: boolean;
   onQueryChange: (value: string) => void;
   onCaseSensitiveChange: (value: boolean) => void;
+  onWholeWordChange: (value: boolean) => void;
+  onRegexChange: (value: boolean) => void;
   onNext: () => void;
   onPrevious: () => void;
   onClose: () => void;
@@ -31,11 +39,18 @@ export function TerminalFindBar({
   focusKey,
   query,
   caseSensitive,
+  wholeWord,
+  regex,
   matchIndex,
   matchCount,
   matchCapped,
+  outsideScrollback,
+  outsideCapped,
+  invalidRegex,
   onQueryChange,
   onCaseSensitiveChange,
+  onWholeWordChange,
+  onRegexChange,
   onNext,
   onPrevious,
   onClose,
@@ -73,10 +88,21 @@ export function TerminalFindBar({
   const hasQuery = query.length > 0;
   let status = "";
   if (hasQuery) {
-    if (matchCount === 0) {
+    if (invalidRegex) {
+      status = t("find.invalidRegex");
+    } else if (matchCount === 0 && outsideScrollback === 0) {
       status = t("find.noMatch");
+    } else if (matchCount === 0 && outsideScrollback > 0) {
+      status = t("find.beyondOnly", {
+        count: formatCount(outsideScrollback, outsideCapped),
+      });
     } else {
       status = `${matchIndex} / ${formatCount(matchCount, matchCapped)}`;
+      if (outsideScrollback > 0) {
+        status += ` · ${t("find.beyond", {
+          count: formatCount(outsideScrollback, outsideCapped),
+        })}`;
+      }
     }
   }
 
@@ -108,12 +134,35 @@ export function TerminalFindBar({
         }}
         className="h-auto w-44 min-w-0 border-chrome-border-strong bg-chrome-bg px-2 py-1 text-[12px] text-chrome-text focus-visible:border-chrome-ui-accent focus-visible:ring-chrome-ui-accent/40"
       />
-      <Label className="flex cursor-pointer select-none items-center gap-1 text-[11px] font-normal text-chrome-text-muted">
+      <Label
+        className="flex cursor-pointer select-none items-center gap-1 text-[11px] font-normal text-chrome-text-muted"
+        title={t("find.caseSensitive")}
+      >
         <Checkbox
           checked={caseSensitive}
           onCheckedChange={(v) => onCaseSensitiveChange(v === true)}
         />
         Aa
+      </Label>
+      <Label
+        className="flex cursor-pointer select-none items-center gap-1 text-[11px] font-normal text-chrome-text-muted"
+        title={t("find.wholeWord")}
+      >
+        <Checkbox
+          checked={wholeWord}
+          onCheckedChange={(v) => onWholeWordChange(v === true)}
+        />
+        Ab
+      </Label>
+      <Label
+        className="flex cursor-pointer select-none items-center gap-1 text-[11px] font-normal text-chrome-text-muted"
+        title={t("find.regex")}
+      >
+        <Checkbox
+          checked={regex}
+          onCheckedChange={(v) => onRegexChange(v === true)}
+        />
+        .*
       </Label>
       <Button
         type="button"
@@ -139,7 +188,7 @@ export function TerminalFindBar({
       </Button>
       {status ? (
         <span
-          className="max-w-[14rem] truncate text-center text-[11px] tabular-nums text-chrome-text-subtle"
+          className="max-w-[16rem] truncate text-center text-[11px] tabular-nums text-chrome-text-subtle"
           title={status}
         >
           {status}
