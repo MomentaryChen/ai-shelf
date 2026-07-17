@@ -15,6 +15,7 @@ import { EmptyState } from "./EmptyState";
 import { FlowCreateChat } from "./FlowCreateChat";
 import { FlowDagView, type FlowDagPhase } from "./FlowDagView";
 import { FlowOutputDialog } from "./FlowOutputDialog";
+import { FlowAgentConsolePanel } from "./FlowAgentConsolePanel";
 import { FlowOutputPanel } from "./FlowOutputPanel";
 import { FlowRunDetailDialog } from "./FlowRunDetailDialog";
 import { FlowRunHistoryPanel } from "./FlowRunHistoryPanel";
@@ -703,6 +704,19 @@ export function FlowTab() {
                 error={showLiveRun && selectedActiveRun ? selectedActiveRun.error : selectedError}
                 outputPath={selectedActiveRun?.outputPath ?? lastOutput?.outputPath ?? null}
               />
+
+              {selectedActiveRun?.flowId === selectedId &&
+                flowDef.runner !== "http" &&
+                (showLiveRun ||
+                  selectedActiveRun.status === "completed" ||
+                  selectedActiveRun.status === "failed" ||
+                  selectedActiveRun.status === "cancelled") && (
+                  <FlowAgentConsolePanel
+                    runId={selectedActiveRun.runId}
+                    phaseId={selectedActiveRun.currentPhaseId}
+                    live={selectedRunning || selectedWaitingApproval}
+                  />
+                )}
 
               <FlowOutputPanel
                 runId={panelOutputRunId}

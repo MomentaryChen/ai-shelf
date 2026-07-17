@@ -170,6 +170,8 @@ import {
   listRecentRuns,
   listRunsForFlow,
   onFlowRunState,
+  onFlowConsoleChunk,
+  getFlowConsoleBuffer,
   readFlowFile,
   readRunOutput,
   getLatestRunWithOutput,
@@ -2454,6 +2456,12 @@ ipcMain.handle("flow-list-runs-for-flow", (_event, flowId: unknown, limit: unkno
   return listRunsForFlow(flowId.trim(), n);
 });
 
+ipcMain.handle("flow-get-console-buffer", (_event, runId: unknown) => {
+  if (typeof runId !== "string" || !runId.trim()) {
+    return { runId: "", text: "", truncated: false, phaseId: null, alive: false, lastSeq: 0 };
+  }
+  return getFlowConsoleBuffer(runId.trim());
+});
 ipcMain.handle("flow-get-run-events", (_event, runId: unknown) => {
   if (typeof runId !== "string" || !runId.trim()) return [];
   return getRunEvents(runId.trim());
@@ -2708,6 +2716,11 @@ app.whenReady().then(async () => {
     const win = mainWindow;
     if (!win || win.isDestroyed()) return;
     win.webContents.send("flow-run-state", state);
+  });
+  onFlowConsoleChunk((chunk) => {
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    win.webContents.send("flow-console-chunk", chunk);
   });
   onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
 });
