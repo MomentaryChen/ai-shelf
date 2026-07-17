@@ -1614,9 +1614,41 @@ ipcMain.handle("pty-get-log-path", (_event, sessionId: string) => ({
   path: join(ptyLogDir(), `${sessionId}.log`),
 }));
 
-ipcMain.on("pty-write",  (_e, sessionId: string, data: string)                    => { PTY_SESSIONS.get(sessionId)?.write(data); });
-ipcMain.on("pty-resize", (_e, sessionId: string, cols: number, rows: number)       => { PTY_SESSIONS.get(sessionId)?.resize(cols, rows); });
-ipcMain.on("pty-kill",   (_e, sessionId: string)                                   => {
+/** Dead session write/resize must not silently no-op — return + re-emit exit so the UI can stop accepting input. */
+function ptySessionGoneResult(sessionId: string): { success: false; error: string } {
+  broadcastPtyExit(sessionId, -1);
+  return { success: false, error: "PTY session is not alive" };
+}
+
+ipcMain.handle("pty-write", (_e, sessionId: string, data: string) => {
+  const proc = PTY_SESSIONS.get(sessionId);
+  if (!proc) return ptySessionGoneResult(sessionId);
+  try {
+    proc.write(data);
+    return { success: true as const };
+  } catch (err: unknown) {
+    PTY_SESSIONS.delete(sessionId);
+    clearPtyBuffer(sessionId);
+    broadcastPtyExit(sessionId, -1);
+    return { success: false as const, error: (err as Error).message || "PTY write failed" };
+  }
+});
+
+ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number) => {
+  const proc = PTY_SESSIONS.get(sessionId);
+  if (!proc) return ptySessionGoneResult(sessionId);
+  try {
+    proc.resize(cols, rows);
+    return { success: true as const };
+  } catch (err: unknown) {
+    PTY_SESSIONS.delete(sessionId);
+    clearPtyBuffer(sessionId);
+    broadcastPtyExit(sessionId, -1);
+    return { success: false as const, error: (err as Error).message || "PTY resize failed" };
+  }
+});
+
+ipcMain.on("pty-kill", (_e, sessionId: string) => {
   try { PTY_SESSIONS.get(sessionId)?.kill(); } catch { /* already dead */ }
   PTY_SESSIONS.delete(sessionId);
   clearPtyBuffer(sessionId);

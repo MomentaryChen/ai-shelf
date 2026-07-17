@@ -105,8 +105,8 @@ contextBridge.exposeInMainWorld("api", {
   pickFolder: (defaultPath)                 => ipcRenderer.invoke("pick-folder", defaultPath),
   clipboardReadText: ()                     => ipcRenderer.invoke("clipboard-read-text"),
   clipboardWriteText: (text)                => ipcRenderer.invoke("clipboard-write-text", text),
-  ptyWrite:  (sessionId, data)          => ipcRenderer.send("pty-write",  sessionId, data),
-  ptyResize: (sessionId, cols, rows)    => ipcRenderer.send("pty-resize", sessionId, cols, rows),
+  ptyWrite:  (sessionId, data)          => ipcRenderer.invoke("pty-write",  sessionId, data),
+  ptyResize: (sessionId, cols, rows)    => ipcRenderer.invoke("pty-resize", sessionId, cols, rows),
   ptyKill:   (sessionId)                => ipcRenderer.send("pty-kill",   sessionId),
   onPtyData: (cb) => {
     const handler = (_e, p) => cb(p);
