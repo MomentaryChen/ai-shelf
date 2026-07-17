@@ -762,7 +762,7 @@ export interface ElectronAPI {
     tool: string,
     cwd?: string,
     extraArgs?: string,
-  ) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
+  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
   ptyAttach: (sessionId: string)                                    => Promise<{ success: boolean; alive: boolean; buffer: string }>;
   ptyGetOutputBuffer: (sessionId: string)                            => Promise<{ buffer: string }>;
   ptyExportOutput: (

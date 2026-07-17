@@ -14,6 +14,7 @@ import {
   SEARCH_DEBOUNCE_MS,
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
+import { bindTerminalCwd } from "../terminal/xterm-cwd";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
 import {
   copyTerminalOutputForIssue,
@@ -39,6 +40,8 @@ interface Props {
   onSessionLost?: (sessionId: string) => void;
   onWrite?: (data: string, sessionId: string) => void;
   onRestart?: () => void;
+  /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
+  onCwdReport?: (sessionId: string, cwd: string) => void;
 }
 
 /** True when the viewport is pinned to the latest output (ydisp === ybase). */
@@ -76,6 +79,7 @@ function EmbeddedTerminalInner({
   onSessionLost,
   onWrite,
   onRestart,
+  onCwdReport,
 }: Props) {
   const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,6 +90,7 @@ function EmbeddedTerminalInner({
   const onSessionLostRef = useRef(onSessionLost);
   const onRestartRef = useRef(onRestart);
   const onExitRef = useRef(onExit);
+  const onCwdReportRef = useRef(onCwdReport);
   const fitRef = useRef<(() => void) | null>(null);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const [hasNewOutput, setHasNewOutput] = useState(false);
@@ -262,6 +267,7 @@ function EmbeddedTerminalInner({
   onSessionLostRef.current = onSessionLost;
   onRestartRef.current = onRestart;
   onExitRef.current = onExit;
+  onCwdReportRef.current = onCwdReport;
 
   useEffect(() => {
     setHasNewOutput(false);
@@ -321,6 +327,9 @@ function EmbeddedTerminalInner({
       },
     });
     const unbindLinks = bindTerminalLinks(term);
+    const unbindCwd = bindTerminalCwd(term, (cwd) => {
+      onCwdReportRef.current?.(sessionId, cwd);
+    });
 
     const pending: string[] = [];
     let opened = true;
@@ -521,6 +530,7 @@ function EmbeddedTerminalInner({
       unregisterClear();
       unbindClipboard();
       unbindLinks();
+      unbindCwd();
       ro.disconnect();
       searchAddon.dispose();
       disposeTerminal(term);

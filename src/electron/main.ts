@@ -67,6 +67,11 @@ import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import type { GroupLayoutSnapshot } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
 import {
+  bashSingleQuote,
+  ensureShellIntegrationScripts,
+  psSingleQuote,
+} from "./shell-integration.js";
+import {
   checkAppUpdate,
   downloadAppUpdate,
   getAppUpdateState,
@@ -1484,20 +1489,47 @@ ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string, extraArgs?
   }
   const workDir = workDirResult.dir;
 
+  // OSC 7 hooks so `cd` updates the status bar without respawning the PTY.
+  // If script install fails, still spawn — cwd just won't track until restart succeeds.
+  let pwshInject = "";
+  let bashInit: string | null = null;
+  try {
+    const integration = ensureShellIntegrationScripts(app.getPath("userData"));
+    pwshInject = `. ${psSingleQuote(integration.pwsh)}`;
+    bashInit = integration.bash;
+  } catch (err) {
+    console.warn("[pty-spawn] shell integration unavailable:", err);
+  }
+
   // On Windows: prefer pwsh (loads $PROFILE for prompt themes) → powershell → cmd
   const windowsCandidates: [string, string[]][] = shellOnly
     ? [
-        ["pwsh.exe", ["-NoLogo", "-NoExit"]],
-        ["powershell.exe", ["-NoLogo", "-NoExit"]],
+        ["pwsh.exe", pwshInject ? ["-NoLogo", "-NoExit", "-Command", pwshInject] : ["-NoLogo", "-NoExit"]],
+        ["powershell.exe", pwshInject ? ["-NoLogo", "-NoExit", "-Command", pwshInject] : ["-NoLogo", "-NoExit"]],
         ["cmd.exe", ["/k"]],
       ]
     : [
-        ["pwsh.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
-        ["powershell.exe", ["-NoLogo", "-NoExit", "-Command", cmd]],
+        [
+          "pwsh.exe",
+          ["-NoLogo", "-NoExit", "-Command", pwshInject ? `${pwshInject}; ${cmd}` : cmd],
+        ],
+        [
+          "powershell.exe",
+          ["-NoLogo", "-NoExit", "-Command", pwshInject ? `${pwshInject}; ${cmd}` : cmd],
+        ],
         ["cmd.exe", ["/k", cmd]],
       ];
   const unixShell = "/bin/bash";
-  const unixArgs = shellOnly ? [] : ["-c", `${cmd}; exec bash`];
+  const unixArgs = shellOnly
+    ? bashInit
+      ? ["--init-file", bashInit]
+      : []
+    : bashInit
+      ? [
+          "-c",
+          `source ${bashSingleQuote(bashInit)}; ${cmd}; exec bash --init-file ${bashSingleQuote(bashInit)}`,
+        ]
+      : ["-c", `${cmd}; exec bash`];
 
   const ptyOpts = {
     name: "xterm-256color",
@@ -1549,7 +1581,7 @@ ipcMain.handle("pty-spawn", async (event, tool: string, cwd?: string, extraArgs?
       broadcastPtyExit(sessionId, exitCode);
     });
 
-    return { success: true, sessionId };
+    return { success: true, sessionId, cwd: workDir };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
   }

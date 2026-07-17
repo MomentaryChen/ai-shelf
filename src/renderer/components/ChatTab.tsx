@@ -224,7 +224,12 @@ function ChatTabInner({
       return null;
     }
     setTerminalError(null);
-    return { id: result.sessionId, tool, sessionId: result.sessionId, cwd: cwd || "" };
+    return {
+      id: result.sessionId,
+      tool,
+      sessionId: result.sessionId,
+      cwd: result.cwd || cwd || "",
+    };
   }, [settings.toolLaunchArgs, t]);
 
   const spawnPaneResilient = useCallback(
@@ -612,6 +617,21 @@ function ChatTabInner({
           )
         : prev,
     );
+  }, []);
+
+  /** Update pane cwd from OSC 7 without killing the session. */
+  const reportPaneCwd = useCallback((sessionId: string, nextCwd: string) => {
+    const cwd = nextCwd.trim();
+    if (!cwd) return;
+    setLayout((prev) => {
+      if (!prev) return prev;
+      const panes = collectPanes(prev);
+      const hit = panes.find((p) => p.sessionId === sessionId);
+      if (!hit || hit.cwd === cwd) return prev;
+      return mapPanesInTree(prev, (p) =>
+        p.sessionId === sessionId ? { ...p, cwd } : p,
+      );
+    });
   }, []);
 
   const changePaneCwd = useCallback(
@@ -1397,6 +1417,7 @@ function ChatTabInner({
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}
+            onCwdReport={reportPaneCwd}
             onSessionLost={() => {
               if (respawningPaneIdsRef.current.has(pane.id)) return;
               void respawnPane(pane.id);
