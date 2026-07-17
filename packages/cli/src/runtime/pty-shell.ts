@@ -1,39 +1,106 @@
 /**
  * Shared PTY shell spawn helpers for Electron main and CLI PtyRuntime.
- * Keeps Windows candidate args, preference ordering, and env in one place.
+ * Keeps Windows/Unix candidate args, preference ordering, and env in one place.
  */
 
-export type PtyShellPreference = "pwsh" | "powershell" | "cmd" | "bash";
+export type PtyShellPreference =
+  | "auto"
+  | "pwsh"
+  | "powershell"
+  | "cmd"
+  | "bash"
+  | "zsh"
+  | "fish"
+  | "sh";
+
+export type UnixShellFamily = "bash" | "zsh" | "fish" | "sh";
+export type WindowsShellFamily = "pwsh" | "powershell" | "cmd";
 
 export type PtyShellCandidate = readonly [file: string, args: string[]];
 
-export const DEFAULT_PTY_SHELL: PtyShellPreference = "pwsh";
+export const PTY_SHELL_PREFERENCE_VALUES = [
+  "auto",
+  "pwsh",
+  "powershell",
+  "cmd",
+  "bash",
+  "zsh",
+  "fish",
+  "sh",
+] as const;
 
-export const NO_SUITABLE_SHELL_ERROR =
+/** Default preference: platform-aware cascade ($SHELL on Unix, pwsh-first on Windows). */
+export const DEFAULT_PTY_SHELL: PtyShellPreference = "auto";
+
+export const NO_SUITABLE_WINDOWS_SHELL_ERROR =
   "No suitable shell found (pwsh / powershell / cmd)";
+
+export const NO_SUITABLE_UNIX_SHELL_ERROR =
+  "No suitable shell found ($SHELL / bash / zsh / fish / sh)";
+
+/** Windows shell miss (kept for existing imports). */
+export const NO_SUITABLE_SHELL_ERROR = NO_SUITABLE_WINDOWS_SHELL_ERROR;
 
 /** Default WT_SESSION when the host env does not already set one. */
 export const DEFAULT_PTY_WT_SESSION = "ai-shelf";
 
+const UNIX_FAMILIES: readonly UnixShellFamily[] = ["bash", "zsh", "fish", "sh"];
+const UNIX_FAMILY_SET = new Set<string>(UNIX_FAMILIES);
+const WINDOWS_FAMILY_SET = new Set<string>(["pwsh", "powershell", "cmd"]);
+
+export function shellBasename(shellPath: string): string {
+  const base = shellPath.replace(/\\/g, "/").split("/").pop() ?? "";
+  return base.toLowerCase().replace(/\.exe$/i, "");
+}
+
+export function isUnixShellFamily(value: string): value is UnixShellFamily {
+  return UNIX_FAMILY_SET.has(value);
+}
+
+export function isWindowsShellFamily(value: string): value is WindowsShellFamily {
+  return WINDOWS_FAMILY_SET.has(value);
+}
+
+/**
+ * Normalize a stored/CLI preference.
+ * Unknown values become `auto`. Cross-platform ids are kept so callers can
+ * map them away with {@link effectiveWindowsShellPref} / {@link effectiveUnixShellPref}.
+ */
 export function normalizePtyShellPreference(shell?: string): PtyShellPreference {
   switch (shell) {
+    case "auto":
     case "powershell":
     case "cmd":
-    case "bash":
-      return shell;
     case "pwsh":
+    case "bash":
+    case "zsh":
+    case "fish":
+    case "sh":
+      return shell;
     default:
-      return "pwsh";
+      return DEFAULT_PTY_SHELL;
   }
+}
+
+/** Windows-relevant preference; Unix ids → auto (pwsh-first cascade). */
+export function effectiveWindowsShellPref(shell?: string): "auto" | WindowsShellFamily {
+  const pref = normalizePtyShellPreference(shell);
+  if (isWindowsShellFamily(pref)) return pref;
+  return "auto";
+}
+
+/** Unix-relevant preference; Windows ids → auto ($SHELL cascade). */
+export function effectiveUnixShellPref(shell?: string): "auto" | UnixShellFamily {
+  const pref = normalizePtyShellPreference(shell);
+  if (isUnixShellFamily(pref)) return pref;
+  return "auto";
 }
 
 /**
  * Map desktop "external terminal" preference onto an embedded PTY shell order.
- * `auto` / `wt` keep the default pwsh → powershell → cmd cascade.
+ * `auto` / `wt` keep the default platform cascade.
  */
-export function ptyShellFromExternalTerminal(
-  terminal?: string,
-): PtyShellPreference {
+export function ptyShellFromExternalTerminal(terminal?: string): PtyShellPreference {
   switch (terminal) {
     case "powershell":
     case "cmd":
@@ -98,7 +165,7 @@ export function orderWindowsPtyCandidates(
   candidates: readonly PtyShellCandidate[],
   shellPref?: string,
 ): PtyShellCandidate[] {
-  const pref = normalizePtyShellPreference(shellPref);
+  const pref = effectiveWindowsShellPref(shellPref);
   if (pref === "cmd") {
     return [...candidates].reverse();
   }
@@ -109,35 +176,114 @@ export function orderWindowsPtyCandidates(
     if (!pwsh || !powershell || !cmd) return [...candidates];
     return [powershell, pwsh, cmd];
   }
-  // pwsh / bash → default order
+  // auto / pwsh → default order
   return [...candidates];
 }
 
-export function buildUnixPtySpawn(
+function pathsForUnixFamily(family: UnixShellFamily): string[] {
+  switch (family) {
+    case "bash":
+      return ["bash", "/bin/bash", "/usr/bin/bash", "/usr/local/bin/bash"];
+    case "zsh":
+      return ["zsh", "/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh", "/opt/homebrew/bin/zsh"];
+    case "fish":
+      return ["fish", "/usr/bin/fish", "/usr/local/bin/fish", "/opt/homebrew/bin/fish"];
+    case "sh":
+      return ["sh", "/bin/sh", "/usr/bin/sh"];
+  }
+}
+
+function orderUnixFamilies(
+  preferred: "auto" | UnixShellFamily,
+  envBase: string,
+): UnixShellFamily[] {
+  if (preferred !== "auto") {
+    return [preferred, ...UNIX_FAMILIES.filter((f) => f !== preferred)];
+  }
+  if (isUnixShellFamily(envBase)) {
+    return [envBase, ...UNIX_FAMILIES.filter((f) => f !== envBase)];
+  }
+  return [...UNIX_FAMILIES];
+}
+
+function posixSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Args for a Unix shell candidate.
+ * When `bashInitFile` is set, bash gets OSC 7 via `--init-file` / source; other shells stay plain.
+ */
+export function unixShellArgs(
+  shellPath: string,
   command: string,
   bashInitFile?: string,
-): {
-  file: string;
-  args: string[];
-} {
+): string[] {
   const init = bashInitFile?.trim() || "";
-  if (!init) {
-    return {
-      file: "/bin/bash",
-      args: command === "" ? [] : ["-c", `${command}; exec bash`],
-    };
-  }
-  if (command === "") {
-    return { file: "/bin/bash", args: ["--init-file", init] };
-  }
-  const quoted = bashSingleQuote(init);
-  return {
-    file: "/bin/bash",
-    args: [
+  const isBash = shellBasename(shellPath) === "bash";
+
+  if (init && isBash) {
+    if (!command) return ["--init-file", init];
+    const quotedInit = bashSingleQuote(init);
+    const quotedShell = posixSingleQuote(shellPath);
+    return [
       "-c",
-      `source ${quoted}; ${command}; exec bash --init-file ${quoted}`,
-    ],
+      `source ${quotedInit}; ${command}; exec ${quotedShell} --init-file ${quotedInit}`,
+    ];
+  }
+
+  if (!command) return [];
+  return ["-c", `${command}; exec ${posixSingleQuote(shellPath)}`];
+}
+
+/**
+ * Ordered Unix shell commands/paths to try (spawn + catch next).
+ * - auto: $SHELL first when set, then bash → zsh → fish → sh
+ * - bash|zsh|fish|sh: that family first, then the rest
+ */
+export function buildUnixPtyCandidates(
+  command: string,
+  shellPref?: string,
+  envShell: string | undefined = process.env.SHELL,
+  bashInitFile?: string,
+): PtyShellCandidate[] {
+  const preferred = effectiveUnixShellPref(shellPref);
+  const env = envShell?.trim() ?? "";
+  const envBase = env ? shellBasename(env) : "";
+  const families = orderUnixFamilies(preferred, envBase);
+
+  const files: string[] = [];
+  const seen = new Set<string>();
+  const add = (p: string | undefined) => {
+    const t = p?.trim();
+    if (!t || seen.has(t)) return;
+    seen.add(t);
+    files.push(t);
   };
+
+  if (env && (preferred === "auto" || envBase === preferred)) {
+    add(env);
+  }
+
+  for (const family of families) {
+    if (env && envBase === family) add(env);
+    for (const p of pathsForUnixFamily(family)) add(p);
+  }
+
+  return files.map(
+    (file) => [file, unixShellArgs(file, command, bashInitFile)] as const,
+  );
+}
+
+/** @deprecated Prefer {@link buildUnixPtyCandidates}; kept for callers that want a single target. */
+export function buildUnixPtySpawn(
+  command: string,
+  shellPref?: string,
+  envShell?: string,
+  bashInitFile?: string,
+): { file: string; args: string[] } {
+  const [first] = buildUnixPtyCandidates(command, shellPref, envShell, bashInitFile);
+  return first ? { file: first[0], args: [...first[1]] } : { file: "/bin/bash", args: [] };
 }
 
 export function buildPtyEnv(options?: {
@@ -160,7 +306,9 @@ export interface ResolvedPtySpawnPlan {
   platform: "win32" | "unix";
   /** Ordered Windows candidates when platform is win32. */
   windowsCandidates: PtyShellCandidate[];
-  /** Unix spawn target when platform is unix. */
+  /** Ordered Unix candidates when platform is unix. */
+  unixCandidates: PtyShellCandidate[];
+  /** First Unix candidate (compat for older call sites). */
   unix: { file: string; args: string[] };
   env: Record<string, string>;
 }
@@ -173,7 +321,7 @@ export function resolvePtySpawnPlan(options: {
   wtSessionFallback?: string;
   /**
    * Optional OSC 7 hooks: pwsh/powershell dot-source command, bash init-file path.
-   * cmd.exe is left unchanged.
+   * cmd.exe and non-bash Unix shells are left unchanged.
    */
   shellIntegration?: {
     pwshCommand?: string;
@@ -187,6 +335,17 @@ export function resolvePtySpawnPlan(options: {
   });
   const pwshCommand = options.shellIntegration?.pwshCommand;
   const bashInitFile = options.shellIntegration?.bashInitFile;
+  const unixCandidates = buildUnixPtyCandidates(
+    options.command,
+    options.shell,
+    options.env?.SHELL ?? process.env.SHELL,
+    bashInitFile,
+  );
+  const unixFirst = unixCandidates[0];
+  const unix = unixFirst
+    ? { file: unixFirst[0], args: [...unixFirst[1]] }
+    : { file: "/bin/bash", args: [] };
+
   if (platform === "win32") {
     return {
       platform: "win32",
@@ -194,14 +353,16 @@ export function resolvePtySpawnPlan(options: {
         buildWindowsPtyCandidates(options.command, pwshCommand),
         options.shell,
       ),
-      unix: buildUnixPtySpawn(options.command, bashInitFile),
+      unixCandidates,
+      unix,
       env,
     };
   }
   return {
     platform: "unix",
     windowsCandidates: [],
-    unix: buildUnixPtySpawn(options.command, bashInitFile),
+    unixCandidates,
+    unix,
     env,
   };
 }

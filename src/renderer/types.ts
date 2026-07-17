@@ -762,7 +762,7 @@ export interface ElectronAPI {
     tool: string,
     cwd?: string,
     extraArgs?: string,
-    /** Embedded PTY shell preference: pwsh | powershell | cmd (falls back through cascade). */
+    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | bash | zsh | fish | sh. */
     shell?: string,
   ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
   ptyAttach: (sessionId: string) => Promise<{
