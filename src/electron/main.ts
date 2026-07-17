@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
-import { join, normalize, dirname } from "node:path";
+import { join, normalize, dirname, basename } from "node:path";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
@@ -1327,6 +1327,17 @@ const PLAIN_SHELL_TOOL_ID = "shell";
 
 const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
 const PTY_OUTPUT_BUFFERS = new Map<string, string>();
+
+/** Session metadata kept after exit so the status bar can show pid / shell / size / exit. */
+type PtySessionMeta = {
+  pid: number | null;
+  shell: string;
+  cols: number;
+  rows: number;
+  exitCode: number | null;
+};
+const PTY_META = new Map<string, PtySessionMeta>();
+
 const DEFAULT_PTY_BUFFER_MAX_CHARS = 4 * 1024 * 1024;
 const MIN_PTY_BUFFER_MAX_CHARS = 256 * 1024;
 const MAX_PTY_BUFFER_MAX_CHARS = 64 * 1024 * 1024;
@@ -1416,6 +1427,30 @@ function broadcastPtyExit(sessionId: string, exitCode: number) {
   }
 }
 
+function ptyMetaPayload(sessionId: string) {
+  const meta = PTY_META.get(sessionId);
+  if (!meta) return null;
+  return {
+    sessionId,
+    alive: PTY_SESSIONS.has(sessionId),
+    pid: meta.pid,
+    shell: meta.shell,
+    cols: meta.cols,
+    rows: meta.rows,
+    exitCode: meta.exitCode,
+  };
+}
+
+function broadcastPtyMeta(sessionId: string) {
+  const payload = ptyMetaPayload(sessionId);
+  if (!payload) return;
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("pty-meta", payload);
+    }
+  }
+}
+
 function resolvePtyWorkDir(cwd?: string): { ok: true; dir: string } | { ok: false; error: string } {
   const trimmed = cwd?.trim();
   if (!trimmed) return { ok: true, dir: homedir() };
@@ -1501,11 +1536,13 @@ ipcMain.handle(
 
     try {
       let proc: import("node-pty").IPty | undefined;
+      let shellPath = "";
 
       if (plan.platform === "win32") {
         for (const [sh, args] of plan.windowsCandidates) {
           try {
             proc = pty.spawn(sh, args, ptyOpts);
+            shellPath = sh;
             break;
           } catch {
             /* try next */
@@ -1514,11 +1551,18 @@ ipcMain.handle(
         if (!proc) throw new Error(NO_SUITABLE_SHELL_ERROR);
       } else {
         proc = pty.spawn(plan.unix.file, plan.unix.args, ptyOpts);
+        shellPath = plan.unix.file;
       }
 
       PTY_OUTPUT_BUFFERS.set(sessionId, "");
-
       PTY_SESSIONS.set(sessionId, proc);
+      PTY_META.set(sessionId, {
+        pid: typeof proc.pid === "number" ? proc.pid : null,
+        shell: basename(shellPath) || shellPath,
+        cols: ptyOpts.cols,
+        rows: ptyOpts.rows,
+        exitCode: null,
+      });
 
       proc.onData((data) => {
         broadcastPtyData(sessionId, data);
@@ -1534,9 +1578,13 @@ ipcMain.handle(
       proc.onExit(({ exitCode }) => {
         PTY_SESSIONS.delete(sessionId);
         clearPtyBuffer(sessionId);
+        const meta = PTY_META.get(sessionId);
+        if (meta) meta.exitCode = exitCode;
         broadcastPtyExit(sessionId, exitCode);
+        broadcastPtyMeta(sessionId);
       });
 
+      broadcastPtyMeta(sessionId);
       return { success: true, sessionId };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -1546,10 +1594,16 @@ ipcMain.handle(
 
 ipcMain.handle("pty-attach", (_event, sessionId: string) => {
   const alive = PTY_SESSIONS.has(sessionId);
+  const meta = PTY_META.get(sessionId);
   return {
     success: true,
     alive,
     buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
+    pid: meta?.pid ?? null,
+    shell: meta?.shell ?? null,
+    cols: meta?.cols ?? null,
+    rows: meta?.rows ?? null,
+    exitCode: meta?.exitCode ?? null,
   };
 });
 
@@ -1611,8 +1665,20 @@ ipcMain.handle("pty-get-log-path", (_event, sessionId: string) => ({
 
 /** Dead session write/resize must not silently no-op — return + re-emit exit so the UI can stop accepting input. */
 function ptySessionGoneResult(sessionId: string): { success: false; error: string } {
+  const meta = PTY_META.get(sessionId);
+  if (meta && meta.exitCode == null) meta.exitCode = -1;
   broadcastPtyExit(sessionId, -1);
+  broadcastPtyMeta(sessionId);
   return { success: false, error: "PTY session is not alive" };
+}
+
+function markPtySessionDead(sessionId: string, exitCode: number) {
+  PTY_SESSIONS.delete(sessionId);
+  clearPtyBuffer(sessionId);
+  const meta = PTY_META.get(sessionId);
+  if (meta && meta.exitCode == null) meta.exitCode = exitCode;
+  broadcastPtyExit(sessionId, exitCode);
+  broadcastPtyMeta(sessionId);
 }
 
 ipcMain.handle("pty-write", (_e, sessionId: string, data: string) => {
@@ -1622,9 +1688,7 @@ ipcMain.handle("pty-write", (_e, sessionId: string, data: string) => {
     proc.write(data);
     return { success: true as const };
   } catch (err: unknown) {
-    PTY_SESSIONS.delete(sessionId);
-    clearPtyBuffer(sessionId);
-    broadcastPtyExit(sessionId, -1);
+    markPtySessionDead(sessionId, -1);
     return { success: false as const, error: (err as Error).message || "PTY write failed" };
   }
 });
@@ -1634,19 +1698,30 @@ ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number)
   if (!proc) return ptySessionGoneResult(sessionId);
   try {
     proc.resize(cols, rows);
+    const meta = PTY_META.get(sessionId);
+    if (meta) {
+      meta.cols = cols;
+      meta.rows = rows;
+      broadcastPtyMeta(sessionId);
+    }
     return { success: true as const };
   } catch (err: unknown) {
-    PTY_SESSIONS.delete(sessionId);
-    clearPtyBuffer(sessionId);
-    broadcastPtyExit(sessionId, -1);
+    markPtySessionDead(sessionId, -1);
     return { success: false as const, error: (err as Error).message || "PTY resize failed" };
   }
 });
 
 ipcMain.on("pty-kill", (_e, sessionId: string) => {
-  try { PTY_SESSIONS.get(sessionId)?.kill(); } catch { /* already dead */ }
+  try {
+    PTY_SESSIONS.get(sessionId)?.kill();
+  } catch {
+    /* already dead */
+  }
   PTY_SESSIONS.delete(sessionId);
   clearPtyBuffer(sessionId);
+  // Keep PTY_META so the status bar can still show shell / last size / exit.
+  // Broadcast immediately so UI leaves "live" before onExit arrives with exitCode.
+  broadcastPtyMeta(sessionId);
 });
 
 // --- Launch in Terminal ---
