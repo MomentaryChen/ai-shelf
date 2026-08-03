@@ -1087,12 +1087,8 @@ function ChatTabInner({
     enabled: active && !profileBusy && !restoring,
     isPaneLive: (ref) => isPaneLive(ref.workspaceId, ref.profileId, ref.paneId),
     onActivate: async (ref) => {
-      const group = sidebarForest?.groups.find((g) =>
-        g.profiles.some(
-          (p) => p.id === ref.profileId && p.workspaceId === ref.workspaceId,
-        ),
-      );
-      if (group) setSelectedGroupId(group.id);
+      // ProfileForest.groups[].id === DB workspace id === ProfileInfo.workspaceId
+      setSelectedGroupId(ref.workspaceId);
       await restorePaneToDisplayById(ref.profileId, ref.paneId);
     },
   });
@@ -1100,7 +1096,9 @@ function ChatTabInner({
   usePaneShortcuts({
     panes,
     focusedPaneId,
-    enabled: active && layout !== null && !profileBusy && !restoring,
+    // layout may be null on an empty workspace — Ctrl+Tab MRU must still run
+    // so focus can return to a live terminal in another workspace/profile.
+    enabled: active && !profileBusy && !restoring,
     onFocusPane: (paneId) => {
       if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
       else setFocusedPaneId(paneId);
