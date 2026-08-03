@@ -3,7 +3,15 @@ import type { MessageKey } from "../i18n/messages/en";
 import type { ProviderEntry } from "../types";
 import { toolLabel } from "../utils";
 
-type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update" | "usage";
+type TabId =
+  | "overview"
+  | "models"
+  | "skills"
+  | "mcp"
+  | "config"
+  | "doctor"
+  | "update"
+  | "usage";
 
 /** Inventory-side palette entries (tools, config, skills, MCP) — always merged into Cmd+K. */
 export function buildGlobalSearchCommands(

@@ -1,6 +1,7 @@
 export const en = {
   "app.mode.terminal": "Terminal",
   "app.mode.inventory": "Inventory",
+  "app.mode.tools": "Tools",
   "app.mode.flow": "AI Flow",
   "app.mode.aria": "Application mode",
   "app.detecting": "Detecting AI tools…",
@@ -16,6 +17,7 @@ export const en = {
   "app.tab.doctor": "Doctor",
   "app.tab.update": "Update",
   "app.nav.sections": "Sections",
+  "app.nav.tools": "Tools",
   "app.cmdk": "Commands",
   "onboarding.step.detect": "Detect",
   "onboarding.step.connect": "Connect",
@@ -72,6 +74,7 @@ export const en = {
   "status.pid": "pid",
   "status.exit": "exit",
   "cmd.action.inventory": "Switch to Inventory",
+  "cmd.action.tools": "Switch to Tools",
   "cmd.action.refresh": "Refresh inventory",
   "cmd.terminal.openClaudeCursor": "Open Claude + Cursor",
   "cmd.terminal.openInApp": "Open {tool} in app",
@@ -1175,6 +1178,29 @@ export const en = {
   "shortcuts.terminal.copy": "Copy selection",
   "shortcuts.terminal.paste": "Paste",
   "shortcuts.terminal.selectAll": "Select all scrollback",
+
+  // Tools mode — Codec
+  "tools.tab.codec": "Codec",
+  "codec.subtitle": "Hash, Base64, URL, and hex — paste on the left, copy from the right.",
+  "codec.tools": "Codec tools",
+  "codec.tool.hash": "Hash",
+  "codec.tool.base64": "Base64",
+  "codec.tool.url": "URL",
+  "codec.tool.hex": "Hex",
+  "codec.hash.algo": "Algorithm",
+  "codec.direction.encode": "Encode",
+  "codec.direction.decode": "Decode",
+  "codec.base64.urlSafe": "URL-safe",
+  "codec.input": "Input",
+  "codec.output": "Output",
+  "codec.inputPlaceholder": "Paste text here…",
+  "codec.outputPlaceholder": "Result appears here",
+  "codec.copy": "Copy",
+  "codec.copied": "Copied",
+  "codec.swap": "Use as input",
+  "codec.clear": "Clear",
+  "codec.hint.live": "Updates as you type",
+  "codec.error.invalid": "Could not decode this input — check the format and try again.",
 } as const;
 
 export type MessageKey = keyof typeof en;
