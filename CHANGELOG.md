@@ -7,15 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 GitHub Releases use the matching `## [x.y.z]` section here as the release description (see `scripts/release-notes.mjs` and `.github/workflows/release.yml`).
 
-## [Unreleased]
+## [4.1.0] - 2026-08-03
+
+Responsive Tools panels, clearer dual-pane layouts, and steadier CJK IME in the terminal.
+
+### Added
+
+- **Responsive Tools panels** — Tools mode adapts with container queries so dual-pane utilities stay usable on narrower windows.
 
 ### Changed
 
+- **Tools dual-pane layout** — Aligns input/output panes across Codec, JWT, JSON, Regex, Crypto, Cron, and Time.
 - **Docs screenshots by locale** — README / `pages.md` use English captures (`tests/screenshots/en`, `docs/assets/en`); Chinese docs use `zh`. `pnpm gen:docs-assets` regenerates both.
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIFs for the current UI.
 
 ### Fixed
 
+- **CJK IME caret anchor** — Keeps composition input anchored to the AI CLI caret in the terminal.
+- **Profile sidebar selection** — Paints the selected profile immediately before the async switch completes.
 - **Docs capture onboarding** — Screenshot / GIF prep marks onboarding complete and dismisses the wizard so captures are not blocked.
+
+[4.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.1.0
 
 ## [4.0.0] - 2026-08-03
 
