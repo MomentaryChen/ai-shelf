@@ -72,6 +72,9 @@ const TimeToolsTab = lazy(() =>
 const CronToolsTab = lazy(() =>
   import("./components/CronToolsTab").then((m) => ({ default: m.CronToolsTab })),
 );
+const JwtToolsTab = lazy(() =>
+  import("./components/JwtToolsTab").then((m) => ({ default: m.JwtToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -97,7 +100,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "crypto" | "time" | "cron";
+type ToolId = "codec" | "crypto" | "time" | "cron" | "jwt";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -199,6 +202,7 @@ const TOOL_ICONS: Record<ToolId, string> = {
   crypto: "🗝️",
   time: "🕒",
   cron: "⏰",
+  jwt: "🪪",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
@@ -206,6 +210,7 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   crypto: "tools.tab.crypto",
   time: "tools.tab.time",
   cron: "tools.tab.cron",
+  jwt: "tools.tab.jwt",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -454,7 +459,9 @@ export function App() {
             ? "crypto aes rsa ecdsa encrypt decrypt sign verify key pem"
             : it.id === "cron"
               ? "cron schedule expression timezone preset"
-              : "codec hash base64 image md5 tools",
+              : it.id === "jwt"
+                ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
+                : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -478,7 +485,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
+          "tools codec crypto time cron jwt hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule token decode verify",
         run: () => handleModeChange("tools"),
       },
       {
@@ -756,6 +763,7 @@ export function App() {
                   {activeTool === "crypto" && <CryptoToolsTab />}
                   {activeTool === "time" && <TimeToolsTab />}
                   {activeTool === "cron" && <CronToolsTab />}
+                  {activeTool === "jwt" && <JwtToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>
