@@ -28,6 +28,7 @@ import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
+import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
 import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
 import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
@@ -423,6 +424,7 @@ function ChatTabInner({
 
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
+      if (shouldIgnoreShortcutForIme(ev)) return;
       const hasMod = ev.ctrlKey || ev.metaKey;
       if (!hasMod || ev.shiftKey || ev.altKey) return;
       if (ev.key.toLowerCase() !== "s") return;

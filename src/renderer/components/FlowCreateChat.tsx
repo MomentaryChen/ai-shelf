@@ -6,6 +6,7 @@ import { FLOW_CHAT_DRAFT_ID } from "../../shared/flow-chat-types.js";
 import type { FlowChatMessage } from "../../shared/flow-chat-types.js";
 import { parseFlowDocument } from "../../shared/flow-parse.js";
 import { useLocale } from "../i18n/LocaleProvider";
+import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
 
 type UiMessage = FlowChatMessage & { draft?: string; error?: boolean };
 
@@ -211,6 +212,8 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Don't submit while IME is committing a candidate with Enter.
+    if (shouldIgnoreShortcutForIme(e.nativeEvent)) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void send();
