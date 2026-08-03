@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import { join, normalize, dirname, basename } from "node:path";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFile, mkdir, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
 import {
@@ -1373,26 +1374,119 @@ function ptyLogDir(): string {
   return join(app.getPath("userData"), "pty-logs");
 }
 
-/** Rewrite the mirrored log to match the in-memory PTY tail. */
-function mirrorPtyLog(sessionId: string, text: string) {
-  try {
-    const dir = ptyLogDir();
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${sessionId}.log`), text, "utf8");
-  } catch {
-    /* best-effort */
+type PtyLogOp =
+  | { kind: "append"; chunk: string }
+  | { kind: "rewrite"; text: string }
+  | { kind: "clear" };
+
+const PTY_LOG_QUEUES = new Map<string, PtyLogOp[]>();
+const PTY_LOG_INFLIGHT = new Map<string, Promise<void>>();
+const PTY_LOG_FLUSH_TIMERS = new Map<string, ReturnType<typeof setTimeout>>();
+const PTY_LOG_FLUSH_IDLE_MS = 50;
+
+const PTY_DATA_PENDING = new Map<string, string>();
+const PTY_DATA_FLUSH_TIMERS = new Map<string, ReturnType<typeof setTimeout>>();
+const PTY_DATA_COALESCE_MS = 16;
+
+function enqueuePtyLog(sessionId: string, op: PtyLogOp) {
+  let q = PTY_LOG_QUEUES.get(sessionId);
+  if (!q) {
+    q = [];
+    PTY_LOG_QUEUES.set(sessionId, q);
   }
+  if (op.kind === "rewrite" || op.kind === "clear") {
+    q.length = 0;
+    q.push(op);
+  } else {
+    const last = q.at(-1);
+    if (last && last.kind === "append") {
+      last.chunk += op.chunk;
+    } else {
+      q.push(op);
+    }
+  }
+  schedulePtyLogFlush(sessionId);
+}
+
+function schedulePtyLogFlush(sessionId: string) {
+  if (PTY_LOG_FLUSH_TIMERS.has(sessionId)) return;
+  const timer = setTimeout(() => {
+    PTY_LOG_FLUSH_TIMERS.delete(sessionId);
+    void flushPtyLog(sessionId);
+  }, PTY_LOG_FLUSH_IDLE_MS);
+  PTY_LOG_FLUSH_TIMERS.set(sessionId, timer);
+}
+
+async function flushPtyLog(sessionId: string): Promise<void> {
+  const inflight = PTY_LOG_INFLIGHT.get(sessionId);
+  if (inflight) {
+    schedulePtyLogFlush(sessionId);
+    return inflight;
+  }
+  const q = PTY_LOG_QUEUES.get(sessionId);
+  if (!q || q.length === 0) return;
+
+  const run = (async () => {
+    const ops = q.splice(0, q.length);
+    try {
+      const dir = ptyLogDir();
+      await mkdir(dir, { recursive: true });
+      const file = join(dir, `${sessionId}.log`);
+      for (const op of ops) {
+        if (op.kind === "clear") {
+          try {
+            await unlink(file);
+          } catch {
+            /* ignore */
+          }
+        } else if (op.kind === "rewrite") {
+          await writeFile(file, op.text, "utf8");
+        } else if (op.chunk) {
+          await appendFile(file, op.chunk, "utf8");
+        }
+      }
+    } catch {
+      /* best-effort */
+    } finally {
+      PTY_LOG_INFLIGHT.delete(sessionId);
+      if ((PTY_LOG_QUEUES.get(sessionId)?.length ?? 0) > 0) {
+        schedulePtyLogFlush(sessionId);
+      } else {
+        PTY_LOG_QUEUES.delete(sessionId);
+      }
+    }
+  })();
+
+  PTY_LOG_INFLIGHT.set(sessionId, run);
+  await run;
+}
+
+/** Drain queued + in-flight log ops so callers (e.g. get-log-path) see a consistent file. */
+async function flushPtyLogNow(sessionId: string): Promise<void> {
+  for (;;) {
+    const timer = PTY_LOG_FLUSH_TIMERS.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      PTY_LOG_FLUSH_TIMERS.delete(sessionId);
+    }
+    const inflight = PTY_LOG_INFLIGHT.get(sessionId);
+    if (inflight) {
+      await inflight;
+      continue;
+    }
+    if ((PTY_LOG_QUEUES.get(sessionId)?.length ?? 0) === 0) return;
+    await flushPtyLog(sessionId);
+  }
+}
+
+/** Rewrite the mirrored log to match the in-memory PTY tail (queued, async). */
+function mirrorPtyLog(sessionId: string, text: string) {
+  enqueuePtyLog(sessionId, { kind: "rewrite", text });
 }
 
 function mirrorPtyLogAppend(sessionId: string, chunk: string) {
   if (!chunk) return;
-  try {
-    const dir = ptyLogDir();
-    mkdirSync(dir, { recursive: true });
-    appendFileSync(join(dir, `${sessionId}.log`), chunk, "utf8");
-  } catch {
-    /* best-effort */
-  }
+  enqueuePtyLog(sessionId, { kind: "append", chunk });
 }
 
 function appendPtyBuffer(sessionId: string, data: string) {
@@ -1408,18 +1502,8 @@ function appendPtyBuffer(sessionId: string, data: string) {
   mirrorPtyLogAppend(sessionId, data);
 }
 
-function clearPtyBuffer(sessionId: string) {
-  PTY_OUTPUT_BUFFERS.delete(sessionId);
-  try {
-    const file = join(ptyLogDir(), `${sessionId}.log`);
-    if (existsSync(file)) unlinkSync(file);
-  } catch {
-    /* ignore */
-  }
-}
-
-function broadcastPtyData(sessionId: string, data: string) {
-  appendPtyBuffer(sessionId, data);
+function sendPtyData(sessionId: string, data: string) {
+  if (!data) return;
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.send("pty-data", { sessionId, data });
@@ -1427,7 +1511,42 @@ function broadcastPtyData(sessionId: string, data: string) {
   }
 }
 
+function flushPtyDataBroadcast(sessionId: string) {
+  const timer = PTY_DATA_FLUSH_TIMERS.get(sessionId);
+  if (timer) {
+    clearTimeout(timer);
+    PTY_DATA_FLUSH_TIMERS.delete(sessionId);
+  }
+  const data = PTY_DATA_PENDING.get(sessionId);
+  PTY_DATA_PENDING.delete(sessionId);
+  if (data) sendPtyData(sessionId, data);
+}
+
+function clearPtyBuffer(sessionId: string) {
+  // Deliver any coalesced chunks before dropping the in-memory buffer.
+  flushPtyDataBroadcast(sessionId);
+  PTY_OUTPUT_BUFFERS.delete(sessionId);
+  const logTimer = PTY_LOG_FLUSH_TIMERS.get(sessionId);
+  if (logTimer) {
+    clearTimeout(logTimer);
+    PTY_LOG_FLUSH_TIMERS.delete(sessionId);
+  }
+  enqueuePtyLog(sessionId, { kind: "clear" });
+}
+
+function broadcastPtyData(sessionId: string, data: string) {
+  appendPtyBuffer(sessionId, data);
+  const prev = PTY_DATA_PENDING.get(sessionId) ?? "";
+  PTY_DATA_PENDING.set(sessionId, prev + data);
+  if (PTY_DATA_FLUSH_TIMERS.has(sessionId)) return;
+  const timer = setTimeout(() => {
+    flushPtyDataBroadcast(sessionId);
+  }, PTY_DATA_COALESCE_MS);
+  PTY_DATA_FLUSH_TIMERS.set(sessionId, timer);
+}
+
 function broadcastPtyExit(sessionId: string, exitCode: number) {
+  flushPtyDataBroadcast(sessionId);
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.send("pty-exit", { sessionId, exitCode });
@@ -1616,20 +1735,24 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle("pty-attach", (_event, sessionId: string) => {
-  const alive = PTY_SESSIONS.has(sessionId);
-  const meta = PTY_META.get(sessionId);
-  return {
-    success: true,
-    alive,
-    buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
-    pid: meta?.pid ?? null,
-    shell: meta?.shell ?? null,
-    cols: meta?.cols ?? null,
-    rows: meta?.rows ?? null,
-    exitCode: meta?.exitCode ?? null,
-  };
-});
+ipcMain.handle(
+  "pty-attach",
+  (_event, sessionId: string, opts?: { includeBuffer?: boolean }) => {
+    const alive = PTY_SESSIONS.has(sessionId);
+    const meta = PTY_META.get(sessionId);
+    const includeBuffer = opts?.includeBuffer !== false;
+    return {
+      success: true,
+      alive,
+      buffer: includeBuffer ? (PTY_OUTPUT_BUFFERS.get(sessionId) ?? "") : "",
+      pid: meta?.pid ?? null,
+      shell: meta?.shell ?? null,
+      cols: meta?.cols ?? null,
+      rows: meta?.rows ?? null,
+      exitCode: meta?.exitCode ?? null,
+    };
+  },
+);
 
 ipcMain.handle("pty-get-output-buffer", (_event, sessionId: string) => ({
   buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
@@ -1683,16 +1806,21 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle("pty-get-log-path", (_event, sessionId: string) => ({
-  path: join(ptyLogDir(), `${sessionId}.log`),
-}));
+ipcMain.handle("pty-get-log-path", async (_event, sessionId: string) => {
+  await flushPtyLogNow(sessionId);
+  return { path: join(ptyLogDir(), `${sessionId}.log`) };
+});
 
-/** Dead session write/resize must not silently no-op — return + re-emit exit so the UI can stop accepting input. */
-function ptySessionGoneResult(sessionId: string): { success: false; error: string } {
+/** Dead session write/resize must not silently no-op — re-emit exit so the UI can stop accepting input. */
+function notifyPtySessionGone(sessionId: string): void {
   const meta = PTY_META.get(sessionId);
   if (meta && meta.exitCode == null) meta.exitCode = -1;
   broadcastPtyExit(sessionId, -1);
   broadcastPtyMeta(sessionId);
+}
+
+function ptySessionGoneResult(sessionId: string): { success: false; error: string } {
+  notifyPtySessionGone(sessionId);
   return { success: false, error: "PTY session is not alive" };
 }
 
@@ -1705,15 +1833,16 @@ function markPtySessionDead(sessionId: string, exitCode: number) {
   broadcastPtyMeta(sessionId);
 }
 
-ipcMain.handle("pty-write", (_e, sessionId: string, data: string) => {
+ipcMain.on("pty-write", (_e, sessionId: string, data: string) => {
   const proc = PTY_SESSIONS.get(sessionId);
-  if (!proc) return ptySessionGoneResult(sessionId);
+  if (!proc) {
+    notifyPtySessionGone(sessionId);
+    return;
+  }
   try {
     proc.write(data);
-    return { success: true as const };
-  } catch (err: unknown) {
+  } catch {
     markPtySessionDead(sessionId, -1);
-    return { success: false as const, error: (err as Error).message || "PTY write failed" };
   }
 });
 
