@@ -28,6 +28,7 @@ import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
+import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
 import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
 import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
@@ -172,6 +173,8 @@ function ChatTabInner({
   useAppThemeRevision();
   const initialRestoreDoneRef = useRef(false);
   const restoreInFlightRef = useRef(false);
+  /** Synchronous mirror of per-group last profile (avoids stale sidebarForest on fast switches). */
+  const lastActiveByGroupRef = useRef<Record<string, string>>({});
 
   const panes = layout ? collectPanes(layout) : [];
   const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
@@ -375,6 +378,11 @@ function ChatTabInner({
   const refreshSidebarForest = useCallback(async (preferredGroupId?: string | null) => {
     const r = await window.api.profileGroupGetForest();
     if (!r.success || !r.forest) return;
+    // Prefer in-session activations over forest (forest refresh can lag behind activate).
+    lastActiveByGroupRef.current = {
+      ...(r.forest.lastActiveByGroup ?? {}),
+      ...lastActiveByGroupRef.current,
+    };
     setSidebarForest(r.forest);
     const preferred =
       (preferredGroupId &&
@@ -416,6 +424,7 @@ function ChatTabInner({
 
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
+      if (shouldIgnoreShortcutForIme(ev)) return;
       const hasMod = ev.ctrlKey || ev.metaKey;
       if (!hasMod || ev.shiftKey || ev.altKey) return;
       if (ev.key.toLowerCase() !== "s") return;
@@ -737,6 +746,10 @@ function ChatTabInner({
   );
 
   async function handleActivateProfile(profile: ProfileInfo) {
+    lastActiveByGroupRef.current = {
+      ...lastActiveByGroupRef.current,
+      [profile.workspaceId]: profile.id,
+    };
     setProfileBusy(true);
     setTerminalError(null);
     try {
@@ -1076,12 +1089,8 @@ function ChatTabInner({
     enabled: active && !profileBusy && !restoring,
     isPaneLive: (ref) => isPaneLive(ref.workspaceId, ref.profileId, ref.paneId),
     onActivate: async (ref) => {
-      const group = sidebarForest?.groups.find((g) =>
-        g.profiles.some(
-          (p) => p.id === ref.profileId && p.workspaceId === ref.workspaceId,
-        ),
-      );
-      if (group) setSelectedGroupId(group.id);
+      // ProfileForest.groups[].id === DB workspace id === ProfileInfo.workspaceId
+      setSelectedGroupId(ref.workspaceId);
       await restorePaneToDisplayById(ref.profileId, ref.paneId);
     },
   });
@@ -1089,7 +1098,9 @@ function ChatTabInner({
   usePaneShortcuts({
     panes,
     focusedPaneId,
-    enabled: active && layout !== null && !profileBusy && !restoring,
+    // layout may be null on an empty workspace — Ctrl+Tab MRU must still run
+    // so focus can return to a live terminal in another workspace/profile.
+    enabled: active && !profileBusy && !restoring,
     onFocusPane: (paneId) => {
       if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
       else setFocusedPaneId(paneId);
@@ -1116,8 +1127,13 @@ function ChatTabInner({
         onGroupChange={(groupId) => {
           setSelectedGroupId(groupId);
           const group = sidebarForest?.groups.find((g) => g.id === groupId);
-          const first = group?.profiles[0];
-          if (first) void handleActivateProfile(first);
+          if (!group || group.profiles.length === 0) return;
+          const rememberedId =
+            lastActiveByGroupRef.current[groupId] ?? sidebarForest?.lastActiveByGroup?.[groupId];
+          const remembered =
+            (rememberedId && group.profiles.find((p) => p.id === rememberedId)) || null;
+          const target = remembered ?? group.profiles[0]!;
+          void handleActivateProfile(target);
         }}
         onCreateGroup={() => {
           setCreateGroupOpen(true);

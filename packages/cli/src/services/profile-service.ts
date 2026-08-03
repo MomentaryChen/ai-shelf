@@ -40,6 +40,8 @@ export interface ProfileForest {
   groups: ProfileGroupNode[];
   lastActiveGroupId: string | null;
   lastActiveProfileId: string | null;
+  /** Last opened profile id keyed by profile group id. */
+  lastActiveByGroup: Record<string, string>;
 }
 
 /** @deprecated Use ProfileForest */
@@ -136,6 +138,7 @@ export class ProfileService {
         lastActiveProfileId = lastKey.slice(colon + 1);
       }
     }
+    const lastActiveByGroup = this.layouts.getLastActiveByGroup();
 
     const groups: ProfileGroupNode[] = this.workspaces.list().map((ws) => {
       const groupRows = this.groups.listByWorkspace(ws.id);
@@ -153,7 +156,7 @@ export class ProfileService {
       };
     });
 
-    return { groups, lastActiveGroupId, lastActiveProfileId };
+    return { groups, lastActiveGroupId, lastActiveProfileId, lastActiveByGroup };
   }
 
   /** @deprecated Use getForest() */
@@ -362,6 +365,7 @@ export class ProfileService {
     if (lastKey === `${workspaceId}:${profileId}`) {
       this.layouts.clearLastActiveGroupKey();
     }
+    this.layouts.clearLastActiveForProfile(workspaceId, profileId);
 
     this.groups.deleteByName(workspaceId, group.name);
     this.deleteLegacyMirror(ws.name, group.name);

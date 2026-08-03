@@ -1,4 +1,5 @@
 import type { Terminal } from "@xterm/xterm";
+import { shouldDeferImeKeyToXterm, shouldIgnoreShortcutForIme } from "./ime-keys";
 import { tryConsumePaneShortcut } from "./pane-shortcuts";
 import { getStoredT } from "../i18n/stored-locale.js";
 
@@ -290,6 +291,12 @@ export function bindTerminalClipboard(
 
   const onKey = (ev: KeyboardEvent): boolean => {
     if (!isKeyDown(ev)) return true;
+    // Active IME composition: refuse so xterm skips its keydown→PTY path.
+    // Space/Enter commit must stay with the IME (AI CLI prompts especially).
+    if (shouldDeferImeKeyToXterm(ev)) return false;
+    // keyCode 229 ("Process") before isComposing is set — let CompositionHelper
+    // run, but never treat these as copy/paste/pane shortcuts.
+    if (shouldIgnoreShortcutForIme(ev)) return true;
     if (tryConsumePaneShortcut(ev)) return false;
 
     const key = ev.key.toLowerCase();

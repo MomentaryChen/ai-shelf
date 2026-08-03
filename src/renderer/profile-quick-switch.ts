@@ -1,3 +1,5 @@
+import { shouldIgnoreShortcutForIme } from "./terminal/ime-keys";
+
 export type ProfileQuickSwitchAction =
   | { type: "by-index"; index: number }
   | { type: "cycle"; direction: "next" | "prev" };
@@ -21,6 +23,7 @@ function inXterm(target: EventTarget | null): boolean {
 /** Returns a profile switch action when the event matches a profile shortcut. */
 export function matchProfileQuickSwitch(ev: KeyboardEvent): ProfileQuickSwitchAction | null {
   if (ev.type !== "keydown" || !hasMod(ev) || ev.altKey) return null;
+  if (shouldIgnoreShortcutForIme(ev)) return null;
   if (shouldIgnoreTarget(ev.target)) return null;
 
   // Ctrl+` / Ctrl+Shift+` — cycle recent profiles (anywhere except form fields).

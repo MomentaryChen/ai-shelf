@@ -1,5 +1,6 @@
 import { loadSettings } from "../chat-settings";
 import type { PaneInfo } from "./split-tree";
+import { shouldIgnoreShortcutForIme } from "./ime-keys";
 import { matchPaneFocusSplitShortcut } from "./pane-key-bindings";
 
 export type PaneShortcutAction =
@@ -25,7 +26,8 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest("[contenteditable='true']"));
 }
 
-function applyPaneShortcutAction(
+/** Apply a matched pane shortcut. Exported for unit tests. */
+export function applyPaneShortcutAction(
   action: PaneShortcutAction,
   h: PaneShortcutHandlers,
 ): void {
@@ -39,16 +41,20 @@ function applyPaneShortcutAction(
     onClearPane,
     onRestartPane,
   } = h;
+
+  // Ctrl+Tab MRU must work with zero local panes (e.g. empty workspace after a
+  // group switch) so focus can jump back across profiles/workspaces.
+  if (action.type === "focus-next" && onFocusRecentTerminal) {
+    onFocusRecentTerminal();
+    return;
+  }
+
   if (panes.length === 0) return;
 
   const focusId = focusedPaneId ?? panes[0]!.id;
 
   switch (action.type) {
     case "focus-next": {
-      if (onFocusRecentTerminal) {
-        onFocusRecentTerminal();
-        break;
-      }
       const id = cyclePaneId(panes, focusedPaneId, "next");
       if (id) onFocusPane(id);
       break;
@@ -131,13 +137,28 @@ export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null 
 export function tryConsumePaneShortcut(ev: KeyboardEvent): boolean {
   const h = getHandlers?.();
   if (!h || h.enabled === false) return false;
+  if (shouldIgnoreShortcutForIme(ev)) return false;
 
   const action = matchPaneShortcut(ev);
   if (!action) return false;
+  if (!shouldConsumePaneShortcut(action, h)) return false;
 
   ev.preventDefault();
   ev.stopImmediatePropagation();
   applyPaneShortcutAction(action, h);
+  return true;
+}
+
+/** Whether a matched action should run (and consume the key) for the current handlers. */
+export function shouldConsumePaneShortcut(
+  action: PaneShortcutAction,
+  h: Pick<PaneShortcutHandlers, "panes" | "onFocusRecentTerminal">,
+): boolean {
+  // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
+  // split keys — those may belong to profile quick-switch or should no-op cleanly.
+  if (h.panes.length === 0) {
+    return action.type === "focus-next" && Boolean(h.onFocusRecentTerminal);
+  }
   return true;
 }
 
