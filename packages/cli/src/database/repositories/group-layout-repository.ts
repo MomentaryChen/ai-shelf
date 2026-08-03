@@ -8,6 +8,8 @@ import {
 import { DatabaseError } from "../../core/errors/app-error.js";
 
 const PREF_LAST_ACTIVE_GROUP = "last_active_group";
+/** JSON map: profileGroupId → last active profileId within that group. */
+const PREF_LAST_ACTIVE_BY_GROUP = "last_active_by_group";
 
 export class GroupLayoutRepository {
   constructor(private readonly db: Database.Database) {}
@@ -174,11 +176,63 @@ export class GroupLayoutRepository {
     return this.getPreference(PREF_LAST_ACTIVE_GROUP);
   }
 
+  /** Last opened profile id per profile group (workspace row id). */
+  getLastActiveByGroup(): Record<string, string> {
+    const map = this.readLastActiveByGroup();
+    const last = this.getLastActiveGroupKey();
+    if (last) {
+      const colon = last.indexOf(":");
+      if (colon > 0) {
+        const groupId = last.slice(0, colon);
+        const profileId = last.slice(colon + 1);
+        if (groupId && profileId && !map[groupId]) {
+          map[groupId] = profileId;
+        }
+      }
+    }
+    return map;
+  }
+
   setLastActiveGroupKey(workspaceId: string, groupId: string): void {
     this.setPreference(PREF_LAST_ACTIVE_GROUP, `${workspaceId}:${groupId}`);
+    const map = this.readLastActiveByGroup();
+    map[workspaceId] = groupId;
+    this.setPreference(PREF_LAST_ACTIVE_BY_GROUP, JSON.stringify(map));
   }
 
   clearLastActiveGroupKey(): void {
     this.db.prepare(`DELETE FROM app_preferences WHERE key = ?`).run(PREF_LAST_ACTIVE_GROUP);
+  }
+
+  /** Drop a group's remembered profile (e.g. group deleted). */
+  clearLastActiveForGroup(workspaceId: string): void {
+    const map = this.readLastActiveByGroup();
+    if (!(workspaceId in map)) return;
+    delete map[workspaceId];
+    this.setPreference(PREF_LAST_ACTIVE_BY_GROUP, JSON.stringify(map));
+  }
+
+  /** Drop a remembered profile if it matches (e.g. profile deleted). */
+  clearLastActiveForProfile(workspaceId: string, profileId: string): void {
+    const map = this.readLastActiveByGroup();
+    if (map[workspaceId] !== profileId) return;
+    delete map[workspaceId];
+    this.setPreference(PREF_LAST_ACTIVE_BY_GROUP, JSON.stringify(map));
+  }
+
+  private readLastActiveByGroup(): Record<string, string> {
+    const raw = this.getPreference(PREF_LAST_ACTIVE_BY_GROUP);
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof k === "string" && typeof v === "string" && k && v) out[k] = v;
+      }
+      return out;
+    } catch {
+      return {};
+    }
   }
 }

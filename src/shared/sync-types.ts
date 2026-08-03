@@ -31,6 +31,8 @@ export interface SyncLayout {
 
 export interface SyncPreferences {
   lastActiveGroupKey: string | null;
+  /** Optional for older sync bundles; profile group id → last profile id. */
+  lastActiveByGroup?: Record<string, string> | null;
   updatedAt: string;
 }
 

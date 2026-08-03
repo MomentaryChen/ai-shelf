@@ -38,6 +38,18 @@ function pickNewer<
   return [...map.values()];
 }
 
+function sameLastActiveByGroup(
+  a: Record<string, string> | null | undefined,
+  b: Record<string, string> | null | undefined,
+): boolean {
+  const left = a ?? {};
+  const right = b ?? {};
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((k) => left[k] === right[k]);
+}
+
 function mergePreferences(
   local: SyncPreferences | null,
   remote: SyncPreferences | null,
@@ -45,7 +57,10 @@ function mergePreferences(
   if (!local && !remote) return null;
   if (!local) return remote;
   if (!remote) return local;
-  if (local.lastActiveGroupKey === remote.lastActiveGroupKey) {
+  if (
+    local.lastActiveGroupKey === remote.lastActiveGroupKey &&
+    sameLastActiveByGroup(local.lastActiveByGroup, remote.lastActiveByGroup)
+  ) {
     return local;
   }
   return remote.updatedAt >= local.updatedAt ? remote : local;

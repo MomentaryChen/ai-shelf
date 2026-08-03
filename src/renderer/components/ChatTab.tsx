@@ -172,6 +172,8 @@ function ChatTabInner({
   useAppThemeRevision();
   const initialRestoreDoneRef = useRef(false);
   const restoreInFlightRef = useRef(false);
+  /** Synchronous mirror of per-group last profile (avoids stale sidebarForest on fast switches). */
+  const lastActiveByGroupRef = useRef<Record<string, string>>({});
 
   const panes = layout ? collectPanes(layout) : [];
   const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
@@ -375,6 +377,11 @@ function ChatTabInner({
   const refreshSidebarForest = useCallback(async (preferredGroupId?: string | null) => {
     const r = await window.api.profileGroupGetForest();
     if (!r.success || !r.forest) return;
+    // Prefer in-session activations over forest (forest refresh can lag behind activate).
+    lastActiveByGroupRef.current = {
+      ...(r.forest.lastActiveByGroup ?? {}),
+      ...lastActiveByGroupRef.current,
+    };
     setSidebarForest(r.forest);
     const preferred =
       (preferredGroupId &&
@@ -737,6 +744,10 @@ function ChatTabInner({
   );
 
   async function handleActivateProfile(profile: ProfileInfo) {
+    lastActiveByGroupRef.current = {
+      ...lastActiveByGroupRef.current,
+      [profile.workspaceId]: profile.id,
+    };
     setProfileBusy(true);
     setTerminalError(null);
     try {
@@ -1116,8 +1127,13 @@ function ChatTabInner({
         onGroupChange={(groupId) => {
           setSelectedGroupId(groupId);
           const group = sidebarForest?.groups.find((g) => g.id === groupId);
-          const first = group?.profiles[0];
-          if (first) void handleActivateProfile(first);
+          if (!group || group.profiles.length === 0) return;
+          const rememberedId =
+            lastActiveByGroupRef.current[groupId] ?? sidebarForest?.lastActiveByGroup?.[groupId];
+          const remembered =
+            (rememberedId && group.profiles.find((p) => p.id === rememberedId)) || null;
+          const target = remembered ?? group.profiles[0]!;
+          void handleActivateProfile(target);
         }}
         onCreateGroup={() => {
           setCreateGroupOpen(true);

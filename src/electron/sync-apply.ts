@@ -3,6 +3,7 @@ import { SYNC_BUNDLE_VERSION, type SyncBundle } from "../shared/sync-types.js";
 import { closeWorkspaceContext, getWorkspaceContext } from "./workspace-host.js";
 
 const PREF_LAST_ACTIVE_GROUP = "last_active_group";
+const PREF_LAST_ACTIVE_BY_GROUP = "last_active_by_group";
 
 function isSyncBundle(value: unknown): value is SyncBundle {
   if (!value || typeof value !== "object") return false;
@@ -134,6 +135,15 @@ export function applySyncBundle(bundle: unknown): { ok: true } | { ok: false; er
           `INSERT INTO app_preferences (key, value) VALUES (@key, @value)
            ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
         ).run({ key: PREF_LAST_ACTIVE_GROUP, value: data.preferences.lastActiveGroupKey });
+      }
+      if (data.preferences?.lastActiveByGroup) {
+        db.prepare(
+          `INSERT INTO app_preferences (key, value) VALUES (@key, @value)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        ).run({
+          key: PREF_LAST_ACTIVE_BY_GROUP,
+          value: JSON.stringify(data.preferences.lastActiveByGroup),
+        });
       }
     });
     apply(bundle);

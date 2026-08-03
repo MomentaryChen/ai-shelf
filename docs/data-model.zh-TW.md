@@ -26,7 +26,8 @@ Profile 沿用舊表名以相容既有資料：
 Profile Group  →  workspaces 列
 Profile  →  該 group 底下的 groups 列
 Pane 版面  →  group_layouts 快照（JSON）
-上次使用中 Profile  →  app_preferences.last_active_group_key
+上次使用中 Profile  →  app_preferences.last_active_group（`groupId:profileId`）
+各 group 上次 Profile →  app_preferences.last_active_by_group（JSON map）
 ```
 
 隱藏的 **`Profiles`** workspace 會自動建立；一般不需要再建立其他 workspace。

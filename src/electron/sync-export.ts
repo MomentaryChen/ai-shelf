@@ -4,6 +4,7 @@ import { SYNC_BUNDLE_VERSION, type SyncBundle, type SyncLayout, type SyncPrefere
 import { closeWorkspaceContext, getWorkspaceContext } from "./workspace-host.js";
 
 const PREF_LAST_ACTIVE_GROUP = "last_active_group";
+const PREF_LAST_ACTIVE_BY_GROUP = "last_active_by_group";
 
 export function exportLocalSyncBundle(deviceId: string): SyncBundle {
   closeWorkspaceContext();
@@ -128,11 +129,31 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
     const prefRow = db.prepare(`SELECT value FROM app_preferences WHERE key = ?`).get(PREF_LAST_ACTIVE_GROUP) as
       | { value: string }
       | undefined;
+    const byGroupRow = db
+      .prepare(`SELECT value FROM app_preferences WHERE key = ?`)
+      .get(PREF_LAST_ACTIVE_BY_GROUP) as { value: string } | undefined;
+
+    let lastActiveByGroup: Record<string, string> | null = null;
+    if (byGroupRow?.value) {
+      try {
+        const parsed = JSON.parse(byGroupRow.value) as unknown;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          const out: Record<string, string> = {};
+          for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+            if (typeof k === "string" && typeof v === "string" && k && v) out[k] = v;
+          }
+          lastActiveByGroup = out;
+        }
+      } catch {
+        lastActiveByGroup = null;
+      }
+    }
 
     let preferences: SyncPreferences | null = null;
-    if (prefRow?.value) {
+    if (prefRow?.value || lastActiveByGroup) {
       preferences = {
-        lastActiveGroupKey: prefRow.value,
+        lastActiveGroupKey: prefRow?.value ?? null,
+        lastActiveByGroup,
         updatedAt: new Date().toISOString(),
       };
     }

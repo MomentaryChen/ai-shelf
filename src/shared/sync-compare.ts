@@ -15,7 +15,10 @@ export interface SyncComparePlan {
   compareState: CloudSyncCompareState;
 }
 
-type NormalizedPreferences = { lastActiveGroupKey: string | null } | null;
+type NormalizedPreferences = {
+  lastActiveGroupKey: string | null;
+  lastActiveByGroup: Record<string, string> | null;
+} | null;
 
 interface NormalizedBundle {
   version: number;
@@ -45,7 +48,10 @@ function normalizeBundle(bundle: SyncBundle): NormalizedBundle {
     profiles: sortById(bundle.profiles),
     layouts: sortLayouts(bundle.layouts),
     preferences: bundle.preferences
-      ? { lastActiveGroupKey: bundle.preferences.lastActiveGroupKey }
+      ? {
+          lastActiveGroupKey: bundle.preferences.lastActiveGroupKey,
+          lastActiveByGroup: bundle.preferences.lastActiveByGroup ?? null,
+        }
       : null,
   };
 }
