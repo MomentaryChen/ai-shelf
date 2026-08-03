@@ -61,7 +61,7 @@ const HASH_TO_SHA: Record<Exclude<HashAlgo, "md5">, ShaAlgo> = {
 };
 
 const fieldClass =
-  "min-h-[140px] max-h-[220px] resize-y overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary";
+  "h-[180px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
 
 export function CodecToolsTab() {
   const { t } = useLocale();
@@ -379,13 +379,13 @@ export function CodecToolsTab() {
               <span className="text-[12px] text-text-tertiary">{t("codec.image.hint")}</span>
             </button>
 
-            <div className="grid gap-3 @md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
                     {t("codec.output")}
                   </Label>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                  <div className="flex shrink-0 items-center justify-end gap-1">
                     <Button
                       type="button"
                       variant="ghost"
@@ -433,7 +433,7 @@ export function CodecToolsTab() {
               </div>
 
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label className="text-[12px] font-medium text-text-secondary">
                     {t("codec.image.previewLabel")}
                   </Label>
@@ -450,7 +450,7 @@ export function CodecToolsTab() {
                     {t("codec.image.enlarge")}
                   </Button>
                 </div>
-                <div className="relative flex min-h-[140px] items-center justify-center overflow-hidden rounded-[22px] border border-border bg-bg-primary p-3">
+                <div className="relative flex h-[180px] items-center justify-center overflow-hidden rounded-[22px] border border-border bg-bg-primary p-3">
                   {previewUrl ? (
                     <button
                       type="button"
@@ -570,11 +570,13 @@ export function CodecToolsTab() {
               </div>
             )}
 
-            <div className="grid gap-3 @md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
-                  {t("codec.input")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
+                    {t("codec.input")}
+                  </Label>
+                </div>
                 <Textarea
                   id={inputId}
                   value={input}
@@ -586,11 +588,11 @@ export function CodecToolsTab() {
               </div>
 
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
                     {t("codec.output")}
                   </Label>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                  <div className="flex shrink-0 items-center justify-end gap-1">
                     {showDirection && (
                       <Button
                         type="button"

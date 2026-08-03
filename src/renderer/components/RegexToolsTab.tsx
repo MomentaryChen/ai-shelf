@@ -48,7 +48,7 @@ const PRESET_LABEL_KEYS: Record<RegexBuiltinPresetId, MessageKey> = {
 };
 
 const monoField =
-  "min-h-[120px] rounded-[22px] border-border bg-bg-primary font-mono text-[13px] text-text-primary placeholder:text-text-tertiary";
+  "h-[160px] resize-none rounded-[22px] border-border bg-bg-primary font-mono text-[13px] text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
 
 const monoInput =
   "h-10 rounded-[22px] border-border bg-bg-primary font-mono text-[13px] text-text-primary placeholder:text-text-tertiary";
@@ -396,9 +396,9 @@ export function RegexToolsTab() {
               {errorMessage}
             </p>
           ) : mode === "test" ? (
-            <div className="grid gap-3 @md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="rounded-[22px] bg-bg-primary/60 px-3.5 py-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="mb-2 flex h-8 items-center justify-between gap-2">
                   <p className="text-[12px] font-medium text-text-secondary">
                     {t("regex.matches")}
                     {testResult.ok && (
@@ -435,7 +435,9 @@ export function RegexToolsTab() {
                 )}
               </div>
               <div className="rounded-[22px] bg-bg-primary/60 px-3.5 py-3">
-                <p className="mb-2 text-[12px] font-medium text-text-secondary">{t("regex.groups")}</p>
+                <p className="mb-2 flex h-8 items-center text-[12px] font-medium text-text-secondary">
+                  {t("regex.groups")}
+                </p>
                 {!activeMatch ||
                 (activeMatch.groups.length === 0 &&
                   Object.keys(activeMatch.namedGroups).length === 0) ? (
@@ -466,7 +468,7 @@ export function RegexToolsTab() {
             </div>
           ) : (
             <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                 <Label className="text-[12px] font-medium text-text-secondary">
                   {t("regex.replaceResult")}
                   {replaceResult.ok && (

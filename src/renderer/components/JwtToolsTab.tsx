@@ -36,7 +36,7 @@ const RS_ALGS: JwtAlg[] = ["RS256", "RS384", "RS512"];
 const ES_ALGS: JwtAlg[] = ["ES256", "ES384", "ES512"];
 
 const fieldClass =
-  "min-h-[120px] max-h-[240px] resize-y overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary";
+  "h-[180px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
 
 const monoInputClass =
   "h-9 border-border bg-bg-primary font-mono text-[13px] text-text-primary placeholder:text-text-tertiary";
@@ -280,7 +280,7 @@ export function JwtToolsTab() {
         <Card>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                 <Label htmlFor={decodeId} className="text-[12px] font-medium text-text-secondary">
                   {t("jwt.token")}
                 </Label>
@@ -310,9 +310,9 @@ export function JwtToolsTab() {
             </div>
 
             {decoded ? (
-              <div className="grid gap-4 @md:grid-cols-2">
+              <div className="grid items-start gap-4 @md:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                     <Label className="text-[12px] font-medium text-text-secondary">
                       {t("jwt.header")}
                       <span className="ml-2 font-mono text-text-tertiary">{decoded.alg}</span>
@@ -330,7 +330,7 @@ export function JwtToolsTab() {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                     <Label className="text-[12px] font-medium text-text-secondary">
                       {t("jwt.payload")}
                     </Label>
@@ -454,11 +454,13 @@ export function JwtToolsTab() {
               </ToggleGroup>
             </div>
 
-            <div className="grid gap-4 @md:grid-cols-2">
+            <div className="grid items-start gap-4 @md:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor={encodeHeaderId} className="text-[12px] font-medium text-text-secondary">
-                  {t("jwt.header")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label htmlFor={encodeHeaderId} className="text-[12px] font-medium text-text-secondary">
+                    {t("jwt.header")}
+                  </Label>
+                </div>
                 <Textarea
                   id={encodeHeaderId}
                   value={encodeHeader}
@@ -468,9 +470,11 @@ export function JwtToolsTab() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor={encodePayloadId} className="text-[12px] font-medium text-text-secondary">
-                  {t("jwt.payload")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label htmlFor={encodePayloadId} className="text-[12px] font-medium text-text-secondary">
+                    {t("jwt.payload")}
+                  </Label>
+                </div>
                 <Textarea
                   id={encodePayloadId}
                   value={encodePayload}
@@ -529,7 +533,7 @@ export function JwtToolsTab() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                 <Label htmlFor={encodeOutId} className="text-[12px] font-medium text-text-secondary">
                   {t("jwt.output")}
                 </Label>
