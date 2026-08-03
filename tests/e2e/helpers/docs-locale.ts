@@ -1,6 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 
-/** README / docs screenshots use zh labels (see docs/pages.zh-TW.md). Override via env. */
+/**
+ * Docs screenshot / GIF locale. `pnpm gen:docs-assets` runs both `en` and `zh`.
+ * Single-test default is `zh` unless `AISHELF_DOCS_LOCALE=en`.
+ */
 export const DOCS_SCREENSHOT_LOCALE = process.env.AISHELF_DOCS_LOCALE === "en" ? "en" : "zh";
 
 /** Sidebar section heading — not the profile-group name (e.g. default group "Profiles"). */

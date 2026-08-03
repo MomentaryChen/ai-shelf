@@ -9,7 +9,8 @@ import { prepareDocsSession } from "./helpers/docs-demo-workspace.js";
 import { launchDocsElectron } from "./helpers/launch-docs-electron.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const OUT = join(__dirname, "../screenshots");
+/** Locale-specific folder: `tests/screenshots/en` or `tests/screenshots/zh`. */
+const OUT = join(__dirname, "../screenshots", DOCS_SCREENSHOT_LOCALE);
 
 /** Left-rail nav — keep in sync with `src/renderer/App.tsx` inventory tabs (excludes usage). */
 const INVENTORY_NAV = [
@@ -47,7 +48,10 @@ async function dismissBlockingDialog(page: Page) {
   const overlay = page.locator('[data-slot="dialog-overlay"][data-state="open"]');
   if ((await overlay.count()) === 0) return;
 
-  const closeButton = page.getByRole("button", { name: /Close|Skip|Later|關閉|略過|稍後|之後/i });
+  // Prefer onboarding skip, then generic dismiss labels (update modal, etc.).
+  const closeButton = page.getByRole("button", {
+    name: /Skip for now|暫時略過|Close|Skip|Later|關閉|略過|稍後|之後/i,
+  });
   if (await closeButton.first().isVisible().catch(() => false)) {
     await closeButton.first().click();
   } else {

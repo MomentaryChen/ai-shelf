@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
  * Regenerate README / docs visual assets locally before release (single build).
- * - tests/screenshots/*.png  → README, docs/pages.md, docs/pages.zh-TW.md
- * - docs/assets/terminal-demo.gif → README hero
+ * - tests/screenshots/{en,zh}/*.png  → README / README.zh-TW, docs/pages.md / pages.zh-TW.md
+ * - docs/assets/{en,zh}/terminal-demo.gif → README hero (locale-matched)
  *
  * Requires a Windows desktop + ffmpeg on PATH. Uses an isolated Demo profile group
- * (see tests/e2e/helpers/docs-demo-workspace.ts). Locale: AISHELF_DOCS_LOCALE=zh (default).
+ * (see tests/e2e/helpers/docs-demo-workspace.ts).
  */
 import { spawnSync } from "node:child_process";
 
-const docsLocale = process.env.AISHELF_DOCS_LOCALE?.trim() || "zh";
+const DOCS_LOCALES = ["zh", "en"];
 
 function run(label, command, args, env = {}) {
   console.log(`\n→ ${label}`);
   const result = spawnSync(command, args, {
-    env: { ...process.env, AISHELF_DOCS_LOCALE: docsLocale, ...env },
+    env: { ...process.env, ...env },
     stdio: "inherit",
     shell: true,
   });
@@ -24,19 +24,25 @@ function run(label, command, args, env = {}) {
 }
 
 run("build", "pnpm", ["build"]);
-run(
-  "page screenshots",
-  "pnpm",
-  ["exec", "playwright", "test", "tests/e2e/screenshot.spec.ts"],
-);
-run(
-  "terminal demo GIF",
-  "pnpm",
-  ["exec", "playwright", "test", "tests/e2e/terminal-demo-gif.spec.ts"],
-  { GENERATE_TERMINAL_DEMO_GIF: "1" },
-);
+
+for (const locale of DOCS_LOCALES) {
+  run(
+    `page screenshots (${locale})`,
+    "pnpm",
+    ["exec", "playwright", "test", "tests/e2e/screenshot.spec.ts"],
+    { AISHELF_DOCS_LOCALE: locale },
+  );
+  run(
+    `terminal demo GIF (${locale})`,
+    "pnpm",
+    ["exec", "playwright", "test", "tests/e2e/terminal-demo-gif.spec.ts"],
+    { AISHELF_DOCS_LOCALE: locale, GENERATE_TERMINAL_DEMO_GIF: "1" },
+  );
+}
 
 console.log("\nDocs assets updated:");
-console.log("  tests/screenshots/*.png");
-console.log("  docs/assets/terminal-demo.gif");
+console.log("  tests/screenshots/en/*.png");
+console.log("  tests/screenshots/zh/*.png");
+console.log("  docs/assets/en/terminal-demo.gif");
+console.log("  docs/assets/zh/terminal-demo.gif");
 console.log("\nCommit these files with the release.");

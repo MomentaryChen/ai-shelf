@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Changed
+
+- **Docs screenshots by locale** — README / `pages.md` use English captures (`tests/screenshots/en`, `docs/assets/en`); Chinese docs use `zh`. `pnpm gen:docs-assets` regenerates both.
+
+### Fixed
+
+- **Docs capture onboarding** — Screenshot / GIF prep marks onboarding complete and dismisses the wizard so captures are not blocked.
+
 ## [4.0.0] - 2026-08-03
 
 Cross-platform desktop packages, a top-level Tools mode, Flow agent console, and sync conflict preferences.
