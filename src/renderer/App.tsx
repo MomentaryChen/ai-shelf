@@ -35,6 +35,7 @@ import {
   buildGlobalSearchCommands,
   mergePaletteCommands,
 } from "./commands/build-global-search-commands";
+import { shouldIgnoreShortcutForIme } from "./terminal/ime-keys";
 
 const OverviewTab = lazy(() =>
   import("./components/OverviewTab").then((m) => ({ default: m.OverviewTab })),
@@ -266,6 +267,7 @@ export function App() {
   // Cmd/Ctrl+K toggles the command palette; Cmd/Ctrl+/ opens the shortcuts cheatsheet.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (shouldIgnoreShortcutForIme(e)) return;
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
       if (e.key === "k" || e.key === "K") {
         e.preventDefault();

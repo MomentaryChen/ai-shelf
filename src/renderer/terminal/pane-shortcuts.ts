@@ -1,5 +1,6 @@
 import { loadSettings } from "../chat-settings";
 import type { PaneInfo } from "./split-tree";
+import { shouldIgnoreShortcutForIme } from "./ime-keys";
 import { matchPaneFocusSplitShortcut } from "./pane-key-bindings";
 
 export type PaneShortcutAction =
@@ -131,6 +132,7 @@ export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null 
 export function tryConsumePaneShortcut(ev: KeyboardEvent): boolean {
   const h = getHandlers?.();
   if (!h || h.enabled === false) return false;
+  if (shouldIgnoreShortcutForIme(ev)) return false;
 
   const action = matchPaneShortcut(ev);
   if (!action) return false;
