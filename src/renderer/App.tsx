@@ -66,6 +66,9 @@ const CodecToolsTab = lazy(() =>
 const CryptoToolsTab = lazy(() =>
   import("./components/CryptoToolsTab").then((m) => ({ default: m.CryptoToolsTab })),
 );
+const TimeToolsTab = lazy(() =>
+  import("./components/TimeToolsTab").then((m) => ({ default: m.TimeToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -91,7 +94,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "crypto";
+type ToolId = "codec" | "crypto" | "time";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -191,11 +194,13 @@ const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
 const TOOL_ICONS: Record<ToolId, string> = {
   codec: "🔐",
   crypto: "🗝️",
+  time: "🕒",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   codec: "tools.tab.codec",
   crypto: "tools.tab.crypto",
+  time: "tools.tab.time",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -383,7 +388,8 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec crypto hash base64 image aes rsa ecdsa md5",
+        keywords:
+          "tools codec crypto time hash base64 image aes rsa ecdsa md5 timestamp unix timezone",
         run: () => handleModeChange("tools"),
       },
       {
@@ -436,7 +442,12 @@ export function App() {
       title: `${t("cmd.go")} ${t(it.labelKey)}`,
       group: t("cmd.group.navigate"),
       icon: it.icon,
-      keywords: `${it.id} tools codec crypto hash base64 image aes rsa ecdsa md5`,
+      keywords:
+        it.id === "time"
+          ? "time timestamp unix timezone utc epoch ms us ns iso"
+          : it.id === "crypto"
+            ? "crypto aes rsa ecdsa encrypt decrypt sign verify key pem"
+            : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -459,7 +470,8 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec crypto hash base64 image aes rsa ecdsa md5",
+        keywords:
+          "tools codec crypto time hash base64 image aes rsa ecdsa md5 timestamp unix timezone",
         run: () => handleModeChange("tools"),
       },
       {
@@ -504,7 +516,8 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec crypto hash base64 image aes rsa ecdsa md5",
+        keywords:
+          "tools codec crypto time hash base64 image aes rsa ecdsa md5 timestamp unix timezone",
         run: () => handleModeChange("tools"),
       },
       {
@@ -734,6 +747,7 @@ export function App() {
                 <Suspense fallback={<Spinner label={t("profile.loading")} />}>
                   {activeTool === "codec" && <CodecToolsTab />}
                   {activeTool === "crypto" && <CryptoToolsTab />}
+                  {activeTool === "time" && <TimeToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>

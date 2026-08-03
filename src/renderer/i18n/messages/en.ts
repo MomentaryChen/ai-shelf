@@ -1253,6 +1253,37 @@ export const en = {
   "crypto.hint.rsaSign": "RSA-PSS with SHA-256. Generate sign keys before signing.",
   "crypto.hint.ecdsa": "ECDSA signatures use the curve’s matching SHA hash.",
   "crypto.error.generic": "That operation failed — check the key, IV, and input format.",
+
+  // Tools mode — Time
+  "tools.tab.time": "Time",
+  "time.subtitle":
+    "Paste a unix timestamp (s / ms / µs / ns) or an ISO date — get UTC, local, and timezone views for debugging.",
+  "time.now": "Now",
+  "time.useNow": "Use now",
+  "time.input": "Input",
+  "time.inputPlaceholder": "e.g. 1712345678, 1712345678000000 us, 2024-04-05T12:00:00Z",
+  "time.unit": "Unit",
+  "time.timezone": "Timezone",
+  "time.timezone.local": "local",
+  "time.copy": "Copy",
+  "time.copied": "Copied",
+  "time.clear": "Clear",
+  "time.hint.live": "Updates as you type · clock refreshes every second",
+  "time.error.invalid": "Could not parse this time — try a unix number, unit suffix, or ISO date.",
+  "time.detected.now": "Using current time",
+  "time.detected.iso": "Parsed as date/time string",
+  "time.detected.inferred": "Inferred unit: {unit}",
+  "time.detected.unit": "Unit: {unit}",
+  "time.field.isoUtc": "UTC (ISO)",
+  "time.field.isoLocal": "Local (ISO)",
+  "time.field.zone": "In timezone",
+  "time.field.rfc2822": "RFC 2822",
+  "time.field.unixSeconds": "Unix (s)",
+  "time.field.unixMillis": "Unix (ms)",
+  "time.field.unixMicros": "Unix (µs)",
+  "time.field.unixNanos": "Unix (ns)",
+  "time.field.relative": "Relative",
+  "time.field.offset": "Offset",
 } as const;
 
 export type MessageKey = keyof typeof en;
