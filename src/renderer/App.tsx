@@ -58,6 +58,9 @@ const UpdateTab = lazy(() =>
 const UsageTab = lazy(() =>
   import("./components/UsageTab").then((m) => ({ default: m.UsageTab })),
 );
+const CodecToolsTab = lazy(() =>
+  import("./components/CodecToolsTab").then((m) => ({ default: m.CodecToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -73,7 +76,16 @@ const ShortcutCheatsheet = lazy(() =>
   import("./components/ShortcutCheatsheet").then((m) => ({ default: m.ShortcutCheatsheet })),
 );
 
-type TabId = "overview" | "models" | "skills" | "mcp" | "config" | "doctor" | "update" | "usage";
+type TabId =
+  | "overview"
+  | "models"
+  | "skills"
+  | "mcp"
+  | "config"
+  | "doctor"
+  | "update"
+  | "usage"
+  | "codec";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -150,6 +162,7 @@ const TAB_ICONS: Record<TabId, string> = {
   doctor: "🩺",
   update: "🔄",
   usage: "📊",
+  codec: "🔐",
 };
 
 const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
@@ -161,6 +174,7 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
   doctor: "app.tab.doctor",
   update: "app.tab.update",
   usage: "app.tab.usage",
+  codec: "app.tab.codec",
 };
 
 const TAB_IDS = Object.keys(TAB_LABEL_KEYS) as TabId[];
@@ -600,6 +614,11 @@ export function App() {
                   {activeTab === "usage" && (
                     <Suspense fallback={<Spinner label={t("app.detecting")} />}>
                       <UsageTab />
+                    </Suspense>
+                  )}
+                  {activeTab === "codec" && (
+                    <Suspense fallback={<Spinner label={t("app.detecting")} />}>
+                      <CodecToolsTab />
                     </Suspense>
                   )}
                 </ViewTransition>

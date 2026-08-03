@@ -1175,6 +1175,29 @@ export const en = {
   "shortcuts.terminal.copy": "Copy selection",
   "shortcuts.terminal.paste": "Paste",
   "shortcuts.terminal.selectAll": "Select all scrollback",
+
+  // Codec tools
+  "app.tab.codec": "Codec",
+  "codec.subtitle": "Hash, Base64, URL, and hex — paste on the left, copy from the right.",
+  "codec.tools": "Codec tools",
+  "codec.tool.hash": "Hash",
+  "codec.tool.base64": "Base64",
+  "codec.tool.url": "URL",
+  "codec.tool.hex": "Hex",
+  "codec.hash.algo": "Algorithm",
+  "codec.direction.encode": "Encode",
+  "codec.direction.decode": "Decode",
+  "codec.base64.urlSafe": "URL-safe",
+  "codec.input": "Input",
+  "codec.output": "Output",
+  "codec.inputPlaceholder": "Paste text here…",
+  "codec.outputPlaceholder": "Result appears here",
+  "codec.copy": "Copy",
+  "codec.copied": "Copied",
+  "codec.swap": "Use as input",
+  "codec.clear": "Clear",
+  "codec.hint.live": "Updates as you type",
+  "codec.error.invalid": "Could not decode this input — check the format and try again.",
 } as const;
 
 export type MessageKey = keyof typeof en;
