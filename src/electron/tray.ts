@@ -152,7 +152,7 @@ function buildTrayMenu(deps: TrayDeps): Menu {
   try {
     forest = getProfileForest();
   } catch {
-    forest = { groups: [], lastActiveGroupId: null, lastActiveProfileId: null };
+    forest = { groups: [], lastActiveGroupId: null, lastActiveProfileId: null, lastActiveByGroup: {} };
   }
 
   const switchProfileSubmenu: MenuItemConstructorOptions[] = forest.groups

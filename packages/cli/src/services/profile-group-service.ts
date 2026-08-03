@@ -88,6 +88,7 @@ export class ProfileGroupService {
     if (lastKey?.startsWith(`${ws.id}:`)) {
       this.layouts.clearLastActiveGroupKey();
     }
+    this.layouts.clearLastActiveForGroup(ws.id);
     const deleted = this.workspaces.deleteById(ws.id);
     if (!deleted) throw new AppError("Profile group not found", "PROFILE_GROUP_NOT_FOUND");
   }

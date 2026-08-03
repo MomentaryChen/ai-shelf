@@ -26,7 +26,8 @@ Profiles are stored using legacy table names for compatibility:
 Profile Group  →  workspace row
 Profile  →  group row in that workspace
 Pane layout  →  group_layouts snapshot (JSON)
-Last active profile  →  app_preferences.last_active_group_key
+Last active profile  →  app_preferences.last_active_group (`groupId:profileId`)
+Per-group last profile →  app_preferences.last_active_by_group (JSON map)
 ```
 
 A default **`Profiles`** group is created automatically for compatibility, and you can create additional profile groups.

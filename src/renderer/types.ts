@@ -450,6 +450,8 @@ export interface ProfileForest {
   groups: ProfileGroupNode[];
   lastActiveGroupId: string | null;
   lastActiveProfileId: string | null;
+  /** Last opened profile id keyed by profile group id. */
+  lastActiveByGroup: Record<string, string>;
 }
 
 export interface ProfileCreateInput {
