@@ -8,13 +8,16 @@ export type AesKeyBits = 128 | 256;
 export type RsaModulusBits = 2048 | 4096;
 export type EcCurve = "P-256" | "P-384" | "P-521";
 
+/** ArrayBuffer-backed views — required by Web Crypto BufferSource under TS 5.7+/6. */
+type CryptoBytes = Uint8Array<ArrayBuffer>;
+
 function bytesToBinary(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
   return binary;
 }
 
-function binaryToBytes(binary: string): Uint8Array {
+function binaryToBytes(binary: string): CryptoBytes {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
@@ -26,7 +29,7 @@ export function bytesToHex(bytes: Uint8Array): string {
   return out;
 }
 
-export function hexToBytes(input: string): Uint8Array {
+export function hexToBytes(input: string): CryptoBytes {
   let hex = input.trim().replace(/[\s:_-]/gu, "");
   if (hex.startsWith("0x") || hex.startsWith("0X")) hex = hex.slice(2);
   if (!hex || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/u.test(hex)) {
@@ -43,7 +46,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bytesToBinary(bytes));
 }
 
-export function base64ToBytes(input: string): Uint8Array {
+export function base64ToBytes(input: string): CryptoBytes {
   let b64 = input.trim().replace(/\s+/gu, "");
   if (/[-_]/u.test(b64)) b64 = b64.replace(/-/gu, "+").replace(/_/gu, "/");
   const pad = b64.length % 4;
@@ -51,7 +54,7 @@ export function base64ToBytes(input: string): Uint8Array {
   return binaryToBytes(atob(b64));
 }
 
-export function randomBytes(length: number): Uint8Array {
+export function randomBytes(length: number): CryptoBytes {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return bytes;
