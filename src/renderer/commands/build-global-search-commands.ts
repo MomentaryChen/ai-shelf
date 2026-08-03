@@ -11,8 +11,7 @@ type TabId =
   | "config"
   | "doctor"
   | "update"
-  | "usage"
-  | "codec";
+  | "usage";
 
 /** Inventory-side palette entries (tools, config, skills, MCP) — always merged into Cmd+K. */
 export function buildGlobalSearchCommands(

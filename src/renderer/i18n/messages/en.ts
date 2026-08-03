@@ -1,6 +1,7 @@
 export const en = {
   "app.mode.terminal": "Terminal",
   "app.mode.inventory": "Inventory",
+  "app.mode.tools": "Tools",
   "app.mode.flow": "AI Flow",
   "app.mode.aria": "Application mode",
   "app.detecting": "Detecting AI tools…",
@@ -16,6 +17,7 @@ export const en = {
   "app.tab.doctor": "Doctor",
   "app.tab.update": "Update",
   "app.nav.sections": "Sections",
+  "app.nav.tools": "Tools",
   "app.cmdk": "Commands",
   "onboarding.step.detect": "Detect",
   "onboarding.step.connect": "Connect",
@@ -72,6 +74,7 @@ export const en = {
   "status.pid": "pid",
   "status.exit": "exit",
   "cmd.action.inventory": "Switch to Inventory",
+  "cmd.action.tools": "Switch to Tools",
   "cmd.action.refresh": "Refresh inventory",
   "cmd.terminal.openClaudeCursor": "Open Claude + Cursor",
   "cmd.terminal.openInApp": "Open {tool} in app",
@@ -1176,8 +1179,8 @@ export const en = {
   "shortcuts.terminal.paste": "Paste",
   "shortcuts.terminal.selectAll": "Select all scrollback",
 
-  // Codec tools
-  "app.tab.codec": "Codec",
+  // Tools mode — Codec
+  "tools.tab.codec": "Codec",
   "codec.subtitle": "Hash, Base64, URL, and hex — paste on the left, copy from the right.",
   "codec.tools": "Codec tools",
   "codec.tool.hash": "Hash",

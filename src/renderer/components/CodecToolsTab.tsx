@@ -137,7 +137,7 @@ export function CodecToolsTab() {
 
   return (
     <>
-      <SectionHeading icon={Hash}>{t("app.tab.codec")}</SectionHeading>
+      <SectionHeading icon={Hash}>{t("tools.tab.codec")}</SectionHeading>
       <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("codec.subtitle")}
       </p>

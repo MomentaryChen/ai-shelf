@@ -1,4 +1,4 @@
-/** Pure codec helpers for the inventory Codec tools tab (UTF-8 safe). */
+/** Pure codec helpers for the Tools → Codec panel (UTF-8 safe). */
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();

@@ -17,6 +17,7 @@ import {
   Plug,
   RefreshCw,
   Stethoscope,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { Spinner } from "./components/Spinner";
@@ -84,8 +85,9 @@ type TabId =
   | "config"
   | "doctor"
   | "update"
-  | "usage"
-  | "codec";
+  | "usage";
+
+type ToolId = "codec";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -162,7 +164,6 @@ const TAB_ICONS: Record<TabId, string> = {
   doctor: "🩺",
   update: "🔄",
   usage: "📊",
-  codec: "🔐",
 };
 
 const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
@@ -174,7 +175,6 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
   doctor: "app.tab.doctor",
   update: "app.tab.update",
   usage: "app.tab.usage",
-  codec: "app.tab.codec",
 };
 
 const TAB_IDS = Object.keys(TAB_LABEL_KEYS) as TabId[];
@@ -184,6 +184,21 @@ const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
   labelKey: TAB_LABEL_KEYS[id],
 }));
 
+const TOOL_ICONS: Record<ToolId, string> = {
+  codec: "🔐",
+};
+
+const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
+  codec: "tools.tab.codec",
+};
+
+const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
+const TOOLS: NavItem<ToolId>[] = TOOL_IDS.map((id) => ({
+  id,
+  icon: <span className="text-[14px] leading-none">{TOOL_ICONS[id]}</span>,
+  labelKey: TOOL_LABEL_KEYS[id],
+}));
+
 const IS_MAC =
   typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
 
@@ -191,6 +206,7 @@ export function App() {
   const { t } = useLocale();
   const [appMode, setAppMode] = useState<AppMode>("terminal");
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [activeTool, setActiveTool] = useState<ToolId>("codec");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -318,8 +334,17 @@ export function App() {
     startTransition(() => setActiveTab(tab));
   };
 
+  const goToTool = (tool: ToolId) => {
+    handleModeChange("tools");
+    startTransition(() => setActiveTool(tool));
+  };
+
   const selectTab = (tab: TabId) => {
     startTransition(() => setActiveTab(tab));
+  };
+
+  const selectTool = (tool: ToolId) => {
+    startTransition(() => setActiveTool(tool));
   };
 
   const inventoryCommands = useMemo<Command[]>(() => {
@@ -345,6 +370,14 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Package className="h-4 w-4" />,
         run: () => handleModeChange("inventory"),
+      },
+      {
+        id: "mode-tools",
+        title: t("cmd.action.tools"),
+        group: t("cmd.group.actions"),
+        icon: <Wrench className="h-4 w-4" />,
+        keywords: "tools codec hash base64 md5",
+        run: () => handleModeChange("tools"),
       },
       {
         id: "mode-flow",
@@ -390,6 +423,59 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, openCheatsheet]);
 
+  const toolsCommands = useMemo<Command[]>(() => {
+    const navigate: Command[] = TOOLS.map((it) => ({
+      id: `go-tool-${it.id}`,
+      title: `${t("cmd.go")} ${t(it.labelKey)}`,
+      group: t("cmd.group.navigate"),
+      icon: it.icon,
+      keywords: `${it.id} tools codec hash base64 md5`,
+      run: () => goToTool(it.id),
+    }));
+    const actions: Command[] = [
+      {
+        id: "mode-terminal",
+        title: t("cmd.action.terminal"),
+        group: t("cmd.group.actions"),
+        icon: <Monitor className="h-4 w-4" />,
+        run: () => handleModeChange("terminal"),
+      },
+      {
+        id: "mode-inventory",
+        title: t("cmd.action.inventory"),
+        group: t("cmd.group.actions"),
+        icon: <Package className="h-4 w-4" />,
+        run: () => handleModeChange("inventory"),
+      },
+      {
+        id: "mode-tools",
+        title: t("cmd.action.tools"),
+        group: t("cmd.group.actions"),
+        icon: <Wrench className="h-4 w-4" />,
+        keywords: "tools codec hash base64 md5",
+        run: () => handleModeChange("tools"),
+      },
+      {
+        id: "mode-flow",
+        title: t("cmd.action.flow"),
+        group: t("cmd.group.actions"),
+        icon: <Compass className="h-4 w-4" />,
+        run: () => handleModeChange("flow"),
+      },
+      {
+        id: "show-shortcuts",
+        title: t("cmd.action.shortcuts"),
+        group: t("cmd.group.actions"),
+        icon: "⌨️",
+        keywords: "keyboard shortcuts cheatsheet help",
+        shortcut: cheatsheetToggleKeys(),
+        run: () => openCheatsheet(),
+      },
+    ];
+    return [...navigate, ...actions];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, openCheatsheet]);
+
   const sharedModeCommands = useMemo<Command[]>(
     () => [
       {
@@ -405,6 +491,14 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Package className="h-4 w-4" />,
         run: () => handleModeChange("inventory"),
+      },
+      {
+        id: "mode-tools",
+        title: t("cmd.action.tools"),
+        group: t("cmd.group.actions"),
+        icon: <Wrench className="h-4 w-4" />,
+        keywords: "tools codec hash base64 md5",
+        run: () => handleModeChange("tools"),
       },
       {
         id: "mode-flow",
@@ -444,10 +538,20 @@ export function App() {
               (c) => !terminalCommands.some((tc) => tc.id === c.id),
             ),
           )
-        : mergePaletteCommands(inventoryCommands, terminalCommands);
+        : appMode === "tools"
+          ? mergePaletteCommands(toolsCommands, terminalCommands)
+          : mergePaletteCommands(inventoryCommands, terminalCommands);
 
     return mergePaletteCommands(modeBase, globalSearch);
-  }, [paletteOpen, paletteCommandsRev, appMode, sharedModeCommands, inventoryCommands, t]);
+  }, [
+    paletteOpen,
+    paletteCommandsRev,
+    appMode,
+    sharedModeCommands,
+    inventoryCommands,
+    toolsCommands,
+    t,
+  ]);
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
@@ -616,11 +720,29 @@ export function App() {
                       <UsageTab />
                     </Suspense>
                   )}
-                  {activeTab === "codec" && (
-                    <Suspense fallback={<Spinner label={t("app.detecting")} />}>
-                      <CodecToolsTab />
-                    </Suspense>
-                  )}
+                </ViewTransition>
+              </div>
+            </main>
+          </div>
+        )}
+
+        {ready && (
+          <div
+            data-active={appMode === "tools"}
+            className="ui-mode-panel absolute inset-0 flex overflow-hidden"
+          >
+            <InventoryNav
+              items={TOOLS}
+              active={activeTool}
+              onSelect={selectTool}
+              sectionLabelKey="app.nav.tools"
+            />
+            <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
+              <div className="mx-auto w-full max-w-[1400px]">
+                <ViewTransition viewKey={activeTool}>
+                  <Suspense fallback={<Spinner label={t("app.detecting")} />}>
+                    {activeTool === "codec" && <CodecToolsTab />}
+                  </Suspense>
                 </ViewTransition>
               </div>
             </main>

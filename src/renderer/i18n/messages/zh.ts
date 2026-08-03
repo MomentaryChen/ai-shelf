@@ -3,6 +3,7 @@ import type { MessageKey } from "./en.js";
 export const zh: Record<MessageKey, string> = {
   "app.mode.terminal": "終端機",
   "app.mode.inventory": "清單",
+  "app.mode.tools": "工具",
   "app.mode.flow": "AI Flow",
   "app.mode.aria": "應用程式模式",
   "app.detecting": "正在偵測 AI 工具…",
@@ -14,6 +15,7 @@ export const zh: Record<MessageKey, string> = {
   "app.tab.models": "模型",
   "app.tab.skills": "技能",
   "app.nav.sections": "區段",
+  "app.nav.tools": "工具",
   "app.cmdk": "指令",
   "onboarding.step.detect": "偵測",
   "onboarding.step.connect": "連線",
@@ -65,6 +67,7 @@ export const zh: Record<MessageKey, string> = {
   "status.pid": "pid",
   "status.exit": "exit",
   "cmd.action.inventory": "切換到清單",
+  "cmd.action.tools": "切換到工具",
   "cmd.action.refresh": "重新整理清單",
   "cmd.terminal.openClaudeCursor": "開啟 Claude + Cursor",
   "cmd.terminal.openInApp": "在 App 內開啟 {tool}",
@@ -1150,8 +1153,8 @@ export const zh: Record<MessageKey, string> = {
   "shortcuts.terminal.paste": "貼上",
   "shortcuts.terminal.selectAll": "全選捲動緩衝",
 
-  // Codec 工具
-  "app.tab.codec": "編解碼",
+  // Tools 模式 — 編解碼
+  "tools.tab.codec": "編解碼",
   "codec.subtitle": "雜湊、Base64、URL、Hex — 左邊貼上，右邊複製。",
   "codec.tools": "編解碼工具",
   "codec.tool.hash": "雜湊",

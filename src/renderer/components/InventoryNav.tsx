@@ -18,21 +18,24 @@ export function InventoryNav<T extends string>({
   onSelect,
   disabled = false,
   badges,
+  sectionLabelKey = "app.nav.sections",
 }: {
   items: NavItem<T>[];
   active: T;
   onSelect: (id: T) => void;
   disabled?: boolean;
   badges?: Partial<Record<T, number>>;
+  /** Left-rail section title (Inventory vs Tools, etc.). */
+  sectionLabelKey?: MessageKey;
 }) {
   const { t } = useLocale();
   return (
     <nav
-      aria-label={t("app.nav.sections")}
+      aria-label={t(sectionLabelKey)}
       className="flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border bg-bg-secondary/40 p-2"
     >
       <div className="px-2 pt-1 pb-2 text-[10.5px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
-        {t("app.nav.sections")}
+        {t(sectionLabelKey)}
       </div>
       {items.map((it) => {
         const isActive = it.id === active;
