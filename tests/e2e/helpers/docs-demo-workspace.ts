@@ -70,15 +70,41 @@ export async function expectDocsDemoGroup(page: Page, timeout = 120_000): Promis
   ).toBeVisible({ timeout });
 }
 
+/**
+ * Fresh docs userdata always triggers first-run onboarding. Persist completion and
+ * close the modal so screenshots / GIF captures are not blocked by the wizard.
+ */
+export async function completeDocsOnboarding(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await window.api.setOnboardingCompleted();
+  });
+
+  const skip = page.getByRole("button", { name: /Skip for now|暫時略過/i });
+  if (await skip.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await skip.click();
+  }
+
+  const overlay = page.locator('[data-slot="dialog-overlay"][data-state="open"]');
+  if ((await overlay.count()) > 0) {
+    // Dialog onOpenChange(false) also marks onboarding complete.
+    await page.keyboard.press("Escape");
+  }
+
+  await expect(overlay).toHaveCount(0, { timeout: 15_000 });
+}
+
 export async function prepareDocsSession(
   page: Page,
   waitForAppReady: (page: Page) => Promise<void>,
 ): Promise<void> {
   await forceDocsLocale(page);
   await waitForAppReady(page);
+  await completeDocsOnboarding(page);
   if (await seedDocsDemoWorkspace(page)) {
     await forceDocsLocale(page);
     await waitForAppReady(page);
+    // Preference persists across reload; still close if a race reopened the modal.
+    await completeDocsOnboarding(page);
   }
   await expectDocsDemoGroup(page);
 }

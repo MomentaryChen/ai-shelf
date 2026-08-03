@@ -29,12 +29,12 @@ Normal releases: **`develop` → `release/vX.Y.Z` → `main` → tag `vX.Y.Z`**,
    pnpm gen:docs-assets
    ```
 
-   - Regenerates `tests/screenshots/*.png` and `docs/assets/terminal-demo.gif`
+   - Regenerates `tests/screenshots/{en,zh}/*.png` and `docs/assets/{en,zh}/terminal-demo.gif`
    - Requires a **Windows desktop** (Electron display) and **ffmpeg** on `PATH`
    - Terminal screenshots use an isolated **Demo** profile group (`tests/e2e/helpers/docs-demo-workspace.ts`), not your real workspace
-   - Locale is pinned to **zh** (`AISHELF_DOCS_LOCALE`) to match [pages.zh-TW.md](pages.zh-TW.md)
+   - Runs **both** locales (`en` + `zh`) so English README/`pages.md` and Chinese README/`pages.zh-TW.md` each get matching UI screenshots
    - Inventory tabs still reflect CLIs installed on your machine — review before committing
-   - Individual targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
+   - Individual targets: `pnpm test:e2e` with `AISHELF_DOCS_LOCALE=en|zh` (PNGs only), `pnpm gen:terminal-demo-gif` (GIFs for both locales; set `AISHELF_DOCS_LOCALE` for one)
    - Skip only when the release has **no** UI/visual changes
    - Commit the updated image files with the release
 5. [ ] Local smoke test when you can: `pnpm dist:win` (Windows), or rely on CI for macOS/Linux packages

@@ -54,17 +54,17 @@ On **Windows** (local desktop — not CI), from the release worktree / `develop`
 pnpm gen:docs-assets
 ```
 
-This runs one build, then Playwright captures:
+This runs one build, then Playwright captures **both** locales:
 
-- `tests/screenshots/*.png` — README and [docs/pages.md](../../../docs/pages.md) / [docs/pages.zh-TW.md](../../../docs/pages.zh-TW.md)
-- `docs/assets/terminal-demo.gif` — README hero
+- `tests/screenshots/{en,zh}/*.png` — [README.md](../../../README.md) / [docs/pages.md](../../../docs/pages.md) use `en`; [README.zh-TW.md](../../../README.zh-TW.md) / [docs/pages.zh-TW.md](../../../docs/pages.zh-TW.md) use `zh`
+- `docs/assets/{en,zh}/terminal-demo.gif` — README hero (locale-matched)
 
 Details ([docs/RELEASE.md](../../../docs/RELEASE.md)):
 
-- Locale pinned to **zh** (`AISHELF_DOCS_LOCALE`, default) for [pages.zh-TW.md](../../../docs/pages.zh-TW.md)
+- `AISHELF_DOCS_LOCALE` selects `en` or `zh` for a single Playwright run; `gen:docs-assets` loops both
 - Terminal shots use an isolated **Demo** profile group via `AISHELF_APP_DATA_DIR` — not the developer's real `%APPDATA%/ai-shelf` workspace
 - Inventory tabs still reflect CLIs on the machine running the command — review screenshots before committing
-- Lighter targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
+- Lighter targets: `AISHELF_DOCS_LOCALE=en|zh pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (both GIFs; set `AISHELF_DOCS_LOCALE` for one)
 
 Include updated PNG/GIF files in the **release prep commit** (step 5). If `gen:docs-assets` fails (missing ffmpeg, no display), stop and report — do not create the release branch or tag.
 
@@ -108,7 +108,7 @@ Fix failures or stop and report.
 
 ## 5. Commit on develop, then create `release/vX.Y.Z`
 
-Single release prep commit on **`develop`** (unless user prefers split commits). Stage version files, CHANGELOG, and any refreshed `tests/screenshots/*.png` + `docs/assets/terminal-demo.gif` from step 1:
+Single release prep commit on **`develop`** (unless user prefers split commits). Stage version files, CHANGELOG, and any refreshed `tests/screenshots/{en,zh}/*.png` + `docs/assets/{en,zh}/terminal-demo.gif` from step 1:
 
 ```text
 chore(release): vX.Y.Z
