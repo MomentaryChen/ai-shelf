@@ -113,7 +113,10 @@ git push origin vX.Y.Z
 
 Pushing **`v*`** triggers [.github/workflows/release.yml](../../../.github/workflows/release.yml):
 
-- **release-windows** — NSIS installer + Release body from CHANGELOG; attaches **`AI-Shelf-Setup-*.exe`**, **`latest.yml`**, **`*.blockmap`** (required for in-app auto-update via `electron-updater`).
+- **create-release** — Release body from CHANGELOG (no binaries yet).
+- **release-windows** — NSIS installer; attaches **`AI-Shelf-Setup-*.exe`**, **`latest.yml`**, **`*.blockmap`**.
+- **release-mac** — unsigned DMG/ZIP (`arm64` + `x64`); attaches **`AI-Shelf-*.dmg`**, **`.zip`**, **`latest-mac.yml`**.
+- **release-linux** — unsigned AppImage; attaches **`AI-Shelf-*.AppImage`**, **`latest-linux.yml`**.
 - **publish-npm** — publishes **`ai-shelf`** from `packages/cli` to npm (needs repo secret **`NPM_TOKEN`**; version synced from tag via [scripts/sync-version-from-tag.mjs](../../../scripts/sync-version-from-tag.mjs)).
 
 See [docs/RELEASE.md](../../../docs/RELEASE.md).
@@ -122,14 +125,16 @@ See [docs/RELEASE.md](../../../docs/RELEASE.md).
 
 Tell the user to open **Actions → Release** and then **Releases**. Confirm:
 
-- Both workflow jobs succeeded (**publish-npm**, **release-windows**)
-- **`AI-Shelf-Setup-X.Y.Z.exe`**, **`latest.yml`**, **`*.blockmap`** on the GitHub Release (if missing, installed apps cannot auto-update in-app)
+- Desktop jobs succeeded (**create-release**, **release-windows**, **release-mac**, **release-linux**) plus **publish-npm**
+- Windows: **`AI-Shelf-Setup-X.Y.Z.exe`**, **`latest.yml`**, **`*.blockmap`**
+- macOS: **`AI-Shelf-X.Y.Z-{arm64,x64}.dmg`** (+ zip) and **`latest-mac.yml`**
+- Linux: **`AI-Shelf-X.Y.Z.AppImage`** and **`latest-linux.yml`**
 - **`npm view ai-shelf version`** shows `X.Y.Z` (if publish-npm failed, check **`NPM_TOKEN`** secret)
 - Release description matches CHANGELOG
 
 If this is the **first release** that ships in-app auto-update, mention in CHANGELOG (or release notes) that users on older installers must install that build **once manually**; later versions can upgrade inside the app.
 
-**Manual publish fallback:** after `pnpm dist:win`, upload `release/AI-Shelf-Setup-<version>.exe`, `release/latest.yml`, and `release/*.blockmap` together — not the installer alone.
+**Manual publish fallback:** package on the matching OS (`pnpm dist:win` / `dist:mac` / `dist:linux`) and upload the artifacts listed in [docs/RELEASE.md](../../../docs/RELEASE.md) — not unpacked folders.
 
 Local preview of GitHub release body:
 

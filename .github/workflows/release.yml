@@ -9,6 +9,15 @@ permissions:
   contents: write
   id-token: write
 
+env:
+  # Shared Firebase Web client config (public). Omit secrets to ship without Firebase.
+  VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+  VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+  VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+  VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+  VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+  VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+
 jobs:
   publish-npm:
     name: Publish ai-shelf to npm
@@ -43,7 +52,34 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  # Create the GitHub Release once so platform jobs can attach assets without racing.
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sync version from tag
+        run: node scripts/sync-version-from-tag.mjs
+
+      # Release body matches CHANGELOG.md for this tag (single source of truth).
+      - name: Build release notes from CHANGELOG
+        run: node scripts/release-notes.mjs
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          generate_release_notes: false
+
   release-windows:
+    needs: create-release
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -68,15 +104,6 @@ jobs:
 
       - name: Build
         run: pnpm build
-        env:
-          # Firebase Web client config (public). Set matching repository secrets so release
-          # installers include Google sign-in / sync. Omit secrets to ship without Firebase.
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
 
       - name: Configure code signing certificate
         shell: pwsh
@@ -139,16 +166,94 @@ jobs:
         run: |
           echo "::notice::Installer was signed using repository CSC_LINK / CSC_KEY_PASSWORD secrets."
 
-      # Release body matches CHANGELOG.md for this tag (single source of truth).
-      - name: Build release notes from CHANGELOG
-        run: node scripts/release-notes.mjs
-
-      - name: Create GitHub Release
+      - name: Upload Windows assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release/AI-Shelf-Setup-*.exe
             release/latest.yml
             release/*.blockmap
-          body_path: release-notes.md
-          generate_release_notes: false
+
+  release-mac:
+    needs: create-release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Sync version from tag
+        run: node scripts/sync-version-from-tag.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Package macOS (unsigned)
+        run: pnpm exec electron-builder --mac --publish never -c.mac.identity=null
+        env:
+          # Skip Apple code signing / notarization for now.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Upload macOS assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/AI-Shelf-*.dmg
+            release/AI-Shelf-*.zip
+            release/latest-mac.yml
+            release/*.blockmap
+
+  release-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3
+
+      - name: Sync version from tag
+        run: node scripts/sync-version-from-tag.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Package Linux AppImage (unsigned)
+        run: pnpm exec electron-builder --linux --publish never
+
+      - name: Upload Linux assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/AI-Shelf-*.AppImage
+            release/latest-linux.yml
