@@ -17,6 +17,7 @@ import {
 import { bindTerminalLinks } from "../terminal/xterm-links";
 import { bindTerminalCwd } from "../terminal/xterm-cwd";
 import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
+import { recordImeAnchor } from "../terminal/ime-anchor-log";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
 import {
   copyTerminalOutputForIssue,
@@ -370,7 +371,9 @@ function EmbeddedTerminalInner({
       },
     });
     // Pin IME to Ink-style inverse caret (Claude Code / Codex AI prompts).
-    const unbindImeAnchor = attachImeAnchor(term);
+    const unbindImeAnchor = attachImeAnchor(term, {
+      onAnchor: (a) => recordImeAnchor(sessionId, a),
+    });
     const unbindLinks = bindTerminalLinks(term);
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
       onCwdReportRef.current?.(sessionId, cwd);
