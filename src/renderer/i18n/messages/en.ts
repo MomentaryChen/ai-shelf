@@ -1318,6 +1318,25 @@ export const en = {
   "cron.error.fields": "Use five fields: minute hour day-of-month month day-of-week.",
   "cron.error.timezone": "That timezone is not recognized — try an IANA name like Asia/Taipei.",
   "cron.error.invalid": "Could not parse this expression — check the fields and try again.",
+
+  // Tools mode — JSON
+  "tools.tab.json": "JSON",
+  "json.subtitle":
+    "Pretty-print or minify JSON — paste on the left, copy from the right. Optional key sorting.",
+  "json.mode.pretty": "Pretty",
+  "json.mode.minify": "Minify",
+  "json.indent": "Indent",
+  "json.sortKeys": "Sort keys",
+  "json.input": "Input",
+  "json.output": "Output",
+  "json.inputPlaceholder": "Paste JSON here…",
+  "json.outputPlaceholder": "Formatted result appears here",
+  "json.copy": "Copy",
+  "json.copied": "Copied",
+  "json.swap": "Use as input",
+  "json.clear": "Clear",
+  "json.hint.live": "Updates as you type",
+  "json.error.invalid": "Could not parse this JSON — check for trailing commas or quotes.",
 } as const;
 
 export type MessageKey = keyof typeof en;
