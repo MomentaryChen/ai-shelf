@@ -63,6 +63,9 @@ const UsageTab = lazy(() =>
 const CodecToolsTab = lazy(() =>
   import("./components/CodecToolsTab").then((m) => ({ default: m.CodecToolsTab })),
 );
+const CryptoToolsTab = lazy(() =>
+  import("./components/CryptoToolsTab").then((m) => ({ default: m.CryptoToolsTab })),
+);
 const TimeToolsTab = lazy(() =>
   import("./components/TimeToolsTab").then((m) => ({ default: m.TimeToolsTab })),
 );
@@ -94,7 +97,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "time" | "cron";
+type ToolId = "codec" | "crypto" | "time" | "cron";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -193,12 +196,14 @@ const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
 
 const TOOL_ICONS: Record<ToolId, string> = {
   codec: "🔐",
+  crypto: "🗝️",
   time: "🕒",
   cron: "⏰",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   codec: "tools.tab.codec",
+  crypto: "tools.tab.crypto",
   time: "tools.tab.time",
   cron: "tools.tab.cron",
 };
@@ -388,7 +393,8 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5 time timestamp unix timezone cron schedule",
+        keywords:
+          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
         run: () => handleModeChange("tools"),
       },
       {
@@ -444,9 +450,11 @@ export function App() {
       keywords:
         it.id === "time"
           ? "time timestamp unix timezone utc epoch ms us ns iso"
-          : it.id === "cron"
-            ? "cron schedule expression timezone preset"
-            : "codec hash base64 md5 tools",
+          : it.id === "crypto"
+            ? "crypto aes rsa ecdsa encrypt decrypt sign verify key pem"
+            : it.id === "cron"
+              ? "cron schedule expression timezone preset"
+              : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -469,7 +477,8 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5 time timestamp unix timezone cron schedule",
+        keywords:
+          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
         run: () => handleModeChange("tools"),
       },
       {
@@ -514,7 +523,8 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5 time timestamp unix timezone cron schedule",
+        keywords:
+          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
         run: () => handleModeChange("tools"),
       },
       {
@@ -743,6 +753,7 @@ export function App() {
               <ViewTransition viewKey={activeTool}>
                 <Suspense fallback={<Spinner label={t("profile.loading")} />}>
                   {activeTool === "codec" && <CodecToolsTab />}
+                  {activeTool === "crypto" && <CryptoToolsTab />}
                   {activeTool === "time" && <TimeToolsTab />}
                   {activeTool === "cron" && <CronToolsTab />}
                 </Suspense>
