@@ -1,7 +1,13 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, Copy, Hash, ArrowLeftRight, ImagePlus } from "lucide-react";
+import { Check, Copy, Hash, ArrowLeftRight, ImagePlus, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -24,6 +30,7 @@ import {
   type ImageBase64Format,
   imageFileToBase64,
   parseDataUrl,
+  rawBase64ToDataUrl,
 } from "../utils/image-base64";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
@@ -63,7 +70,9 @@ export function CodecToolsTab() {
   const fileInputId = useId();
   const copiedTimerRef = useRef<number | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const previewSourceRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const skipAutoPreviewRef = useRef(false);
 
   const [tool, setTool] = useState<ToolId>("hash");
   const [direction, setDirection] = useState<Direction>("encode");
@@ -77,20 +86,50 @@ export function CodecToolsTab() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [enlargeOpen, setEnlargeOpen] = useState(false);
 
   const revokePreview = () => {
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = null;
     }
+    previewSourceRef.current = null;
     setPreviewUrl(null);
   };
 
-  const setPreviewFromFile = (file: File) => {
-    revokePreview();
-    const url = URL.createObjectURL(file);
+  const applyPreviewUrl = (url: string, source: string) => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     previewUrlRef.current = url;
+    previewSourceRef.current = source;
     setPreviewUrl(url);
+  };
+
+  const setPreviewFromFile = (file: File) => {
+    const url = URL.createObjectURL(file);
+    applyPreviewUrl(url, `file:${file.name}:${file.size}:${file.lastModified}`);
+  };
+
+  const trySetPreviewFromBase64 = (source: string, reportError: boolean): boolean => {
+    const trimmed = source.trim();
+    if (!trimmed) {
+      revokePreview();
+      if (reportError) setError(t("codec.error.invalid"));
+      return false;
+    }
+    if (previewSourceRef.current === trimmed && previewUrlRef.current) {
+      if (reportError) setError(null);
+      return true;
+    }
+    try {
+      const url = base64ToObjectUrl(trimmed);
+      applyPreviewUrl(url, trimmed);
+      setError(null);
+      return true;
+    } catch {
+      revokePreview();
+      if (reportError) setError(t("codec.error.invalid"));
+      return false;
+    }
   };
 
   const encodeImageFile = async (file: File) => {
@@ -102,7 +141,9 @@ export function CodecToolsTab() {
     try {
       setFileName(file.name);
       setPreviewFromFile(file);
+      skipAutoPreviewRef.current = true;
       const next = await imageFileToBase64(file, imageFormat);
+      previewSourceRef.current = next.trim();
       setOutput(next);
       setError(null);
     } catch {
@@ -158,6 +199,48 @@ export function CodecToolsTab() {
     };
   }, [tool, direction, hashAlgo, urlSafe, input, t]);
 
+  // Live preview while pasting / editing Base64 (debounced).
+  useEffect(() => {
+    if (tool !== "image") return;
+    if (skipAutoPreviewRef.current) {
+      skipAutoPreviewRef.current = false;
+      return;
+    }
+    const source = output.trim();
+    if (!source) {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+      previewSourceRef.current = null;
+      setPreviewUrl(null);
+      setError(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (previewSourceRef.current === source && previewUrlRef.current) {
+        setError(null);
+        return;
+      }
+      try {
+        const url = base64ToObjectUrl(source);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = url;
+        previewSourceRef.current = source;
+        setPreviewUrl(url);
+        setError(null);
+      } catch {
+        if (previewUrlRef.current) {
+          URL.revokeObjectURL(previewUrlRef.current);
+          previewUrlRef.current = null;
+        }
+        previewSourceRef.current = null;
+        setPreviewUrl(null);
+      }
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [tool, output]);
+
   useEffect(() => {
     return () => {
       if (copiedTimerRef.current != null) window.clearTimeout(copiedTimerRef.current);
@@ -186,20 +269,7 @@ export function CodecToolsTab() {
   const showDirection = tool !== "hash" && tool !== "image";
 
   const previewFromBase64 = () => {
-    if (!output && !input) return;
-    const source = output || input;
-    try {
-      revokePreview();
-      const url = base64ToObjectUrl(source);
-      previewUrlRef.current = url;
-      setPreviewUrl(url);
-      setError(null);
-      if (!parseDataUrl(source) && !/^[A-Za-z0-9+/=\s_-]+$/u.test(source.trim())) {
-        setError(t("codec.error.invalid"));
-      }
-    } catch {
-      setError(t("codec.error.invalid"));
-    }
+    trySetPreviewFromBase64(output || input, true);
   };
 
   return (
@@ -218,6 +288,7 @@ export function CodecToolsTab() {
             onClick={() => {
               setTool(item.id);
               setError(null);
+              setEnlargeOpen(false);
               if (item.id !== "image") {
                 revokePreview();
                 setFileName(null);
@@ -249,7 +320,11 @@ export function CodecToolsTab() {
                     const parsed = parseDataUrl(output);
                     if (parsed) setOutput(parsed.base64);
                   } else if (!output.startsWith("data:") && next === "dataUrl" && output) {
-                    setOutput(`data:image/png;base64,${output.replace(/\s+/gu, "")}`);
+                    try {
+                      setOutput(rawBase64ToDataUrl(output));
+                    } catch {
+                      setOutput(`data:image/png;base64,${output.replace(/\s+/gu, "")}`);
+                    }
                   }
                 }}
                 className="gap-1.5"
@@ -355,16 +430,42 @@ export function CodecToolsTab() {
               </div>
 
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label className="text-[12px] font-medium text-text-secondary">
-                  {t("codec.image.previewLabel")}
-                </Label>
-                <div className="flex min-h-[140px] items-center justify-center overflow-hidden rounded-[22px] border border-border bg-bg-primary p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-[12px] font-medium text-text-secondary">
+                    {t("codec.image.previewLabel")}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEnlargeOpen(true)}
+                    disabled={!previewUrl}
+                    className="h-8 px-2 text-[12px]"
+                    title={t("codec.image.enlarge")}
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    {t("codec.image.enlarge")}
+                  </Button>
+                </div>
+                <div className="relative flex min-h-[140px] items-center justify-center overflow-hidden rounded-[22px] border border-border bg-bg-primary p-3">
                   {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt={fileName ?? t("codec.image.previewLabel")}
-                      className="max-h-[200px] max-w-full object-contain"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setEnlargeOpen(true)}
+                      className="flex max-h-[200px] max-w-full cursor-zoom-in items-center justify-center rounded-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(201,123,90,0.45)]"
+                      title={t("codec.image.enlarge")}
+                      aria-label={t("codec.image.enlarge")}
+                    >
+                      <img
+                        src={previewUrl}
+                        alt={fileName ?? t("codec.image.previewLabel")}
+                        className="max-h-[200px] max-w-full object-contain"
+                        onError={() => {
+                          revokePreview();
+                          setError(t("codec.image.error.preview"));
+                        }}
+                      />
+                    </button>
                   ) : (
                     <span className="text-[12px] text-text-tertiary">
                       {t("codec.image.previewEmpty")}
@@ -383,6 +484,7 @@ export function CodecToolsTab() {
                   setOutput("");
                   setFileName(null);
                   setError(null);
+                  setEnlargeOpen(false);
                   revokePreview();
                 }}
                 disabled={!output && !previewUrl}
@@ -390,6 +492,28 @@ export function CodecToolsTab() {
                 {t("codec.clear")}
               </Button>
             </div>
+
+            <Dialog open={enlargeOpen && !!previewUrl} onOpenChange={setEnlargeOpen}>
+              <DialogContent
+                className="flex max-h-[90vh] max-w-[min(92vw,960px)] flex-col gap-3 border-border bg-bg-card p-4 text-text-primary"
+                aria-describedby={undefined}
+              >
+                <DialogHeader className="pr-8">
+                  <DialogTitle className="text-[15px] font-semibold text-text-primary">
+                    {fileName ?? t("codec.image.enlargeTitle")}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-[22px] bg-bg-primary p-3">
+                  {previewUrl && (
+                    <img
+                      src={previewUrl}
+                      alt={fileName ?? t("codec.image.previewLabel")}
+                      className="max-h-[min(78vh,820px)] max-w-full object-contain"
+                    />
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
