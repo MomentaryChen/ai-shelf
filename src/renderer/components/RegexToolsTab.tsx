@@ -70,6 +70,7 @@ function CopyButton({ value, copyKey, copiedKey }: { value: string; copyKey: Mes
       variant="ghost"
       size="sm"
       disabled={!value}
+      title={copied ? t(copiedKey) : t(copyKey)}
       className="h-8 shrink-0 px-2 text-[12px]"
       onClick={() => {
         void (async () => {
@@ -85,7 +86,7 @@ function CopyButton({ value, copyKey, copiedKey }: { value: string; copyKey: Mes
       }}
     >
       {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? t(copiedKey) : t(copyKey)}
+      <span className="hidden @sm:inline">{copied ? t(copiedKey) : t(copyKey)}</span>
     </Button>
   );
 }
@@ -219,13 +220,13 @@ export function RegexToolsTab() {
 
       <Card>
         <div className="flex flex-col gap-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <div className="grid gap-3 @md:grid-cols-[1fr_auto]">
             <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={patternId} className="text-[12px] font-medium text-text-secondary">
                 {t("regex.pattern")}
               </Label>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[13px] text-text-tertiary">/</span>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="shrink-0 text-[13px] text-text-tertiary">/</span>
                 <Input
                   id={patternId}
                   value={pattern}
@@ -233,7 +234,7 @@ export function RegexToolsTab() {
                   spellCheck={false}
                   placeholder={t("regex.patternPlaceholder")}
                   aria-invalid={errorMessage ? true : undefined}
-                  className={monoInput}
+                  className={`${monoInput} min-w-0 flex-1`}
                 />
                 <span className="shrink-0 font-mono text-[13px] text-text-tertiary">
                   /{flagString}
@@ -395,7 +396,7 @@ export function RegexToolsTab() {
               {errorMessage}
             </p>
           ) : mode === "test" ? (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 @md:grid-cols-2">
               <div className="rounded-[22px] bg-bg-primary/60 px-3.5 py-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-[12px] font-medium text-text-secondary">
@@ -465,7 +466,7 @@ export function RegexToolsTab() {
             </div>
           ) : (
             <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Label className="text-[12px] font-medium text-text-secondary">
                   {t("regex.replaceResult")}
                   {replaceResult.ok && (

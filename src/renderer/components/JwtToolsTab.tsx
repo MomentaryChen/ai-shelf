@@ -57,6 +57,7 @@ function CopyButton({ value, label, copiedLabel }: { value: string; label: strin
       variant="ghost"
       size="sm"
       disabled={!value}
+      title={copied ? copiedLabel : label}
       className="h-8 shrink-0 px-2 text-[12px]"
       onClick={() => {
         void (async () => {
@@ -72,7 +73,7 @@ function CopyButton({ value, label, copiedLabel }: { value: string; label: strin
       }}
     >
       {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? copiedLabel : label}
+      <span className="hidden @sm:inline">{copied ? copiedLabel : label}</span>
     </Button>
   );
 }
@@ -279,7 +280,7 @@ export function JwtToolsTab() {
         <Card>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Label htmlFor={decodeId} className="text-[12px] font-medium text-text-secondary">
                   {t("jwt.token")}
                 </Label>
@@ -309,9 +310,9 @@ export function JwtToolsTab() {
             </div>
 
             {decoded ? (
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 @md:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                     <Label className="text-[12px] font-medium text-text-secondary">
                       {t("jwt.header")}
                       <span className="ml-2 font-mono text-text-tertiary">{decoded.alg}</span>
@@ -329,7 +330,7 @@ export function JwtToolsTab() {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                     <Label className="text-[12px] font-medium text-text-secondary">
                       {t("jwt.payload")}
                     </Label>
@@ -345,7 +346,7 @@ export function JwtToolsTab() {
                     className={fieldClass}
                   />
                 </div>
-                <div className="lg:col-span-2">
+                <div className="@md:col-span-2">
                   <ClaimRows payload={decoded.payload} nowMs={nowMs} />
                 </div>
               </div>
@@ -453,7 +454,7 @@ export function JwtToolsTab() {
               </ToggleGroup>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 @md:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor={encodeHeaderId} className="text-[12px] font-medium text-text-secondary">
                   {t("jwt.header")}
@@ -528,7 +529,7 @@ export function JwtToolsTab() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Label htmlFor={encodeOutId} className="text-[12px] font-medium text-text-secondary">
                   {t("jwt.output")}
                 </Label>

@@ -139,7 +139,7 @@ export function JsonToolsTab() {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 @md:grid-cols-2">
             <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
                 {t("json.input")}
@@ -155,11 +155,11 @@ export function JsonToolsTab() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
                   {t("json.output")}
                 </Label>
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                   <Button
                     type="button"
                     variant="ghost"
@@ -170,7 +170,7 @@ export function JsonToolsTab() {
                     title={t("json.swap")}
                   >
                     <ArrowLeftRight className="h-3.5 w-3.5" />
-                    {t("json.swap")}
+                    <span className="hidden @sm:inline">{t("json.swap")}</span>
                   </Button>
                   <Button
                     type="button"
@@ -178,6 +178,7 @@ export function JsonToolsTab() {
                     size="sm"
                     onClick={() => void copyOutput()}
                     disabled={!output}
+                    title={copied ? t("json.copied") : t("json.copy")}
                     className="h-8 px-2 text-[12px]"
                   >
                     {copied ? (
@@ -185,7 +186,9 @@ export function JsonToolsTab() {
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
-                    {copied ? t("json.copied") : t("json.copy")}
+                    <span className="hidden @sm:inline">
+                      {copied ? t("json.copied") : t("json.copy")}
+                    </span>
                   </Button>
                 </div>
               </div>
