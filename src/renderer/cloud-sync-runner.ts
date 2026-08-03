@@ -6,7 +6,7 @@ import {
   validateSyncBundle,
 } from "../shared/sync-limits.js";
 import { planSyncAction } from "../shared/sync-compare.js";
-import type { SyncStatus } from "../shared/sync-types.js";
+import type { SyncConflictPreference, SyncStatus } from "../shared/sync-types.js";
 import { loadSettings } from "./chat-settings.js";
 import {
   ensureFirebaseAuthForSync,
@@ -27,6 +27,11 @@ import { formatSyncDateTime } from "./utils/format-sync-time.js";
 export interface RunCloudSyncOptions {
   /** Skip success/no-op toasts (e.g. sign-in background sync). */
   silent?: boolean;
+  /**
+   * Conflict preference for this run.
+   * Manual sync UI defaults to `local`; silent sign-in sync keeps `merge`.
+   */
+  prefer?: SyncConflictPreference;
 }
 
 async function loadMeta(): Promise<Pick<SyncStatus, "lastSyncAt" | "lastError" | "syncDay" | "syncCountToday">> {
@@ -116,7 +121,8 @@ export async function runCloudSync(
     }
 
     const remoteState = await pullRemoteSyncState(uid);
-    const plan = planSyncAction(local, remoteState?.bundle ?? null);
+    const prefer = options.prefer ?? (options.silent ? "merge" : "local");
+    const plan = planSyncAction(local, remoteState?.bundle ?? null, prefer);
     const checkedAt = new Date().toISOString();
     setSyncStatus({ compareState: plan.compareState, compareCheckedAt: checkedAt });
 

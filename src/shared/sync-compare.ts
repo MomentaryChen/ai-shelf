@@ -2,6 +2,7 @@ import { mergeSyncBundles } from "./sync-merge.js";
 import type {
   CloudSyncCompareState,
   SyncBundle,
+  SyncConflictPreference,
   SyncLayout,
   SyncProfile,
   SyncProfileGroup,
@@ -80,27 +81,47 @@ export function bundlesNormalizedEqual(a: SyncBundle, b: SyncBundle): boolean {
   return stableStringify(normalizeBundle(a)) === stableStringify(normalizeBundle(b));
 }
 
-export function planSyncAction(local: SyncBundle, remote: SyncBundle | null): SyncComparePlan {
+function compareStateFromMerge(
+  local: SyncBundle,
+  remote: SyncBundle,
+  merged: SyncBundle,
+): CloudSyncCompareState {
+  const localEqMerged = bundlesNormalizedEqual(local, merged);
+  const remoteEqMerged = bundlesNormalizedEqual(remote, merged);
+  if (localEqMerged && !remoteEqMerged) return "local_ahead";
+  if (remoteEqMerged && !localEqMerged) return "remote_ahead";
+  return "diverged";
+}
+
+export function planSyncAction(
+  local: SyncBundle,
+  remote: SyncBundle | null,
+  prefer: SyncConflictPreference = "merge",
+): SyncComparePlan {
   if (!remote) {
     return { action: "push_only", merged: local, compareState: "local_ahead" };
   }
 
-  const merged = mergeSyncBundles(local, remote);
   const localEqRemote = bundlesNormalizedEqual(local, remote);
-
   if (localEqRemote) {
-    return { action: "noop", merged, compareState: "in_sync" };
+    return { action: "noop", merged: local, compareState: "in_sync" };
   }
 
-  const localEqMerged = bundlesNormalizedEqual(local, merged);
-  const remoteEqMerged = bundlesNormalizedEqual(remote, merged);
+  const merged = mergeSyncBundles(local, remote);
+  const compareState = compareStateFromMerge(local, remote, merged);
 
-  if (localEqMerged && !remoteEqMerged) {
-    return { action: "push_only", merged, compareState: "local_ahead" };
+  if (prefer === "local") {
+    return { action: "push_only", merged: local, compareState };
   }
-  if (remoteEqMerged && !localEqMerged) {
-    return { action: "apply_only", merged, compareState: "remote_ahead" };
+  if (prefer === "cloud") {
+    return { action: "apply_only", merged: remote, compareState };
   }
 
-  return { action: "apply_and_push", merged, compareState: "diverged" };
+  if (compareState === "local_ahead") {
+    return { action: "push_only", merged, compareState };
+  }
+  if (compareState === "remote_ahead") {
+    return { action: "apply_only", merged, compareState };
+  }
+  return { action: "apply_and_push", merged, compareState };
 }

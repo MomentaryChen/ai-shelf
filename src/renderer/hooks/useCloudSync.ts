@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { SyncStatus } from "../../shared/sync-types.js";
+import type { SyncConflictPreference, SyncStatus } from "../../shared/sync-types.js";
 import { refreshCloudSyncStatus } from "../cloud-sync-status.js";
 import { runCloudSync } from "../cloud-sync-runner.js";
 import { setSyncStatus, subscribeSyncStatus } from "../sync-status-store.js";
@@ -37,9 +37,14 @@ export function useCloudSync() {
     void refreshCloudSyncStatus();
   }, [authState.signedIn, authState.user?.uid]);
 
-  const runSync = useCallback(async (): Promise<{ ok: boolean; error?: string; skipped?: boolean }> => {
-    return runCloudSync();
-  }, []);
+  const runSync = useCallback(
+    async (
+      prefer: SyncConflictPreference = "local",
+    ): Promise<{ ok: boolean; error?: string; skipped?: boolean }> => {
+      return runCloudSync({ prefer });
+    },
+    [],
+  );
 
   const refreshCompare = useCallback(async () => {
     return refreshCloudSyncStatus();
