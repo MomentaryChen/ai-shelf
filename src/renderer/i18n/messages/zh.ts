@@ -1336,4 +1336,22 @@ export const zh: Record<MessageKey, string> = {
   "regex.hint.live": "輸入時即時更新",
   "regex.error.empty": "請輸入 pattern 開始匹配。",
   "regex.error.invalid": "無效的正規表達式 — 請檢查 pattern 後再試。",
+
+  // Tools 模式 — JSON
+  "tools.tab.json": "JSON",
+  "json.subtitle": "美化或壓縮 JSON — 左邊貼上，右邊複製。可選擇依 key 排序。",
+  "json.mode.pretty": "美化",
+  "json.mode.minify": "壓縮",
+  "json.indent": "縮排",
+  "json.sortKeys": "排序 key",
+  "json.input": "輸入",
+  "json.output": "輸出",
+  "json.inputPlaceholder": "在此貼上 JSON…",
+  "json.outputPlaceholder": "格式化結果會顯示在這裡",
+  "json.copy": "複製",
+  "json.copied": "已複製",
+  "json.swap": "當作輸入",
+  "json.clear": "清除",
+  "json.hint.live": "輸入時即時更新",
+  "json.error.invalid": "無法解析此 JSON — 請檢查結尾逗號或引號後再試。",
 };

@@ -1365,6 +1365,25 @@ export const en = {
   "regex.hint.live": "Updates as you type",
   "regex.error.empty": "Enter a pattern to start matching.",
   "regex.error.invalid": "Invalid regex — check the pattern and try again.",
+
+  // Tools mode — JSON
+  "tools.tab.json": "JSON",
+  "json.subtitle":
+    "Pretty-print or minify JSON — paste on the left, copy from the right. Optional key sorting.",
+  "json.mode.pretty": "Pretty",
+  "json.mode.minify": "Minify",
+  "json.indent": "Indent",
+  "json.sortKeys": "Sort keys",
+  "json.input": "Input",
+  "json.output": "Output",
+  "json.inputPlaceholder": "Paste JSON here…",
+  "json.outputPlaceholder": "Formatted result appears here",
+  "json.copy": "Copy",
+  "json.copied": "Copied",
+  "json.swap": "Use as input",
+  "json.clear": "Clear",
+  "json.hint.live": "Updates as you type",
+  "json.error.invalid": "Could not parse this JSON — check for trailing commas or quotes.",
 } as const;
 
 export type MessageKey = keyof typeof en;
