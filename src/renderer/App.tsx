@@ -72,6 +72,12 @@ const TimeToolsTab = lazy(() =>
 const CronToolsTab = lazy(() =>
   import("./components/CronToolsTab").then((m) => ({ default: m.CronToolsTab })),
 );
+const RegexToolsTab = lazy(() =>
+  import("./components/RegexToolsTab").then((m) => ({ default: m.RegexToolsTab })),
+);
+const JsonToolsTab = lazy(() =>
+  import("./components/JsonToolsTab").then((m) => ({ default: m.JsonToolsTab })),
+);
 const JwtToolsTab = lazy(() =>
   import("./components/JwtToolsTab").then((m) => ({ default: m.JwtToolsTab })),
 );
@@ -100,7 +106,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "crypto" | "time" | "cron" | "jwt";
+type ToolId = "codec" | "crypto" | "time" | "cron" | "regex" | "json" | "jwt";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -202,6 +208,8 @@ const TOOL_ICONS: Record<ToolId, string> = {
   crypto: "🗝️",
   time: "🕒",
   cron: "⏰",
+  regex: "🔤",
+  json: "{}",
   jwt: "🪪",
 };
 
@@ -210,6 +218,8 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   crypto: "tools.tab.crypto",
   time: "tools.tab.time",
   cron: "tools.tab.cron",
+  regex: "tools.tab.regex",
+  json: "tools.tab.json",
   jwt: "tools.tab.jwt",
 };
 
@@ -399,7 +409,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
+          "tools codec crypto time cron regex json hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify",
         run: () => handleModeChange("tools"),
       },
       {
@@ -459,9 +469,13 @@ export function App() {
             ? "crypto aes rsa ecdsa encrypt decrypt sign verify key pem"
             : it.id === "cron"
               ? "cron schedule expression timezone preset"
-              : it.id === "jwt"
-                ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
-                : "codec hash base64 image md5 tools",
+              : it.id === "regex"
+                ? "regex regexp match replace flags capture preset pattern"
+                : it.id === "json"
+                  ? "json format minify pretty beautify validate sort keys"
+                  : it.id === "jwt"
+                    ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
+                    : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -485,7 +499,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron jwt hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule token decode verify",
+          "tools codec crypto time cron regex json jwt hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify token decode verify",
         run: () => handleModeChange("tools"),
       },
       {
@@ -531,7 +545,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
+          "tools codec crypto time cron regex json hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify",
         run: () => handleModeChange("tools"),
       },
       {
@@ -763,6 +777,8 @@ export function App() {
                   {activeTool === "crypto" && <CryptoToolsTab />}
                   {activeTool === "time" && <TimeToolsTab />}
                   {activeTool === "cron" && <CronToolsTab />}
+                  {activeTool === "regex" && <RegexToolsTab />}
+                  {activeTool === "json" && <JsonToolsTab />}
                   {activeTool === "jwt" && <JwtToolsTab />}
                 </Suspense>
               </ViewTransition>
