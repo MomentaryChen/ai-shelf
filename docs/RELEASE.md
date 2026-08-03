@@ -1,6 +1,6 @@
 # Release guide
 
-How maintainers ship **AI Shelf** desktop builds and how Windows users install them.
+How maintainers ship **AI Shelf** desktop builds and how users install them on Windows, macOS, and Linux.
 
 ---
 
@@ -9,10 +9,10 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
 ### Prerequisites
 
 - Node.js ≥ 22, pnpm ≥ 10.12.1
-- Windows machine (or rely on CI) for `pnpm dist:win`
+- Prefer GitHub Actions for packaged builds (`release-windows` / `release-mac` / `release-linux`). Local packaging needs the matching OS (`pnpm dist:win` on Windows, `pnpm dist:mac` on macOS, `pnpm dist:linux` on Linux).
 - **ffmpeg** on `PATH` when running `pnpm gen:docs-assets` locally (GIF step; Windows: `choco install ffmpeg` or [ffmpeg builds](https://www.gyan.dev/ffmpeg/builds/))
 - Git tag `vX.Y.Z` must match the release version (e.g. tag `v2.0.0` ↔ `2.0.0`). CI runs [scripts/sync-version-from-tag.mjs](../scripts/sync-version-from-tag.mjs) so root and `packages/cli` `version` fields align with the tag before build/publish.
-- **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; the Windows installer job still runs.
+- **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; desktop installer jobs still run.
 
 ### Pre-release checklist
 
@@ -33,10 +33,10 @@ How maintainers ship **AI Shelf** desktop builds and how Windows users install t
    - Individual targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
    - Skip only when the release has **no** UI/visual changes
    - Commit the updated image files with the release
-5. [ ] Local smoke test: `pnpm dist:win` → install `release/AI-Shelf-Setup-<version>.exe`
+5. [ ] Local smoke test when you can: `pnpm dist:win` (Windows), or rely on CI for macOS/Linux packages
 6. [ ] [CHANGELOG.md](../CHANGELOG.md) updated for user-facing changes
 7. [ ] README version badge (`**vX.Y.Z**`) matches the release
-8. [ ] Release workflow reports **Authenticode signature present** (self-signed; SmartScreen may still warn — see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md))
+8. [ ] Windows job reports **Authenticode signature present** (self-signed; SmartScreen may still warn — see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md)). macOS/Linux builds are **unsigned** for now.
 
 ### Publish via GitHub Actions (recommended)
 
@@ -47,9 +47,12 @@ git tag -a v1.0.0 -m "AI Shelf 1.0.0"
 git push origin v1.0.0
 ```
 
-1. Open **Actions** → **Release** workflow on the tag commit (two jobs: **Publish ai-shelf to npm** + **release-windows**)
-2. When both are green, open **Releases** on GitHub
-3. Confirm release assets include **`AI-Shelf-Setup-<version>.exe`**, **`latest.yml`**, and **`*.blockmap`** (required for in-app auto-update via `electron-updater`)
+1. Open **Actions** → **Release** workflow on the tag commit (`publish-npm`, `create-release`, then `release-windows` / `release-mac` / `release-linux`)
+2. When desktop jobs are green, open **Releases** on GitHub
+3. Confirm release assets include:
+   - Windows: **`AI-Shelf-Setup-<version>.exe`**, **`latest.yml`**, **`*.blockmap`**
+   - macOS: **`AI-Shelf-<version>-arm64.dmg`**, **`AI-Shelf-<version>-x64.dmg`**, matching **`.zip`**, **`latest-mac.yml`**
+   - Linux: **`AI-Shelf-<version>.AppImage`**, **`latest-linux.yml`**
 4. Confirm **`ai-shelf@<version>`** on [npm](https://www.npmjs.com/package/ai-shelf): `npm view ai-shelf version`
 5. Confirm the **release description** matches **[CHANGELOG.md](../CHANGELOG.md)** for that version (CI builds it via [scripts/release-notes.mjs](../scripts/release-notes.mjs))
 6. Optionally tweak wording on GitHub only for hotfixes — then mirror edits back into `CHANGELOG.md` so they stay aligned
@@ -74,15 +77,34 @@ Before tagging: ensure `CHANGELOG.md` has a `## [<version>]` section with the bu
 
 ### Publish manually (fallback)
 
-**Desktop (Windows installer):**
+Package on the matching OS, then upload the artifacts listed below to a GitHub Release. Do **not** attach unpacked folders (`*-unpacked`) for end users.
+
+**Windows:**
 
 ```powershell
 pnpm install
-pnpm build
 pnpm dist:win
 ```
 
-Upload `release/AI-Shelf-Setup-<version>.exe`, `release/latest.yml`, and `release/*.blockmap` to a GitHub Release. Do **not** attach portable builds or `win-unpacked` folders for end users.
+Upload `release/AI-Shelf-Setup-<version>.exe`, `release/latest.yml`, and `release/*.blockmap`.
+
+**macOS** (must run on a Mac; unsigned):
+
+```bash
+pnpm install
+CSC_IDENTITY_AUTO_DISCOVERY=false pnpm dist:mac
+```
+
+Upload `release/AI-Shelf-<version>-*.dmg`, matching `.zip`, `release/latest-mac.yml`, and `release/*.blockmap`.
+
+**Linux:**
+
+```bash
+pnpm install
+pnpm dist:linux
+```
+
+Upload `release/AI-Shelf-<version>.AppImage` and `release/latest-linux.yml`.
 
 **CLI (npm):**
 
@@ -96,59 +118,72 @@ npm publish --access public
 
 Requires `npm login` locally and publish rights on the `ai-shelf` package.
 
-### Developer-only targets
+### Desktop package targets
 
 | Script | Output | Ship to users? |
 |--------|--------|----------------|
 | `pnpm dist:win` | `release/AI-Shelf-Setup-<version>.exe` (NSIS) | Yes |
+| `pnpm dist:mac` | `release/AI-Shelf-<version>-{arm64,x64}.dmg` + `.zip` | Yes (unsigned) |
+| `pnpm dist:linux` | `release/AI-Shelf-<version>.AppImage` | Yes (unsigned) |
 | `pnpm dist:win:portable` | portable `.exe` in `release/` | No |
 | `pnpm package:win` | `dist/ai-shelf.exe` (CLI only, pkg) | No |
 
 ### Code signing
 
-Every release tag build is **self-signed** in CI (no secrets required). The installer has an Authenticode signature, but Windows **does not trust** self-signed publishers — SmartScreen may still warn.
-
-Details and optional local signed builds: **[docs/WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md)**.
+| Platform | Current policy |
+|----------|----------------|
+| Windows | **Self-signed** Authenticode in CI (SmartScreen may warn). See [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md). |
+| macOS | **Unsigned** (`CSC_IDENTITY_AUTO_DISCOVERY=false`). Gatekeeper will block until the user allows the app (right-click → Open, or remove quarantine). |
+| Linux | **Unsigned** AppImage — mark executable (`chmod +x`) and run. |
 
 ---
 
-## For Windows users
+## For users
 
-### Install
+### Windows
 
 1. Go to [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases)
-2. Download **`AI-Shelf-Setup-<version>.exe`** (the installer only)
-3. Run the installer and follow the wizard (desktop / Start menu shortcuts are created)
+2. Download **`AI-Shelf-Setup-<version>.exe`**
+3. Run the installer and follow the wizard
 4. Launch **AI Shelf** from the Start menu or desktop
 
-### SmartScreen (unsigned builds)
+If Windows shows **“Windows protected your PC”**: **More info** → **Run anyway**. Expected for self-signed builds; see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md).
 
-If Windows shows **“Windows protected your PC”**:
+**Requirements:** Windows 10 or 11 (64-bit). AI CLIs must be installed separately on `PATH`. Node.js is not required for the installed app.
 
-1. Click **More info**
-2. Click **Run anyway**
+**Uninstall:** **Settings → Apps → Installed apps → AI Shelf → Uninstall**.
 
-This is expected for **self-signed** builds (and fully unsigned builds). Choose **More info** → **Run anyway**. A CA-trusted certificate would show a verified publisher; see [WINDOWS_CODE_SIGNING.md](WINDOWS_CODE_SIGNING.md).
+### macOS (unsigned)
 
-### Requirements
+1. Download **`AI-Shelf-<version>-arm64.dmg`** (Apple Silicon) or **`AI-Shelf-<version>-x64.dmg`** (Intel)
+2. Open the DMG and drag **AI Shelf** to Applications
+3. First launch: if macOS says the app can’t be opened, **right-click the app → Open**, or clear quarantine:
 
-- Windows 10 or 11 (64-bit)
-- AI CLIs (`claude`, `copilot`, `agent`, etc.) must be installed separately and available on `PATH` for inventory and launch features
-- Node.js is **not** required for the installed desktop app (only for building from source)
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/AI Shelf.app"
+   ```
 
-### In-app updates (desktop installer)
+### Linux (unsigned)
 
-Installed **NSIS** builds check [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) on startup (after a short delay). When a newer version exists, a dialog asks to download; progress shows 0–100%, then you confirm **Restart** to finish installing.
+1. Download **`AI-Shelf-<version>.AppImage`**
+2. Make it executable and run:
+
+   ```bash
+   chmod +x AI-Shelf-<version>.AppImage
+   ./AI-Shelf-<version>.AppImage
+   ```
+
+   Packages use electron-builder’s static AppImage runtime (`toolsets.appimage: "1.0.3"`), so **libfuse2 is not required** on modern distros.
+
+### In-app updates
+
+Packaged desktop builds check [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) on startup (after a short delay). When a newer version exists, a dialog asks to download; progress shows 0–100%, then you confirm **Restart** to finish installing.
 
 - **First time** this feature ships: install that release manually once; later upgrades can stay in-app.
-- **Self-signed builds**: SmartScreen may appear when running the installer or in-app updates (same workaround: **More info** → **Run anyway**).
+- Windows self-signed builds may still hit SmartScreen on update installers.
 - **Dev / `electron .`**: no update checks (not packaged).
 
-Maintainers: `package.json` → `build.publish` must point at this repo; CI must upload `latest.yml` (see workflow above).
-
-### Uninstall
-
-**Settings → Apps → Installed apps → AI Shelf → Uninstall**, or use **Add or remove programs**.
+Maintainers: `package.json` → `build.publish` must point at this repo; CI must upload `latest.yml` / `latest-mac.yml` / `latest-linux.yml`.
 
 ---
 
@@ -158,6 +193,8 @@ Maintainers: `package.json` → `build.publish` must point at this repo; CI must
 |------|---------|
 | Git tag | `v1.0.0` |
 | `package.json` version | `1.0.0` |
-| Installer filename | `AI-Shelf-Setup-1.0.0.exe` |
+| Windows installer | `AI-Shelf-Setup-1.0.0.exe` |
+| macOS DMG | `AI-Shelf-1.0.0-arm64.dmg` |
+| Linux AppImage | `AI-Shelf-1.0.0.AppImage` |
 | Electron `app.getVersion()` | `1.0.0` |
 | npm package `ai-shelf` | `1.0.0` |

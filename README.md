@@ -249,6 +249,8 @@ pnpm lint
 pnpm format / pnpm format:check
 pnpm package:win             # standalone CLI exe (pkg)
 pnpm dist:win                # Windows NSIS installer → release/AI-Shelf-Setup-<version>.exe
+pnpm dist:mac                # macOS DMG/ZIP (unsigned; run on macOS) → release/AI-Shelf-<version>-*.dmg
+pnpm dist:linux              # Linux AppImage (unsigned; run on Linux) → release/AI-Shelf-<version>.AppImage
 pnpm dist:win:portable       # dev-only portable exe (do not ship to users)
 ```
 

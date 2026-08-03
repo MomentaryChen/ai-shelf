@@ -233,7 +233,13 @@ function getTrayDeps(): TrayDeps {
 }
 
 const RENDERER_DIR = join(import.meta.dirname, "..", "renderer");
-const APP_ICON = join(import.meta.dirname, "..", "assets", "icon.ico");
+/** Windows prefers .ico; macOS/Linux use PNG (also used by electron-builder). */
+const APP_ICON = join(
+  import.meta.dirname,
+  "..",
+  "assets",
+  process.platform === "win32" ? "icon.ico" : "icon.png",
+);
 
 const sharedWebPreferences = {
   preload: join(import.meta.dirname, "preload.cjs"),

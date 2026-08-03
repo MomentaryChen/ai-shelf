@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **macOS and Linux desktop packages** — CI builds unsigned macOS DMG/ZIP (`arm64` + `x64`) and Linux AppImage (static runtime, no FUSE2) alongside the Windows installer; see [RELEASE.md](docs/RELEASE.md).
+
 ## [3.9.0] - 2026-07-17
 
 Terminal directory tracking, GPU rendering, richer find and status bar, plus smarter Flow authoring.

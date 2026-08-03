@@ -248,6 +248,8 @@ pnpm lint
 pnpm format / pnpm format:check
 pnpm package:win             # 獨立 CLI exe（pkg）
 pnpm dist:win                # Windows NSIS 安裝程式 → release/AI-Shelf-Setup-<version>.exe
+pnpm dist:mac                # macOS DMG/ZIP（未簽名；需在 macOS 上執行）→ release/AI-Shelf-<version>-*.dmg
+pnpm dist:linux              # Linux AppImage（未簽名；需在 Linux 上執行）→ release/AI-Shelf-<version>.AppImage
 pnpm dist:win:portable       # 僅開發用 portable（勿提供給使用者）
 ```
 
