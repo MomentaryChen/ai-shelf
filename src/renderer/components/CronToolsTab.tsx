@@ -107,7 +107,7 @@ export function CronToolsTab() {
 
       <Card>
         <div className="flex flex-col gap-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_minmax(12rem,16rem)]">
+          <div className="grid gap-3 @md:grid-cols-[1fr_minmax(12rem,16rem)]">
             <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={expressionId} className="text-[12px] font-medium text-text-secondary">
                 {t("cron.expression")}
@@ -162,16 +162,20 @@ export function CronToolsTab() {
                     title={preset.cron}
                   >
                     <span>{t(PRESET_LABEL_KEYS[preset.id])}</span>
-                    <span className="ml-1.5 font-mono text-[11px] opacity-70">{preset.cron}</span>
+                    <span className="ml-1.5 hidden font-mono text-[11px] opacity-70 @sm:inline">
+                      {preset.cron}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid items-start gap-3 @md:grid-cols-2">
             <div className="rounded-[22px] bg-bg-primary/60 px-3.5 py-3">
-              <p className="mb-2 text-[12px] font-medium text-text-secondary">{t("cron.fields")}</p>
+              <p className="mb-2 flex h-8 items-center text-[12px] font-medium text-text-secondary">
+                {t("cron.fields")}
+              </p>
               <ul className="flex flex-col gap-1.5">
                 {CRON_FIELD_ORDER.map((field) => {
                   const value = preview.ok ? preview.parts[field] : "—";
@@ -199,7 +203,9 @@ export function CronToolsTab() {
             </div>
 
             <div className="rounded-[22px] bg-bg-primary/60 px-3.5 py-3">
-              <p className="mb-2 text-[12px] font-medium text-text-secondary">{t("cron.nextRuns")}</p>
+              <p className="mb-2 flex h-8 items-center text-[12px] font-medium text-text-secondary">
+                {t("cron.nextRuns")}
+              </p>
               {preview.ok ? (
                 <ol className="flex flex-col gap-1.5 tabular-nums">
                   {preview.nextRuns.map((run, index) => (

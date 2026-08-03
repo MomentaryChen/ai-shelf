@@ -69,6 +69,7 @@ function CopyButton({ value }: { value: string }) {
       variant="ghost"
       size="sm"
       disabled={!value || value === "—"}
+      title={copied ? t("time.copied") : t("time.copy")}
       className="h-8 shrink-0 px-2 text-[12px]"
       onClick={() => {
         void (async () => {
@@ -84,7 +85,7 @@ function CopyButton({ value }: { value: string }) {
       }}
     >
       {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? t("time.copied") : t("time.copy")}
+      <span className="hidden @sm:inline">{copied ? t("time.copied") : t("time.copy")}</span>
     </Button>
   );
 }
@@ -164,7 +165,7 @@ export function TimeToolsTab() {
               {t("time.useNow")}
             </Button>
           </div>
-          <div className="grid gap-2 font-mono text-[12px] leading-relaxed text-text-primary sm:grid-cols-2">
+          <div className="grid gap-2 font-mono text-[12px] leading-relaxed text-text-primary @sm:grid-cols-2">
             <div>
               <span className="text-text-tertiary">UTC</span>
               <div className="truncate">{nowFormats.isoUtc}</div>
@@ -187,7 +188,7 @@ export function TimeToolsTab() {
 
       <Card>
         <div className="flex flex-col gap-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <div className="grid gap-3 @md:grid-cols-[1fr_auto] @md:items-end">
             <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
                 {t("time.input")}
@@ -211,7 +212,7 @@ export function TimeToolsTab() {
                 onValueChange={(v) => {
                   if (v) setUnitMode(v as UnitMode);
                 }}
-                className="gap-1"
+                className="flex-wrap gap-1"
               >
                 {UNIT_MODES.map((mode) => (
                   <ToggleGroupItem key={mode.id} value={mode.id} size="sm">
@@ -250,8 +251,8 @@ export function TimeToolsTab() {
           )}
 
           {rows.length > 0 && (
-            <div className="overflow-hidden rounded-[22px] border border-border">
-              <table className="w-full text-left text-[13px]">
+            <div className="overflow-x-auto rounded-[22px] border border-border">
+              <table className="w-full min-w-[28rem] text-left text-[13px]">
                 <tbody>
                   {rows.map((row, i) => (
                     <tr
@@ -260,7 +261,7 @@ export function TimeToolsTab() {
                     >
                       <th
                         scope="row"
-                        className="w-[140px] px-3 py-2 align-middle text-[12px] font-medium text-text-secondary"
+                        className="w-[7.5rem] shrink-0 px-3 py-2 align-middle text-[12px] font-medium text-text-secondary @md:w-[140px]"
                       >
                         {t(row.labelKey)}
                       </th>

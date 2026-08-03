@@ -42,7 +42,7 @@ const TOOLS: { id: ToolId; labelKey: MessageKey }[] = [
 ];
 
 const fieldClass =
-  "min-h-[120px] max-h-[220px] resize-y overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary";
+  "h-[180px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
 
 const monoInputClass =
   "h-9 border-border bg-bg-primary font-mono text-[13px] text-text-primary placeholder:text-text-tertiary";
@@ -290,9 +290,9 @@ export function CryptoToolsTab() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label className="text-[12px] font-medium text-text-secondary">
                     {t("crypto.key")}
                   </Label>
@@ -316,7 +316,7 @@ export function CryptoToolsTab() {
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label className="text-[12px] font-medium text-text-secondary">
                     {t("crypto.iv")}
                   </Label>
@@ -341,11 +341,13 @@ export function CryptoToolsTab() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor={aesInId} className="text-[12px] font-medium text-text-secondary">
-                  {aesAction === "encrypt" ? t("crypto.plaintext") : t("crypto.ciphertext")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label htmlFor={aesInId} className="text-[12px] font-medium text-text-secondary">
+                    {aesAction === "encrypt" ? t("crypto.plaintext") : t("crypto.ciphertext")}
+                  </Label>
+                </div>
                 <Textarea
                   id={aesInId}
                   value={aesInput}
@@ -360,7 +362,7 @@ export function CryptoToolsTab() {
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label htmlFor={aesOutId} className="text-[12px] font-medium text-text-secondary">
                     {t("crypto.output")}
                   </Label>
@@ -369,6 +371,7 @@ export function CryptoToolsTab() {
                     variant="ghost"
                     size="sm"
                     disabled={!aesOutput}
+                    title={copied ? t("crypto.copied") : t("crypto.copy")}
                     className="h-8 px-2 text-[12px]"
                     onClick={() => void markCopied(aesOutput)}
                   >
@@ -377,7 +380,7 @@ export function CryptoToolsTab() {
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
-                    {copied ? t("crypto.copied") : t("crypto.copy")}
+                    <span className="hidden @sm:inline">{copied ? t("crypto.copied") : t("crypto.copy")}</span>
                   </Button>
                 </div>
                 <Textarea
@@ -469,11 +472,13 @@ export function CryptoToolsTab() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label className="text-[12px] font-medium text-text-secondary">
-                  {t("crypto.publicKey")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label className="text-[12px] font-medium text-text-secondary">
+                    {t("crypto.publicKey")}
+                  </Label>
+                </div>
                 <Textarea
                   value={rsaPublic}
                   onChange={(e) => setRsaPublic(e.target.value)}
@@ -483,9 +488,11 @@ export function CryptoToolsTab() {
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label className="text-[12px] font-medium text-text-secondary">
-                  {t("crypto.privateKey")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label className="text-[12px] font-medium text-text-secondary">
+                    {t("crypto.privateKey")}
+                  </Label>
+                </div>
                 <Textarea
                   value={rsaPrivate}
                   onChange={(e) => setRsaPrivate(e.target.value)}
@@ -511,11 +518,13 @@ export function CryptoToolsTab() {
               </div>
             )}
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor={rsaInId} className="text-[12px] font-medium text-text-secondary">
-                  {rsaAction === "decrypt" ? t("crypto.ciphertext") : t("crypto.message")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label htmlFor={rsaInId} className="text-[12px] font-medium text-text-secondary">
+                    {rsaAction === "decrypt" ? t("crypto.ciphertext") : t("crypto.message")}
+                  </Label>
+                </div>
                 <Textarea
                   id={rsaInId}
                   value={rsaInput}
@@ -526,7 +535,7 @@ export function CryptoToolsTab() {
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label htmlFor={rsaOutId} className="text-[12px] font-medium text-text-secondary">
                     {t("crypto.output")}
                   </Label>
@@ -535,6 +544,7 @@ export function CryptoToolsTab() {
                     variant="ghost"
                     size="sm"
                     disabled={!rsaOutput}
+                    title={copied ? t("crypto.copied") : t("crypto.copy")}
                     className="h-8 px-2 text-[12px]"
                     onClick={() => void markCopied(rsaOutput)}
                   >
@@ -543,7 +553,7 @@ export function CryptoToolsTab() {
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
-                    {copied ? t("crypto.copied") : t("crypto.copy")}
+                    <span className="hidden @sm:inline">{copied ? t("crypto.copied") : t("crypto.copy")}</span>
                   </Button>
                 </div>
                 <Textarea
@@ -636,11 +646,13 @@ export function CryptoToolsTab() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label className="text-[12px] font-medium text-text-secondary">
-                  {t("crypto.publicKey")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label className="text-[12px] font-medium text-text-secondary">
+                    {t("crypto.publicKey")}
+                  </Label>
+                </div>
                 <Textarea
                   value={ecPublic}
                   onChange={(e) => setEcPublic(e.target.value)}
@@ -650,9 +662,11 @@ export function CryptoToolsTab() {
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label className="text-[12px] font-medium text-text-secondary">
-                  {t("crypto.privateKey")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label className="text-[12px] font-medium text-text-secondary">
+                    {t("crypto.privateKey")}
+                  </Label>
+                </div>
                 <Textarea
                   value={ecPrivate}
                   onChange={(e) => setEcPrivate(e.target.value)}
@@ -678,11 +692,13 @@ export function CryptoToolsTab() {
               </div>
             )}
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor={ecInId} className="text-[12px] font-medium text-text-secondary">
-                  {t("crypto.message")}
-                </Label>
+                <div className="flex h-8 min-w-0 items-center">
+                  <Label htmlFor={ecInId} className="text-[12px] font-medium text-text-secondary">
+                    {t("crypto.message")}
+                  </Label>
+                </div>
                 <Textarea
                   id={ecInId}
                   value={ecInput}
@@ -693,7 +709,7 @@ export function CryptoToolsTab() {
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                   <Label htmlFor={ecOutId} className="text-[12px] font-medium text-text-secondary">
                     {t("crypto.output")}
                   </Label>
@@ -702,6 +718,7 @@ export function CryptoToolsTab() {
                     variant="ghost"
                     size="sm"
                     disabled={!ecOutput}
+                    title={copied ? t("crypto.copied") : t("crypto.copy")}
                     className="h-8 px-2 text-[12px]"
                     onClick={() => void markCopied(ecOutput)}
                   >
@@ -710,7 +727,7 @@ export function CryptoToolsTab() {
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
-                    {copied ? t("crypto.copied") : t("crypto.copy")}
+                    <span className="hidden @sm:inline">{copied ? t("crypto.copied") : t("crypto.copy")}</span>
                   </Button>
                 </div>
                 <Textarea

@@ -1,6 +1,6 @@
 # AI Shelf
 
-![Terminal 模式 — 建立 Profile、雙開窗格、廣播輸入](docs/assets/terminal-demo.gif)
+![Terminal 模式 — 建立 Profile、雙開窗格、廣播輸入](docs/assets/zh/terminal-demo.gif)
 
 > 統一工具集：一次檢視、啟動與編排 Claude Code、GitHub Copilot、Cursor 等 AI CLI。
 
@@ -8,7 +8,7 @@
 
 [English](README.md) · [Changelog](CHANGELOG.md)
 
-**v4.0.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
+**v4.1.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
 
 ---
 
@@ -73,7 +73,7 @@
 
 ## 桌面應用
 
-![Overview](tests/screenshots/01.overview.png)
+![Overview](tests/screenshots/zh/01.overview.png)
 
 在標題列切換 **Terminal** 與 **Inventory**。Inventory 模式為上圖的分頁儀表板；Terminal 模式為內嵌多窗格啟動器與 Profile 側欄。
 

@@ -14,9 +14,13 @@ How maintainers ship **AI Shelf** desktop builds and how users install them on W
 - Git tag `vX.Y.Z` must match the release version (e.g. tag `v2.0.0` ↔ `2.0.0`). CI runs [scripts/sync-version-from-tag.mjs](../scripts/sync-version-from-tag.mjs) so root and `packages/cli` `version` fields align with the tag before build/publish.
 - **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; desktop installer jobs still run.
 
+### Branch flow
+
+Normal releases: **`develop` → `release/vX.Y.Z` → `main` → tag `vX.Y.Z`**, then sync **`develop` ← `main`**. Do not tag from `develop`. Agent workflow: [.cursor/skills/ai-shelf-release/SKILL.md](../.cursor/skills/ai-shelf-release/SKILL.md).
+
 ### Pre-release checklist
 
-1. [ ] All changes committed and pushed to `main`
+1. [ ] Release prep committed on `develop`, `release/vX.Y.Z` created and merged into `main`
 2. [ ] Root and `packages/cli` `version` fields match the intended release
 3. [ ] `pnpm lint`
 4. [ ] **Docs visuals** — if this release changes the desktop UI, refresh README / pages screenshots **locally on Windows before** tagging:
@@ -25,12 +29,12 @@ How maintainers ship **AI Shelf** desktop builds and how users install them on W
    pnpm gen:docs-assets
    ```
 
-   - Regenerates `tests/screenshots/*.png` and `docs/assets/terminal-demo.gif`
+   - Regenerates `tests/screenshots/{en,zh}/*.png` and `docs/assets/{en,zh}/terminal-demo.gif`
    - Requires a **Windows desktop** (Electron display) and **ffmpeg** on `PATH`
    - Terminal screenshots use an isolated **Demo** profile group (`tests/e2e/helpers/docs-demo-workspace.ts`), not your real workspace
-   - Locale is pinned to **zh** (`AISHELF_DOCS_LOCALE`) to match [pages.zh-TW.md](pages.zh-TW.md)
+   - Runs **both** locales (`en` + `zh`) so English README/`pages.md` and Chinese README/`pages.zh-TW.md` each get matching UI screenshots
    - Inventory tabs still reflect CLIs installed on your machine — review before committing
-   - Individual targets: `pnpm test:e2e` (PNGs only), `pnpm gen:terminal-demo-gif` (GIF only)
+   - Individual targets: `pnpm test:e2e` with `AISHELF_DOCS_LOCALE=en|zh` (PNGs only), `pnpm gen:terminal-demo-gif` (GIFs for both locales; set `AISHELF_DOCS_LOCALE` for one)
    - Skip only when the release has **no** UI/visual changes
    - Commit the updated image files with the release
 5. [ ] Local smoke test when you can: `pnpm dist:win` (Windows), or rely on CI for macOS/Linux packages
@@ -40,9 +44,11 @@ How maintainers ship **AI Shelf** desktop builds and how users install them on W
 
 ### Publish via GitHub Actions (recommended)
 
-Pushing an annotated tag triggers [.github/workflows/release.yml](../.github/workflows/release.yml):
+After `release/vX.Y.Z` is merged into `main`, push an annotated tag **on `main`**. That triggers [.github/workflows/release.yml](../.github/workflows/release.yml):
 
 ```powershell
+git switch main
+git pull --ff-only origin main
 git tag -a v1.0.0 -m "AI Shelf 1.0.0"
 git push origin v1.0.0
 ```

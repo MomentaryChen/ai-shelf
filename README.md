@@ -1,6 +1,6 @@
 # AI Shelf
 
-![Terminal mode — create profile, dual panes, broadcast input](docs/assets/terminal-demo.gif)
+![Terminal mode — create profile, dual panes, broadcast input](docs/assets/en/terminal-demo.gif)
 
 > Unified toolkit to inspect, launch, and orchestrate AI CLIs — Claude Code, GitHub Copilot, and Cursor — in one place.
 
@@ -8,7 +8,7 @@
 
 [中文說明](README.zh-TW.md) · [Changelog](CHANGELOG.md)
 
-**v4.0.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
+**v4.1.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
 
 ---
 
@@ -73,7 +73,7 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 
 ## Desktop app
 
-![Overview](tests/screenshots/01.overview.png)
+![Overview](tests/screenshots/en/01.overview.png)
 
 Switch between **Terminal** and **Inventory** in the header. Inventory mode has the tabbed dashboard above; Terminal mode is the embedded multi-pane launcher with a profiles sidebar.
 
@@ -244,7 +244,7 @@ pnpm rebuild:native:all      # all installed Electron versions
 
 # Quality & packaging
 pnpm test:e2e                # Playwright screenshot tests
-pnpm gen:docs-assets         # refresh README/docs PNGs + GIF before release (Windows + ffmpeg)
+pnpm gen:docs-assets         # refresh README/docs PNGs + GIFs (en+zh) before release (Windows + ffmpeg)
 pnpm lint
 pnpm format / pnpm format:check
 pnpm package:win             # standalone CLI exe (pkg)

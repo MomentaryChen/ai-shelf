@@ -4,13 +4,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { waitForTerminalPane } from "./helpers/docs-locale.js";
+import { DOCS_SCREENSHOT_LOCALE, waitForTerminalPane } from "./helpers/docs-locale.js";
 import { prepareDocsSession } from "./helpers/docs-demo-workspace.js";
 import { launchDocsElectron } from "./helpers/launch-docs-electron.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FRAMES_DIR = join(__dirname, "../artifacts/terminal-demo-frames");
-const OUT_GIF = join(__dirname, "../../docs/assets/terminal-demo.gif");
+const FRAMES_DIR = join(__dirname, "../artifacts/terminal-demo-frames", DOCS_SCREENSHOT_LOCALE);
+/** Locale-specific GIF: `docs/assets/en/terminal-demo.gif` or `docs/assets/zh/...`. */
+const OUT_GIF = join(__dirname, "../../docs/assets", DOCS_SCREENSHOT_LOCALE, "terminal-demo.gif");
 const DEMO_PROFILE = "Broadcast demo";
 
 const CONTENT_TIMEOUT = 120_000;
