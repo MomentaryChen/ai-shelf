@@ -69,6 +69,9 @@ const CryptoToolsTab = lazy(() =>
 const TimeToolsTab = lazy(() =>
   import("./components/TimeToolsTab").then((m) => ({ default: m.TimeToolsTab })),
 );
+const CronToolsTab = lazy(() =>
+  import("./components/CronToolsTab").then((m) => ({ default: m.CronToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -94,7 +97,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "crypto" | "time";
+type ToolId = "codec" | "crypto" | "time" | "cron";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -195,12 +198,14 @@ const TOOL_ICONS: Record<ToolId, string> = {
   codec: "🔐",
   crypto: "🗝️",
   time: "🕒",
+  cron: "⏰",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   codec: "tools.tab.codec",
   crypto: "tools.tab.crypto",
   time: "tools.tab.time",
+  cron: "tools.tab.cron",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -389,7 +394,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time hash base64 image aes rsa ecdsa md5 timestamp unix timezone",
+          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
         run: () => handleModeChange("tools"),
       },
       {
@@ -447,7 +452,9 @@ export function App() {
           ? "time timestamp unix timezone utc epoch ms us ns iso"
           : it.id === "crypto"
             ? "crypto aes rsa ecdsa encrypt decrypt sign verify key pem"
-            : "codec hash base64 image md5 tools",
+            : it.id === "cron"
+              ? "cron schedule expression timezone preset"
+              : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -471,7 +478,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time hash base64 image aes rsa ecdsa md5 timestamp unix timezone",
+          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
         run: () => handleModeChange("tools"),
       },
       {
@@ -517,7 +524,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time hash base64 image aes rsa ecdsa md5 timestamp unix timezone",
+          "tools codec crypto time cron hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule",
         run: () => handleModeChange("tools"),
       },
       {
@@ -748,6 +755,7 @@ export function App() {
                   {activeTool === "codec" && <CodecToolsTab />}
                   {activeTool === "crypto" && <CryptoToolsTab />}
                   {activeTool === "time" && <TimeToolsTab />}
+                  {activeTool === "cron" && <CronToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>
