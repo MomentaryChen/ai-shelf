@@ -13,9 +13,10 @@ import type { AuthErrorReason } from "../firebase/auth-errors";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { useCloudSync } from "../hooks/useCloudSync";
 import { syncLimitsSummary } from "../firebase/sync-limit-messages";
-import type { CloudSyncCompareState } from "../../shared/sync-types.js";
+import type { CloudSyncCompareState, SyncConflictPreference } from "../../shared/sync-types.js";
 import type { MessageKey } from "../i18n/messages/en";
 import { formatSyncDateTime } from "../utils/format-sync-time.js";
+import { CloudSyncPreferDialog } from "./CloudSyncPreferDialog";
 
 const AUTH_ERROR_KEYS: Partial<Record<AuthErrorReason, MessageKey>> = {
   "not_configured": "settings.accountNotConfigured",
@@ -131,6 +132,8 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
   const { state, busy, authError, signIn, signOut } = useAuthSession();
   const { status: syncStatus, runSync, refreshCompare } = useCloudSync();
   const [syncBusy, setSyncBusy] = useState(false);
+  const [preferOpen, setPreferOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (!state.configured) return null;
 
@@ -145,10 +148,16 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
   const compareKey = compareStateMessageKey(syncStatus.compareState);
   const compareText = compareKey ? t(compareKey) : null;
 
-  async function handleSyncNow() {
+  function handleSyncNow() {
+    setMenuOpen(false);
+    setPreferOpen(true);
+  }
+
+  async function handlePreferConfirm(prefer: Exclude<SyncConflictPreference, "merge">) {
     setSyncBusy(true);
     try {
-      await runSync();
+      await runSync(prefer);
+      setPreferOpen(false);
     } finally {
       setSyncBusy(false);
     }
@@ -202,67 +211,83 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
   const collapsedTitle = outerSubtitle ? `${displayName}\n${outerSubtitle}` : displayName;
 
   return (
-    <DropdownMenu onOpenChange={(open) => { if (open) void refreshCompare(); }}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={rowClass()}
-          disabled={busy}
-          title={collapsed ? collapsedTitle : undefined}
-        >
-          <AccountAvatar name={displayName} photoURL={state.user.photoURL} />
-          {!collapsed && (
-            <AccountRowContent
-              title={displayName}
-              subtitle={outerSubtitle}
-            />
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        side="right"
-        align={collapsed ? "center" : "end"}
-        sideOffset={8}
-        className="min-w-[240px]"
+    <>
+      <DropdownMenu
+        open={menuOpen}
+        onOpenChange={(open) => {
+          setMenuOpen(open);
+          if (open) void refreshCompare();
+        }}
       >
-        <DropdownMenuLabel className="font-normal">
-          <p className="truncate text-sm text-text-primary">{displayName}</p>
-          {state.user.displayName && state.user.email ? (
-            <p className="truncate text-[11px] font-normal text-text-tertiary">{state.user.email}</p>
-          ) : null}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <div className="flex items-start gap-2 px-2 py-1.5">
-          <SyncStatusIcon syncing={syncing} compareState={syncStatus.compareState} />
-          <div className="min-w-0 flex-1">
-            {compareText ? (
-              <p className="text-[11px] leading-snug text-chrome-text-subtle">{compareText}</p>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={rowClass()}
+            disabled={busy}
+            title={collapsed ? collapsedTitle : undefined}
+          >
+            <AccountAvatar name={displayName} photoURL={state.user.photoURL} />
+            {!collapsed && (
+              <AccountRowContent
+                title={displayName}
+                subtitle={outerSubtitle}
+              />
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side="right"
+          align={collapsed ? "center" : "end"}
+          sideOffset={8}
+          className="min-w-[240px]"
+        >
+          <DropdownMenuLabel className="font-normal">
+            <p className="truncate text-sm text-text-primary">{displayName}</p>
+            {state.user.displayName && state.user.email ? (
+              <p className="truncate text-[11px] font-normal text-text-tertiary">{state.user.email}</p>
             ) : null}
-            <p
-              className={`text-[11px] leading-snug text-chrome-text-subtle${compareText ? " mt-0.5" : ""}`}
-            >
-              {lastSyncText}
-            </p>
-            <p className="mt-1 text-[10px] leading-snug text-chrome-text-faint">
-              {syncLimitsSummary(t)}
-            </p>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <div className="flex items-start gap-2 px-2 py-1.5">
+            <SyncStatusIcon syncing={syncing} compareState={syncStatus.compareState} />
+            <div className="min-w-0 flex-1">
+              {compareText ? (
+                <p className="text-[11px] leading-snug text-chrome-text-subtle">{compareText}</p>
+              ) : null}
+              <p
+                className={`text-[11px] leading-snug text-chrome-text-subtle${compareText ? " mt-0.5" : ""}`}
+              >
+                {lastSyncText}
+              </p>
+              <p className="mt-1 text-[10px] leading-snug text-chrome-text-faint">
+                {syncLimitsSummary(t)}
+              </p>
+            </div>
           </div>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={busy || syncing} onSelect={() => void handleSyncNow()}>
-          {syncing ? <Loader2 className="size-3.5 animate-spin" /> : null}
-          {syncLabel}
-        </DropdownMenuItem>
-        {syncStatus.lastError ? (
-          <p className="px-2 pb-1 text-[10px] leading-snug text-fail">
-            {t("settings.accountSyncFailed", { error: syncStatus.lastError })}
-          </p>
-        ) : null}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={busy} onSelect={() => void signOut()}>
-          {t("settings.accountSignOut")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={busy || syncing} onSelect={handleSyncNow}>
+            {syncing ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {syncLabel}
+          </DropdownMenuItem>
+          {syncStatus.lastError ? (
+            <p className="px-2 pb-1 text-[10px] leading-snug text-fail">
+              {t("settings.accountSyncFailed", { error: syncStatus.lastError })}
+            </p>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={busy} onSelect={() => void signOut()}>
+            {t("settings.accountSignOut")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <CloudSyncPreferDialog
+        open={preferOpen}
+        busy={syncBusy}
+        onCancel={() => {
+          if (!syncBusy) setPreferOpen(false);
+        }}
+        onConfirm={(prefer) => void handlePreferConfirm(prefer)}
+      />
+    </>
   );
 }

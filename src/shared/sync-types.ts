@@ -77,6 +77,14 @@ export type CloudSyncCompareState =
   | "remote_ahead"
   | "diverged";
 
+/**
+ * Manual sync conflict preference.
+ * - `local`: push this device’s bundle (overwrite cloud)
+ * - `cloud`: apply the remote bundle (overwrite local)
+ * - `merge`: per-item last-write-wins (used for silent sync / compare)
+ */
+export type SyncConflictPreference = "local" | "cloud" | "merge";
+
 export interface SyncStatus extends SyncMeta {
   syncing: boolean;
   compareState: CloudSyncCompareState;
