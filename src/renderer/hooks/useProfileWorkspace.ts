@@ -112,6 +112,8 @@ export function useProfileWorkspace(
   const cacheKey = useCallback((workspaceId: string, profileId: string) => `${workspaceId}:${profileId}`, []);
   /** True while activateProfile clears layout between profiles (avoids wiping stashed cache). */
   const profileSwitchInProgressRef = useRef(false);
+  /** Bumps on every activate so superseded async switches skip layout writes. */
+  const activateGenerationRef = useRef(0);
 
   layoutRef.current = layout;
   focusedPaneIdRef.current = focusedPaneId;
@@ -123,28 +125,33 @@ export function useProfileWorkspace(
     void migrateLocalStorageToSqlite().finally(() => setMigrationDone(true));
   }, []);
 
-  const persistCurrentProfile = useCallback(async () => {
-    const profile = activeProfileRef.current;
-    const node = layoutRef.current;
-    if (!profile || !node) return;
+  /** Persist the given profile using an explicit layout tree (or the live layout). */
+  const persistProfile = useCallback(async (profile?: ProfileInfo | null, node?: LayoutNode | null) => {
+    const target = profile ?? activeProfileRef.current;
+    const layoutNode = node !== undefined ? node : layoutRef.current;
+    if (!target || !layoutNode) return;
 
-    const collected = collectPanes(node).slice(0, MAX_GROUP_PANES);
+    const collected = collectPanes(layoutNode).slice(0, MAX_GROUP_PANES);
     if (collected.length === 0) return;
 
-    const { layout: serialized, panes } = serializeLayout(node);
-    const existing = await loadGroupSnapshot(profile.workspaceId, profile.id);
+    const { layout: serialized, panes } = serializeLayout(layoutNode);
+    const existing = await loadGroupSnapshot(target.workspaceId, target.id);
     const snapshot: GroupLayoutSnapshot = {
-      defaultCwd: existing?.defaultCwd ?? profile.defaultCwd ?? "",
-      defaultTool: existing?.defaultTool ?? profile.defaultTool ?? "claude",
+      defaultCwd: existing?.defaultCwd ?? target.defaultCwd ?? "",
+      defaultTool: existing?.defaultTool ?? target.defaultTool ?? "claude",
       panes,
       layout: collected.length > 1 ? serialized : null,
       broadcastInput: broadcastRef.current,
-      accentColor: existing?.accentColor ?? profile.accentColor ?? null,
-      savedCommands: existing?.savedCommands ?? profile.savedCommands ?? [],
+      accentColor: existing?.accentColor ?? target.accentColor ?? null,
+      savedCommands: existing?.savedCommands ?? target.savedCommands ?? [],
       updatedAt: new Date().toISOString(),
     };
-    await saveGroupSnapshot(profile.workspaceId, profile.id, snapshot);
+    await saveGroupSnapshot(target.workspaceId, target.id, snapshot);
   }, []);
+
+  const persistCurrentProfile = useCallback(async () => {
+    await persistProfile();
+  }, [persistProfile]);
 
   const persistTimerRef = useRef<number | null>(null);
   const persistInFlightRef = useRef<Promise<void> | null>(null);
@@ -185,16 +192,6 @@ export function useProfileWorkspace(
     setMinimizedPaneIds(next);
   }, []);
 
-  const stashLiveProfile = useCallback((profile: ProfileInfo) => {
-    const node = layoutRef.current;
-    if (!node || collectPanes(node).length === 0) return;
-    profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
-      layout: node,
-      focusedPaneId: focusedPaneIdRef.current,
-      minimizedPaneIds: [...minimizedPaneIdsRef.current],
-    });
-  }, [cacheKey]);
-
   const discardProfileSessions = useCallback((profileId: string, workspaceId?: string) => {
     const ws =
       workspaceId ??
@@ -214,7 +211,11 @@ export function useProfileWorkspace(
   }, [cacheKey]);
 
   const restoreSnapshot = useCallback(
-    async (snapshot: GroupLayoutSnapshot, profile: ProfileInfo) => {
+    async (
+      snapshot: GroupLayoutSnapshot,
+      profile: ProfileInfo,
+      stillActive: () => boolean = () => true,
+    ) => {
       setRestoringFlag(true);
       // Only replace this profile's previous PTYs — never kill another profile's stashed sessions.
       const staleCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
@@ -226,6 +227,15 @@ export function useProfileWorkspace(
       const spawned: PaneInfo[] = [];
 
       for (const slot of slots) {
+        if (!stillActive()) {
+          for (const p of spawned) window.api.ptyKill(p.sessionId);
+          setRestoringFlag(false);
+          return {
+            cwd: cwdDefault,
+            broadcastInput: snapshot.broadcastInput ?? false,
+            paneCount: 0,
+          };
+        }
         const paneCwd = slot.cwd?.trim() || cwdDefault;
         let pane = await spawnPane(slot.tool, paneCwd);
         if (!pane && slot.tool !== "shell") {
@@ -235,6 +245,16 @@ export function useProfileWorkspace(
           const title = normalizePaneTitle(slot.title ?? "");
           spawned.push(title ? { ...pane, title } : pane);
         }
+      }
+
+      if (!stillActive()) {
+        for (const p of spawned) window.api.ptyKill(p.sessionId);
+        setRestoringFlag(false);
+        return {
+          cwd: cwdDefault,
+          broadcastInput: snapshot.broadcastInput ?? false,
+          paneCount: 0,
+        };
       }
 
       if (spawned.length === 0) {
@@ -255,6 +275,15 @@ export function useProfileWorkspace(
 
       // spawned is non-empty (guarded above), so next is always a layout here.
       const reconciled = await reconcileLayoutPtys(next!, spawnPane);
+      if (!stillActive()) {
+        teardownPtys(reconciled);
+        setRestoringFlag(false);
+        return {
+          cwd: cwdDefault,
+          broadcastInput: snapshot.broadcastInput ?? false,
+          paneCount: 0,
+        };
+      }
       const focusId = collectPanes(reconciled)[0]?.id ?? null;
       applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
       // Restore full layout visibility from snapshot; do not auto-minimize sibling panes.
@@ -272,40 +301,114 @@ export function useProfileWorkspace(
         paneCount: spawned.length,
       };
     },
-    [setLayout, setFocusedPaneId, spawnPane, setRestoringFlag],
+    [setLayout, setFocusedPaneId, spawnPane, setRestoringFlag, applyMinimizedPaneIds, cacheKey],
   );
 
   const activateProfile = useCallback(
     async (profile: ProfileInfo) => {
+      const generation = ++activateGenerationRef.current;
       profileSwitchInProgressRef.current = true;
+      const isCurrent = () => generation === activateGenerationRef.current;
       try {
-      const prev = activeProfileRef.current;
+        const prev = activeProfileRef.current;
+        const sameProfile =
+          prev?.id === profile.id && prev.workspaceId === profile.workspaceId;
 
-      if (prev?.id === profile.id) {
-        if (layoutRef.current && collectPanes(layoutRef.current).length > 0) {
+        if (sameProfile) {
+          if (layoutRef.current && collectPanes(layoutRef.current).length > 0) {
+            return {
+              cwd: profile.defaultCwd || workingDirRef.current,
+              broadcastInput: profile.broadcastInput,
+              paneCount: collectPanes(layoutRef.current).length,
+            };
+          }
+
+          const sameCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
+          const sameCachedPanes = sameCached ? collectPanes(sameCached.layout).length : 0;
+          if (sameCached && sameCachedPanes > 0) {
+            const reconciled = await reconcileLayoutPtys(sameCached.layout, spawnPane);
+            const panes = collectPanes(reconciled);
+            const focusId =
+              sameCached.focusedPaneId && panes.some((p) => p.id === sameCached.focusedPaneId)
+                ? sameCached.focusedPaneId
+                : panes[0]?.id ?? null;
+            profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
+              layout: reconciled,
+              focusedPaneId: focusId,
+              minimizedPaneIds: sameCached.minimizedPaneIds ?? [],
+            });
+            if (!isCurrent()) return undefined;
+            applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
+            applyMinimizedPaneIds(minimizedSet(sameCached.minimizedPaneIds ?? []));
+            return {
+              cwd: profile.defaultCwd || panes[0]?.cwd || workingDirRef.current,
+              broadcastInput: profile.broadcastInput,
+              paneCount: panes.length,
+            };
+          }
+
+          const snapshot = await loadGroupSnapshot(profile.workspaceId, profile.id);
+          if (!isCurrent()) return undefined;
+          if (snapshot && snapshot.panes.length > 0) {
+            const restored = await restoreSnapshot(snapshot, profile, isCurrent);
+            if (!isCurrent()) return undefined;
+            if (restored.paneCount > 0) return restored;
+          }
+
+          if (!isCurrent()) return undefined;
+          applyMinimizedPaneIds(new Set());
+          applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
           return {
-            cwd: profile.defaultCwd || workingDirRef.current,
+            cwd: profile.defaultCwd || workingDirRef.current || "",
             broadcastInput: profile.broadcastInput,
-            paneCount: collectPanes(layoutRef.current).length,
+            paneCount: 0,
           };
         }
 
-        const sameCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
-        const sameCachedPanes = sameCached ? collectPanes(sameCached.layout).length : 0;
-        if (sameCached && sameCachedPanes > 0) {
-          const reconciled = await reconcileLayoutPtys(sameCached.layout, spawnPane);
+        const targetCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
+
+        // Sync handoff before any await: stash/clear outgoing so concurrent activates
+        // cannot persist mixed (new profile + old layout) state, then paint selection.
+        let outgoingPersist: Promise<void> | null = null;
+        if (prev) {
+          const outgoingLayout = layoutRef.current;
+          if (outgoingLayout && collectPanes(outgoingLayout).length > 0) {
+            profileLiveCacheRef.current.set(cacheKey(prev.workspaceId, prev.id), {
+              layout: outgoingLayout,
+              focusedPaneId: focusedPaneIdRef.current,
+              minimizedPaneIds: [...minimizedPaneIdsRef.current],
+            });
+            outgoingPersist = persistProfile(prev, outgoingLayout);
+          }
+          layoutRef.current = null;
+          setLayout(null);
+          setFocusedPaneId(null);
+          applyMinimizedPaneIds(new Set());
+        }
+
+        setActiveProfile(profile);
+        activeProfileRef.current = profile;
+        void saveLastActiveGroupKey(profile.workspaceId, profile.id);
+        // Disk persist can finish in the background — live cache already holds the tree.
+        if (outgoingPersist) void outgoingPersist;
+
+        const cached = targetCached ?? profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
+        const cachedPaneCount = cached ? collectPanes(cached.layout).length : 0;
+        if (cached && cachedPaneCount > 0) {
+          const reconciled = await reconcileLayoutPtys(cached.layout, spawnPane);
           const panes = collectPanes(reconciled);
           const focusId =
-            sameCached.focusedPaneId && panes.some((p) => p.id === sameCached.focusedPaneId)
-              ? sameCached.focusedPaneId
+            cached.focusedPaneId && panes.some((p) => p.id === cached.focusedPaneId)
+              ? cached.focusedPaneId
               : panes[0]?.id ?? null;
-          applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
-          applyMinimizedPaneIds(minimizedSet(sameCached.minimizedPaneIds ?? []));
           profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
             layout: reconciled,
             focusedPaneId: focusId,
-            minimizedPaneIds: sameCached.minimizedPaneIds ?? [],
+            minimizedPaneIds: cached.minimizedPaneIds ?? [],
           });
+          if (!isCurrent()) return undefined;
+          applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
+          applyMinimizedPaneIds(minimizedSet(cached.minimizedPaneIds ?? []));
           return {
             cwd: profile.defaultCwd || panes[0]?.cwd || workingDirRef.current,
             broadcastInput: profile.broadcastInput,
@@ -314,11 +417,14 @@ export function useProfileWorkspace(
         }
 
         const snapshot = await loadGroupSnapshot(profile.workspaceId, profile.id);
+        if (!isCurrent()) return undefined;
         if (snapshot && snapshot.panes.length > 0) {
-          const restored = await restoreSnapshot(snapshot, profile);
+          const restored = await restoreSnapshot(snapshot, profile, isCurrent);
+          if (!isCurrent()) return undefined;
           if (restored.paneCount > 0) return restored;
         }
 
+        if (!isCurrent()) return undefined;
         applyMinimizedPaneIds(new Set());
         applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
         return {
@@ -326,74 +432,24 @@ export function useProfileWorkspace(
           broadcastInput: profile.broadcastInput,
           paneCount: 0,
         };
-      }
-
-      const targetCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
-
-      if (prev && prev.id !== profile.id) {
-        await persistCurrentProfile();
-        stashLiveProfile(prev);
-        layoutRef.current = null;
-        setLayout(null);
-        setFocusedPaneId(null);
-        applyMinimizedPaneIds(new Set());
-      }
-
-      await saveLastActiveGroupKey(profile.workspaceId, profile.id);
-      setActiveProfile(profile);
-      activeProfileRef.current = profile;
-
-      const cached = targetCached ?? profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
-      const cachedPaneCount = cached ? collectPanes(cached.layout).length : 0;
-      if (cached && cachedPaneCount > 0) {
-        const reconciled = await reconcileLayoutPtys(cached.layout, spawnPane);
-        const panes = collectPanes(reconciled);
-        const focusId =
-          cached.focusedPaneId && panes.some((p) => p.id === cached.focusedPaneId)
-            ? cached.focusedPaneId
-            : panes[0]?.id ?? null;
-        applyLayout(setLayout, setFocusedPaneId, layoutRef, reconciled, focusId);
-        applyMinimizedPaneIds(minimizedSet(cached.minimizedPaneIds ?? []));
-        profileLiveCacheRef.current.set(cacheKey(profile.workspaceId, profile.id), {
-          layout: reconciled,
-          focusedPaneId: focusId,
-          minimizedPaneIds: cached.minimizedPaneIds ?? [],
-        });
-        return {
-          cwd: profile.defaultCwd || panes[0]?.cwd || workingDirRef.current,
-          broadcastInput: profile.broadcastInput,
-          paneCount: panes.length,
-        };
-      }
-
-      const snapshot = await loadGroupSnapshot(profile.workspaceId, profile.id);
-      if (snapshot && snapshot.panes.length > 0) {
-        const restored = await restoreSnapshot(snapshot, profile);
-        if (restored.paneCount > 0) return restored;
-      }
-
-      applyMinimizedPaneIds(new Set());
-      applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
-      return {
-        cwd: profile.defaultCwd || workingDirRef.current || "",
-        broadcastInput: profile.broadcastInput,
-        paneCount: 0,
-      };
       } finally {
         // Let layout effects run while the switch guard is still set (avoids wiping stashed cache).
+        // Only the latest activation may clear the guard.
         queueMicrotask(() => {
-          profileSwitchInProgressRef.current = false;
+          if (generation === activateGenerationRef.current) {
+            profileSwitchInProgressRef.current = false;
+          }
         });
       }
     },
     [
-      persistCurrentProfile,
-      stashLiveProfile,
+      persistProfile,
       restoreSnapshot,
       setLayout,
       setFocusedPaneId,
       applyMinimizedPaneIds,
       spawnPane,
+      cacheKey,
     ],
   );
 
