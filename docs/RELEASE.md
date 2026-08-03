@@ -14,9 +14,13 @@ How maintainers ship **AI Shelf** desktop builds and how users install them on W
 - Git tag `vX.Y.Z` must match the release version (e.g. tag `v2.0.0` ↔ `2.0.0`). CI runs [scripts/sync-version-from-tag.mjs](../scripts/sync-version-from-tag.mjs) so root and `packages/cli` `version` fields align with the tag before build/publish.
 - **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; desktop installer jobs still run.
 
+### Branch flow
+
+Normal releases: **`develop` → `release/vX.Y.Z` → `main` → tag `vX.Y.Z`**, then sync **`develop` ← `main`**. Do not tag from `develop`. Agent workflow: [.cursor/skills/ai-shelf-release/SKILL.md](../.cursor/skills/ai-shelf-release/SKILL.md).
+
 ### Pre-release checklist
 
-1. [ ] All changes committed and pushed to `main`
+1. [ ] Release prep committed on `develop`, `release/vX.Y.Z` created and merged into `main`
 2. [ ] Root and `packages/cli` `version` fields match the intended release
 3. [ ] `pnpm lint`
 4. [ ] **Docs visuals** — if this release changes the desktop UI, refresh README / pages screenshots **locally on Windows before** tagging:
@@ -40,9 +44,11 @@ How maintainers ship **AI Shelf** desktop builds and how users install them on W
 
 ### Publish via GitHub Actions (recommended)
 
-Pushing an annotated tag triggers [.github/workflows/release.yml](../.github/workflows/release.yml):
+After `release/vX.Y.Z` is merged into `main`, push an annotated tag **on `main`**. That triggers [.github/workflows/release.yml](../.github/workflows/release.yml):
 
 ```powershell
+git switch main
+git pull --ff-only origin main
 git tag -a v1.0.0 -m "AI Shelf 1.0.0"
 git push origin v1.0.0
 ```
