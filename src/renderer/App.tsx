@@ -66,6 +66,9 @@ const CodecToolsTab = lazy(() =>
 const TimeToolsTab = lazy(() =>
   import("./components/TimeToolsTab").then((m) => ({ default: m.TimeToolsTab })),
 );
+const RegexToolsTab = lazy(() =>
+  import("./components/RegexToolsTab").then((m) => ({ default: m.RegexToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -91,7 +94,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "time";
+type ToolId = "codec" | "time" | "regex";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -191,11 +194,13 @@ const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
 const TOOL_ICONS: Record<ToolId, string> = {
   codec: "🔐",
   time: "🕒",
+  regex: "🔤",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   codec: "tools.tab.codec",
   time: "tools.tab.time",
+  regex: "tools.tab.regex",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -383,7 +388,7 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5 time timestamp unix timezone",
+        keywords: "tools codec hash base64 md5 time timestamp unix timezone regex regexp match replace",
         run: () => handleModeChange("tools"),
       },
       {
@@ -439,7 +444,9 @@ export function App() {
       keywords:
         it.id === "time"
           ? "time timestamp unix timezone utc epoch ms us ns iso"
-          : "codec hash base64 md5 tools",
+          : it.id === "regex"
+            ? "regex regexp match replace flags capture preset pattern"
+            : "codec hash base64 md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -462,7 +469,7 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5 time timestamp unix timezone",
+        keywords: "tools codec hash base64 md5 time timestamp unix timezone regex regexp match replace",
         run: () => handleModeChange("tools"),
       },
       {
@@ -507,7 +514,7 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5 time timestamp unix timezone",
+        keywords: "tools codec hash base64 md5 time timestamp unix timezone regex regexp match replace",
         run: () => handleModeChange("tools"),
       },
       {
@@ -737,6 +744,7 @@ export function App() {
                 <Suspense fallback={<Spinner label={t("profile.loading")} />}>
                   {activeTool === "codec" && <CodecToolsTab />}
                   {activeTool === "time" && <TimeToolsTab />}
+                  {activeTool === "regex" && <RegexToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>
