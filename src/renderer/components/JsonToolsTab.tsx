@@ -16,7 +16,7 @@ import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
 
 const fieldClass =
-  "min-h-[180px] max-h-[320px] resize-y overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary";
+  "h-[260px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
 
 export function JsonToolsTab() {
   const { t } = useLocale();
@@ -120,10 +120,10 @@ export function JsonToolsTab() {
                     }}
                     className="gap-1.5"
                   >
-                    <ToggleGroupItem value="2" size="sm">
+                    <ToggleGroupItem value="2" size="sm" className="min-w-9 px-2.5">
                       2
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="4" size="sm">
+                    <ToggleGroupItem value="4" size="sm" className="min-w-9 px-2.5">
                       4
                     </ToggleGroupItem>
                   </ToggleGroup>
@@ -139,11 +139,13 @@ export function JsonToolsTab() {
             </div>
           </div>
 
-          <div className="grid gap-3 @md:grid-cols-2">
+          <div className="grid items-start gap-3 @md:grid-cols-2">
             <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
-                {t("json.input")}
-              </Label>
+              <div className="flex h-8 min-w-0 items-center">
+                <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
+                  {t("json.input")}
+                </Label>
+              </div>
               <Textarea
                 id={inputId}
                 value={input}
@@ -155,11 +157,11 @@ export function JsonToolsTab() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex h-8 min-w-0 items-center justify-between gap-2">
                 <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
                   {t("json.output")}
                 </Label>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                <div className="flex shrink-0 items-center justify-end gap-1">
                   <Button
                     type="button"
                     variant="ghost"
