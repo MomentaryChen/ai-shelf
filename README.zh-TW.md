@@ -8,7 +8,7 @@
 
 [English](README.md) · [Changelog](CHANGELOG.md)
 
-**v3.9.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
+**v4.0.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
 
 ---
 

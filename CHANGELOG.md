@@ -9,9 +9,33 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-08-03
+
+Cross-platform desktop packages, a top-level Tools mode, Flow agent console, and sync conflict preferences.
+
 ### Added
 
 - **macOS and Linux desktop packages** — CI builds unsigned macOS DMG/ZIP (`arm64` + `x64`) and Linux AppImage (static runtime, no FUSE2) alongside the Windows installer; see [RELEASE.md](docs/RELEASE.md).
+- **Tools mode** — Top-level workspace for everyday utilities: Codec (hash / encode / decode / image Base64), JWT, JSON format/minify, Regex test/replace with presets, Crypto (AES / RSA / ECDSA), Cron, and Time/timezone conversion.
+- **Flow agent console** — Streams print-mode agent console output into the Flow UI while runs are in progress.
+- **Cloud sync prefer local or cloud** — When backup conflicts, choose whether local or cloud wins before applying.
+- **Last opened profile per workspace** — Restores the last profile you used in each workspace group.
+
+### Changed
+
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIF for the current UI.
+- **PTY hot path** — Cuts sync I/O and IPC churn on the terminal hot path for smoother multi-pane sessions.
+
+### Fixed
+
+- **Chinese IME in AI CLI prompts** — Restores composition input inside terminal AI prompts on Windows.
+- **Startup inventory gate** — Opens the terminal without waiting for the inventory scan to finish.
+- **Ctrl+Tab across empty workspaces** — Lets focus jump back across empty workspace groups.
+- **Codec image Base64 preview** — Hardens preview handling and adds enlarge for large images.
+- **Crypto byte helpers** — Narrows buffer helpers to ArrayBuffer-backed `Uint8Array` to avoid runtime type errors.
+- **Pane awareness encoding** — Replaces an invalid Windows-1252 dash that broke pane-awareness source.
+
+[4.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.0.0
 
 ## [3.9.0] - 2026-07-17
 
