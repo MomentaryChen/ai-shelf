@@ -332,7 +332,7 @@ export function usePaneAgentAwareness(
         readyNotifiedRef.current[pane.id] = false;
         clearReadyPending(pane.id);
       }
-      // Process is gone — do not treat as busy for close-confirm / status dots.
+      // Process is gone -- do not treat as busy for close-confirm / status dots.
       updateSession(sessionId, () => createPaneAgentState());
     });
 
