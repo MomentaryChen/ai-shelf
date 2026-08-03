@@ -508,7 +508,10 @@ export function useProfileWorkspace(
   const getProfileMinimizedPaneIds = useCallback(
     (profileId: string): Set<string> => {
       if (activeProfile?.id === profileId) return minimizedPaneIdsRef.current;
-      const cached = profileLiveCacheRef.current.get(profileId);
+      const cached =
+        Array.from(profileLiveCacheRef.current.entries()).find(([key]) =>
+          key.endsWith(`:${profileId}`),
+        )?.[1] ?? null;
       return minimizedSet(cached?.minimizedPaneIds ?? []);
     },
     [activeProfile],
@@ -523,15 +526,26 @@ export function useProfileWorkspace(
 
   const syncLiveCacheDisplay = useCallback(
     (profileId: string, focusId: string | null, minimized: string[]) => {
-      const cached = profileLiveCacheRef.current.get(profileId);
-      if (!cached) return;
-      profileLiveCacheRef.current.set(profileId, {
+      const active = activeProfileRef.current;
+      if (!active || active.id !== profileId) return;
+      const key = cacheKey(active.workspaceId, profileId);
+      const cached = profileLiveCacheRef.current.get(key);
+      if (!cached) {
+        if (!layoutRef.current) return;
+        profileLiveCacheRef.current.set(key, {
+          layout: layoutRef.current,
+          focusedPaneId: focusId,
+          minimizedPaneIds: minimized,
+        });
+        return;
+      }
+      profileLiveCacheRef.current.set(key, {
         ...cached,
         focusedPaneId: focusId,
         minimizedPaneIds: minimized,
       });
     },
-    [],
+    [cacheKey],
   );
 
   /** Focus a pane and show it without hiding other visible panes (preserves split layout). */
