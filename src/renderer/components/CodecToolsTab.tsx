@@ -379,13 +379,13 @@ export function CodecToolsTab() {
               <span className="text-[12px] text-text-tertiary">{t("codec.image.hint")}</span>
             </button>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
                     {t("codec.output")}
                   </Label>
-                  <div className="flex items-center gap-1">
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                     <Button
                       type="button"
                       variant="ghost"
@@ -402,6 +402,7 @@ export function CodecToolsTab() {
                       size="sm"
                       onClick={() => void copyOutput()}
                       disabled={!output}
+                      title={copied ? t("codec.copied") : t("codec.copy")}
                       className="h-8 px-2 text-[12px]"
                     >
                       {copied ? (
@@ -409,7 +410,9 @@ export function CodecToolsTab() {
                       ) : (
                         <Copy className="h-3.5 w-3.5" />
                       )}
-                      {copied ? t("codec.copied") : t("codec.copy")}
+                      <span className="hidden @sm:inline">
+                        {copied ? t("codec.copied") : t("codec.copy")}
+                      </span>
                     </Button>
                   </div>
                 </div>
@@ -430,7 +433,7 @@ export function CodecToolsTab() {
               </div>
 
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <Label className="text-[12px] font-medium text-text-secondary">
                     {t("codec.image.previewLabel")}
                   </Label>
@@ -567,7 +570,7 @@ export function CodecToolsTab() {
               </div>
             )}
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 @md:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-1.5">
                 <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
                   {t("codec.input")}
@@ -583,11 +586,11 @@ export function CodecToolsTab() {
               </div>
 
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
                     {t("codec.output")}
                   </Label>
-                  <div className="flex items-center gap-1">
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                     {showDirection && (
                       <Button
                         type="button"
@@ -599,7 +602,7 @@ export function CodecToolsTab() {
                         title={t("codec.swap")}
                       >
                         <ArrowLeftRight className="h-3.5 w-3.5" />
-                        {t("codec.swap")}
+                        <span className="hidden @sm:inline">{t("codec.swap")}</span>
                       </Button>
                     )}
                     <Button
@@ -608,6 +611,7 @@ export function CodecToolsTab() {
                       size="sm"
                       onClick={() => void copyOutput()}
                       disabled={!output}
+                      title={copied ? t("codec.copied") : t("codec.copy")}
                       className="h-8 px-2 text-[12px]"
                     >
                       {copied ? (
@@ -615,7 +619,9 @@ export function CodecToolsTab() {
                       ) : (
                         <Copy className="h-3.5 w-3.5" />
                       )}
-                      {copied ? t("codec.copied") : t("codec.copy")}
+                      <span className="hidden @sm:inline">
+                        {copied ? t("codec.copied") : t("codec.copy")}
+                      </span>
                     </Button>
                   </div>
                 </div>

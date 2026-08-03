@@ -717,7 +717,7 @@ export function App() {
             disabled={!tabsEnabled && activeTab !== "usage"}
             badges={navBadges}
           />
-          <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
+          <main className="@container min-w-0 flex-1 overflow-y-auto px-3 pt-4 pb-8 sm:px-5 sm:pt-5 sm:pb-10 lg:px-6">
             <div className="mx-auto w-full max-w-[1400px]">
               <ViewTransition viewKey={activeTab}>
                 {showSpinner && activeTab !== "usage" && <Spinner label={t("app.detecting")} />}
@@ -769,7 +769,7 @@ export function App() {
             onSelect={selectTool}
             sectionLabelKey="app.nav.tools"
           />
-          <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
+          <main className="@container min-w-0 flex-1 overflow-y-auto px-3 pt-4 pb-8 sm:px-5 sm:pt-5 sm:pb-10 lg:px-6">
             <div className="mx-auto w-full max-w-[1400px]">
               <ViewTransition viewKey={activeTool}>
                 <Suspense fallback={<Spinner label={t("profile.loading")} />}>

@@ -9,8 +9,9 @@ export interface NavItem<T extends string> {
 }
 
 /**
- * Left rail for inventory mode — icon + label list, one active item. Replaces
- * the old top tab strip so the section set can grow without crowding the header.
+ * Left rail for inventory / tools mode — icon + label list, one active item.
+ * Collapses to an icon-only rail below `lg` so the content column keeps room
+ * when the Electron window is near its 900px minimum.
  */
 export function InventoryNav<T extends string>({
   items,
@@ -32,22 +33,25 @@ export function InventoryNav<T extends string>({
   return (
     <nav
       aria-label={t(sectionLabelKey)}
-      className="flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border bg-bg-secondary/40 p-2"
+      className="flex w-14 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border bg-bg-secondary/40 p-1.5 lg:w-52 lg:p-2"
     >
-      <div className="px-2 pt-1 pb-2 text-[10.5px] font-semibold tracking-[0.08em] text-text-tertiary uppercase">
+      <div className="hidden px-2 pt-1 pb-2 text-[10.5px] font-semibold tracking-[0.08em] text-text-tertiary uppercase lg:block">
         {t(sectionLabelKey)}
       </div>
       {items.map((it) => {
         const isActive = it.id === active;
         const badge = badges?.[it.id];
+        const label = t(it.labelKey);
         return (
           <button
             key={it.id}
             type="button"
             disabled={disabled}
+            title={label}
+            aria-label={label}
             aria-current={isActive ? "page" : undefined}
             onClick={() => onSelect(it.id)}
-            className={`group relative flex items-center gap-2.5 rounded-xl py-1.5 pr-2.5 pl-2 text-left text-[13px] transition-[color,background-color,transform] duration-200 ${
+            className={`group relative flex items-center justify-center gap-2.5 rounded-xl py-1.5 text-left text-[13px] transition-[color,background-color,transform] duration-200 lg:justify-start lg:pr-2.5 lg:pl-2 ${
               disabled
                 ? "cursor-not-allowed text-text-tertiary opacity-50"
                 : isActive
@@ -71,11 +75,11 @@ export function InventoryNav<T extends string>({
             >
               {it.icon}
             </span>
-            <span className="flex-1 truncate">{t(it.labelKey)}</span>
+            <span className="hidden min-w-0 flex-1 truncate lg:block">{label}</span>
             {badge != null && badge > 0 && (
               <span
                 aria-label={`${badge} alerts`}
-                className="h-2 w-2 shrink-0 rounded-full bg-fail"
+                className="absolute top-1.5 right-1.5 h-2 w-2 shrink-0 rounded-full bg-fail lg:static lg:ml-0"
               />
             )}
           </button>
