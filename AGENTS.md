@@ -36,7 +36,7 @@ AI Shelf is a pnpm monorepo with two workspaces:
 
 3. **Docs screenshot workspace**: `tests/e2e/screenshot.spec.ts` and `terminal-demo-gif.spec.ts` set `AISHELF_APP_DATA_DIR` to an isolated folder and seed a **Demo** profile group — not the developer's real `%APPDATA%/ai-shelf` data.
 
-4. **E2E test locale dependency**: The screenshot test asserts Chinese-language text (e.g. "已安裝 / 偵測總數"). Locale is pinned via `AISHELF_DOCS_LOCALE=zh` in docs helpers.
+4. **E2E test locale dependency**: Docs screenshots assert locale-specific copy (e.g. zh `"已安裝 / 偵測總數"`, en `"Installed / detected"`). `pnpm gen:docs-assets` runs both `en` and `zh` via `AISHELF_DOCS_LOCALE`; single runs default to `zh`.
 
 5. **Inventory CLI works standalone**: `node dist/cli.js` (after build) runs the `ai` inventory commands without native module issues — it does not use `better-sqlite3`.
 

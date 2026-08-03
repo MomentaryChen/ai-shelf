@@ -36,7 +36,7 @@
 
 ## 1. 總覽
 
-![Overview](../tests/screenshots/01.overview.png)
+![Overview](../tests/screenshots/zh/01.overview.png)
 
 **Overview** 是清單儀表板首頁，列出 App 認得的每套 AI CLI（不論是否已安裝）。介面為中英混合：統計數字區塊多為中文標籤，下方表格欄位標題為英文。
 
@@ -77,7 +77,7 @@
 
 ## 2. Terminal 模式
 
-![Terminal](../tests/screenshots/02.terminal.png)
+![Terminal](../tests/screenshots/zh/02.terminal.png)
 
 **Terminal** 模式是 Profile 化工作區：Profile 與版面存於 SQLite、內嵌 **node-pty** 工作階段、可開啟獨立的 **Terminal Settings** 視窗調整共用偏好。
 
@@ -135,7 +135,7 @@
 
 ## 3. 模型
 
-![Models](../tests/screenshots/03.models.png)
+![Models](../tests/screenshots/zh/03.models.png)
 
 **Models** 分頁以唯讀方式呈現各工具的預設模型、可擴充的模型清單與能力旗標。偵測尚未完成時，標題列可能顯示 **loading models…**。
 
@@ -165,7 +165,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ## 4. 技能
 
-![Skills](../tests/screenshots/04.skills.png)
+![Skills](../tests/screenshots/zh/04.skills.png)
 
 **Skills** 分頁顯示各工具回報的技能。
 
@@ -200,7 +200,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ## 5. MCP 伺服器
 
-![MCP](../tests/screenshots/05.mcp.png)
+![MCP](../tests/screenshots/zh/05.mcp.png)
 
 **MCP** 分頁整理 MCP 伺服器組態與跨工具對照。
 
@@ -235,7 +235,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ## 6. 設定檔
 
-![Config](../tests/screenshots/06.config.png)
+![Config](../tests/screenshots/zh/06.config.png)
 
 **Config** 分頁依類型列出各工具用到的檔案路徑。
 
@@ -255,7 +255,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ## 7. 診斷
 
-![Doctor](../tests/screenshots/07.doctor.png)
+![Doctor](../tests/screenshots/zh/07.doctor.png)
 
 **Doctor** 並行執行基本健康檢查。
 
@@ -280,7 +280,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ## 8. 更新
 
-![Update](../tests/screenshots/08.update.png)
+![Update](../tests/screenshots/zh/08.update.png)
 
 **Update** 分頁比對現況並可觸發更新；按鈕 **🔍 Re-check All** 僅重新向 npm 等新版本來源查詢，不套用更新。
 
@@ -305,6 +305,6 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ## 備註
 
-- 截圖順序由 `tests/e2e/screenshot.spec.ts` 產出，檔名與順序請與本文件、`pages.md` 保持一致。
+- 截圖順序由 `tests/e2e/screenshot.spec.ts` 產出至 `tests/screenshots/zh/`（本頁）與 `tests/screenshots/en/`（[pages.md](pages.md)），檔名與順序請與本文件、`pages.md` 保持一致。
 - Release 前重產 README/docs 圖片：在 Windows 本地執行 `pnpm gen:docs-assets`（見 [RELEASE.md](RELEASE.md)）。
 - 若 Inventory 分頁標籤或順序異動，請同步更新中英文頁面與前述測試常數。
