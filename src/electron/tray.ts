@@ -147,6 +147,40 @@ function activateProfileFromTray(workspaceId: string, profileId: string, deps: T
   }
 }
 
+function trayWindowItems(deps: TrayDeps): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: "Show Terminal",
+      click: () => showTerminalWindow(deps),
+    },
+    {
+      label: "Show AI Shelf",
+      click: () => {
+        const main = deps.getMainWindow();
+        if (main && !main.isDestroyed()) {
+          if (!main.isVisible()) main.show();
+          main.focus();
+        }
+      },
+    },
+  ];
+}
+
+/** Fast path — no SQLite / profile forest. Used so the tray icon exists before first paint. */
+function buildMinimalTrayMenu(deps: TrayDeps): Menu {
+  return Menu.buildFromTemplate([
+    ...trayWindowItems(deps),
+    { type: "separator" },
+    {
+      label: "Quit",
+      click: () => {
+        setAppQuitting(true);
+        app.quit();
+      },
+    },
+  ]);
+}
+
 function buildTrayMenu(deps: TrayDeps): Menu {
   let forest: ReturnType<typeof getProfileForest>;
   try {
@@ -169,20 +203,7 @@ function buildTrayMenu(deps: TrayDeps): Menu {
     }));
 
   const template: MenuItemConstructorOptions[] = [
-    {
-      label: "Show Terminal",
-      click: () => showTerminalWindow(deps),
-    },
-    {
-      label: "Show AI Shelf",
-      click: () => {
-        const main = deps.getMainWindow();
-        if (main && !main.isDestroyed()) {
-          if (!main.isVisible()) main.show();
-          main.focus();
-        }
-      },
-    },
+    ...trayWindowItems(deps),
     { type: "separator" },
     ...(switchProfileSubmenu.length > 0
       ? [{ label: "Switch Profile", submenu: switchProfileSubmenu }]
@@ -217,13 +238,17 @@ export function getTrayAttentionCount(): number {
   return trayAttentionCount;
 }
 
-export function initTray(deps: TrayDeps): Tray {
+export function initTray(deps: TrayDeps, opts?: { skipForestMenu?: boolean }): Tray {
   trayDeps = deps;
   const icon = nativeImage.createFromPath(deps.iconPath);
   baseTrayIcon = icon.resize({ width: 16, height: 16 });
   tray = new Tray(iconWithHealthBadge(baseTrayIcon, trayHealthAlert));
   applyTrayPresentation();
-  refreshTrayMenu(deps);
+  if (opts?.skipForestMenu) {
+    tray.setContextMenu(buildMinimalTrayMenu(deps));
+  } else {
+    refreshTrayMenu(deps);
+  }
 
   tray.on("click", () => {
     const terminal = getTerminalWindow(deps);
@@ -249,13 +274,17 @@ function showHiddenAppWindows(deps: TrayDeps): void {
 }
 
 /** Apply tray on/off from settings; keeps renderer localStorage and main-process pref in sync. */
-export function applySystemTrayEnabled(enabled: boolean, deps: TrayDeps): void {
+export function applySystemTrayEnabled(
+  enabled: boolean,
+  deps: TrayDeps,
+  opts?: { skipForestMenu?: boolean },
+): void {
   setMinimizeToTrayEnabled(enabled);
   trayDeps = deps;
 
   if (enabled) {
-    if (!tray) initTray(deps);
-    else refreshTrayMenu(deps);
+    if (!tray) initTray(deps, opts);
+    else if (!opts?.skipForestMenu) refreshTrayMenu(deps);
     return;
   }
 

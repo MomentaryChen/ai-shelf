@@ -474,9 +474,9 @@ export function App() {
             : "border-border bg-bg-primary text-text-primary"
         }`}
       >
-        <AppModeSwitch mode={appMode} onChange={handleModeChange} disabled={!ready && scanning} />
+        <AppModeSwitch mode={appMode} onChange={handleModeChange} />
 
-        {appMode === "terminal" && (scanning || enriching) && hasData && (
+        {appMode === "terminal" && (scanning || enriching) && (
           <span className="shrink-0 px-3 text-[11px] text-text-secondary">
             {scanning && t("app.detectingShort")}
             {scanning && enriching && " · "}
@@ -525,99 +525,82 @@ export function App() {
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {showSpinner && appMode === "terminal" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-chrome-bg">
-            <Spinner label={t("app.detecting")} />
-          </div>
-        )}
-        {error && !hasData && appMode === "terminal" && (
-          <p className="absolute inset-0 flex items-center justify-center bg-chrome-bg text-chrome-text-muted">
-            {t("app.loadInventoryFailed")}
-          </p>
-        )}
-
-        {ready && (
-          <main
-            data-active={appMode === "terminal"}
-            className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
-          >
-            <Suspense fallback={<Spinner label={t("app.detecting")} />}>
-              <ChatTab
-                data={data}
-                active={appMode === "terminal"}
-                inventoryScanning={scanning}
-                onRegisterCommands={registerTerminalCommands}
-                onRequestTerminalMode={requestTerminalMode}
-              />
-            </Suspense>
-          </main>
-        )}
-
-        {ready && (
-          <div
-            data-active={appMode === "inventory"}
-            className="ui-mode-panel absolute inset-0 flex overflow-hidden"
-          >
-            <InventoryNav
-              items={TABS}
-              active={activeTab}
-              onSelect={selectTab}
-              disabled={!tabsEnabled && activeTab !== "usage"}
-              badges={navBadges}
+        <main
+          data-active={appMode === "terminal"}
+          className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
+        >
+          <Suspense fallback={<Spinner label={t("profile.loading")} />}>
+            <ChatTab
+              data={data}
+              active={appMode === "terminal"}
+              inventoryScanning={scanning}
+              onRegisterCommands={registerTerminalCommands}
+              onRequestTerminalMode={requestTerminalMode}
             />
-            <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
-              <div className="mx-auto w-full max-w-[1400px]">
-                <ViewTransition viewKey={activeTab}>
-                  {showSpinner && <Spinner label={t("app.detecting")} />}
-                  {error && !hasData && (
-                    <p className="py-10 text-center text-text-secondary">
-                      {t("app.loadInventoryFailed")}
-                    </p>
-                  )}
-                  {hasData && (
-                    <Suspense fallback={<Spinner label={t("app.detecting")} />}>
-                      {activeTab === "overview" && (
-                        <OverviewTab
-                          data={data}
-                          modelOverrides={modelOverrides}
-                          healthState={healthState}
-                          onGoDoctor={() => goTo("doctor")}
-                          onGoUpdate={() => goTo("update")}
-                          onRefreshHealth={refreshHealth}
-                          onRefresh={reload}
-                        />
-                      )}
-                      {activeTab === "models" && <ModelsTab data={data} />}
-                      {activeTab === "skills" && (
-                        <SkillsTab data={data} onOpenMcpSync={() => selectTab("mcp")} />
-                      )}
-                      {activeTab === "mcp" && <McpTab data={data} />}
-                      {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
-                      {activeTab === "doctor" && <DoctorTab data={data} onRefresh={reload} />}
-                      {activeTab === "update" && <UpdateTab data={data} onRefresh={reload} />}
-                    </Suspense>
-                  )}
-                  {activeTab === "usage" && (
-                    <Suspense fallback={<Spinner label={t("app.detecting")} />}>
-                      <UsageTab />
-                    </Suspense>
-                  )}
-                </ViewTransition>
-              </div>
-            </main>
-          </div>
-        )}
+          </Suspense>
+        </main>
 
-        {ready && (
-          <div
-            data-active={appMode === "flow"}
-            className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
-          >
-            <Suspense fallback={<Spinner label={t("flow.loading")} />}>
-              <FlowTab />
-            </Suspense>
-          </div>
-        )}
+        <div
+          data-active={appMode === "inventory"}
+          className="ui-mode-panel absolute inset-0 flex overflow-hidden"
+        >
+          <InventoryNav
+            items={TABS}
+            active={activeTab}
+            onSelect={selectTab}
+            disabled={!tabsEnabled && activeTab !== "usage"}
+            badges={navBadges}
+          />
+          <main className="min-w-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
+            <div className="mx-auto w-full max-w-[1400px]">
+              <ViewTransition viewKey={activeTab}>
+                {showSpinner && activeTab !== "usage" && <Spinner label={t("app.detecting")} />}
+                {error && !hasData && activeTab !== "usage" && (
+                  <p className="py-10 text-center text-text-secondary">
+                    {t("app.loadInventoryFailed")}
+                  </p>
+                )}
+                {hasData && (
+                  <Suspense fallback={<Spinner label={t("profile.loading")} />}>
+                    {activeTab === "overview" && (
+                      <OverviewTab
+                        data={data}
+                        modelOverrides={modelOverrides}
+                        healthState={healthState}
+                        onGoDoctor={() => goTo("doctor")}
+                        onGoUpdate={() => goTo("update")}
+                        onRefreshHealth={refreshHealth}
+                        onRefresh={reload}
+                      />
+                    )}
+                    {activeTab === "models" && <ModelsTab data={data} />}
+                    {activeTab === "skills" && (
+                      <SkillsTab data={data} onOpenMcpSync={() => selectTab("mcp")} />
+                    )}
+                    {activeTab === "mcp" && <McpTab data={data} />}
+                    {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
+                    {activeTab === "doctor" && <DoctorTab data={data} onRefresh={reload} />}
+                    {activeTab === "update" && <UpdateTab data={data} onRefresh={reload} />}
+                  </Suspense>
+                )}
+                {activeTab === "usage" && (
+                  <Suspense fallback={<Spinner label={t("profile.loading")} />}>
+                    <UsageTab />
+                  </Suspense>
+                )}
+              </ViewTransition>
+            </div>
+          </main>
+        </div>
+
+        <div
+          data-active={appMode === "flow"}
+          className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
+        >
+          <Suspense fallback={<Spinner label={t("flow.loading")} />}>
+            <FlowTab />
+          </Suspense>
+        </div>
       </div>
     </div>
   );

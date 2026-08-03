@@ -126,6 +126,7 @@ import {
   isSystemTrayEnabled,
   refreshTrayMenu,
   setAppQuitting,
+  setMinimizeToTrayEnabled,
   type TrayDeps,
 } from "./tray.js";
 import { showPaneAgentNotification, syncTrayPaneAttention } from "./agent-notify.js";
@@ -2702,11 +2703,21 @@ app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
   await startRendererServer(RENDERER_DIR);
 
+  // Apply close-to-tray preference before bindMinimizeToTray runs inside createWindow.
+  // Tray icon uses a minimal menu first; profile forest (SQLite) loads on the next tick.
   const trayEnabled = readSystemTrayEnabledFromDisk();
-  applySystemTrayEnabled(trayEnabled, getTrayDeps());
+  setMinimizeToTrayEnabled(trayEnabled);
 
   setupAppMenu();
   createWindow();
+
+  if (trayEnabled) {
+    applySystemTrayEnabled(true, getTrayDeps(), { skipForestMenu: true });
+  }
+  setImmediate(() => {
+    applySystemTrayEnabled(trayEnabled, getTrayDeps());
+  });
+
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
