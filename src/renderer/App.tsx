@@ -63,6 +63,9 @@ const UsageTab = lazy(() =>
 const CodecToolsTab = lazy(() =>
   import("./components/CodecToolsTab").then((m) => ({ default: m.CodecToolsTab })),
 );
+const CryptoToolsTab = lazy(() =>
+  import("./components/CryptoToolsTab").then((m) => ({ default: m.CryptoToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -88,7 +91,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec";
+type ToolId = "codec" | "crypto";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -187,10 +190,12 @@ const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
 
 const TOOL_ICONS: Record<ToolId, string> = {
   codec: "🔐",
+  crypto: "🗝️",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   codec: "tools.tab.codec",
+  crypto: "tools.tab.crypto",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -378,7 +383,7 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5",
+        keywords: "tools codec crypto hash base64 image aes rsa ecdsa md5",
         run: () => handleModeChange("tools"),
       },
       {
@@ -431,7 +436,7 @@ export function App() {
       title: `${t("cmd.go")} ${t(it.labelKey)}`,
       group: t("cmd.group.navigate"),
       icon: it.icon,
-      keywords: `${it.id} tools codec hash base64 md5`,
+      keywords: `${it.id} tools codec crypto hash base64 image aes rsa ecdsa md5`,
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -454,7 +459,7 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5",
+        keywords: "tools codec crypto hash base64 image aes rsa ecdsa md5",
         run: () => handleModeChange("tools"),
       },
       {
@@ -499,7 +504,7 @@ export function App() {
         title: t("cmd.action.tools"),
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
-        keywords: "tools codec hash base64 md5",
+        keywords: "tools codec crypto hash base64 image aes rsa ecdsa md5",
         run: () => handleModeChange("tools"),
       },
       {
@@ -728,6 +733,7 @@ export function App() {
               <ViewTransition viewKey={activeTool}>
                 <Suspense fallback={<Spinner label={t("profile.loading")} />}>
                   {activeTool === "codec" && <CodecToolsTab />}
+                  {activeTool === "crypto" && <CryptoToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>

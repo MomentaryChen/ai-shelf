@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, Copy, Hash, ArrowLeftRight } from "lucide-react";
+import { Check, Copy, Hash, ArrowLeftRight, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -19,16 +19,23 @@ import {
   shaHex,
   type ShaAlgo,
 } from "../utils/codec";
+import {
+  base64ToObjectUrl,
+  type ImageBase64Format,
+  imageFileToBase64,
+  parseDataUrl,
+} from "../utils/image-base64";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
 
-type ToolId = "hash" | "base64" | "url" | "hex";
+type ToolId = "hash" | "base64" | "image" | "url" | "hex";
 type Direction = "encode" | "decode";
 type HashAlgo = "md5" | "sha1" | "sha256" | "sha512";
 
 const TOOLS: { id: ToolId; labelKey: MessageKey }[] = [
   { id: "hash", labelKey: "codec.tool.hash" },
   { id: "base64", labelKey: "codec.tool.base64" },
+  { id: "image", labelKey: "codec.tool.image" },
   { id: "url", labelKey: "codec.tool.url" },
   { id: "hex", labelKey: "codec.tool.hex" },
 ];
@@ -53,7 +60,10 @@ export function CodecToolsTab() {
   const { t } = useLocale();
   const inputId = useId();
   const outputId = useId();
+  const fileInputId = useId();
   const copiedTimerRef = useRef<number | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [tool, setTool] = useState<ToolId>("hash");
   const [direction, setDirection] = useState<Direction>("encode");
@@ -63,11 +73,50 @@ export function CodecToolsTab() {
   const [output, setOutput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [imageFormat, setImageFormat] = useState<ImageBase64Format>("dataUrl");
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const revokePreview = () => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    setPreviewUrl(null);
+  };
+
+  const setPreviewFromFile = (file: File) => {
+    revokePreview();
+    const url = URL.createObjectURL(file);
+    previewUrlRef.current = url;
+    setPreviewUrl(url);
+  };
+
+  const encodeImageFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setError(t("codec.image.error.type"));
+      setOutput("");
+      return;
+    }
+    try {
+      setFileName(file.name);
+      setPreviewFromFile(file);
+      const next = await imageFileToBase64(file, imageFormat);
+      setOutput(next);
+      setError(null);
+    } catch {
+      setOutput("");
+      setError(t("codec.image.error.read"));
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
+      if (tool === "image") return;
+
       if (!input) {
         if (!cancelled) {
           setOutput("");
@@ -112,6 +161,7 @@ export function CodecToolsTab() {
   useEffect(() => {
     return () => {
       if (copiedTimerRef.current != null) window.clearTimeout(copiedTimerRef.current);
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     };
   }, []);
 
@@ -128,12 +178,29 @@ export function CodecToolsTab() {
   };
 
   const swap = () => {
-    if (tool === "hash" || !output) return;
+    if (tool === "hash" || tool === "image" || !output) return;
     setInput(output);
     setDirection((d) => (d === "encode" ? "decode" : "encode"));
   };
 
-  const showDirection = tool !== "hash";
+  const showDirection = tool !== "hash" && tool !== "image";
+
+  const previewFromBase64 = () => {
+    if (!output && !input) return;
+    const source = output || input;
+    try {
+      revokePreview();
+      const url = base64ToObjectUrl(source);
+      previewUrlRef.current = url;
+      setPreviewUrl(url);
+      setError(null);
+      if (!parseDataUrl(source) && !/^[A-Za-z0-9+/=\s_-]+$/u.test(source.trim())) {
+        setError(t("codec.error.invalid"));
+      }
+    } catch {
+      setError(t("codec.error.invalid"));
+    }
+  };
 
   return (
     <>
@@ -151,6 +218,10 @@ export function CodecToolsTab() {
             onClick={() => {
               setTool(item.id);
               setError(null);
+              if (item.id !== "image") {
+                revokePreview();
+                setFileName(null);
+              }
             }}
             className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[13px] transition-colors duration-200 ${
               tool === item.id
@@ -164,143 +235,301 @@ export function CodecToolsTab() {
       </nav>
 
       <Card>
-        <div className="flex flex-col gap-4">
-          {tool === "hash" ? (
-            <div>
-              <Label className="mb-2 block text-[12px] font-medium text-text-secondary">
-                {t("codec.hash.algo")}
-              </Label>
-              <ToggleGroup
-                type="single"
-                value={hashAlgo}
-                onValueChange={(v) => {
-                  if (v) setHashAlgo(v as HashAlgo);
-                }}
-                className="gap-1.5"
-              >
-                {HASH_ALGOS.map((algo) => (
-                  <ToggleGroupItem key={algo.id} value={algo.id} size="sm">
-                    {algo.label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-          ) : (
+        {tool === "image" ? (
+          <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <ToggleGroup
                 type="single"
-                value={direction}
+                value={imageFormat}
                 onValueChange={(v) => {
-                  if (v) setDirection(v as Direction);
+                  if (!v) return;
+                  const next = v as ImageBase64Format;
+                  setImageFormat(next);
+                  if (output.startsWith("data:") && next === "raw") {
+                    const parsed = parseDataUrl(output);
+                    if (parsed) setOutput(parsed.base64);
+                  } else if (!output.startsWith("data:") && next === "dataUrl" && output) {
+                    setOutput(`data:image/png;base64,${output.replace(/\s+/gu, "")}`);
+                  }
                 }}
                 className="gap-1.5"
               >
-                <ToggleGroupItem value="encode" size="sm">
-                  {t("codec.direction.encode")}
+                <ToggleGroupItem value="dataUrl" size="sm">
+                  {t("codec.image.format.dataUrl")}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="decode" size="sm">
-                  {t("codec.direction.decode")}
+                <ToggleGroupItem value="raw" size="sm">
+                  {t("codec.image.format.raw")}
                 </ToggleGroupItem>
               </ToggleGroup>
-
-              {tool === "base64" && (
-                <Label className="flex cursor-pointer items-center gap-2 text-[13px] font-normal text-text-primary">
-                  <Checkbox
-                    checked={urlSafe}
-                    onCheckedChange={(v) => setUrlSafe(v === true)}
-                  />
-                  {t("codec.base64.urlSafe")}
-                </Label>
+              {fileName && (
+                <span className="truncate text-[12px] text-text-tertiary">{fileName}</span>
               )}
             </div>
-          )}
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
-                {t("codec.input")}
-              </Label>
-              <Textarea
-                id={inputId}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                spellCheck={false}
-                placeholder={t("codec.inputPlaceholder")}
-                className={fieldClass}
-              />
-            </div>
+            <input
+              ref={fileInputRef}
+              id={fileInputId}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void encodeImageFile(file);
+                e.target.value = "";
+              }}
+            />
 
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
-                  {t("codec.output")}
-                </Label>
-                <div className="flex items-center gap-1">
-                  {showDirection && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) void encodeImageFile(file);
+              }}
+              className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 rounded-[22px] border border-dashed px-4 py-6 text-center transition-colors duration-200 ${
+                dragOver
+                  ? "border-accent bg-accent-surface"
+                  : "border-border bg-bg-primary hover:bg-accent-surface"
+              }`}
+            >
+              <ImagePlus className="h-6 w-6 text-text-secondary" />
+              <span className="text-[13px] text-text-primary">{t("codec.image.drop")}</span>
+              <span className="text-[12px] text-text-tertiary">{t("codec.image.hint")}</span>
+            </button>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
+                    {t("codec.output")}
+                  </Label>
+                  <div className="flex items-center gap-1">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={swap}
+                      onClick={previewFromBase64}
                       disabled={!output}
                       className="h-8 px-2 text-[12px]"
-                      title={t("codec.swap")}
                     >
-                      <ArrowLeftRight className="h-3.5 w-3.5" />
-                      {t("codec.swap")}
+                      {t("codec.image.preview")}
                     </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void copyOutput()}
+                      disabled={!output}
+                      className="h-8 px-2 text-[12px]"
+                    >
+                      {copied ? (
+                        <Check className="h-3.5 w-3.5 text-success" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {copied ? t("codec.copied") : t("codec.copy")}
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  id={outputId}
+                  value={output}
+                  onChange={(e) => setOutput(e.target.value)}
+                  spellCheck={false}
+                  placeholder={t("codec.image.outputPlaceholder")}
+                  aria-invalid={error ? true : undefined}
+                  className={fieldClass}
+                />
+                {error && (
+                  <p role="alert" className="text-[12px] text-fail">
+                    {error}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label className="text-[12px] font-medium text-text-secondary">
+                  {t("codec.image.previewLabel")}
+                </Label>
+                <div className="flex min-h-[140px] items-center justify-center overflow-hidden rounded-[22px] border border-border bg-bg-primary p-3">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt={fileName ?? t("codec.image.previewLabel")}
+                      className="max-h-[200px] max-w-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-[12px] text-text-tertiary">
+                      {t("codec.image.previewEmpty")}
+                    </span>
                   )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void copyOutput()}
-                    disabled={!output}
-                    className="h-8 px-2 text-[12px]"
-                  >
-                    {copied ? (
-                      <Check className="h-3.5 w-3.5 text-success" />
-                    ) : (
-                      <Copy className="h-3.5 w-3.5" />
-                    )}
-                    {copied ? t("codec.copied") : t("codec.copy")}
-                  </Button>
                 </div>
               </div>
-              <Textarea
-                id={outputId}
-                value={output}
-                readOnly
-                spellCheck={false}
-                placeholder={t("codec.outputPlaceholder")}
-                aria-invalid={error ? true : undefined}
-                className={fieldClass}
-              />
-              {error && (
-                <p role="alert" className="text-[12px] text-fail">
-                  {error}
-                </p>
-              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setOutput("");
+                  setFileName(null);
+                  setError(null);
+                  revokePreview();
+                }}
+                disabled={!output && !previewUrl}
+              >
+                {t("codec.clear")}
+              </Button>
             </div>
           </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {tool === "hash" ? (
+              <div>
+                <Label className="mb-2 block text-[12px] font-medium text-text-secondary">
+                  {t("codec.hash.algo")}
+                </Label>
+                <ToggleGroup
+                  type="single"
+                  value={hashAlgo}
+                  onValueChange={(v) => {
+                    if (v) setHashAlgo(v as HashAlgo);
+                  }}
+                  className="gap-1.5"
+                >
+                  {HASH_ALGOS.map((algo) => (
+                    <ToggleGroupItem key={algo.id} value={algo.id} size="sm">
+                      {algo.label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <ToggleGroup
+                  type="single"
+                  value={direction}
+                  onValueChange={(v) => {
+                    if (v) setDirection(v as Direction);
+                  }}
+                  className="gap-1.5"
+                >
+                  <ToggleGroupItem value="encode" size="sm">
+                    {t("codec.direction.encode")}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="decode" size="sm">
+                    {t("codec.direction.decode")}
+                  </ToggleGroupItem>
+                </ToggleGroup>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setInput("");
-                setOutput("");
-                setError(null);
-              }}
-              disabled={!input && !output}
-            >
-              {t("codec.clear")}
-            </Button>
-            <span className="text-[12px] text-text-tertiary">{t("codec.hint.live")}</span>
+                {tool === "base64" && (
+                  <Label className="flex cursor-pointer items-center gap-2 text-[13px] font-normal text-text-primary">
+                    <Checkbox
+                      checked={urlSafe}
+                      onCheckedChange={(v) => setUrlSafe(v === true)}
+                    />
+                    {t("codec.base64.urlSafe")}
+                  </Label>
+                )}
+              </div>
+            )}
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label htmlFor={inputId} className="text-[12px] font-medium text-text-secondary">
+                  {t("codec.input")}
+                </Label>
+                <Textarea
+                  id={inputId}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  spellCheck={false}
+                  placeholder={t("codec.inputPlaceholder")}
+                  className={fieldClass}
+                />
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor={outputId} className="text-[12px] font-medium text-text-secondary">
+                    {t("codec.output")}
+                  </Label>
+                  <div className="flex items-center gap-1">
+                    {showDirection && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={swap}
+                        disabled={!output}
+                        className="h-8 px-2 text-[12px]"
+                        title={t("codec.swap")}
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                        {t("codec.swap")}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void copyOutput()}
+                      disabled={!output}
+                      className="h-8 px-2 text-[12px]"
+                    >
+                      {copied ? (
+                        <Check className="h-3.5 w-3.5 text-success" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {copied ? t("codec.copied") : t("codec.copy")}
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  id={outputId}
+                  value={output}
+                  readOnly
+                  spellCheck={false}
+                  placeholder={t("codec.outputPlaceholder")}
+                  aria-invalid={error ? true : undefined}
+                  className={fieldClass}
+                />
+                {error && (
+                  <p role="alert" className="text-[12px] text-fail">
+                    {error}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setInput("");
+                  setOutput("");
+                  setError(null);
+                }}
+                disabled={!input && !output}
+              >
+                {t("codec.clear")}
+              </Button>
+              <span className="text-[12px] text-text-tertiary">{t("codec.hint.live")}</span>
+            </div>
           </div>
-        </div>
+        )}
       </Card>
     </>
   );
