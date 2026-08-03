@@ -1184,8 +1184,11 @@ export const zh: Record<MessageKey, string> = {
   "codec.image.preview": "預覽",
   "codec.image.previewLabel": "預覽",
   "codec.image.previewEmpty": "編碼或貼上 Base64 後會顯示預覽",
+  "codec.image.enlarge": "放大",
+  "codec.image.enlargeTitle": "圖片預覽",
   "codec.image.error.type": "這不是圖片檔 — 請選 PNG、JPEG 等格式。",
   "codec.image.error.read": "無法讀取這張圖片 — 換一個檔案再試。",
+  "codec.image.error.preview": "無法把這段 Base64 顯示成圖片 — 請檢查內容。",
 
   "tools.tab.crypto": "加解密",
   "crypto.subtitle": "AES、RSA、ECDSA — 在本機加密、解密、簽名與驗證。",

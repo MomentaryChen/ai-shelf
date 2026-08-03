@@ -1210,8 +1210,11 @@ export const en = {
   "codec.image.preview": "Preview",
   "codec.image.previewLabel": "Preview",
   "codec.image.previewEmpty": "Preview shows up after you encode or paste Base64",
+  "codec.image.enlarge": "Enlarge",
+  "codec.image.enlargeTitle": "Image preview",
   "codec.image.error.type": "That file is not an image — pick a PNG, JPEG, or similar.",
   "codec.image.error.read": "Could not read that image — try another file.",
+  "codec.image.error.preview": "Could not render this Base64 as an image — check the data.",
 
   // Tools mode — Crypto
   "tools.tab.crypto": "Crypto",
