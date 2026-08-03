@@ -98,7 +98,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
   ptySpawn: (tool, cwd, extraArgs, shell) =>
     ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell),
-  ptyAttach: (sessionId)                    => ipcRenderer.invoke("pty-attach", sessionId),
+  ptyAttach: (sessionId, opts)              => ipcRenderer.invoke("pty-attach", sessionId, opts),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
   ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),
   ptySearchOutput: (sessionId, query, opts)  => ipcRenderer.invoke("pty-search-output", sessionId, query, opts),
@@ -106,7 +106,7 @@ contextBridge.exposeInMainWorld("api", {
   pickFolder: (defaultPath)                 => ipcRenderer.invoke("pick-folder", defaultPath),
   clipboardReadText: ()                     => ipcRenderer.invoke("clipboard-read-text"),
   clipboardWriteText: (text)                => ipcRenderer.invoke("clipboard-write-text", text),
-  ptyWrite:  (sessionId, data)          => ipcRenderer.invoke("pty-write",  sessionId, data),
+  ptyWrite:  (sessionId, data)          => ipcRenderer.send("pty-write",  sessionId, data),
   ptyResize: (sessionId, cols, rows)    => ipcRenderer.invoke("pty-resize", sessionId, cols, rows),
   ptyKill:   (sessionId)                => ipcRenderer.send("pty-kill",   sessionId),
   onPtyData: (cb) => {

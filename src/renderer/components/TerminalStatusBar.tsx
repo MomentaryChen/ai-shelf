@@ -79,7 +79,7 @@ export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
       });
     });
 
-    void window.api.ptyAttach(sessionId).then((r) => {
+    void window.api.ptyAttach(sessionId, { includeBuffer: false }).then((r) => {
       if (cancelled) return;
       // Merge carefully: a late attach reply must not wipe exitCode set by onPtyExit.
       setMeta((prev) => ({

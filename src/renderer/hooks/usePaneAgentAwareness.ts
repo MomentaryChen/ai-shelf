@@ -46,6 +46,15 @@ function stateOptions(settings: ChatSettings) {
   };
 }
 
+function statusVisibleEqual(a: PaneAgentState, b: PaneAgentState): boolean {
+  return (
+    a.status === b.status &&
+    a.wasRunning === b.wasRunning &&
+    a.runningSinceAt === b.runningSinceAt &&
+    a.lastRunningSpellMs === b.lastRunningSpellMs
+  );
+}
+
 export function usePaneAgentAwareness(
   panes: PaneInfo[],
   focusedPaneId: string | null,
@@ -56,6 +65,12 @@ export function usePaneAgentAwareness(
   const [states, setStates] = useState<Record<string, PaneAgentState>>({});
   const statesRef = useRef(states);
   statesRef.current = states;
+
+  /** Authoritative per-pane state including tail; React state only commits status-visible fields. */
+  const draftRef = useRef<Record<string, PaneAgentState>>({});
+  const pendingOutputRef = useRef(new Map<string, string>());
+  const coalesceRafRef = useRef(0);
+  const coalesceTimerRef = useRef(0);
 
   const prevStatusRef = useRef<Record<string, PaneAgentStatus>>({});
   const notifyCooldownRef = useRef<Record<string, number>>({});
@@ -74,6 +89,17 @@ export function usePaneAgentAwareness(
     if (timer !== undefined) {
       window.clearTimeout(timer);
       delete readyPendingRef.current[paneId];
+    }
+  }, []);
+
+  const cancelOutputCoalesce = useCallback(() => {
+    if (coalesceRafRef.current) {
+      cancelAnimationFrame(coalesceRafRef.current);
+      coalesceRafRef.current = 0;
+    }
+    if (coalesceTimerRef.current) {
+      window.clearTimeout(coalesceTimerRef.current);
+      coalesceTimerRef.current = 0;
     }
   }, []);
 
@@ -122,7 +148,7 @@ export function usePaneAgentAwareness(
 
       readyPendingRef.current[pane.id] = window.setTimeout(() => {
         delete readyPendingRef.current[pane.id];
-        const state = statesRef.current[pane.id];
+        const state = draftRef.current[pane.id] ?? statesRef.current[pane.id];
         if (!state || state.status !== "idle") return;
         if (readyNotifiedRef.current[pane.id]) return;
         if (!shouldNotifyPane(pane)) return;
@@ -203,23 +229,73 @@ export function usePaneAgentAwareness(
     };
   }, []);
 
+  const commitPaneState = useCallback((paneId: string, nextState: PaneAgentState) => {
+    draftRef.current[paneId] = nextState;
+    setStates((prev) => {
+      const current = prev[paneId] ?? createPaneAgentState();
+      if (statusVisibleEqual(current, nextState)) return prev;
+      return { ...prev, [paneId]: nextState };
+    });
+  }, []);
+
   const updateSession = useCallback(
     (sessionId: string, updater: (prev: PaneAgentState) => PaneAgentState) => {
       const pane = paneBySession.current.get(sessionId);
       if (!pane || !settings.paneAgentAwarenessEnabled) return;
 
-      setStates((prev) => {
-        const current = prev[pane.id] ?? createPaneAgentState();
-        const nextState = updater(current);
-        if (nextState === current) return prev;
-        return { ...prev, [pane.id]: nextState };
-      });
+      const current =
+        draftRef.current[pane.id] ?? statesRef.current[pane.id] ?? createPaneAgentState();
+      const nextState = updater(current);
+      if (nextState === current) return;
+      commitPaneState(pane.id, nextState);
     },
-    [settings.paneAgentAwarenessEnabled],
+    [commitPaneState, settings.paneAgentAwarenessEnabled],
   );
+
+  const flushPendingOutput = useCallback(() => {
+    coalesceRafRef.current = 0;
+    if (coalesceTimerRef.current) {
+      window.clearTimeout(coalesceTimerRef.current);
+      coalesceTimerRef.current = 0;
+    }
+    const pending = pendingOutputRef.current;
+    if (pending.size === 0) return;
+    pendingOutputRef.current = new Map();
+    const now = Date.now();
+    const opts = stateOptions(settings);
+    for (const [sessionId, data] of pending) {
+      if (!data) continue;
+      const pane = paneBySession.current.get(sessionId);
+      if (!pane || !settings.paneAgentAwarenessEnabled) continue;
+      const current =
+        draftRef.current[pane.id] ?? statesRef.current[pane.id] ?? createPaneAgentState();
+      commitPaneState(pane.id, applyPaneAgentOutput(current, data, now, opts));
+    }
+  }, [commitPaneState, settings]);
+
+  const scheduleOutputFlush = useCallback(() => {
+    if (coalesceRafRef.current) return;
+    coalesceRafRef.current = requestAnimationFrame(() => {
+      flushPendingOutput();
+    });
+    // Cap wait when rAF is throttled (background / occluded windows).
+    if (!coalesceTimerRef.current) {
+      coalesceTimerRef.current = window.setTimeout(() => {
+        coalesceTimerRef.current = 0;
+        if (coalesceRafRef.current) {
+          cancelAnimationFrame(coalesceRafRef.current);
+          coalesceRafRef.current = 0;
+        }
+        flushPendingOutput();
+      }, 50);
+    }
+  }, [flushPendingOutput]);
 
   useEffect(() => {
     if (!settings.paneAgentAwarenessEnabled) {
+      cancelOutputCoalesce();
+      pendingOutputRef.current.clear();
+      draftRef.current = {};
       setStates({});
       prevStatusRef.current = {};
       readyNotifiedRef.current = {};
@@ -232,30 +308,53 @@ export function usePaneAgentAwareness(
     }
 
     const offData = window.api.onPtyData(({ sessionId, data }) => {
-      const now = Date.now();
-      updateSession(sessionId, (prev) =>
-        applyPaneAgentOutput(prev, data, now, stateOptions(settings)),
-      );
+      const prev = pendingOutputRef.current.get(sessionId) ?? "";
+      pendingOutputRef.current.set(sessionId, prev + data);
+      scheduleOutputFlush();
     });
 
     const offExit = window.api.onPtyExit(({ sessionId }) => {
       const pane = paneBySession.current.get(sessionId);
+      // Apply coalesced bytes before reset so the final chunk is not dropped.
+      const pending = pendingOutputRef.current.get(sessionId);
+      if (pending) {
+        pendingOutputRef.current.delete(sessionId);
+        if (pane && settings.paneAgentAwarenessEnabled) {
+          const current =
+            draftRef.current[pane.id] ?? statesRef.current[pane.id] ?? createPaneAgentState();
+          commitPaneState(
+            pane.id,
+            applyPaneAgentOutput(current, pending, Date.now(), stateOptions(settings)),
+          );
+        }
+      }
       if (pane) {
         readyNotifiedRef.current[pane.id] = false;
         clearReadyPending(pane.id);
       }
-      // Process is gone â€” do not treat as busy for close-confirm / status dots.
+      // Process is gone — do not treat as busy for close-confirm / status dots.
       updateSession(sessionId, () => createPaneAgentState());
     });
 
     return () => {
       offData();
       offExit();
+      cancelOutputCoalesce();
     };
-  }, [clearReadyPending, settings, updateSession]);
+  }, [
+    cancelOutputCoalesce,
+    clearReadyPending,
+    commitPaneState,
+    scheduleOutputFlush,
+    settings,
+    updateSession,
+  ]);
 
   useEffect(() => {
     const paneIds = new Set(panes.map((p) => p.id));
+    for (const id of Object.keys(draftRef.current)) {
+      if (!paneIds.has(id)) delete draftRef.current[id];
+    }
     setStates((prev) => {
       const next: Record<string, PaneAgentState> = {};
       let changed = false;
@@ -280,7 +379,7 @@ export function usePaneAgentAwareness(
         applyPaneAgentUserInput(prev, now, stateOptions(settings)),
       );
     },
-    [clearReadyPending, settings.paneAgentAwarenessEnabled, updateSession],
+    [clearReadyPending, settings, updateSession],
   );
 
   useEffect(() => {
@@ -288,21 +387,19 @@ export function usePaneAgentAwareness(
     const id = window.setInterval(() => {
       const now = Date.now();
       const opts = stateOptions(settings);
-      setStates((prev) => {
-        let next = prev;
-        for (const pane of panes) {
-          const current = prev[pane.id];
-          if (!current) continue;
-          const ticked = tickPaneAgentState(current, now, opts);
-          if (ticked === current) continue;
-          if (next === prev) next = { ...prev };
-          next[pane.id] = ticked;
+      for (const pane of panes) {
+        const current = draftRef.current[pane.id] ?? statesRef.current[pane.id];
+        if (!current) continue;
+        const ticked = tickPaneAgentState(current, now, opts);
+        if (statusVisibleEqual(current, ticked) && ticked.tail === current.tail) {
+          draftRef.current[pane.id] = ticked;
+          continue;
         }
-        return next;
-      });
+        commitPaneState(pane.id, ticked);
+      }
     }, 4_000);
     return () => window.clearInterval(id);
-  }, [panes, settings]);
+  }, [commitPaneState, panes, settings]);
 
   useEffect(() => {
     if (!settings.paneAgentAwarenessEnabled || !settings.paneAgentNotifyTrayBadge) {

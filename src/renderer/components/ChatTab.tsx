@@ -399,7 +399,25 @@ function ChatTabInner({
 
   useEffect(() => {
     void refreshSidebarForest();
-  }, [refreshSidebarForest, activeProfile?.id, panes.length]);
+  }, [refreshSidebarForest, activeProfile?.id]);
+
+  // Keep active profile paneCount in sync locally — avoid full forest IPC on every split/close.
+  useEffect(() => {
+    if (!activeProfile?.id) return;
+    setSidebarForest((prev) => {
+      if (!prev) return prev;
+      let changed = false;
+      const groups = prev.groups.map((g) => ({
+        ...g,
+        profiles: g.profiles.map((p) => {
+          if (p.id !== activeProfile.id || p.paneCount === panes.length) return p;
+          changed = true;
+          return { ...p, paneCount: panes.length };
+        }),
+      }));
+      return changed ? { ...prev, groups } : prev;
+    });
+  }, [activeProfile?.id, panes.length]);
 
   useEffect(() => {
     const unsub = window.api.onSyncDataApplied(() => {

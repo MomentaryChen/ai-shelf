@@ -339,10 +339,8 @@ function EmbeddedTerminalInner({
 
     const writePty = (data: string) => {
       if (cancelled || exited) return;
-      void window.api.ptyWrite(sessionId, data).then((r) => {
-        if (cancelled || r.success) return;
-        markExited();
-      });
+      // Fire-and-forget; dead sessions re-emit pty-exit / pty-meta for markExited.
+      window.api.ptyWrite(sessionId, data);
     };
 
     const doClear = () => {

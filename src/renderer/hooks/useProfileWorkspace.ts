@@ -61,7 +61,7 @@ async function reconcileLayoutPtys(
 ): Promise<LayoutNode> {
   let next = node;
   for (const pane of collectPanes(node)) {
-    const attached = await window.api.ptyAttach(pane.sessionId);
+    const attached = await window.api.ptyAttach(pane.sessionId, { includeBuffer: false });
     if (attached.alive) continue;
 
     window.api.ptyKill(pane.sessionId);
