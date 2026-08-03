@@ -118,4 +118,4 @@ PR base is usually `main`; merge policy is up to the user.
 
 ## Release skill boundary
 
-Releases (version bump, tag, CHANGELOG) use [ai-shelf-release](../ai-shelf-release/SKILL.md) on **`main`**. Feature worktrees should not run the release workflow unless the user explicitly switches context to a release task.
+Releases (version bump, CHANGELOG, docs assets) use [ai-shelf-release](../ai-shelf-release/SKILL.md): prep on **`develop`**, auto-cut **`release/vX.Y.Z`**, merge into **`main`**, then tag **`vX.Y.Z` on `main`** and sync **`develop` ← `main`**. Feature worktrees should not run that workflow unless the user explicitly switches context to a release task.
