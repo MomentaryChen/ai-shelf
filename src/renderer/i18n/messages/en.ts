@@ -1396,6 +1396,19 @@ export const en = {
   "json.hint.live": "Updates as you type",
   "json.error.invalid": "Could not parse this JSON — check for trailing commas or quotes.",
 
+  // Tools mode — Markdown
+  "tools.tab.markdown": "Markdown",
+  "markdown.subtitle":
+    "Live Markdown preview with GFM — fenced Mermaid blocks render as flowcharts and diagrams.",
+  "markdown.input": "Markdown",
+  "markdown.preview": "Preview",
+  "markdown.inputPlaceholder": "Paste Markdown here…",
+  "markdown.empty": "Preview appears here as you type.",
+  "markdown.sample": "Load sample",
+  "markdown.clear": "Clear",
+  "markdown.hint.live": "Updates as you type · Mermaid fences render as diagrams",
+  "markdown.mermaid.errorTitle": "Mermaid",
+
   // Tools mode — JWT
   "tools.tab.jwt": "JWT",
   "jwt.subtitle":
