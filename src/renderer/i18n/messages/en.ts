@@ -47,10 +47,13 @@ export const en = {
     "We'll create a starter profile on finish so you can open a terminal right away.",
   "onboarding.start.createFailed": "Could not create a starter profile. Try again or skip for now.",
   "onboarding.start.creating": "Setting up…",
-  "onboarding.start.modesTitle": "Three ways to work",
+  "onboarding.start.modesTitle": "Four ways to work",
   "onboarding.start.modeTerminal": "Terminal — run agents side by side in split panes",
-  "onboarding.start.modeInventory": "Inventory — models, skills, MCP, and doctor checks",
-  "onboarding.start.modeFlow": "Flow — automate multi-step AI jobs",
+  "onboarding.start.modeInventory":
+    "Inventory — models, skills, MCP, doctor checks, and usage",
+  "onboarding.start.modeTools":
+    "Tools — codec, JSON, regex, JWT, and other everyday utilities",
+  "onboarding.start.modeFlow": "AI Flow — automate multi-step AI jobs",
   "onboarding.start.getStarted": "Open terminal",
   "onboarding.next": "Continue",
   "onboarding.back": "Back",
