@@ -1498,6 +1498,27 @@ export const en = {
   "uuid.variant.reserved": "Reserved",
   "uuid.variant.ncs": "NCS",
   "uuid.variant.unknown": "Unknown",
+
+  // Tools mode — Diff
+  "tools.tab.diff": "Diff",
+  "diff.subtitle":
+    "Compare two texts side by side — paste original and changed, then copy a unified patch.",
+  "diff.left": "Original",
+  "diff.right": "Changed",
+  "diff.leftPlaceholder": "Paste original text…",
+  "diff.rightPlaceholder": "Paste changed text…",
+  "diff.result": "Diff",
+  "diff.ignoreWhitespace": "Ignore leading/trailing whitespace",
+  "diff.swap": "Swap sides",
+  "diff.copy": "Copy patch",
+  "diff.copied": "Copied",
+  "diff.clear": "Clear",
+  "diff.hint.live": "Updates as you type",
+  "diff.empty": "Paste text on both sides to see the difference.",
+  "diff.identical": "No differences",
+  "diff.stats": "+{added} −{removed}",
+  "diff.error.tooLarge":
+    "Each side can be at most {max} lines — shorten the text and try again.",
 } as const;
 
 export type MessageKey = keyof typeof en;
