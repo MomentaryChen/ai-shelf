@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 GitHub Releases use the matching `## [x.y.z]` section here as the release description (see `scripts/release-notes.mjs` and `.github/workflows/release.yml`).
 
+## [4.2.0] - 2026-08-05
+
+New Tools panels for Diff, Markdown, YAML↔JSON, and UUID/NanoID, plus sync overwrite and steadier CJK IME pinning.
+
+### Added
+
+- **Diff / text compare** — Side-by-side patch comparison in Tools mode.
+- **Markdown preview** — Preview Markdown with Mermaid diagrams.
+- **YAML ↔ JSON convert** — Dense config workflows between YAML and JSON.
+- **UUID / NanoID** — Generator and validator panel in Tools mode.
+
+### Changed
+
+- **Documentation narrative** — Aligns the install story and four-mode product narrative across docs.
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIFs for the current UI.
+- **Sync profile capacity** — Raises the profile count cap for cloud sync.
+
+### Fixed
+
+- **Sync prefer local/cloud** — Overwrites the other side when prefer-local or prefer-cloud is chosen.
+- **CJK IME pin drift** — Re-pins composition against the caret element instead of the last intent.
+
+[4.2.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.2.0
+
 ## [4.1.0] - 2026-08-03
 
 Responsive Tools panels, clearer dual-pane layouts, and steadier CJK IME in the terminal.
