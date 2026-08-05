@@ -925,10 +925,20 @@ export const en = {
   "appUpdate.later": "Later",
   "appUpdate.now": "Update now",
   "appUpdate.downloading": "Downloading",
+  "appUpdate.downloadingHint": "Keep working — restart whenever the download finishes.",
   "appUpdate.downloadComplete": "Download complete",
-  "appUpdate.restartFinish": "Restart AI Shelf to finish installing.",
+  "appUpdate.whatsNew": "What's new",
+  "appUpdate.silentInstallNote": "Installs silently in the background — no Windows setup wizard.",
+  "appUpdate.restartFinish": "Restarting installs the update and reopens AI Shelf.",
   "appUpdate.restartLater": "Restart later",
   "appUpdate.restartNow": "Restart now",
+  "appUpdate.installing": "Installing",
+  "appUpdate.installingHint": "AI Shelf will close and reopen automatically.",
+  "appUpdate.installingBody":
+    "Installing the new version in the background — please don't close the app.",
+  "appUpdate.installStalledHint":
+    "The install doesn't seem to be progressing. You can close this dialog and keep working, or install manually from GitHub Releases.",
+  "appUpdate.errorSubtitle": "This update didn't finish. You can try again later.",
   "appUpdate.errorDefault": "Could not check or download the update.",
   "appUpdate.errorSignature":
     "The downloaded installer signature could not be verified (self-signed or publisher mismatch). Install manually from GitHub Releases, or update after a newer app build with matching signing.",

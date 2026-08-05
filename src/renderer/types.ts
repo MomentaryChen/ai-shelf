@@ -763,6 +763,7 @@ export interface ElectronAPI {
   onAppUpdateNotAvailable: (cb: (payload: { version: string | null }) => void) => () => void;
   onAppUpdateProgress: (cb: (payload: AppUpdateProgressPayload) => void) => () => void;
   onAppUpdateDownloaded: (cb: (payload: { version: string | null }) => void) => () => void;
+  onAppUpdateInstalling: (cb: (payload: { version: string | null }) => void) => () => void;
   onAppUpdateError: (cb: (payload: { message: string }) => void) => () => void;
   getToolsList: () => Promise<UpdateCheckResult>;
   checkToolLatest: (tool: string) => Promise<ToolUpdateInfo | null>;

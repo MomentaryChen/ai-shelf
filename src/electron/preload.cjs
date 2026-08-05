@@ -55,6 +55,11 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("app-update-downloaded", handler);
     return () => ipcRenderer.off("app-update-downloaded", handler);
   },
+  onAppUpdateInstalling: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-installing", handler);
+    return () => ipcRenderer.off("app-update-installing", handler);
+  },
   onAppUpdateError: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("app-update-error", handler);
