@@ -115,11 +115,6 @@ export async function runCloudSync(
     }
     const local = exported.bundle;
 
-    const localLimit = validateSyncBundle(local);
-    if (!localLimit.ok) {
-      throw new Error(encodeSyncLimitError(localLimit.code, localLimit.detail));
-    }
-
     const remoteState = await pullRemoteSyncState(uid);
     const prefer = options.prefer ?? (options.silent ? "merge" : "local");
     const plan = planSyncAction(local, remoteState?.bundle ?? null, prefer);
@@ -152,20 +147,17 @@ export async function runCloudSync(
       hasExistingRemoteSync: remoteState != null,
     });
 
-    if (remoteState) {
-      const remoteLimit = validateSyncBundle(remoteState.bundle);
-      if (!remoteLimit.ok) {
-        throw new Error(encodeSyncLimitError(remoteLimit.code, remoteLimit.detail));
-      }
-    }
-
-    const mergedLimit = validateSyncBundle(plan.merged);
-    if (!mergedLimit.ok) {
-      throw new Error(encodeSyncLimitError(mergedLimit.code, mergedLimit.detail));
+    // Prefer local/cloud overwrites the other side — only validate the winning bundle.
+    // Merge still validates the merged payload (not each side independently).
+    const winningLimit = validateSyncBundle(plan.merged);
+    if (!winningLimit.ok) {
+      throw new Error(encodeSyncLimitError(winningLimit.code, winningLimit.detail));
     }
 
     if (plan.action === "apply_only" || plan.action === "apply_and_push") {
-      const applied = await window.api.syncApplyBundle(plan.merged);
+      const applied = await window.api.syncApplyBundle(plan.merged, {
+        replace: prefer === "cloud",
+      });
       if (!applied.ok) {
         throw new Error(applied.error ?? "Failed to apply sync bundle");
       }
@@ -173,8 +165,17 @@ export async function runCloudSync(
 
     if (plan.action === "push_only" || plan.action === "apply_and_push") {
       const nextRevision = (remoteState?.revision ?? 0) + 1;
-      const refreshed = await window.api.syncExportLocal();
-      const toPush = refreshed.ok ? refreshed.bundle : plan.merged;
+      // Prefer-local must push the planned local winner, not a re-export that could
+      // still reflect stale merge leftovers. After prefer-cloud apply+replace, re-export
+      // matches remote; for merge apply_and_push, re-export picks up applied state.
+      const refreshed =
+        prefer === "local" ? null : await window.api.syncExportLocal();
+      const toPush =
+        prefer === "local"
+          ? plan.merged
+          : refreshed?.ok
+            ? refreshed.bundle
+            : plan.merged;
 
       const pushLimit = validateSyncBundle(toPush);
       if (!pushLimit.ok) {

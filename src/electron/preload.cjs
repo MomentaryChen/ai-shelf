@@ -224,7 +224,7 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.off("auth-oauth-navigated", handler);
   },
   syncExportLocal: () => ipcRenderer.invoke("sync-export-local"),
-  syncApplyBundle: (bundle) => ipcRenderer.invoke("sync-apply-bundle", bundle),
+  syncApplyBundle: (bundle, options) => ipcRenderer.invoke("sync-apply-bundle", bundle, options),
   syncGetMeta: () => ipcRenderer.invoke("sync-get-meta"),
   syncSetMeta: (partial) => ipcRenderer.invoke("sync-set-meta", partial),
   syncPullRemote: () => ipcRenderer.invoke("sync-pull-remote"),

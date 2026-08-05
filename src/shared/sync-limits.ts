@@ -28,8 +28,9 @@ export const MAX_SYNC_OPS_PER_DAY = Math.floor(30 * FREE_TIER_HEADROOM_RATIO);
 export const MIN_SYNC_INTERVAL_MS = 180_000;
 
 export const MAX_SYNC_WORKSPACES = 8;
-export const MAX_SYNC_PROFILES = 40;
-export const MAX_SYNC_LAYOUTS = 40;
+/** Profiles + layouts share the same cap (one layout row per profile). */
+export const MAX_SYNC_PROFILES = 60;
+export const MAX_SYNC_LAYOUTS = 60;
 export const MAX_SYNC_PANES_PER_LAYOUT = 8;
 
 export type SyncLimitCode =

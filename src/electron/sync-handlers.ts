@@ -22,8 +22,12 @@ export function registerSyncHandlers(): void {
     return { ok: true as const, bundle };
   });
 
-  ipcMain.handle("sync-apply-bundle", (_event, bundle: unknown) => {
-    const result = applySyncBundle(bundle);
+  ipcMain.handle("sync-apply-bundle", (_event, bundle: unknown, options?: unknown) => {
+    const replace =
+      options != null &&
+      typeof options === "object" &&
+      (options as { replace?: unknown }).replace === true;
+    const result = applySyncBundle(bundle, { replace });
     if (result.ok) broadcastSyncApplied();
     return result;
   });

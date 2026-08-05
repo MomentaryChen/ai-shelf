@@ -70,6 +70,7 @@ function upsertProfile(
 function upsertLayout(
   db: ReturnType<typeof openDatabase>,
   row: SyncBundle["layouts"][number],
+  options: ApplySyncBundleOptions = {},
 ): void {
   if (row.deletedAt) {
     db.prepare(`DELETE FROM group_layouts WHERE group_id = ?`).run(row.profileId);
@@ -78,13 +79,17 @@ function upsertLayout(
   const group = db.prepare(`SELECT id FROM groups WHERE id = ?`).get(row.profileId);
   if (!group) return;
   const snapshot = row.snapshot;
-  const existingLayout = db
-    .prepare(`SELECT saved_commands_json FROM group_layouts WHERE group_id = ?`)
-    .get(row.profileId) as { saved_commands_json: string } | undefined;
-  const savedCommandsJson =
-    snapshot.savedCommands !== undefined
-      ? JSON.stringify(snapshot.savedCommands)
-      : (existingLayout?.saved_commands_json ?? "[]");
+  // Merge upsert may keep local saved commands when the bundle omits them.
+  // Prefer-cloud replace must take the bundle value (default []) so overwrite is complete.
+  let savedCommandsJson: string;
+  if (options.replace || snapshot.savedCommands !== undefined) {
+    savedCommandsJson = JSON.stringify(snapshot.savedCommands ?? []);
+  } else {
+    const existingLayout = db
+      .prepare(`SELECT saved_commands_json FROM group_layouts WHERE group_id = ?`)
+      .get(row.profileId) as { saved_commands_json: string } | undefined;
+    savedCommandsJson = existingLayout?.saved_commands_json ?? "[]";
+  }
   db.prepare(
     `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at)
      VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @saved_commands_json, @updated_at)
@@ -112,7 +117,59 @@ function upsertLayout(
   });
 }
 
-export function applySyncBundle(bundle: unknown): { ok: true } | { ok: false; error: string } {
+export interface ApplySyncBundleOptions {
+  /**
+   * When true, clear local workspaces/profiles/layouts then insert the bundle
+   * so prefer-cloud is a true overwrite (not upsert-merge).
+   */
+  replace?: boolean;
+}
+
+/** Clear local sync-owned tables so prefer-cloud can insert without UNIQUE name clashes. */
+function clearLocalSyncTables(db: ReturnType<typeof openDatabase>): void {
+  db.prepare(`DELETE FROM group_layouts`).run();
+  db.prepare(`DELETE FROM groups`).run();
+  db.prepare(`DELETE FROM workspaces`).run();
+}
+
+function applyPreferences(
+  db: ReturnType<typeof openDatabase>,
+  preferences: SyncBundle["preferences"],
+  replace: boolean,
+): void {
+  const deletePref = db.prepare(`DELETE FROM app_preferences WHERE key = ?`);
+  const upsertPref = db.prepare(
+    `INSERT INTO app_preferences (key, value) VALUES (@key, @value)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  );
+
+  if (replace && !preferences) {
+    deletePref.run(PREF_LAST_ACTIVE_GROUP);
+    deletePref.run(PREF_LAST_ACTIVE_BY_GROUP);
+    return;
+  }
+  if (!preferences) return;
+
+  if (preferences.lastActiveGroupKey) {
+    upsertPref.run({ key: PREF_LAST_ACTIVE_GROUP, value: preferences.lastActiveGroupKey });
+  } else if (replace) {
+    deletePref.run(PREF_LAST_ACTIVE_GROUP);
+  }
+
+  if (preferences.lastActiveByGroup) {
+    upsertPref.run({
+      key: PREF_LAST_ACTIVE_BY_GROUP,
+      value: JSON.stringify(preferences.lastActiveByGroup),
+    });
+  } else if (replace) {
+    deletePref.run(PREF_LAST_ACTIVE_BY_GROUP);
+  }
+}
+
+export function applySyncBundle(
+  bundle: unknown,
+  options: ApplySyncBundleOptions = {},
+): { ok: true } | { ok: false; error: string } {
   if (!isSyncBundle(bundle)) {
     return { ok: false, error: "Invalid sync bundle" };
   }
@@ -121,6 +178,10 @@ export function applySyncBundle(bundle: unknown): { ok: true } | { ok: false; er
   const db = openDatabase();
   try {
     const apply = db.transaction((data: SyncBundle) => {
+      // Full clear before insert avoids UNIQUE(name) clashes on rename/id swaps.
+      if (options.replace) {
+        clearLocalSyncTables(db);
+      }
       for (const group of data.profileGroups) {
         upsertWorkspace(db, group);
       }
@@ -128,23 +189,9 @@ export function applySyncBundle(bundle: unknown): { ok: true } | { ok: false; er
         upsertProfile(db, profile);
       }
       for (const layout of data.layouts) {
-        upsertLayout(db, layout);
+        upsertLayout(db, layout, options);
       }
-      if (data.preferences?.lastActiveGroupKey) {
-        db.prepare(
-          `INSERT INTO app_preferences (key, value) VALUES (@key, @value)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        ).run({ key: PREF_LAST_ACTIVE_GROUP, value: data.preferences.lastActiveGroupKey });
-      }
-      if (data.preferences?.lastActiveByGroup) {
-        db.prepare(
-          `INSERT INTO app_preferences (key, value) VALUES (@key, @value)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        ).run({
-          key: PREF_LAST_ACTIVE_BY_GROUP,
-          value: JSON.stringify(data.preferences.lastActiveByGroup),
-        });
-      }
+      applyPreferences(db, data.preferences, options.replace === true);
     });
     apply(bundle);
     return { ok: true };
