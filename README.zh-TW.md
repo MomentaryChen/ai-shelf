@@ -8,7 +8,7 @@
 
 [English](README.md) · [Changelog](CHANGELOG.md)
 
-**v4.1.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
+**v4.2.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
 
 ---
 
@@ -18,7 +18,7 @@
 |---|---|---|
 | **清單 CLI** | `ai` | 掃描模型、技能、MCP、設定；執行 doctor / update / raw |
 | **Profile CLI** | `ai-shelf` | 管理 Profile、CLI session、廣播執行；TUI |
-| **桌面應用** | `pnpm electron` | 內嵌終端機啟動器 + 清單儀表板（Electron + React） |
+| **桌面應用** | `pnpm electron` | Terminal · Inventory · Tools · AI Flow（Electron + React） |
 
 桌面應用與 `ai-shelf` 共用同一 SQLite 資料庫。**Profile Group** 用來分割與整理 **Profile**（名稱、預設值、窗格版面），兩邊資料一致。
 
@@ -48,12 +48,16 @@
 
 ### 桌面應用（Electron）
 
-- **雙模式** — **Terminal**（預設）與 **Inventory**（7 個分頁：Overview · Models · Skills · MCP · Config · Doctor · Update）
+- **四種模式** — **Terminal**（預設）· **Inventory** · **Tools** · **AI Flow**
+- **Terminal** — Profile 側欄、內嵌多窗格 xterm.js + node-pty、廣播輸入、外部啟動
+- **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage**（花費／預算）
+- **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、YAML ↔ JSON、JWT、UUID、Diff
+- **AI Flow** — 撰寫、排程與執行多代理 `.flow.md` 工作流（範本、對話撰寫、執行紀錄）
 - **Profile 側欄** — 建立 / 重新命名 / 刪除 Profile；每個 Profile 的分割版面存入 SQLite
-- **內嵌終端機** — xterm.js + node-pty；多窗格分割、拖曳調整大小；支援窗格間廣播輸入
-- **外部啟動** — Windows Terminal、PowerShell 7+、PowerShell 5 或 CMD
+- **外部啟動** — Windows 上為 Windows Terminal / PowerShell / CMD；macOS／Linux 依 `$SHELL`（bash / zsh / fish / sh）
+- **雲端備份** — 可選 Google 登入備份 Profile（手動同步；見 App 內帳戶設定）
 - **獨立視窗** — 可彈出 Chat 與設定視窗
-- **深色主題** — React + Tailwind CSS v4
+- **主題** — 淺色 / 深色 / 跟隨系統（React + Tailwind CSS v4）
 
 ---
 
@@ -75,7 +79,7 @@
 
 ![Overview](tests/screenshots/zh/01.overview.png)
 
-在標題列切換 **Terminal** 與 **Inventory**。Inventory 模式為上圖的分頁儀表板；Terminal 模式為內嵌多窗格啟動器與 Profile 側欄。
+在標題列切換 **Terminal**、**Inventory**、**Tools**、**AI Flow**。Inventory 為上圖的分頁儀表板（含 Usage）；Terminal 為內嵌多窗格啟動器與 Profile 側欄；Tools 為本機工具集；AI Flow 為自動化控制台。
 
 → **[完整頁面介紹（含截圖 · 繁中）](docs/pages.zh-TW.md)** · [English](docs/pages.md)
 
@@ -83,21 +87,35 @@
 
 ## 安裝
 
-> **一般使用者安裝方式：** 桌面應用**僅**透過 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) 提供 Windows 安裝程式。目前**沒有** npm 套件可安裝 AI Shelf — 請使用下方安裝檔，若需要 CLI 請改從原始碼建置。
+> **一般使用者安裝方式：** 桌面應用提供 **Windows**、**macOS**、**Linux** 套件，見 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases)。Profile CLI **`ai-shelf`** 已發佈至 [npm](https://www.npmjs.com/package/ai-shelf)。清單 CLI（`ai`）仍須從原始碼建置。
 
-### Windows 桌面應用（建議）
+### 桌面應用（建議）
 
-1. 至 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) 下載 **`AI-Shelf-Setup-<version>.exe`**（僅安裝程式，請勿下載 portable 版）。
-2. 執行安裝精靈。Windows 可能顯示 SmartScreen（**未知發行者**）— 自簽憑證不受系統信任。請點 **詳細資訊** → **仍要執行**。詳見 [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md)。
-3. 從開始選單或桌面捷徑啟動 **AI Shelf**。
+依作業系統從 [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) 下載對應檔案：
 
-安裝後即包含清單儀表板與內嵌終端機，**不需要**在本機安裝 Node.js。
+| 平台 | 檔案 | 說明 |
+|---|---|---|
+| **Windows** | `AI-Shelf-Setup-<version>.exe` | 僅 NSIS 安裝程式（勿用 portable）。SmartScreen 可能警告 — 自簽憑證；請點 **詳細資訊** → **仍要執行**。詳見 [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md)。 |
+| **macOS** | `AI-Shelf-<version>-arm64.dmg` 或 `-x64.dmg` | 未簽名 — 首次開啟可能需右鍵 → **打開**，或清除隔離屬性（`xattr -dr com.apple.quarantine "/Applications/AI Shelf.app"`）。 |
+| **Linux** | `AI-Shelf-<version>.AppImage` | 未簽名 — `chmod +x` 後執行。使用靜態 AppImage runtime（不需 libfuse2）。 |
 
-維護者發佈流程與解除安裝說明見 [docs/RELEASE.md](docs/RELEASE.md)。
+安裝後包含 Terminal、Inventory、Tools、AI Flow 與內嵌終端機，**不需要**在本機安裝 Node.js。
 
-### CLI（`ai`、`ai-shelf`）— 僅能從原始碼建置
+安裝步驟、解除安裝與 App 內更新見 [docs/RELEASE.md](docs/RELEASE.md)（For users）。維護者發佈流程亦在同一份文件。
 
-清單 CLI（`ai`）與 Profile CLI（`ai-shelf`）**尚未**發佈至 npm。若要使用，請 clone 專案並依下方步驟建置。多數使用者只需 **GitHub 安裝版** 即可。
+### Profile CLI — `ai-shelf`（npm）
+
+```bash
+npm install -g ai-shelf
+ai-shelf profile list
+ai-shelf tui
+```
+
+需求：Node.js ≥ 22。與桌面應用裝在同一台機器時，會共用同一份 SQLite Profile 資料庫。多數使用者只需 **桌面安裝版** 即可。
+
+### 清單 CLI — `ai`（從原始碼）
+
+清單 CLI（`ai`）**尚未**發佈至 npm（npm 上的 [`ai`](https://www.npmjs.com/package/ai) 是另一個專案）。請使用桌面應用的 **Inventory** 模式，或依下方步驟從原始碼建置。
 
 ### 從原始碼（monorepo）
 
@@ -262,7 +280,7 @@ ai-shelf/                 # 根 workspace（Electron + 清單 CLI）
 │   ├── commands/                 # CLI 指令處理
 │   ├── inventory/                # Claude / Copilot / Cursor 偵測器
 │   ├── electron/                 # 主程序、preload、workspace-host
-│   ├── renderer/                 # React UI（Terminal + Inventory 模式）
+│   ├── renderer/                 # React UI（Terminal · Inventory · Tools · Flow）
 │   │   ├── components/           # ChatTab、ProfileSidebar、*Tab 等
 │   │   ├── hooks/                # useInventoryScan、useProfileWorkspace 等
 │   │   └── terminal/             # 分割樹、版面序列化、SQLite 同步

@@ -998,7 +998,10 @@ export interface ElectronAPI {
   onAuthRefreshTokenRequest: (cb: () => void) => () => void;
   onAuthOAuthNavigated: (cb: (url: string) => void) => () => void;
   syncExportLocal: () => Promise<{ ok: true; bundle: SyncBundle } | { ok: false; error: string }>;
-  syncApplyBundle: (bundle: SyncBundle) => Promise<{ ok: true } | { ok: false; error: string }>;
+  syncApplyBundle: (
+    bundle: SyncBundle,
+    options?: { replace?: boolean },
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   syncGetMeta: () => Promise<SyncMeta>;
   syncSetMeta: (partial: Partial<SyncMeta>) => Promise<{ ok: true; meta: SyncMeta } | { ok: false; error: string }>;
   syncPullRemote: () => Promise<

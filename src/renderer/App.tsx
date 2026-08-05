@@ -78,8 +78,20 @@ const RegexToolsTab = lazy(() =>
 const JsonToolsTab = lazy(() =>
   import("./components/JsonToolsTab").then((m) => ({ default: m.JsonToolsTab })),
 );
+const MarkdownToolsTab = lazy(() =>
+  import("./components/MarkdownToolsTab").then((m) => ({ default: m.MarkdownToolsTab })),
+);
+const YamlJsonToolsTab = lazy(() =>
+  import("./components/YamlJsonToolsTab").then((m) => ({ default: m.YamlJsonToolsTab })),
+);
 const JwtToolsTab = lazy(() =>
   import("./components/JwtToolsTab").then((m) => ({ default: m.JwtToolsTab })),
+);
+const UuidToolsTab = lazy(() =>
+  import("./components/UuidToolsTab").then((m) => ({ default: m.UuidToolsTab })),
+);
+const DiffToolsTab = lazy(() =>
+  import("./components/DiffToolsTab").then((m) => ({ default: m.DiffToolsTab })),
 );
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
@@ -106,7 +118,18 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "crypto" | "time" | "cron" | "regex" | "json" | "jwt";
+type ToolId =
+  | "codec"
+  | "crypto"
+  | "time"
+  | "cron"
+  | "regex"
+  | "json"
+  | "markdown"
+  | "yaml"
+  | "jwt"
+  | "uuid"
+  | "diff";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -210,7 +233,11 @@ const TOOL_ICONS: Record<ToolId, string> = {
   cron: "⏰",
   regex: "🔤",
   json: "{}",
+  markdown: "📝",
+  yaml: "📄",
   jwt: "🪪",
+  uuid: "🆔",
+  diff: "≠",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
@@ -220,7 +247,11 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   cron: "tools.tab.cron",
   regex: "tools.tab.regex",
   json: "tools.tab.json",
+  markdown: "tools.tab.markdown",
+  yaml: "tools.tab.yaml",
   jwt: "tools.tab.jwt",
+  uuid: "tools.tab.uuid",
+  diff: "tools.tab.diff",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -409,7 +440,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
         run: () => handleModeChange("tools"),
       },
       {
@@ -473,9 +504,17 @@ export function App() {
                 ? "regex regexp match replace flags capture preset pattern"
                 : it.id === "json"
                   ? "json format minify pretty beautify validate sort keys"
-                  : it.id === "jwt"
-                    ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
-                    : "codec hash base64 image md5 tools",
+                  : it.id === "markdown"
+                    ? "markdown md preview mermaid flowchart diagram gfm"
+                    : it.id === "yaml"
+                      ? "yaml yml json convert config indent sort keys minify pretty"
+                      : it.id === "jwt"
+                        ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
+                        : it.id === "uuid"
+                          ? "uuid nanoid ulid generate validate v4 v7"
+                          : it.id === "diff"
+                            ? "diff compare text unified patch lines whitespace"
+                            : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -499,7 +538,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json jwt hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify token decode verify",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify",
         run: () => handleModeChange("tools"),
       },
       {
@@ -545,7 +584,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
         run: () => handleModeChange("tools"),
       },
       {
@@ -779,7 +818,11 @@ export function App() {
                   {activeTool === "cron" && <CronToolsTab />}
                   {activeTool === "regex" && <RegexToolsTab />}
                   {activeTool === "json" && <JsonToolsTab />}
+                  {activeTool === "markdown" && <MarkdownToolsTab />}
+                  {activeTool === "yaml" && <YamlJsonToolsTab />}
                   {activeTool === "jwt" && <JwtToolsTab />}
+                  {activeTool === "uuid" && <UuidToolsTab />}
+                  {activeTool === "diff" && <DiffToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>
