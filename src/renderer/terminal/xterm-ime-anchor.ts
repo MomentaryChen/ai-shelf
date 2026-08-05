@@ -14,7 +14,18 @@
  * long as the terminal is focused, not only while composing, and re-pins on
  * both sides of xterm's own `compositionstart` listener.
  *
- * Caret detection lives in `./ime-caret` and is unit-tested there.
+ * xterm moves those elements back onto the hardware cursor from four places:
+ * `_syncTextArea` on cursor move, on resize and on `compositionstart`, and
+ * `updateCompositionElements` on render and on `compositionupdate`. So a pin is
+ * never "still applied" just because we applied it once — every re-pin compares
+ * against the element's live inline style (see `./ime-pin`). Remembering only
+ * the *intended* position and skipping the write when it had not changed was
+ * the bug behind the misplacement that survived the first fix: after a window
+ * switch, or after xterm's `compositionstart` sync, the elements had drifted
+ * while the intent had not, so the re-pin did nothing.
+ *
+ * Caret detection lives in `./ime-caret` and is unit-tested there; the drift
+ * rule lives in `./ime-pin`.
  *
  * Adapted from https://github.com/msdshsk/xterm-ime-anchor (MIT).
  */
@@ -26,6 +37,7 @@ import {
   type ImeCaretPosition,
   type ImeCaretViewport,
 } from "./ime-caret";
+import { applyPin, type Pin } from "./ime-pin";
 
 export type ImeAnchorSource =
   /** Ink caret found — the good path. */
@@ -70,7 +82,7 @@ export function attachImeAnchor(
 
   let composing = false;
   let focused = root.ownerDocument.activeElement === textarea;
-  let pinned: { left: string; top: string } | null = null;
+  let pinned: Pin | null = null;
   /** Survives compositionend so a later composition never starts unanchored. */
   let lastCaret: ImeCaretPosition | null = null;
 
@@ -100,33 +112,35 @@ export function attachImeAnchor(
     };
   };
 
-  const reapply = (el: HTMLElement) => {
-    if (!pinned || !(composing || focused)) return;
-    if (el.style.left !== pinned.left || el.style.top !== pinned.top) {
-      el.style.setProperty("left", pinned.left, "important");
-      el.style.setProperty("top", pinned.top, "important");
-    }
+  /**
+   * Put the helper elements back on the current pin.
+   *
+   * Deliberately re-checks their live styles instead of trusting that an
+   * earlier apply still holds: xterm rewrites them from render, cursor-move and
+   * composition callbacks, and while the pane is blurred nothing here defends
+   * them at all.
+   */
+  const enforcePin = () => {
+    if (!pinned) return;
+    applyPin([textarea, compositionView], pinned);
+    // Match xterm's own _syncTextArea so the invisible textarea stays behind
+    // the canvas and cannot swallow clicks while we hold it over the screen.
+    if (!composing && textarea.style.zIndex !== "-5") textarea.style.zIndex = "-5";
   };
-  const moTa = new MutationObserver(() => reapply(textarea));
-  const moCv = new MutationObserver(() => reapply(compositionView));
+
+  // Our own writes re-enter this callback; applyPin then finds no drift and
+  // writes nothing, so the loop settles after one correction.
+  const observer = new MutationObserver(() => {
+    if (composing || focused) enforcePin();
+  });
 
   const pinTo = ({ col, row }: ImeCaretPosition) => {
     const { w, h } = cellSize();
     // A collapsed layout (hidden pane, mid-refit) would pin everything to 0,0.
     if (!(w > 0) || !(h > 0)) return;
 
-    const left = `${Math.round(col * w)}px`;
-    const top = `${Math.round(row * h)}px`;
-    if (pinned && pinned.left === left && pinned.top === top) return;
-    pinned = { left, top };
-
-    for (const el of [textarea, compositionView]) {
-      el.style.setProperty("left", left, "important");
-      el.style.setProperty("top", top, "important");
-    }
-    // Match xterm's own _syncTextArea so the invisible textarea stays behind
-    // the canvas and cannot swallow clicks while we hold it over the screen.
-    if (!composing) textarea.style.zIndex = "-5";
+    pinned = { left: `${Math.round(col * w)}px`, top: `${Math.round(row * h)}px` };
+    enforcePin();
   };
 
   const resolve = (): { pos: ImeCaretPosition; source: ImeAnchorSource } => {
@@ -142,21 +156,35 @@ export function attachImeAnchor(
   const anchor = () => {
     const { pos, source } = resolve();
     if (source === "caret") lastCaret = pos;
-    if (source !== "no-caret") pinTo(pos);
+    // "no-caret" means an Ink redraw ate the caret mid-composition: keep the
+    // position we already had, but still re-assert it — xterm's
+    // updateCompositionElements is pulling the elements away every tick.
+    if (source === "no-caret") enforcePin();
+    else pinTo(pos);
     onAnchor?.({ source, col: pos.col, row: pos.row, hardware: hardwareCursor() });
   };
 
   // Capture on the ancestor so this runs *before* xterm's own compositionstart
-  // listener on the textarea; the target-phase one below runs after it.
+  // listener on the textarea; the target-phase one below runs after it and
+  // undoes the `_syncTextArea()` that listener performs.
   const onCompositionStartCapture = () => {
     anchor();
   };
   const onCompositionStart = () => {
     composing = true;
+    // compositionstart can only fire on the focused textarea, so this also
+    // recovers from a `focus` event we never saw (window switch, pane restore).
+    focused = true;
+    anchor();
+  };
+  // xterm's compositionupdate handler calls updateCompositionElements(), which
+  // drags both elements back to the hardware cursor mid-composition.
+  const onCompositionUpdate = () => {
     anchor();
   };
   const onCompositionEnd = () => {
     composing = false;
+    enforcePin();
   };
   const onFocus = () => {
     focused = true;
@@ -172,11 +200,12 @@ export function attachImeAnchor(
 
   root.addEventListener("compositionstart", onCompositionStartCapture, true);
   textarea.addEventListener("compositionstart", onCompositionStart);
+  textarea.addEventListener("compositionupdate", onCompositionUpdate);
   textarea.addEventListener("compositionend", onCompositionEnd);
   textarea.addEventListener("focus", onFocus);
   textarea.addEventListener("blur", onBlur);
-  moTa.observe(textarea, { attributes: true, attributeFilter: ["style"] });
-  moCv.observe(compositionView, { attributes: true, attributeFilter: ["style"] });
+  observer.observe(textarea, { attributes: true, attributeFilter: ["style"] });
+  observer.observe(compositionView, { attributes: true, attributeFilter: ["style"] });
 
   if (focused) anchor();
 
@@ -188,10 +217,10 @@ export function attachImeAnchor(
     renderDisposable.dispose();
     root.removeEventListener("compositionstart", onCompositionStartCapture, true);
     textarea.removeEventListener("compositionstart", onCompositionStart);
+    textarea.removeEventListener("compositionupdate", onCompositionUpdate);
     textarea.removeEventListener("compositionend", onCompositionEnd);
     textarea.removeEventListener("focus", onFocus);
     textarea.removeEventListener("blur", onBlur);
-    moTa.disconnect();
-    moCv.disconnect();
+    observer.disconnect();
   };
 }
