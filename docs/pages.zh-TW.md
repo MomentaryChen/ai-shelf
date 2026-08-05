@@ -16,21 +16,28 @@
 6. [設定檔](#6-設定檔)
 7. [診斷](#7-診斷)
 8. [更新](#8-更新)
+9. [Usage（用量）](#9-usage用量)
+10. [Tools（工具）](#10-tools工具)
+11. [AI Flow](#11-ai-flow)
 
 ---
 
 ## 應用程式導覽
 
-桌面應用有兩種頂層模式（標題列以 **Terminal** / **Inventory** 分頁切換）：
+桌面應用標題列有 **四種** 頂層模式：
 
-- **Terminal**（預設）：基於 Profile 的工作區，內嵌多窗格終端機，可選擇在外部終端機啟動工具
-- **Inventory**：儀表板，子分頁為 Overview、Models、Skills、MCP、Config、Doctor、Update（標籤文案多為英文，與 UI 一致）
+| 模式 | 用途 |
+|---|---|
+| **Terminal**（預設） | Profile 側欄、內嵌多窗格終端機、外部啟動 |
+| **Inventory** | 儀表板：Overview、Models、Skills、MCP、Config、Doctor、Update、**Usage** |
+| **Tools** | 本機工具（Codec、Crypto、Time、Cron、Regex、JSON、Markdown、YAML ↔ JSON、JWT、UUID、Diff） |
+| **AI Flow** | 撰寫、排程與執行多代理 `.flow.md` 工作流 |
 
-隨時可用標題列在兩種模式間切換。
+隨時可用標題列切換模式。命令面板（`Cmd/Ctrl+K`）也可跳到任一模式或 Inventory／Tools 分頁。
 
 ### Inventory 頁尾
 
-在 **Inventory** 模式時，視窗底部有 **🔄 Refresh**，會重新執行偵測並刷新各分頁資料。
+在 **Inventory** 模式時，視窗底部有 **🔄 Refresh**，會重新執行偵測並刷新清單分頁（Usage 有自己的重新整理控制）。
 
 ---
 
@@ -303,8 +310,60 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ---
 
+## 9. Usage（用量）
+
+**Usage** 是 Inventory 左側導覽的一個區塊（目前尚無專用截圖）。彙整已支援的付費 CLI 花費與預算，讓你決定成本投向何處，而不只是看總額。
+
+常見能力：
+
+- 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定）
+- 每週預算目標；Flow 撰寫／執行可歸因回 Usage
+- 憑證在可用時以 OS `safeStorage` 保存；部分供應商需在 App 內設定 API 金鑰或帳號 cookie
+
+從標題列開啟 **Inventory → Usage**，或用命令面板跳轉。
+
+---
+
+## 10. Tools（工具）
+
+**Tools** 是頂層模式（左側為工具面板列表）。目前尚無專用截圖；日後擴大截圖涵蓋範圍後可用 `pnpm gen:docs-assets` 補齊。
+
+| 面板 | 用途 |
+|---|---|
+| **Codec** | 雜湊／編碼／解碼／圖片 Base64 |
+| **Crypto** | AES／RSA／ECDSA 輔助 |
+| **Time** | 時間戳與時區轉換 |
+| **Cron** | Cron 表達式輔助 |
+| **Regex** | 測試／取代（含預設） |
+| **JSON** | 格式化／壓縮 |
+| **Markdown** | 預覽（含 Mermaid） |
+| **YAML ↔ JSON** | YAML 與 JSON 互轉 |
+| **JWT** | 解碼／檢視 token |
+| **UUID** | 產生／驗證 UUID 與 NanoID |
+| **Diff** | 並排文字比對 |
+
+雙欄 Tools 版面會依容器查詢在較窄視窗自動調整。
+
+---
+
+## 11. AI Flow
+
+**AI Flow** 是頂層模式，用於多步驟代理自動化。目前尚無專用截圖。
+
+你可以：
+
+- 瀏覽並安裝 **flow 範本**，或透過 App 內對話建立 flow（草稿為 `.flow.md`）
+- 檢視 **DAG**、runner 設定、排程（cron）與下次執行時間
+- 手動執行 flow；執行中串流代理控制台輸出
+- 檢視 **執行紀錄**（狀態、時長、進度、事件）並開啟執行產物
+- App 開啟時優先使用內建排程；在 Windows 上可於 App 關閉時以 OS 工作排程器呼叫 `ai-shelf flow due`（見 [ai-flow-phase1.md](ai-flow-phase1.md)）
+
+Flow 檔案位於應用資料目錄的 `flows/`；格式說明見 [flow-format.md](flow-format.md)。
+
+---
+
 ## 備註
 
-- 截圖順序由 `tests/e2e/screenshot.spec.ts` 產出至 `tests/screenshots/zh/`（本頁）與 `tests/screenshots/en/`（[pages.md](pages.md)），檔名與順序請與本文件、`pages.md` 保持一致。
+- Overview–Update 的截圖順序由 `tests/e2e/screenshot.spec.ts` 產出至 `tests/screenshots/zh/`（本頁）與 `tests/screenshots/en/`（[pages.md](pages.md)）。上方 Usage／Tools／Flow 章節目前無 PNG，待截圖涵蓋範圍擴大後再補。
 - Release 前重產 README/docs 圖片：在 Windows 本地執行 `pnpm gen:docs-assets`（見 [RELEASE.md](RELEASE.md)）。
 - 若 Inventory 分頁標籤或順序異動，請同步更新中英文頁面與前述測試常數。

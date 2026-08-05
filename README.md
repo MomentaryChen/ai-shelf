@@ -18,7 +18,7 @@
 |---|---|---|
 | **Inventory CLI** | `ai` | Scan models, skills, MCP, config; run doctor/update/raw |
 | **Profile CLI** | `ai-shelf` | Manage profiles, CLI sessions, broadcast exec; TUI |
-| **Desktop app** | `pnpm electron` | Terminal launcher + inventory dashboard (Electron + React) |
+| **Desktop app** | `pnpm electron` | Terminal · Inventory · Tools · AI Flow (Electron + React) |
 
 The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** split and organize **Profiles** (names, defaults, pane layouts) across both surfaces.
 
@@ -48,12 +48,16 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 
 ### Desktop app (Electron)
 
-- **Two modes** — **Terminal** (default) and **Inventory** (7 tabs: Overview · Models · Skills · MCP · Config · Doctor · Update)
+- **Four modes** — **Terminal** (default) · **Inventory** · **Tools** · **AI Flow**
+- **Terminal** — profiles sidebar, embedded multi-pane xterm.js + node-pty, broadcast input, external launch
+- **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage** (spend / budgets)
+- **Tools** — everyday utilities: Codec, Crypto, Time, Cron, Regex, JSON, Markdown, YAML ↔ JSON, JWT, UUID, Diff
+- **AI Flow** — author, schedule, and run multi-agent `.flow.md` workflows (templates, chat authoring, run history)
 - **Profiles sidebar** — create/rename/delete profiles; each profile stores split-pane layout in SQLite
-- **Embedded terminals** — xterm.js + node-pty; multi-pane split with drag resize; broadcast input across panes
-- **External launch** — Windows Terminal, PowerShell 7+, PowerShell 5, or CMD
+- **External launch** — Windows Terminal / PowerShell / CMD on Windows; `$SHELL` (bash / zsh / fish / sh) on macOS and Linux
+- **Cloud backup** — optional Google sign-in to back up profiles (manual sync; see in-app Account settings)
 - **Detached windows** — optional pop-out chat and settings windows
-- **Dark theme** — React + Tailwind CSS v4
+- **Themes** — light / dark / follow system (React + Tailwind CSS v4)
 
 ---
 
@@ -75,7 +79,7 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 
 ![Overview](tests/screenshots/en/01.overview.png)
 
-Switch between **Terminal** and **Inventory** in the header. Inventory mode has the tabbed dashboard above; Terminal mode is the embedded multi-pane launcher with a profiles sidebar.
+Switch **Terminal**, **Inventory**, **Tools**, and **AI Flow** from the header. Inventory opens the tabbed dashboard above (including Usage); Terminal is the embedded multi-pane launcher with a profiles sidebar; Tools holds local utilities; AI Flow is the automation console.
 
 → **[Full page-by-page guide with screenshots](docs/pages.md)** · [繁體中文版](docs/pages.zh-TW.md)
 
@@ -83,21 +87,35 @@ Switch between **Terminal** and **Inventory** in the header. Inventory mode has 
 
 ## Installation
 
-> **End-user distribution:** The desktop app is **only** shipped as a Windows installer on [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases). There is **no** npm package for installing AI Shelf today — use the installer below, or build from source if you need the CLIs.
+> **End-user distribution:** Desktop builds for **Windows**, **macOS**, and **Linux** ship on [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases). The profile CLI **`ai-shelf`** is on [npm](https://www.npmjs.com/package/ai-shelf). The inventory CLI (`ai`) remains build-from-source only.
 
-### Windows desktop app (recommended)
+### Desktop app (recommended)
 
-1. Download **`AI-Shelf-Setup-<version>.exe`** from [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases) (installer only — not portable builds).
-2. Run the installer. Windows may show SmartScreen (**unknown publisher**) — self-signed builds are not CA-trusted. Choose **More info** → **Run anyway**. See [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md).
-3. Launch **AI Shelf** from the Start menu or desktop shortcut.
+Download the asset for your OS from [GitHub Releases](https://github.com/MomentaryChen/ai-shelf/releases):
 
-The installed app includes the inventory UI and embedded terminals. You do **not** need Node.js on the machine.
+| Platform | Asset | Notes |
+|---|---|---|
+| **Windows** | `AI-Shelf-Setup-<version>.exe` | NSIS installer only (not portable). SmartScreen may warn — self-signed; **More info** → **Run anyway**. See [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md). |
+| **macOS** | `AI-Shelf-<version>-arm64.dmg` or `-x64.dmg` | Unsigned — first launch may need right-click → **Open**, or clear quarantine (`xattr -dr com.apple.quarantine "/Applications/AI Shelf.app"`). |
+| **Linux** | `AI-Shelf-<version>.AppImage` | Unsigned — `chmod +x` then run. Static AppImage runtime (no libfuse2). |
 
-See [docs/RELEASE.md](docs/RELEASE.md) for maintainer release steps and uninstall notes.
+The installed app includes Terminal, Inventory, Tools, AI Flow, and embedded terminals. You do **not** need Node.js on the machine.
 
-### CLIs (`ai`, `ai-shelf`) — from source only
+Step-by-step install, uninstall, and in-app updates: [docs/RELEASE.md](docs/RELEASE.md) (For users). Maintainer release flow is in the same guide.
 
-The inventory CLI (`ai`) and profile CLI (`ai-shelf`) are **not** published to npm yet. To use them, clone the repo and build (see below). For most users, the **GitHub installer** is enough.
+### Profile CLI — `ai-shelf` (npm)
+
+```bash
+npm install -g ai-shelf
+ai-shelf profile list
+ai-shelf tui
+```
+
+Requires Node.js ≥ 22. On the same machine as the desktop app, `ai-shelf` shares the SQLite profile database. For most users, the **desktop installer** alone is enough.
+
+### Inventory CLI — `ai` (from source)
+
+The inventory CLI (`ai`) is **not** published to npm (the unrelated [`ai`](https://www.npmjs.com/package/ai) package on npm is a different project). Use **Inventory** mode in the desktop app, or clone and build below.
 
 ### From source (monorepo)
 
@@ -263,7 +281,7 @@ ai-shelf/                 # root workspace (Electron app + inventory CLI)
 │   ├── commands/                 # CLI command handlers
 │   ├── inventory/                # Claude / Copilot / Cursor detectors
 │   ├── electron/                 # Main process, preload, workspace-host
-│   ├── renderer/                 # React UI (Terminal + Inventory modes)
+│   ├── renderer/                 # React UI (Terminal · Inventory · Tools · Flow)
 │   │   ├── components/           # ChatTab, ProfileSidebar, *Tab, …
 │   │   ├── hooks/                # useInventoryScan, useProfileWorkspace, …
 │   │   └── terminal/             # split-tree, layout serialize, SQLite sync
