@@ -202,6 +202,7 @@
     "fflate": "^0.8.3",
     "firebase": "^12.15.0",
     "lucide-react": "^1.17.0",
+    "mermaid": "^11.16.1",
     "node-pty": "^1.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
