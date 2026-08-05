@@ -1477,4 +1477,23 @@ export const zh: Record<MessageKey, string> = {
   "uuid.variant.reserved": "保留",
   "uuid.variant.ncs": "NCS",
   "uuid.variant.unknown": "未知",
+
+  // Tools 模式 — Diff
+  "tools.tab.diff": "Diff",
+  "diff.subtitle": "並排比對兩段文字 — 左邊貼原文、右邊貼變更，可複製 unified patch。",
+  "diff.left": "原文",
+  "diff.right": "變更後",
+  "diff.leftPlaceholder": "在此貼上原文…",
+  "diff.rightPlaceholder": "在此貼上變更後文字…",
+  "diff.result": "差異",
+  "diff.ignoreWhitespace": "忽略行首行尾空白",
+  "diff.swap": "左右交換",
+  "diff.copy": "複製 patch",
+  "diff.copied": "已複製",
+  "diff.clear": "清除",
+  "diff.hint.live": "輸入時即時更新",
+  "diff.empty": "兩邊都貼上文字後即可看到差異。",
+  "diff.identical": "沒有差異",
+  "diff.stats": "+{added} −{removed}",
+  "diff.error.tooLarge": "每一邊最多 {max} 行 — 請縮短文字後再試。",
 };

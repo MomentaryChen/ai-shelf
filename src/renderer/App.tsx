@@ -90,6 +90,9 @@ const JwtToolsTab = lazy(() =>
 const UuidToolsTab = lazy(() =>
   import("./components/UuidToolsTab").then((m) => ({ default: m.UuidToolsTab })),
 );
+const DiffToolsTab = lazy(() =>
+  import("./components/DiffToolsTab").then((m) => ({ default: m.DiffToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -125,7 +128,8 @@ type ToolId =
   | "markdown"
   | "yaml"
   | "jwt"
-  | "uuid";
+  | "uuid"
+  | "diff";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -233,6 +237,7 @@ const TOOL_ICONS: Record<ToolId, string> = {
   yaml: "📄",
   jwt: "🪪",
   uuid: "🆔",
+  diff: "≠",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
@@ -246,6 +251,7 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   yaml: "tools.tab.yaml",
   jwt: "tools.tab.jwt",
   uuid: "tools.tab.uuid",
+  diff: "tools.tab.diff",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -434,7 +440,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
         run: () => handleModeChange("tools"),
       },
       {
@@ -506,7 +512,9 @@ export function App() {
                         ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
                         : it.id === "uuid"
                           ? "uuid nanoid ulid generate validate v4 v7"
-                          : "codec hash base64 image md5 tools",
+                          : it.id === "diff"
+                            ? "diff compare text unified patch lines whitespace"
+                            : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -530,7 +538,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify",
         run: () => handleModeChange("tools"),
       },
       {
@@ -576,7 +584,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
         run: () => handleModeChange("tools"),
       },
       {
@@ -814,6 +822,7 @@ export function App() {
                   {activeTool === "yaml" && <YamlJsonToolsTab />}
                   {activeTool === "jwt" && <JwtToolsTab />}
                   {activeTool === "uuid" && <UuidToolsTab />}
+                  {activeTool === "diff" && <DiffToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>
