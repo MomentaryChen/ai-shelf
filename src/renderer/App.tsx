@@ -81,6 +81,9 @@ const JsonToolsTab = lazy(() =>
 const JwtToolsTab = lazy(() =>
   import("./components/JwtToolsTab").then((m) => ({ default: m.JwtToolsTab })),
 );
+const UuidToolsTab = lazy(() =>
+  import("./components/UuidToolsTab").then((m) => ({ default: m.UuidToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -106,7 +109,7 @@ type TabId =
   | "update"
   | "usage";
 
-type ToolId = "codec" | "crypto" | "time" | "cron" | "regex" | "json" | "jwt";
+type ToolId = "codec" | "crypto" | "time" | "cron" | "regex" | "json" | "jwt" | "uuid";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -211,6 +214,7 @@ const TOOL_ICONS: Record<ToolId, string> = {
   regex: "🔤",
   json: "{}",
   jwt: "🪪",
+  uuid: "🆔",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
@@ -221,6 +225,7 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   regex: "tools.tab.regex",
   json: "tools.tab.json",
   jwt: "tools.tab.jwt",
+  uuid: "tools.tab.uuid",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -780,6 +785,7 @@ export function App() {
                   {activeTool === "regex" && <RegexToolsTab />}
                   {activeTool === "json" && <JsonToolsTab />}
                   {activeTool === "jwt" && <JwtToolsTab />}
+                  {activeTool === "uuid" && <UuidToolsTab />}
                 </Suspense>
               </ViewTransition>
             </div>
