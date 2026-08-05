@@ -1396,6 +1396,31 @@ export const en = {
   "json.hint.live": "Updates as you type",
   "json.error.invalid": "Could not parse this JSON — check for trailing commas or quotes.",
 
+  // Tools mode — YAML ↔ JSON
+  "tools.tab.yaml": "YAML ↔ JSON",
+  "yaml.subtitle":
+    "Convert config between YAML and JSON — paste on the left, copy from the right. Optional key sorting.",
+  "yaml.direction.yamlToJson": "YAML → JSON",
+  "yaml.direction.jsonToYaml": "JSON → YAML",
+  "yaml.mode.pretty": "Pretty",
+  "yaml.mode.minify": "Minify",
+  "yaml.indent": "Indent",
+  "yaml.sortKeys": "Sort keys",
+  "yaml.inputYaml": "YAML",
+  "yaml.inputJson": "JSON",
+  "yaml.outputYaml": "YAML",
+  "yaml.outputJson": "JSON",
+  "yaml.inputYamlPlaceholder": "Paste YAML config here…",
+  "yaml.inputJsonPlaceholder": "Paste JSON config here…",
+  "yaml.outputPlaceholder": "Converted result appears here",
+  "yaml.copy": "Copy",
+  "yaml.copied": "Copied",
+  "yaml.swap": "Swap direction",
+  "yaml.clear": "Clear",
+  "yaml.hint.live": "Updates as you type",
+  "yaml.error.invalidYaml": "Could not parse this YAML — check indentation and punctuation.",
+  "yaml.error.invalidJson": "Could not parse this JSON — check for trailing commas or quotes.",
+
   // Tools mode — JWT
   "tools.tab.jwt": "JWT",
   "jwt.subtitle":
