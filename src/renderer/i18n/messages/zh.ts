@@ -1365,6 +1365,19 @@ export const zh: Record<MessageKey, string> = {
   "json.hint.live": "輸入時即時更新",
   "json.error.invalid": "無法解析此 JSON — 請檢查結尾逗號或引號後再試。",
 
+  // Tools 模式 — Markdown
+  "tools.tab.markdown": "Markdown",
+  "markdown.subtitle":
+    "即時 Markdown 預覽（支援 GFM）— 使用 mermaid 程式碼區塊即可顯示流程圖與圖表。",
+  "markdown.input": "Markdown",
+  "markdown.preview": "預覽",
+  "markdown.inputPlaceholder": "在此貼上 Markdown…",
+  "markdown.empty": "輸入時預覽會顯示在這裡。",
+  "markdown.sample": "載入範例",
+  "markdown.clear": "清除",
+  "markdown.hint.live": "輸入時即時更新 · mermaid 區塊會渲染成圖表",
+  "markdown.mermaid.errorTitle": "Mermaid",
+
   // Tools 模式 — YAML ↔ JSON
   "tools.tab.yaml": "YAML ↔ JSON",
   "yaml.subtitle": "在 YAML 與 JSON 之間轉換設定檔 — 左邊貼上，右邊複製。可選擇依 key 排序。",
