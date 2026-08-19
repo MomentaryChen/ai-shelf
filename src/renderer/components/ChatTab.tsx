@@ -78,6 +78,7 @@ import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 import {
   PLAIN_SHELL_TOOL_ID,
   profileToolLabel,
+  resolveEmbeddedPtyShell,
   resolveLaunchTool,
   toolIdsFromInventory,
 } from "../utils/available-tools";
@@ -220,15 +221,11 @@ function ChatTabInner({
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
-    // Prefer explicit embedded-shell setting; fall back to Windows external-terminal mapping.
-    const shell =
-      settings.preferredShell !== "auto"
-        ? settings.preferredShell
-        : settings.externalTerminal === "pwsh" ||
-            settings.externalTerminal === "powershell" ||
-            settings.externalTerminal === "cmd"
-          ? settings.externalTerminal
-          : "auto";
+    const shell = resolveEmbeddedPtyShell(
+      settings.preferredShell,
+      settings.externalTerminal,
+      tool,
+    );
     const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs, shell);
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
