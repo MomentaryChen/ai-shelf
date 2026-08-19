@@ -218,8 +218,7 @@ export function Sidebar({
   const collapsedTerminals = useMemo(() => {
     if (!collapsed) return [];
     const active = profiles.find((p) => p.id === activeProfileId);
-    const fromActive = active?.terminals ?? [];
-    if (fromActive.length > 0) return fromActive.slice(0, 24);
+    if (active) return (active.terminals ?? []).slice(0, 24);
     return profiles.flatMap((p) => p.terminals ?? []).slice(0, 24);
   }, [collapsed, profiles, activeProfileId]);
 
