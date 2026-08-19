@@ -880,6 +880,7 @@ export interface ElectronAPI {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      groupId?: string;
     },
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileSetSavedCommands: (

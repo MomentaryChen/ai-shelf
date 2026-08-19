@@ -555,6 +555,27 @@ export function useProfileWorkspace(
     setActiveProfile(profile);
   }, []);
 
+  /** Keep live PTY cache when a profile is moved to another workspace (group). */
+  const remapProfileWorkspace = useCallback(
+    (profileId: string, fromWorkspaceId: string, toWorkspaceId: string) => {
+      if (!fromWorkspaceId || !toWorkspaceId || fromWorkspaceId === toWorkspaceId) return;
+      const fromKey = cacheKey(fromWorkspaceId, profileId);
+      const toKey = cacheKey(toWorkspaceId, profileId);
+      const cached = profileLiveCacheRef.current.get(fromKey);
+      if (cached) {
+        profileLiveCacheRef.current.delete(fromKey);
+        profileLiveCacheRef.current.set(toKey, cached);
+      }
+      const active = activeProfileRef.current;
+      if (active?.id === profileId) {
+        const next = { ...active, workspaceId: toWorkspaceId };
+        activeProfileRef.current = next;
+        setActiveProfile(next);
+      }
+    },
+    [cacheKey],
+  );
+
   const getProfileDefaultCwd = useCallback((): string => {
     return activeProfileRef.current?.defaultCwd?.trim() ?? "";
   }, []);
@@ -721,6 +742,7 @@ export function useProfileWorkspace(
     persistCurrentProfile: runPersist,
     flushPersistCurrentProfile,
     syncActiveProfile,
+    remapProfileWorkspace,
     getProfileDefaultCwd,
     discardProfileSessions,
     getProfilePanes,

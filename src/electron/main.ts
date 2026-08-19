@@ -2227,6 +2227,7 @@ ipcMain.handle("profile-update", (
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: { id: string; name: string; command: string; broadcast?: boolean }[];
+      groupId?: string;
     },
   ) => {
     try {

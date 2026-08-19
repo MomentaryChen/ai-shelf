@@ -105,6 +105,54 @@ export class GroupRepository implements GroupRepositoryPort {
     run(orderedGroupIds);
   }
 
+  moveToWorkspace(groupId: string, targetWorkspaceId: string): GroupModel {
+    const existing = this.db.prepare(`SELECT * FROM groups WHERE id = ?`).get(groupId) as
+      | { id: string; workspace_id: string; name: string; sort_order: number; created_at: string }
+      | undefined;
+    if (!existing) {
+      throw new DatabaseError("Group not found");
+    }
+    if (existing.workspace_id === targetWorkspaceId) {
+      return GroupModelSchema.parse(existing);
+    }
+    const target = this.db
+      .prepare(`SELECT id FROM workspaces WHERE id = ?`)
+      .get(targetWorkspaceId) as { id: string } | undefined;
+    if (!target) {
+      throw new DatabaseError("Workspace not found");
+    }
+    const duplicate = this.findByName(targetWorkspaceId, existing.name);
+    if (duplicate) {
+      throw new DatabaseError(`Group "${existing.name}" already exists`);
+    }
+    const maxRow = this.db
+      .prepare(
+        `SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM groups WHERE workspace_id = ?`,
+      )
+      .get(targetWorkspaceId) as { max_order: number };
+    const nextOrder = maxRow.max_order + 1;
+
+    const run = this.db.transaction(() => {
+      this.db
+        .prepare(`UPDATE groups SET workspace_id = ?, sort_order = ? WHERE id = ?`)
+        .run(targetWorkspaceId, nextOrder, groupId);
+      this.db
+        .prepare(`UPDATE group_layouts SET workspace_id = ? WHERE group_id = ?`)
+        .run(targetWorkspaceId, groupId);
+      this.db
+        .prepare(`UPDATE sessions SET workspace_id = ? WHERE group_id = ?`)
+        .run(targetWorkspaceId, groupId);
+    });
+    try {
+      run();
+    } catch (err) {
+      throw new DatabaseError(`Failed to move group "${existing.name}"`, err);
+    }
+
+    const row = this.db.prepare(`SELECT * FROM groups WHERE id = ?`).get(groupId);
+    return GroupModelSchema.parse(row);
+  }
+
   deleteByName(workspaceId: string, name: string): boolean {
     const result = this.db
       .prepare(`DELETE FROM groups WHERE workspace_id = ? AND name = ?`)

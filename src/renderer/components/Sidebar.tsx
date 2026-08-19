@@ -102,6 +102,7 @@ interface SidebarProps {
   onCreateProfile?: (groupId: string) => void;
   onProfileSelect?: (profileId: string) => void;
   onProfileReorder?: (dragProfileId: string, dropProfileId: string) => void;
+  onProfileMoveToGroup?: (profileId: string, targetGroupId: string) => void;
   onProfileSettings?: (profileId: string) => void;
   onProfileOpenFolder?: (profileId: string) => void;
   onProfileAddTerminal?: (profileId: string) => void;
@@ -149,6 +150,7 @@ export function Sidebar({
   onCreateProfile,
   onProfileSelect,
   onProfileReorder,
+  onProfileMoveToGroup,
   onProfileSettings,
   onProfileOpenFolder,
   onProfileAddTerminal,
@@ -169,6 +171,7 @@ export function Sidebar({
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [draggingProfileId, setDraggingProfileId] = useState<string | null>(null);
   const [dragOverProfileId, setDragOverProfileId] = useState<string | null>(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
   const [draggingTerminal, setDraggingTerminal] = useState<{ profileId: string; terminalId: string } | null>(null);
   const [dragOverTerminal, setDragOverTerminal] = useState<{ profileId: string; terminalId: string; zone: "above" | "below" } | null>(null);
   const [query, setQuery] = useState("");
@@ -259,22 +262,53 @@ export function Sidebar({
         </button>
         {groupOpen && !collapsed && (
           <div className="mt-1 space-y-1 rounded-lg border border-chrome-border-input bg-chrome-surface p-1">
-            {groups.map((group) => (
+            {groups.map((group) => {
+              const canDrop =
+                Boolean(draggingProfileId) &&
+                Boolean(onProfileMoveToGroup) &&
+                group.id !== currentGroup?.id;
+              return (
               <button
                 key={group.id}
                 type="button"
                 className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-200 hover:bg-chrome-hover ${
                   group.id === currentGroup?.id ? "bg-chrome-hover text-chrome-text" : "text-chrome-text-muted"
+                } ${
+                  dragOverGroupId === group.id && canDrop
+                    ? "ring-2 ring-chrome-ui-accent/35"
+                    : ""
                 }`}
                 onClick={() => {
                   onGroupChange?.(group.id);
+                  setGroupOpen(false);
+                }}
+                title={
+                  canDrop ? t("profile.dialog.groupHint") : undefined
+                }
+                onDragOver={(e) => {
+                  if (!canDrop) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOverGroupId(group.id);
+                }}
+                onDragLeave={() => {
+                  if (dragOverGroupId === group.id) setDragOverGroupId(null);
+                }}
+                onDrop={(e) => {
+                  if (!canDrop || !draggingProfileId) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onProfileMoveToGroup?.(draggingProfileId, group.id);
+                  setDraggingProfileId(null);
+                  setDragOverGroupId(null);
                   setGroupOpen(false);
                 }}
               >
                 {group.icon ?? <FolderKanban className="h-4 w-4" />}
                 <span className="truncate">{group.name}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
         {!collapsed && (
@@ -463,10 +497,12 @@ export function Sidebar({
                         onDragStart={(e) => {
                           setDraggingProfileId(item.id);
                           e.dataTransfer.effectAllowed = "move";
+                          if (groups.length > 1 && onProfileMoveToGroup) setGroupOpen(true);
                         }}
                         onDragEnd={() => {
                           setDraggingProfileId(null);
                           setDragOverProfileId(null);
+                          setDragOverGroupId(null);
                         }}
                         onClick={() => onProfileSelect?.(item.id)}
                         className={`flex w-full items-center justify-between gap-2 rounded-lg px-1.5 py-1 text-left text-sm transition-all duration-200 ${
