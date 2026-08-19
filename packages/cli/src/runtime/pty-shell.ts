@@ -119,6 +119,15 @@ export function bashSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+/**
+ * `/d` skips AutoRun; `/s` lets cmd strip quotes that node-pty adds around
+ * args with spaces. Do not pre-quote the command: node-pty's argsToCommandLine
+ * turns `"claude"` into `\"claude\"`, which `/s` cannot strip.
+ */
+function cmdExeToolArgs(command: string): string[] {
+  return ["/d", "/s", "/k", command.trim()];
+}
+
 function windowsArgsForShell(
   shell: string,
   command: string,
@@ -126,7 +135,7 @@ function windowsArgsForShell(
 ): string[] {
   const interactive = command === "";
   if (shell === "cmd.exe") {
-    return interactive ? ["/k"] : ["/k", command];
+    return interactive ? ["/k"] : cmdExeToolArgs(command);
   }
   const inject = pwshIntegrationCommand?.trim() || "";
   if (interactive) {
@@ -160,14 +169,21 @@ export function buildWindowsPtyCandidates(
 /**
  * Reorder the default Windows cascade so the preferred shell is tried first,
  * with the remaining shells as fallbacks.
+ *
+ * `command` (when non-empty) is an AI CLI to run inside the shell. cmd.exe
+ * always exists, so a cmd-first order never reaches pwsh — and npm `.cmd`
+ * shims often fail inside that cmd, so the tab still says Claude while the
+ * pane is a Command Prompt. Tool launches therefore keep pwsh-first.
  */
 export function orderWindowsPtyCandidates(
   candidates: readonly PtyShellCandidate[],
   shellPref?: string,
+  command?: string,
 ): PtyShellCandidate[] {
   const pref = effectiveWindowsShellPref(shellPref);
+  const launchingTool = Boolean(command?.trim());
   if (pref === "cmd") {
-    return [...candidates].reverse();
+    return launchingTool ? [...candidates] : [...candidates].reverse();
   }
   if (pref === "powershell") {
     const pwsh = candidates[0];
@@ -352,6 +368,7 @@ export function resolvePtySpawnPlan(options: {
       windowsCandidates: orderWindowsPtyCandidates(
         buildWindowsPtyCandidates(options.command, pwshCommand),
         options.shell,
+        options.command,
       ),
       unixCandidates,
       unix,
