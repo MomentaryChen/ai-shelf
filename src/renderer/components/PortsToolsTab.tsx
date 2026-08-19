@@ -18,6 +18,7 @@ import {
   type PortListenerRow,
 } from "../../shared/port-listeners.js";
 import { Card } from "./Card";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { SectionHeading } from "./SectionHeading";
 
 const PORTS_POLL_MS = 5_000;
@@ -42,6 +43,7 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
   const [listeners, setListeners] = useState<PortListenerRow[]>([]);
   const [queriedPort, setQueriedPort] = useState<number | null>(3000);
   const [killingPid, setKillingPid] = useState<number | null>(null);
+  const [pendingKill, setPendingKill] = useState<PortListenerRow | null>(null);
   const requestIdRef = useRef(0);
   const queryRef = useRef("3000");
 
@@ -138,12 +140,12 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
     void lookup(next);
   };
 
-  const stopProcess = async (row: PortListenerRow) => {
+  const requestStop = (row: PortListenerRow) => {
     if (!row.canKill || killingPid != null) return;
-    const ok = window.confirm(
-      t("ports.killConfirm", { name: row.processName, pid: row.pid, port: row.port }),
-    );
-    if (!ok) return;
+    setPendingKill(row);
+  };
+
+  const stopProcess = async (row: PortListenerRow) => {
     if (!window.api?.portsKill) {
       setError(t("ports.error.unavailable"));
       return;
@@ -292,7 +294,7 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
                           disabled={!row.canKill || killingPid != null}
                           className="h-9 px-3 text-[12px] text-destructive hover:bg-destructive/10 hover:text-destructive"
                           title={row.canKill ? t("ports.stop") : t("ports.stopProtected")}
-                          onClick={() => void stopProcess(row)}
+                          onClick={() => requestStop(row)}
                         >
                           <Unplug className="h-3.5 w-3.5" />
                           <span className="hidden @sm:inline">
@@ -308,6 +310,23 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
           )}
         </div>
       </Card>
+      <ConfirmDialog
+        open={pendingKill !== null}
+        title={t("ports.killTitle")}
+        description={t("ports.killConfirm", {
+          name: pendingKill?.processName ?? "",
+          pid: pendingKill?.pid ?? "",
+          port: pendingKill?.port ?? "",
+        })}
+        confirmLabel={t("ports.stop")}
+        confirmVariant="destructive"
+        onCancel={() => setPendingKill(null)}
+        onConfirm={() => {
+          const row = pendingKill;
+          setPendingKill(null);
+          if (row) void stopProcess(row);
+        }}
+      />
     </>
   );
 }
