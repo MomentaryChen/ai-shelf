@@ -1261,7 +1261,7 @@ export const zh: Record<MessageKey, string> = {
   "time.clear": "清除",
   "time.hint.live": "輸入時即時更新 · 時鐘每秒刷新",
   "time.error.invalid": "無法解析此時間 — 請試試 unix 數字、單位後綴或 ISO 日期。",
-  "time.detected.now": "使用目前時間",
+  "time.detected.now": "已擷取輸入當下的時間",
   "time.detected.iso": "已解析為日期字串",
   "time.detected.inferred": "推斷單位：{unit}",
   "time.detected.unit": "單位：{unit}",

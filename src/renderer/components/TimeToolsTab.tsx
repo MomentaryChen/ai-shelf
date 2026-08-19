@@ -11,6 +11,7 @@ import {
   COMMON_TIMEZONES,
   formatTimeFormats,
   getLocalTimeZone,
+  isNowKeyword,
   parseTimeInput,
   type TimeFormats,
   type TimeUnit,
@@ -100,6 +101,8 @@ export function TimeToolsTab() {
   const [unitMode, setUnitMode] = useState<UnitMode>("auto");
   const [timeZone, setTimeZone] = useState(localZone);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  /** Frozen instant for the `now` keyword so result rows do not jump every second. */
+  const [nowSnapshotMs, setNowSnapshotMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ResultRow[]>([]);
   const [detected, setDetected] = useState<string | null>(null);
@@ -114,6 +117,24 @@ export function TimeToolsTab() {
     return () => window.clearInterval(id);
   }, []);
 
+  const usingNow = isNowKeyword(input);
+  const snapshotMs = usingNow ? (nowSnapshotMs ?? Date.now()) : null;
+  // Capture during render so converting to `now` does not flash the previous table.
+  if (usingNow && nowSnapshotMs == null) {
+    setNowSnapshotMs(snapshotMs);
+  } else if (!usingNow && nowSnapshotMs != null) {
+    setNowSnapshotMs(null);
+  }
+
+  const resultClockMs = snapshotMs ?? nowMs;
+
+  const captureNow = () => {
+    const ms = Date.now();
+    setNowMs(ms);
+    setNowSnapshotMs(ms);
+    setInput("now");
+  };
+
   useEffect(() => {
     if (!input.trim()) {
       setRows([]);
@@ -123,7 +144,7 @@ export function TimeToolsTab() {
     }
 
     const parsed = parseTimeInput(input, {
-      nowMs,
+      nowMs: resultClockMs,
       forcedUnit: unitMode,
     });
     if (!parsed) {
@@ -133,7 +154,7 @@ export function TimeToolsTab() {
       return;
     }
 
-    const formats = formatTimeFormats(parsed.epochMs, { timeZone, nowMs });
+    const formats = formatTimeFormats(parsed.epochMs, { timeZone, nowMs: resultClockMs });
     setRows(buildRows(formats, timeZone));
     setError(null);
 
@@ -141,7 +162,7 @@ export function TimeToolsTab() {
     else if (parsed.unit === "iso") setDetected(t("time.detected.iso"));
     else if (parsed.inferred) setDetected(t("time.detected.inferred", { unit: parsed.unit }));
     else setDetected(t("time.detected.unit", { unit: parsed.unit }));
-  }, [input, unitMode, timeZone, nowMs, t]);
+  }, [input, unitMode, timeZone, resultClockMs, t]);
 
   const nowFormats = formatTimeFormats(nowMs, { timeZone, nowMs });
 
@@ -160,7 +181,7 @@ export function TimeToolsTab() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => setInput("now")}
+              onClick={captureNow}
             >
               {t("time.useNow")}
             </Button>

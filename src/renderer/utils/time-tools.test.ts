@@ -4,8 +4,18 @@ import {
   formatRelative,
   formatTimeFormats,
   inferUnixUnit,
+  isNowKeyword,
   parseTimeInput,
 } from "./time-tools.js";
+
+describe("isNowKeyword", () => {
+  it("matches now ignoring case and surrounding space", () => {
+    assert.equal(isNowKeyword("now"), true);
+    assert.equal(isNowKeyword(" NOW "), true);
+    assert.equal(isNowKeyword("nows"), false);
+    assert.equal(isNowKeyword(""), false);
+  });
+});
 
 describe("inferUnixUnit", () => {
   it("classifies by magnitude", () => {
