@@ -65,6 +65,44 @@ describe("windows ordering", () => {
       ["pwsh.exe", "powershell.exe", "cmd.exe"],
     );
   });
+
+  it("puts cmd first only for interactive shells", () => {
+    const interactive = orderWindowsPtyCandidates(buildWindowsPtyCandidates(""), "cmd");
+    assert.deepEqual(
+      interactive.map(([sh]) => sh),
+      ["cmd.exe", "powershell.exe", "pwsh.exe"],
+    );
+  });
+
+  it("keeps pwsh first when launching an AI CLI even if cmd is preferred", () => {
+    const list = orderWindowsPtyCandidates(
+      buildWindowsPtyCandidates("claude"),
+      "cmd",
+      "claude",
+    );
+    assert.equal(list[0]?.[0], "pwsh.exe");
+    assert.equal(list.at(-1)?.[0], "cmd.exe");
+  });
+});
+
+describe("windows cmd tool args", () => {
+  it("passes AI CLI commands without pre-quotes so node-pty can join them", () => {
+    const list = buildWindowsPtyCandidates("claude");
+    const cmd = list.find(([sh]) => sh === "cmd.exe");
+    assert.deepEqual(cmd?.[1], ["/d", "/s", "/k", "claude"]);
+  });
+
+  it("keeps extra args as one argv for cmd /k", () => {
+    const list = buildWindowsPtyCandidates("claude --model sonnet");
+    const cmd = list.find(([sh]) => sh === "cmd.exe");
+    assert.deepEqual(cmd?.[1], ["/d", "/s", "/k", "claude --model sonnet"]);
+  });
+
+  it("keeps interactive cmd as /k", () => {
+    const list = buildWindowsPtyCandidates("");
+    const cmd = list.find(([sh]) => sh === "cmd.exe");
+    assert.deepEqual(cmd?.[1], ["/k"]);
+  });
 });
 
 describe("resolvePtySpawnPlan", () => {
@@ -78,5 +116,16 @@ describe("resolvePtySpawnPlan", () => {
     assert.equal(plan.platform, "unix");
     assert.equal(plan.unixCandidates[0]?.[0], "/usr/bin/fish");
     assert.equal(plan.unix.file, "/usr/bin/fish");
+  });
+
+  it("launches Claude via pwsh-first even when the preferred shell is cmd", () => {
+    const plan = resolvePtySpawnPlan({
+      command: "claude",
+      shell: "cmd",
+      platform: "win32",
+    });
+    assert.equal(plan.platform, "win32");
+    assert.equal(plan.windowsCandidates[0]?.[0], "pwsh.exe");
+    assert.equal(plan.windowsCandidates.at(-1)?.[0], "cmd.exe");
   });
 });
