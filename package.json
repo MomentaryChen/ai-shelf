@@ -48,6 +48,7 @@
     },
     "files": [
       "dist/**/*",
+      "LICENSE",
       "src/assets/icon.ico",
       "src/assets/icon.png"
     ],

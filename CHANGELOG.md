@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 GitHub Releases use the matching `## [x.y.z]` section here as the release description (see `scripts/release-notes.mjs` and `.github/workflows/release.yml`).
 
+## [Unreleased]
+
+### Added
+
+- **MIT license file** — Adds the SPDX MIT text at the repo root (and the published CLI package) so GitHub and npm can detect the license the README already declared.
+
 ## [4.2.0] - 2026-08-05
 
 New Tools panels for Diff, Markdown, YAML↔JSON, and UUID/NanoID, plus sync overwrite and steadier CJK IME pinning.
