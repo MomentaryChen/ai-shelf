@@ -9,6 +9,14 @@
  *
  * An entry whose `source` is not `"caret"`, or whose position is far from
  * `hardware`, identifies which fallback path ran for that composition.
+ *
+ * The console side prints every fallback, plus the *first* caret hit per
+ * session. That asymmetry is deliberate: a console with no
+ * `caret found (first)` line is a session where `findCaretCell` never matched
+ * once, which means the Ink caret anchor is inert and the IME is riding
+ * xterm's hardware cursor after all. Printing only fallbacks hid exactly that
+ * — it had to be inferred from `hardware` appearing where `last-known` would
+ * have, since `lastCaret` is only ever set from a caret hit.
  */
 
 import type { ImeAnchor } from "./xterm-ime-anchor";
@@ -22,6 +30,8 @@ export type ImeAnchorLogEntry = ImeAnchor & {
 
 const MAX_ENTRIES = 200;
 const entries: ImeAnchorLogEntry[] = [];
+/** Sessions that have found the Ink caret at least once. */
+const caretSeen = new Set<string>();
 
 const sameAnchor = (a: ImeAnchorLogEntry, b: ImeAnchor, sessionId: string): boolean =>
   a.sessionId === sessionId &&
@@ -51,6 +61,12 @@ export function recordImeAnchor(sessionId: string, anchor: ImeAnchor): void {
       `[ime-anchor] ${sessionId} ${anchor.source} at ${anchor.col},${anchor.row} ` +
         `(hardware ${anchor.hardware.col},${anchor.hardware.row})`,
     );
+  } else if (!caretSeen.has(sessionId)) {
+    caretSeen.add(sessionId);
+    console.debug(
+      `[ime-anchor] ${sessionId} caret found (first) at ${anchor.col},${anchor.row} ` +
+        `(hardware ${anchor.hardware.col},${anchor.hardware.row})`,
+    );
   }
 }
 
@@ -60,6 +76,7 @@ export function getImeAnchorLog(): ImeAnchorLogEntry[] {
 
 export function clearImeAnchorLog(): void {
   entries.length = 0;
+  caretSeen.clear();
 }
 
 declare global {
