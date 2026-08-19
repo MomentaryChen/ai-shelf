@@ -35,6 +35,7 @@ import {
   findCaretCell,
   MAX_CARET_RUN,
   type ImeCaretPosition,
+  type ImeCaretScratch,
   type ImeCaretViewport,
 } from "./ime-caret";
 import { applyPin, type Pin } from "./ime-pin";
@@ -85,6 +86,8 @@ export function attachImeAnchor(
   let pinned: Pin | null = null;
   /** Survives compositionend so a later composition never starts unanchored. */
   let lastCaret: ImeCaretPosition | null = null;
+  /** One cell object for every caret scan this terminal ever runs. */
+  const caretScratch: ImeCaretScratch = {};
 
   const view: ImeCaretViewport = {
     get rows() {
@@ -144,7 +147,7 @@ export function attachImeAnchor(
   };
 
   const resolve = (): { pos: ImeCaretPosition; source: ImeAnchorSource } => {
-    const caret = findCaretCell(view, maxCaretRun);
+    const caret = findCaretCell(view, maxCaretRun, caretScratch);
     if (caret) return { pos: caret, source: "caret" };
     // Mid-composition Ink clear-then-redraw: hold the last pin rather than
     // yanking the IME to the hardware cursor.
@@ -214,6 +217,7 @@ export function attachImeAnchor(
     focused = false;
     pinned = null;
     lastCaret = null;
+    caretScratch.cell = undefined;
     renderDisposable.dispose();
     root.removeEventListener("compositionstart", onCompositionStartCapture, true);
     textarea.removeEventListener("compositionstart", onCompositionStart);
