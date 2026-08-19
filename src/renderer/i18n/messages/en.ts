@@ -946,10 +946,16 @@ export const en = {
   "usage.gemini.auth.apiKey.field": "Gemini API key",
   "usage.gemini.auth.gcp.title": "GCP · service account",
   "usage.gemini.auth.gcp.note":
-    "Service account JSON with Service Usage Consumer + Monitoring Viewer on the Gemini project. Matches AI Studio rate-limit data.",
+    "Needs Monitoring Viewer. Service Usage Consumer unlocks live quota limits on billed projects; Free Tier projects without billing fall back to Cloud Monitoring request counts.",
   "usage.gemini.auth.gcp.field": "Service account JSON",
   "usage.gemini.auth.gcp.projectField": "Project ID (optional)",
   "usage.gemini.quota.hint": "GCP quota snapshot — used vs limit for the last 24 hours.",
+  "usage.gemini.quota.hintFreeTier":
+    "Live quota limits are unavailable (common without a billing account). Bars show last-24h Cloud Monitoring usage against published Gemini 2.5 Flash free-tier caps — about 15 requests/min, 250k tokens/min, and 1,500 requests/day. Going over those rates returns a rate-limit error. Daily requests reset at midnight Pacific.",
+  "usage.gemini.quota.remaining": "{used} of {limit}",
+  "usage.gemini.quota.rpd": "Requests (24h)",
+  "usage.gemini.quota.rpm": "Peak requests per minute",
+  "usage.gemini.quota.tpm": "Tokens per minute",
 
   "usage.copilot.intro":
     "Copilot metrics use GitHub's official usage reports API. Requires a PAT with read:org (or read:enterprise) and Copilot usage metrics enabled for your org.",

@@ -42,6 +42,10 @@ function formatUsd(amount: number): string {
   }).format(amount);
 }
 
+function formatCount(amount: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(amount);
+}
+
 function formatTokens(n?: number): string {
   if (n == null || n === 0) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -367,13 +371,12 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
   const showCursorSpending =
     snapshot.toolId === "cursor" && (snapshot.quotas?.length ?? 0) > 0;
   const quotaHintKey =
-    snapshot.toolId === "cursor"
+    snapshot.quotaHintKey ??
+    (snapshot.toolId === "cursor"
       ? "usage.cursor.quota.hint"
       : snapshot.toolId === "gemini"
         ? "usage.gemini.quota.hint"
-        : snapshot.toolId === "claude"
-          ? "usage.claude.quota.hint"
-          : "usage.claude.quota.hint";
+        : "usage.claude.quota.hint");
   const showCostGrid =
     !quotaMode ||
     showCursorSpending ||
@@ -410,6 +413,14 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
                     {t("usage.cursor.quota.remaining", {
                       remaining: formatUsd(q.remainingUsd),
                       limit: formatUsd(q.limitUsd),
+                    })}
+                  </p>
+                )}
+                {q.usedCount != null && q.limitCount != null && (
+                  <p className="mt-1.5 text-[11px] text-text-secondary">
+                    {t("usage.gemini.quota.remaining", {
+                      used: formatCount(q.usedCount),
+                      limit: formatCount(q.limitCount),
                     })}
                   </p>
                 )}

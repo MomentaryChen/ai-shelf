@@ -70,6 +70,9 @@ export interface UsageQuotaWindow {
   usedUsd?: number;
   limitUsd?: number;
   remainingUsd?: number;
+  /** Unit counts for provider quotas (e.g. Gemini requests vs published limit). */
+  usedCount?: number;
+  limitCount?: number;
 }
 
 export interface UsageToolSnapshot {
@@ -78,6 +81,8 @@ export interface UsageToolSnapshot {
   status: "ok" | "not_configured" | "unsupported" | "error";
   error?: string;
   authSourceKey?: string;
+  /** Overrides the default per-tool quota hint in the usage panel. */
+  quotaHintKey?: string;
   totalCostUsd?: number;
   totalInputTokens?: number;
   totalOutputTokens?: number;
