@@ -314,4 +314,4 @@ ai-shelf/                 # root workspace (Electron app + inventory CLI)
 
 ## License
 
-MIT
+[MIT](LICENSE)

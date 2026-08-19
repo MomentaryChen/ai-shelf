@@ -313,4 +313,4 @@ ai-shelf/                 # 根 workspace（Electron + 清單 CLI）
 
 ## 授權條款
 
-MIT
+[MIT](LICENSE)
