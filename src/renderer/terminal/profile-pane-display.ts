@@ -125,3 +125,15 @@ export function unminimizePaneIds(
   for (const id of paneIds) next.delete(id);
   return next;
 }
+
+/**
+ * Saved snapshot rows are a restore preview for inactive profiles only.
+ * The active profile (or any profile with live panes) must not fall back to
+ * stale saved terminals after the user closed every pane.
+ */
+export function shouldShowSavedTerminalPreview(
+  liveCount: number,
+  isActiveProfile: boolean,
+): boolean {
+  return liveCount === 0 && !isActiveProfile;
+}

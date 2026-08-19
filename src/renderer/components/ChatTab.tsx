@@ -55,6 +55,7 @@ import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   hasProfilePaneDrag,
   readProfilePaneDrag,
+  shouldShowSavedTerminalPreview,
   visiblePanes,
 } from "../terminal/profile-pane-display";
 import { applyAppTheme, useAppThemeRevision } from "../app-theme";
@@ -401,7 +402,8 @@ function ChatTabInner({
     void refreshSidebarForest();
   }, [refreshSidebarForest, activeProfile?.id]);
 
-  // Keep active profile paneCount in sync locally — avoid full forest IPC on every split/close.
+  // Keep active profile paneCount / saved-terminal preview in sync locally —
+  // avoid full forest IPC on every split/close.
   useEffect(() => {
     if (!activeProfile?.id) return;
     setSidebarForest((prev) => {
@@ -410,9 +412,11 @@ function ChatTabInner({
       const groups = prev.groups.map((g) => ({
         ...g,
         profiles: g.profiles.map((p) => {
-          if (p.id !== activeProfile.id || p.paneCount === panes.length) return p;
+          if (p.id !== activeProfile.id) return p;
+          const nextTerminals = panes.length === 0 ? [] : p.terminals;
+          if (p.paneCount === panes.length && nextTerminals === p.terminals) return p;
           changed = true;
-          return { ...p, paneCount: panes.length };
+          return { ...p, paneCount: panes.length, terminals: nextTerminals };
         }),
       }));
       return changed ? { ...prev, groups } : prev;
@@ -1058,6 +1062,7 @@ function ChatTabInner({
     () =>
       (currentGroup?.profiles ?? []).map((p) => {
         const live = getProfilePanes(p.id);
+        const isActive = p.id === activeProfile?.id;
         const terminals =
           live.length > 0
             ? live.map((pane, idx) => ({
@@ -1067,16 +1072,18 @@ function ChatTabInner({
                 label: paneDisplayLabel(pane),
                 description: pane.cwd || `${toolLabel(pane.tool)} ${idx + 1}`,
                 live: true,
-                minimized: p.id === activeProfile?.id ? isPaneMinimized(p.id, pane.id) : false,
+                minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
               }))
-            : p.terminals.map((terminal, idx) => ({
-                id: `saved-${p.id}-${idx}`,
-                profileId: p.id,
-                tool: terminal.tool,
-                label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
-                description: terminal.cwd,
-                live: false,
-              }));
+            : shouldShowSavedTerminalPreview(live.length, isActive)
+              ? p.terminals.map((terminal, idx) => ({
+                  id: `saved-${p.id}-${idx}`,
+                  profileId: p.id,
+                  tool: terminal.tool,
+                  label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
+                  description: terminal.cwd,
+                  live: false,
+                }))
+              : [];
         return {
           id: p.id,
           name: p.name,
@@ -1088,7 +1095,14 @@ function ChatTabInner({
           terminals,
         };
       }),
-    [currentGroup?.profiles, getProfilePanes, activeProfile?.id, isPaneMinimized],
+    [
+      currentGroup?.profiles,
+      getProfilePanes,
+      activeProfile?.id,
+      isPaneMinimized,
+      layout,
+      minimizedPaneIds,
+    ],
   );
 
   useProfileQuickSwitch({
@@ -1591,7 +1605,7 @@ function ChatTabInner({
             </div>
           )}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
-          <TerminalStatusBar pane={focusedPane} />
+          <TerminalStatusBar pane={displayLayout ? focusedPane : null} />
         </div>
       </div>
     </TooltipProvider>

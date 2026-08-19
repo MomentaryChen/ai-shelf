@@ -125,22 +125,26 @@ export function useProfileWorkspace(
     void migrateLocalStorageToSqlite().finally(() => setMigrationDone(true));
   }, []);
 
+  const persistGenerationRef = useRef(new Map<string, number>());
+
   /** Persist the given profile using an explicit layout tree (or the live layout). */
   const persistProfile = useCallback(async (profile?: ProfileInfo | null, node?: LayoutNode | null) => {
     const target = profile ?? activeProfileRef.current;
+    if (!target) return;
+    const key = `${target.workspaceId}:${target.id}`;
+    const generation = (persistGenerationRef.current.get(key) ?? 0) + 1;
+    persistGenerationRef.current.set(key, generation);
     const layoutNode = node !== undefined ? node : layoutRef.current;
-    if (!target || !layoutNode) return;
-
-    const collected = collectPanes(layoutNode).slice(0, MAX_GROUP_PANES);
-    if (collected.length === 0) return;
-
-    const { layout: serialized, panes } = serializeLayout(layoutNode);
+    const collected = layoutNode ? collectPanes(layoutNode).slice(0, MAX_GROUP_PANES) : [];
     const existing = await loadGroupSnapshot(target.workspaceId, target.id);
+    if (persistGenerationRef.current.get(key) !== generation) return;
+    const serialized =
+      layoutNode && collected.length > 0 ? serializeLayout(layoutNode) : { layout: null, panes: [] };
     const snapshot: GroupLayoutSnapshot = {
       defaultCwd: existing?.defaultCwd ?? target.defaultCwd ?? "",
       defaultTool: existing?.defaultTool ?? target.defaultTool ?? "claude",
-      panes,
-      layout: collected.length > 1 ? serialized : null,
+      panes: collected.length > 0 ? serialized.panes : [],
+      layout: collected.length > 1 ? serialized.layout : null,
       broadcastInput: broadcastRef.current,
       accentColor: existing?.accentColor ?? target.accentColor ?? null,
       savedCommands: existing?.savedCommands ?? target.savedCommands ?? [],
@@ -155,6 +159,8 @@ export function useProfileWorkspace(
 
   const persistTimerRef = useRef<number | null>(null);
   const persistInFlightRef = useRef<Promise<void> | null>(null);
+  const persistPaneCountRef = useRef(0);
+  const persistProfileIdRef = useRef<string | null>(null);
 
   const runPersist = useCallback(async () => {
     if (persistInFlightRef.current) {
@@ -347,14 +353,8 @@ export function useProfileWorkspace(
             };
           }
 
-          const snapshot = await loadGroupSnapshot(profile.workspaceId, profile.id);
-          if (!isCurrent()) return undefined;
-          if (snapshot && snapshot.panes.length > 0) {
-            const restored = await restoreSnapshot(snapshot, profile, isCurrent);
-            if (!isCurrent()) return undefined;
-            if (restored.paneCount > 0) return restored;
-          }
-
+          // Already active with no live panes — user closed them. Do not respawn
+          // from a stale snapshot (that would put a terminal back on the display).
           if (!isCurrent()) return undefined;
           applyMinimizedPaneIds(new Set());
           applyLayout(setLayout, setFocusedPaneId, layoutRef, null, null);
@@ -470,12 +470,12 @@ export function useProfileWorkspace(
   useEffect(() => {
     if (!activeProfile || restoringRef.current || profileSwitchInProgressRef.current) return;
     const paneCount = layout ? collectPanes(layout).length : 0;
-    if (paneCount > 0) {
-      profileLiveCacheRef.current.set(cacheKey(activeProfile.workspaceId, activeProfile.id), {
-        layout: layout!,
-        focusedPaneId: focusedPaneIdRef.current,
-        minimizedPaneIds: [...minimizedPaneIdsRef.current],
-      });
+    const sameProfile = persistProfileIdRef.current === activeProfile.id;
+    const prevCount = sameProfile ? persistPaneCountRef.current : 0;
+    persistProfileIdRef.current = activeProfile.id;
+    persistPaneCountRef.current = paneCount;
+
+    const schedulePersist = () => {
       if (persistTimerRef.current !== null) {
         window.clearTimeout(persistTimerRef.current);
       }
@@ -483,6 +483,15 @@ export function useProfileWorkspace(
         persistTimerRef.current = null;
         void runPersist();
       }, 400);
+    };
+
+    if (paneCount > 0) {
+      profileLiveCacheRef.current.set(cacheKey(activeProfile.workspaceId, activeProfile.id), {
+        layout: layout!,
+        focusedPaneId: focusedPaneIdRef.current,
+        minimizedPaneIds: [...minimizedPaneIdsRef.current],
+      });
+      schedulePersist();
       return () => {
         if (persistTimerRef.current !== null) {
           window.clearTimeout(persistTimerRef.current);
@@ -491,7 +500,16 @@ export function useProfileWorkspace(
       };
     }
     profileLiveCacheRef.current.delete(cacheKey(activeProfile.workspaceId, activeProfile.id));
-  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, runPersist, cacheKey]);
+    // Persist empty only after the user closed the last live pane — not when
+    // restore produced zero panes (spawn failure must keep the snapshot).
+    if (sameProfile && prevCount > 0) {
+      if (persistTimerRef.current !== null) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+      void persistProfile(activeProfile, null);
+    }
+  }, [layout, focusedPaneId, activeProfile, workingDir, broadcastInput, restoring, runPersist, persistProfile, cacheKey]);
 
   const getProfilePanes = useCallback(
     (profileId: string): PaneInfo[] => {
