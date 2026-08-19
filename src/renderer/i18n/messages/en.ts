@@ -1294,7 +1294,7 @@ export const en = {
   "time.clear": "Clear",
   "time.hint.live": "Updates as you type · clock refreshes every second",
   "time.error.invalid": "Could not parse this time — try a unix number, unit suffix, or ISO date.",
-  "time.detected.now": "Using current time",
+  "time.detected.now": "Snapshot of the current time",
   "time.detected.iso": "Parsed as date/time string",
   "time.detected.inferred": "Inferred unit: {unit}",
   "time.detected.unit": "Unit: {unit}",

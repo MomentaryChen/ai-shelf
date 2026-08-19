@@ -107,6 +107,10 @@ function isValidDate(ms: number): boolean {
   return Number.isFinite(ms) && Math.abs(ms) < 8.64e15; // Date-safe range
 }
 
+export function isNowKeyword(raw: string): boolean {
+  return /^now$/iu.test(raw.trim());
+}
+
 /**
  * Parse a debug-friendly time input.
  * @param forcedUnit When set, numeric input is treated as that unit (ignores suffix/inference).
@@ -121,7 +125,7 @@ export function parseTimeInput(
   const nowMs = opts.nowMs ?? Date.now();
   const forced = opts.forcedUnit && opts.forcedUnit !== "auto" ? opts.forcedUnit : null;
 
-  if (/^now$/iu.test(input)) {
+  if (isNowKeyword(input)) {
     return { epochMs: nowMs, unit: "now", inferred: false };
   }
 
