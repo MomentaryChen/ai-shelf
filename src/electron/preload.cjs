@@ -253,7 +253,8 @@ contextBridge.exposeInMainWorld("api", {
   flowRemoveTaskScheduler: () => ipcRenderer.invoke("flow-remove-task-scheduler"),
   flowGetRunState: (runId) => ipcRenderer.invoke("flow-get-run-state", runId),
   flowListRecentRuns: (limit) => ipcRenderer.invoke("flow-list-recent-runs", limit),
-  flowListRunsForFlow: (flowId, limit) => ipcRenderer.invoke("flow-list-runs-for-flow", flowId, limit),
+  flowListRunsForFlow: (flowId, limit, offset) =>
+    ipcRenderer.invoke("flow-list-runs-for-flow", flowId, limit, offset),
   flowGetRunEvents: (runId) => ipcRenderer.invoke("flow-get-run-events", runId),
   flowGetConsoleBuffer: (runId) => ipcRenderer.invoke("flow-get-console-buffer", runId),
   flowOpenRunArtifact: (runId, artifact) => ipcRenderer.invoke("flow-open-run-artifact", runId, artifact),

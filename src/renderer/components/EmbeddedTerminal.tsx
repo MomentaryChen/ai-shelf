@@ -18,6 +18,7 @@ import { bindTerminalLinks } from "../terminal/xterm-links";
 import { bindTerminalCwd } from "../terminal/xterm-cwd";
 import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
 import { recordImeAnchor } from "../terminal/ime-anchor-log";
+import { attachImeInputTrace, recordImeInputData } from "../terminal/ime-input-trace";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
 import {
   copyTerminalOutputForIssue,
@@ -374,6 +375,8 @@ function EmbeddedTerminalInner({
     const unbindImeAnchor = attachImeAnchor(term, {
       onAnchor: (a) => recordImeAnchor(sessionId, a),
     });
+    // Dropped CJK input has no live repro; see terminal/ime-input-log.
+    const unbindImeTrace = attachImeInputTrace(term, sessionId);
     const unbindLinks = bindTerminalLinks(term);
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
       onCwdReportRef.current?.(sessionId, cwd);
@@ -499,6 +502,7 @@ function EmbeddedTerminalInner({
 
     term.onData((data) => {
       if (cancelled || exited) return;
+      recordImeInputData(sessionId, data);
       if (pasteToThisPaneOnly) {
         writePty(data);
         return;
@@ -576,6 +580,7 @@ function EmbeddedTerminalInner({
       unregisterClear();
       unbindClipboard();
       unbindImeAnchor();
+      unbindImeTrace();
       unbindLinks();
       unbindCwd();
       detachWebgl();

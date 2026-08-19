@@ -223,6 +223,7 @@ ai update self
 ai-shelf profile list
 ai-shelf profile create <名稱> [--cwd <路徑>] [--tool <工具>] [--color <hex>]
 ai-shelf profile update <profile> [--name] [--cwd] [--tool] [--broadcast|--no-broadcast]
+ai-shelf profile move <profile> --to-group <群組>
 ai-shelf profile delete <profile>
 ai-shelf profile reorder <profile...>
 ai-shelf profile exec <profile> <指令...> [--broadcast] [--session <名稱>]

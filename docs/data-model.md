@@ -57,6 +57,8 @@ The renderer uses profile APIs for the main UI:
 
 - `profile-get-tree`, `profile-create`, `profile-update`, `profile-delete`, `profile-reorder`
 
+`profile-update` may include `groupId` to move a profile to another profile group (workspace). Layout keys follow the new `workspaceId:profileId`.
+
 Layout persistence still uses internal group-layout handlers (`ws-group-layout-*`) keyed by `workspaceId:groupId` — equivalent to profile storage keys.
 
 Legacy workspace tree IPC (`ws-get-tree`, `ws-workspace-create`, …) remains for layout migration helpers but is not used by the desktop UI.

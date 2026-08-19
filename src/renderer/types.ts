@@ -883,6 +883,7 @@ export interface ElectronAPI {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      groupId?: string;
     },
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileSetSavedCommands: (
@@ -1053,7 +1054,11 @@ export interface ElectronAPI {
   }>;
   flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
   flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;
-  flowListRunsForFlow: (flowId: string, limit?: number) => Promise<FlowRunState[]>;
+  flowListRunsForFlow: (
+    flowId: string,
+    limit?: number,
+    offset?: number,
+  ) => Promise<{ items: FlowRunState[]; total: number }>;
   flowGetRunEvents: (runId: string) => Promise<FlowRunEvent[]>;
   flowGetConsoleBuffer: (runId: string) => Promise<FlowConsoleBufferSnapshot>;
   flowOpenRunArtifact: (

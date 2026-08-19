@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { findCaretCell, type ImeCaretViewport } from "./ime-caret.js";
+import {
+  findCaretCell,
+  MAX_CARET_RUN,
+  type ImeCaretCell,
+  type ImeCaretScratch,
+  type ImeCaretViewport,
+} from "./ime-caret.js";
 
 /**
  * Build a viewport from ASCII rows where `#` marks an inverse cell and any
@@ -75,5 +81,86 @@ describe("findCaretCell", () => {
     const view = viewport("> ###   ");
     assert.equal(findCaretCell(view, 2), null);
     assert.deepEqual(findCaretCell(view, 3), { col: 2, row: 0 });
+  });
+});
+
+type MutableCell = ImeCaretCell & { inverse: number };
+
+/**
+ * Viewport that counts cell allocations the way xterm's `BufferLineApiView`
+ * does: an out-parameter is written through, and only a call without one
+ * allocates.
+ */
+function countingViewport(rows: string[]): {
+  view: ImeCaretViewport;
+  allocations: () => number;
+} {
+  const width = Math.max(0, ...rows.map((r) => r.length));
+  const padded = rows.map((r) => r.padEnd(width, " "));
+  let allocations = 0;
+
+  return {
+    view: {
+      rows: padded.length,
+      getLine(row) {
+        const text = padded[row];
+        if (text === undefined) return undefined;
+        return {
+          length: width,
+          getCell(x, cell) {
+            if (x < 0 || x >= width) return undefined;
+            const inverse = text[x] === "#" ? 1 : 0;
+            if (cell) {
+              (cell as MutableCell).inverse = inverse;
+              return cell;
+            }
+            allocations++;
+            const fresh: MutableCell = { inverse, isInverse: () => fresh.inverse };
+            return fresh;
+          },
+        };
+      },
+    },
+    allocations: () => allocations,
+  };
+}
+
+describe("findCaretCell cell reuse", () => {
+  // A miss reads every cell in the viewport, and the anchor runs this on every
+  // render while the pane is focused — so one allocation per scan versus one
+  // per cell is the difference between free and thousands of objects a frame.
+  it("allocates one cell for a whole scan when given a scratch", () => {
+    const { view, allocations } = countingViewport(["      ", "      ", "      "]);
+    const scratch: ImeCaretScratch = {};
+
+    assert.equal(findCaretCell(view, MAX_CARET_RUN, scratch), null);
+    assert.equal(allocations(), 1);
+  });
+
+  it("keeps reusing the same cell across scans", () => {
+    const { view, allocations } = countingViewport(["      ", "      "]);
+    const scratch: ImeCaretScratch = {};
+
+    findCaretCell(view, MAX_CARET_RUN, scratch);
+    findCaretCell(view, MAX_CARET_RUN, scratch);
+
+    assert.equal(allocations(), 1);
+  });
+
+  it("allocates per cell without a scratch", () => {
+    const { view, allocations } = countingViewport(["      ", "      ", "      "]);
+
+    assert.equal(findCaretCell(view), null);
+    assert.equal(allocations(), 18);
+  });
+
+  it("reads the same cells with or without a scratch", () => {
+    const rows = ["> hi#     ", "##########", "  /clear  "];
+    const scratch: ImeCaretScratch = {};
+
+    assert.deepEqual(
+      findCaretCell(countingViewport(rows).view, MAX_CARET_RUN, scratch),
+      findCaretCell(countingViewport(rows).view),
+    );
   });
 });
