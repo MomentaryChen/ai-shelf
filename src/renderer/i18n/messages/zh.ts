@@ -913,10 +913,16 @@ export const zh: Record<MessageKey, string> = {
   "usage.gemini.auth.apiKey.field": "Gemini API key",
   "usage.gemini.auth.gcp.title": "GCP · service account",
   "usage.gemini.auth.gcp.note":
-    "具 Service Usage Consumer + Monitoring Viewer 權限的 service account JSON，對應 AI Studio 速率限制頁面。",
+    "需要 Monitoring Viewer。已綁帳單的專案再加 Service Usage Consumer 可讀即時額度上限；未綁帳單的免費專案會改從 Cloud Monitoring 讀實際呼叫次數。",
   "usage.gemini.auth.gcp.field": "Service account JSON",
   "usage.gemini.auth.gcp.projectField": "Project ID（選填）",
   "usage.gemini.quota.hint": "GCP 額度快照 — 過去 24 小時的已用 / 上限。",
+  "usage.gemini.quota.hintFreeTier":
+    "無法讀取即時額度上限（常見於未綁定帳單的免費專案）。長條顯示過去 24 小時 Cloud Monitoring 用量，對照 Gemini 2.5 Flash 免費層公開上限：約每分鐘 15 次請求、每分鐘 25 萬 token、每天 1,500 次請求。超過這些速率會被限流。每日請求於太平洋時間午夜重置。",
+  "usage.gemini.quota.remaining": "{used} / {limit}",
+  "usage.gemini.quota.rpd": "請求次數（24 小時）",
+  "usage.gemini.quota.rpm": "尖峰每分鐘請求",
+  "usage.gemini.quota.tpm": "每分鐘 token",
 
   "usage.copilot.intro":
     "Copilot 使用 GitHub 官方 usage reports API。需要具 read:org（或 read:enterprise）的 PAT，且組織已啟用 Copilot usage metrics。",

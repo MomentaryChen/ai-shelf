@@ -555,6 +555,8 @@ export interface UsageQuotaWindow {
   usedUsd?: number;
   limitUsd?: number;
   remainingUsd?: number;
+  usedCount?: number;
+  limitCount?: number;
 }
 
 export interface UsageToolSnapshot {
@@ -563,6 +565,7 @@ export interface UsageToolSnapshot {
   status: "ok" | "not_configured" | "unsupported" | "error";
   error?: string;
   authSourceKey?: string;
+  quotaHintKey?: string;
   totalCostUsd?: number;
   totalInputTokens?: number;
   totalOutputTokens?: number;

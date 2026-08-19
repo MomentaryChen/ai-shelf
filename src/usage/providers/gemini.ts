@@ -11,15 +11,22 @@ export async function fetchGeminiUsage(
     serviceAccountJson?: string | null;
     projectId?: string | null;
   },
-  _days: number,
+  days: number,
 ): Promise<
   Pick<
     UsageToolSnapshot,
-    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens" | "quotas"
+    | "daily"
+    | "byModel"
+    | "totalCostUsd"
+    | "totalInputTokens"
+    | "totalOutputTokens"
+    | "quotas"
+    | "quotaHintKey"
   > & { authSourceKey: GeminiUsageAuthSource }
 > {
   const saJson = creds.serviceAccountJson?.trim();
   const apiKey = creds.apiKey?.trim();
+  void days;
 
   if (saJson) {
     const data = await fetchGeminiGcpQuotas(saJson, creds.projectId);
