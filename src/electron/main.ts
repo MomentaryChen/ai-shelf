@@ -18,14 +18,11 @@ import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
-import { fetchRemoteLatestVersion, resolveToolLatestVersion } from "../utils/latest-version.js";
 import {
-  getMcpConfigPath,
-  tryReadJson,
-  backupFile,
-  writeJson,
-  parseJsonLoose,
-} from "../utils/config.js";
+  fetchRemoteLatestVersion,
+  resolveToolLatestVersion,
+} from "../utils/latest-version.js";
+import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
 import {
   collectAllMcpServers,
   readMcpServers,
@@ -75,7 +72,10 @@ import {
   type GroupLayoutSnapshot,
 } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
-import { ensureShellIntegrationScripts, psSingleQuote } from "./shell-integration.js";
+import {
+  ensureShellIntegrationScripts,
+  psSingleQuote,
+} from "./shell-integration.js";
 import {
   checkAppUpdate,
   downloadAppUpdate,
@@ -195,7 +195,10 @@ import {
 import { generateFlowFromChat } from "../flow/generate.js";
 import type { FlowChatMessage } from "../shared/flow-chat-types.js";
 import { initFlowScheduler, stopFlowScheduler } from "./flow-scheduler.js";
-import { readFlowSchedulePrefs, writeFlowSchedulePrefs } from "../shared/flow-schedule-pref.js";
+import {
+  readFlowSchedulePrefs,
+  writeFlowSchedulePrefs,
+} from "../shared/flow-schedule-pref.js";
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerAuthHandlers();
@@ -339,7 +342,8 @@ function bindDevToolsShortcuts(win: BrowserWindow) {
     if (input.type !== "keyDown") return;
     const key = input.key;
     const f12 = key === "F12";
-    const ctrlShiftI = (input.control || input.meta) && input.shift && key.toLowerCase() === "i";
+    const ctrlShiftI =
+      (input.control || input.meta) && input.shift && key.toLowerCase() === "i";
     if (f12 || ctrlShiftI) {
       event.preventDefault();
       toggleDevTools(win);
@@ -557,9 +561,7 @@ ipcMain.handle("start-inventory-scan", async (event) => {
           const entry = await detect({ quick: true });
           entries = mergeInventoryEntry(entries, entry);
           push("inventory-entry", entry);
-        } catch {
-          /* skip failed detectors */
-        }
+        } catch { /* skip failed detectors */ }
       }),
     );
     setInventoryCache(entries);
@@ -576,9 +578,7 @@ ipcMain.handle("start-inventory-scan", async (event) => {
         entries = mergeInventoryEntry(entries, enriched);
         setInventoryCache(entries);
         push("inventory-enriched", enriched);
-      } catch {
-        /* keep quick entry */
-      }
+      } catch { /* keep quick entry */ }
     }),
   );
 });
@@ -593,7 +593,7 @@ async function runDoctorForEntry(entry: Awaited<ReturnType<typeof detectAll>>[nu
 }
 
 ipcMain.handle("run-doctor", async () => {
-  const entries = getCachedInventory() ?? (await detectAll({ quick: true }));
+  const entries = getCachedInventory() ?? await detectAll({ quick: true });
   if (!getCachedInventory()) setInventoryCache(entries);
   return Promise.all(entries.map(runDoctorForEntry));
 });
@@ -603,10 +603,7 @@ ipcMain.handle("doctor-tool", async (_event, tool: string) => {
   if (!entry) {
     const detected = await detectTool(tool, { quick: true });
     if (!detected) {
-      return {
-        tool,
-        checks: [{ name: "error", status: "fail", detail: `Tool "${tool}" not found` }],
-      };
+      return { tool, checks: [{ name: "error", status: "fail", detail: `Tool "${tool}" not found` }] };
     }
     entry = detected;
     setInventoryCache(mergeInventoryEntry(getCachedInventory() ?? [], entry));
@@ -696,7 +693,9 @@ ipcMain.handle("check-update", async () => {
     });
   }
 
-  const selfLatest = app.isPackaged ? await resolveDesktopSelfLatestVersion() : null;
+  const selfLatest = app.isPackaged
+    ? await resolveDesktopSelfLatestVersion()
+    : null;
   results.push(buildAiShelfSelfEntry(selfLatest));
 
   return { tools: results };
@@ -748,7 +747,7 @@ ipcMain.handle("get-tools-list", async () => {
     updateCommand: string;
   }[] = [];
 
-  const entries = getCachedInventory() ?? (await detectAll({ quick: true }));
+  const entries = getCachedInventory() ?? await detectAll({ quick: true });
   if (!getCachedInventory()) setInventoryCache(entries);
   for (const entry of entries) {
     const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
@@ -774,12 +773,8 @@ ipcMain.handle("get-tools-list", async () => {
  */
 ipcMain.handle("start-update-scan", async (event) => {
   type ToolInfo = {
-    tool: string;
-    label: string;
-    currentVersion: string | null;
-    latestVersion: string | null;
-    available: boolean;
-    updateCommand: string;
+    tool: string; label: string; currentVersion: string | null;
+    latestVersion: string | null; available: boolean; updateCommand: string;
     desktopUpdate?: boolean;
   };
 
@@ -793,44 +788,38 @@ ipcMain.handle("start-update-scan", async (event) => {
   // Detect each AI tool individually in parallel, push as each resolves
   const allTools: ToolInfo[] = [selfEntry];
 
-  await Promise.all(
-    DETECTORS.map(async (detect) => {
-      try {
-        const entry = await detect({ quick: true });
-        const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
-        const info: ToolInfo = {
-          tool: entry.tool,
-          label: cfg?.label ?? entry.provider,
-          currentVersion: entry.version ?? null,
-          latestVersion: null,
-          available: entry.available,
-          updateCommand: cfg ? cfg.update.join(" ") : "",
-        };
-        allTools.push(info);
-        push("tool-detected", info);
-      } catch {
-        /* skip failed detectors */
-      }
-    }),
-  );
+  await Promise.all(DETECTORS.map(async (detect) => {
+    try {
+      const entry = await detect({ quick: true });
+      const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
+      const info: ToolInfo = {
+        tool: entry.tool,
+        label: cfg?.label ?? entry.provider,
+        currentVersion: entry.version ?? null,
+        latestVersion: null,
+        available: entry.available,
+        updateCommand: cfg ? cfg.update.join(" ") : "",
+      };
+      allTools.push(info);
+      push("tool-detected", info);
+    } catch { /* skip failed detectors */ }
+  }));
 
   // Now check npm / GitHub latest (or desktop updater for ai-shelf) — installed tools only
-  await Promise.all(
-    allTools.map(async (info) => {
-      const { tool, available } = info;
-      if (tool !== "ai-shelf" && !available) {
-        push("tool-latest", { tool, latestVersion: null });
-        return;
-      }
-      let latestVersion: string | null = null;
-      if (tool === "ai-shelf" && app.isPackaged) {
-        latestVersion = await resolveDesktopSelfLatestVersion();
-      } else if (tool !== "ai-shelf") {
-        latestVersion = await fetchRemoteLatestVersion(tool);
-      }
-      push("tool-latest", { tool, latestVersion });
-    }),
-  );
+  await Promise.all(allTools.map(async (info) => {
+    const { tool, available } = info;
+    if (tool !== "ai-shelf" && !available) {
+      push("tool-latest", { tool, latestVersion: null });
+      return;
+    }
+    let latestVersion: string | null = null;
+    if (tool === "ai-shelf" && app.isPackaged) {
+      latestVersion = await resolveDesktopSelfLatestVersion();
+    } else if (tool !== "ai-shelf") {
+      latestVersion = await fetchRemoteLatestVersion(tool);
+    }
+    push("tool-latest", { tool, latestVersion });
+  }));
 
   push("scan-complete", null);
 });
@@ -911,9 +900,7 @@ function detectSelfUpdateCmd(): string {
         : pm === "yarn"
           ? "yarn global upgrade ai-shelf"
           : "npm update -g ai-shelf";
-    } catch {
-      /* not available */
-    }
+    } catch { /* not available */ }
   }
   return "npm update -g ai-shelf";
 }
@@ -967,11 +954,7 @@ async function resolveDesktopSelfLatestVersion(): Promise<string | null> {
 /** Returns only the self (ai-shelf) version and update command — no detectAll(). */
 ipcMain.handle("get-self-info", () => {
   let version = "unknown";
-  try {
-    version = app.getVersion();
-  } catch {
-    /* ok */
-  }
+  try { version = app.getVersion(); } catch { /* ok */ }
   const git = app.isPackaged
     ? { branch: null, commitShort: null, dirty: false }
     : readGitBuildInfo(app.getAppPath());
@@ -1014,51 +997,37 @@ ipcMain.handle("get-mcp-raw", async () => {
       configPath: getMcpConfigPath(tool),
     })),
   );
-  return Object.fromEntries(
-    rows.map(({ tool, servers, configPath }) => [tool, { servers, configPath }]),
-  );
+  return Object.fromEntries(rows.map(({ tool, servers, configPath }) => [tool, { servers, configPath }]));
 });
 
-ipcMain.handle(
-  "sync-mcp",
-  async (
-    _event,
-    opts: {
-      serverNames: string[];
-      targetTools: string[];
-      sourceTool?: string;
-    },
-  ) => {
-    const policy = readTeamPolicy();
-    const sourceTool = opts.sourceTool || resolveMcpSource(policy);
-    const serverNames = filterAllowedMcpNames(policy, opts.serverNames);
-    const allServers = collectAllMcpServers(sourceTool);
+ipcMain.handle("sync-mcp", async (_event, opts: {
+  serverNames: string[];
+  targetTools: string[];
+  sourceTool?: string;
+}) => {
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveMcpSource(policy);
+  const serverNames = filterAllowedMcpNames(policy, opts.serverNames);
+  const allServers = collectAllMcpServers(sourceTool);
 
-    const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+  const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
-    for (const tool of opts.targetTools) {
-      results.push({ tool, ...writeMcpServers(tool, serverNames, allServers) });
-    }
+  for (const tool of opts.targetTools) {
+    results.push({ tool, ...writeMcpServers(tool, serverNames, allServers) });
+  }
 
-    return results;
-  },
-);
+  return results;
+});
 
-ipcMain.handle(
-  "preview-mcp-sync",
-  (
-    _event,
-    opts: {
-      serverNames: string[];
-      targetTools: string[];
-      sourceTool?: string;
-    },
-  ) => {
-    const policy = readTeamPolicy();
-    const sourceTool = opts.sourceTool || resolveMcpSource(policy);
-    return previewMcpSync({ ...opts, sourceTool, policy });
-  },
-);
+ipcMain.handle("preview-mcp-sync", (_event, opts: {
+  serverNames: string[];
+  targetTools: string[];
+  sourceTool?: string;
+}) => {
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveMcpSource(policy);
+  return previewMcpSync({ ...opts, sourceTool, policy });
+});
 
 // --- Team config policy ---
 
@@ -1069,12 +1038,7 @@ ipcMain.handle("get-team-policy", () => ({
 
 ipcMain.handle("set-team-policy", (_event, policy: unknown) => {
   if (!policy || typeof policy !== "object") {
-    return {
-      ok: false,
-      policy: readTeamPolicy(),
-      path: getTeamPolicyPath(),
-      error: "Invalid policy",
-    };
+    return { ok: false, policy: readTeamPolicy(), path: getTeamPolicyPath(), error: "Invalid policy" };
   }
   const next = writeTeamPolicy(policy as TeamPolicy);
   return { ok: true, policy: next, path: getTeamPolicyPath() };
@@ -1095,32 +1059,26 @@ ipcMain.handle("evaluate-team-policy", () => {
   };
 });
 
-ipcMain.handle(
-  "get-config-align-gaps",
-  (
-    _event,
-    opts?: {
-      mcpSourceTool?: string;
-      skillsSourceTool?: string;
-      mcpTargets?: string[];
-      skillTargets?: string[];
-    },
-  ) => {
-    const policy = readTeamPolicy();
-    return {
+ipcMain.handle("get-config-align-gaps", (_event, opts?: {
+  mcpSourceTool?: string;
+  skillsSourceTool?: string;
+  mcpTargets?: string[];
+  skillTargets?: string[];
+}) => {
+  const policy = readTeamPolicy();
+  return {
+    policy,
+    gaps: buildConfigAlignGaps({
       policy,
-      gaps: buildConfigAlignGaps({
-        policy,
-        mcpSourceTool: opts?.mcpSourceTool,
-        skillsSourceTool: opts?.skillsSourceTool,
-        mcpTargets: opts?.mcpTargets,
-        skillTargets: opts?.skillTargets,
-      }),
-      mcpSource: resolveMcpSource(policy, opts?.mcpSourceTool),
-      skillsSource: resolveSkillsSource(policy, opts?.skillsSourceTool),
-    };
-  },
-);
+      mcpSourceTool: opts?.mcpSourceTool,
+      skillsSourceTool: opts?.skillsSourceTool,
+      mcpTargets: opts?.mcpTargets,
+      skillTargets: opts?.skillTargets,
+    }),
+    mcpSource: resolveMcpSource(policy, opts?.mcpSourceTool),
+    skillsSource: resolveSkillsSource(policy, opts?.skillsSourceTool),
+  };
+});
 
 ipcMain.handle("import-team-policy", async () => {
   const parent = BrowserWindow.getFocusedWindow();
@@ -1191,96 +1149,84 @@ ipcMain.handle("get-skills-raw", async () => {
   );
 });
 
-ipcMain.handle(
-  "sync-skills",
-  async (
-    _event,
-    opts: {
-      skillNames: string[];
-      targetTools: string[];
-      sourceTool?: string;
-    },
-  ) => {
-    const policy = readTeamPolicy();
-    const sourceTool = opts.sourceTool || resolveSkillsSource(policy);
-    const skillNames = filterAllowedSkillNames(policy, opts.skillNames);
-    const allSkills = collectAllSkills(sourceTool);
+ipcMain.handle("sync-skills", async (_event, opts: {
+  skillNames: string[];
+  targetTools: string[];
+  sourceTool?: string;
+}) => {
+  const policy = readTeamPolicy();
+  const sourceTool = opts.sourceTool || resolveSkillsSource(policy);
+  const skillNames = filterAllowedSkillNames(policy, opts.skillNames);
+  const allSkills = collectAllSkills(sourceTool);
 
-    const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+  const results: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
-    for (const tool of opts.targetTools) {
-      results.push({ tool, ...writeSkillsToTool(tool, skillNames, allSkills) });
-    }
+  for (const tool of opts.targetTools) {
+    results.push({ tool, ...writeSkillsToTool(tool, skillNames, allSkills) });
+  }
 
-    return results;
-  },
-);
+  return results;
+});
 
 /** Align missing MCP/skills from source of truth onto targets (missing-only). */
-ipcMain.handle(
-  "align-config-from-source",
-  async (
-    _event,
-    opts?: {
-      mcpSourceTool?: string;
-      skillsSourceTool?: string;
-      mcpTargets?: string[];
-      skillTargets?: string[];
-      syncMcp?: boolean;
-      syncSkills?: boolean;
-    },
-  ) => {
-    const policy = readTeamPolicy();
-    const mcpSource = resolveMcpSource(policy, opts?.mcpSourceTool);
-    const skillsSource = resolveSkillsSource(policy, opts?.skillsSourceTool);
-    const syncMcp = opts?.syncMcp !== false;
-    const syncSkills = opts?.syncSkills !== false;
+ipcMain.handle("align-config-from-source", async (_event, opts?: {
+  mcpSourceTool?: string;
+  skillsSourceTool?: string;
+  mcpTargets?: string[];
+  skillTargets?: string[];
+  syncMcp?: boolean;
+  syncSkills?: boolean;
+}) => {
+  const policy = readTeamPolicy();
+  const mcpSource = resolveMcpSource(policy, opts?.mcpSourceTool);
+  const skillsSource = resolveSkillsSource(policy, opts?.skillsSourceTool);
+  const syncMcp = opts?.syncMcp !== false;
+  const syncSkills = opts?.syncSkills !== false;
 
-    const mcpTargets = (opts?.mcpTargets ?? [...SYNC_TOOLS]).filter((t) => t !== mcpSource);
-    const skillTargets = (opts?.skillTargets ?? [...SYNC_SKILL_TOOLS]).filter(
-      (t) => t !== skillsSource,
-    );
+  const mcpTargets = (opts?.mcpTargets ?? [...SYNC_TOOLS]).filter((t) => t !== mcpSource);
+  const skillTargets = (opts?.skillTargets ?? [...SYNC_SKILL_TOOLS]).filter(
+    (t) => t !== skillsSource,
+  );
 
-    const mcpResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
-    const skillResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+  const mcpResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
+  const skillResults: { tool: string; added: string[]; skipped: string[]; error?: string }[] = [];
 
-    if (syncMcp) {
-      const { byTarget } = mcpMissingFromTargets({
-        sourceTool: mcpSource,
-        targetTools: mcpTargets,
-        policy,
-      });
-      const allServers = collectAllMcpServers(mcpSource);
-      for (const tool of mcpTargets) {
-        const names = byTarget[tool] ?? [];
-        if (names.length === 0) {
-          mcpResults.push({ tool, added: [], skipped: [] });
-          continue;
-        }
-        mcpResults.push({ tool, ...writeMcpServers(tool, names, allServers) });
+  if (syncMcp) {
+    const { byTarget } = mcpMissingFromTargets({
+      sourceTool: mcpSource,
+      targetTools: mcpTargets,
+      policy,
+    });
+    const allServers = collectAllMcpServers(mcpSource);
+    for (const tool of mcpTargets) {
+      const names = byTarget[tool] ?? [];
+      if (names.length === 0) {
+        mcpResults.push({ tool, added: [], skipped: [] });
+        continue;
       }
+      mcpResults.push({ tool, ...writeMcpServers(tool, names, allServers) });
     }
+  }
 
-    if (syncSkills) {
-      const { byTarget } = skillsMissingFromTargets({
-        sourceTool: skillsSource,
-        targetTools: skillTargets,
-        policy,
-      });
-      const allSkills = collectAllSkills(skillsSource);
-      for (const tool of skillTargets) {
-        const names = byTarget[tool] ?? [];
-        if (names.length === 0) {
-          skillResults.push({ tool, added: [], skipped: [] });
-          continue;
-        }
-        skillResults.push({ tool, ...writeSkillsToTool(tool, names, allSkills) });
+  if (syncSkills) {
+    const { byTarget } = skillsMissingFromTargets({
+      sourceTool: skillsSource,
+      targetTools: skillTargets,
+      policy,
+    });
+    const allSkills = collectAllSkills(skillsSource);
+    for (const tool of skillTargets) {
+      const names = byTarget[tool] ?? [];
+      if (names.length === 0) {
+        skillResults.push({ tool, added: [], skipped: [] });
+        continue;
       }
+      skillResults.push({ tool, ...writeSkillsToTool(tool, names, allSkills) });
     }
+  }
 
-    return { mcpSource, skillsSource, mcpResults, skillResults };
-  },
-);
+  return { mcpSource, skillsSource, mcpResults, skillResults };
+});
 
 // --- In-app config editing & MCP server management ---
 
@@ -1328,8 +1274,10 @@ ipcMain.handle("mcp-delete-server", (_event, tool: string, name: string) =>
   deleteMcpServer(tool, name),
 );
 
-ipcMain.handle("mcp-set-server-enabled", (_event, tool: string, name: string, enabled: boolean) =>
-  setMcpServerEnabled(tool, name, enabled),
+ipcMain.handle(
+  "mcp-set-server-enabled",
+  (_event, tool: string, name: string, enabled: boolean) =>
+    setMcpServerEnabled(tool, name, enabled),
 );
 
 ipcMain.handle("mcp-ping-tool", (_event, tool: string) => pingToolServers(tool));
@@ -1352,7 +1300,10 @@ ipcMain.handle(
 
 function normalizeOpenPath(raw: string): string {
   let p = raw.trim();
-  if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith("'") && p.endsWith("'"))) {
+  if (
+    (p.startsWith('"') && p.endsWith('"')) ||
+    (p.startsWith("'") && p.endsWith("'"))
+  ) {
     p = p.slice(1, -1);
   }
   p = p.replace(/[,;:!?.)]+$/g, "");
@@ -1733,7 +1684,8 @@ ipcMain.handle(
     try {
       let proc: import("node-pty").IPty | undefined;
       let shellPath = "";
-      const candidates = plan.platform === "win32" ? plan.windowsCandidates : plan.unixCandidates;
+      const candidates =
+        plan.platform === "win32" ? plan.windowsCandidates : plan.unixCandidates;
       for (const [sh, args] of candidates) {
         try {
           proc = pty.spawn(sh, args, ptyOpts);
@@ -1789,54 +1741,57 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle("pty-attach", (_event, sessionId: string, opts?: { includeBuffer?: boolean }) => {
-  const alive = PTY_SESSIONS.has(sessionId);
-  const meta = PTY_META.get(sessionId);
-  const includeBuffer = opts?.includeBuffer !== false;
-  return {
-    success: true,
-    alive,
-    buffer: includeBuffer ? (PTY_OUTPUT_BUFFERS.get(sessionId) ?? "") : "",
-    pid: meta?.pid ?? null,
-    shell: meta?.shell ?? null,
-    cols: meta?.cols ?? null,
-    rows: meta?.rows ?? null,
-    exitCode: meta?.exitCode ?? null,
-  };
-});
+ipcMain.handle(
+  "pty-attach",
+  (_event, sessionId: string, opts?: { includeBuffer?: boolean }) => {
+    const alive = PTY_SESSIONS.has(sessionId);
+    const meta = PTY_META.get(sessionId);
+    const includeBuffer = opts?.includeBuffer !== false;
+    return {
+      success: true,
+      alive,
+      buffer: includeBuffer ? (PTY_OUTPUT_BUFFERS.get(sessionId) ?? "") : "",
+      pid: meta?.pid ?? null,
+      shell: meta?.shell ?? null,
+      cols: meta?.cols ?? null,
+      rows: meta?.rows ?? null,
+      exitCode: meta?.exitCode ?? null,
+    };
+  },
+);
 
 ipcMain.handle("pty-get-output-buffer", (_event, sessionId: string) => ({
   buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
 }));
 
 function sanitizeExportBasename(raw: string): string {
-  const trimmed = raw
-    .trim()
-    .replace(/[^\w.-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const trimmed = raw.trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "");
   return (trimmed || "terminal").slice(0, 80);
 }
 
-ipcMain.handle("pty-export-output", async (_event, sessionId: string, defaultName?: string) => {
-  try {
-    const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const base = sanitizeExportBasename(defaultName ?? sessionId);
-    const { canceled, filePath } = await dialog.showSaveDialog({
-      title: "Export terminal output",
-      defaultPath: `${base}-${stamp}.log`,
-      filters: [
-        { name: "Log file", extensions: ["log"] },
-        { name: "Text file", extensions: ["txt"] },
-      ],
-    });
-    if (canceled || !filePath) return { success: false, canceled: true as const };
-    writeFileSync(filePath, buffer, "utf8");
-    return { success: true, path: filePath };
-  } catch (err: unknown) {
-    return { success: false, error: (err as Error).message };
-  }
-});
+ipcMain.handle(
+  "pty-export-output",
+  async (_event, sessionId: string, defaultName?: string) => {
+    try {
+      const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const base = sanitizeExportBasename(defaultName ?? sessionId);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export terminal output",
+        defaultPath: `${base}-${stamp}.log`,
+        filters: [
+          { name: "Log file", extensions: ["log"] },
+          { name: "Text file", extensions: ["txt"] },
+        ],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true as const };
+      writeFileSync(filePath, buffer, "utf8");
+      return { success: true, path: filePath };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
 
 ipcMain.handle(
   "pty-search-output",
@@ -1933,101 +1888,78 @@ ipcMain.on("pty-kill", (_e, sessionId: string) => {
 ipcMain.handle(
   "launch-in-terminal",
   (_event, tool: string, terminal: string = "auto", cwd?: string, extraArgs?: string) => {
-    const cmd = resolveToolLaunchCommand(tool, extraArgs);
-    if (!cmd) return { success: false, error: `Unknown tool: ${tool}` };
+  const cmd = resolveToolLaunchCommand(tool, extraArgs);
+  if (!cmd) return { success: false, error: `Unknown tool: ${tool}` };
 
-    const isWin = process.platform === "win32";
-    const cdPrefix = cwd ? (isWin ? `cd /d "${cwd}" && ` : `cd "${cwd}" && `) : "";
-    const pwshCdPrefix = cwd ? `Set-Location '${cwd}'; ` : "";
+  const isWin = process.platform === "win32";
+  const cdPrefix = cwd
+    ? isWin
+      ? `cd /d "${cwd}" && `
+      : `cd "${cwd}" && `
+    : "";
+  const pwshCdPrefix = cwd ? `Set-Location '${cwd}'; ` : "";
 
-    try {
-      const plat = process.platform;
-      if (plat === "win32") {
-        const hasWt = (() => {
-          try {
-            execSync("where.exe wt", { stdio: "ignore" });
-            return true;
-          } catch {
-            return false;
-          }
-        })();
-        if (terminal === "wt" || terminal === "auto") {
-          if (hasWt) {
-            const wtArgs = cwd
-              ? [
-                  "new-tab",
-                  "--startingDirectory",
-                  cwd,
-                  "--",
-                  "pwsh.exe",
-                  "-NoExit",
-                  "-Command",
-                  cmd,
-                ]
-              : ["new-tab", "--", "pwsh.exe", "-NoExit", "-Command", cmd];
-            spawn("wt", wtArgs, { detached: true, stdio: "ignore" }).unref();
-            return { success: true };
-          }
-          if (terminal === "wt")
-            return { success: false, error: "Windows Terminal (wt) not found in PATH" };
-          // auto: fall through to pwsh/cmd
+  try {
+    const plat = process.platform;
+    if (plat === "win32") {
+      const hasWt = (() => {
+        try {
+          execSync("where.exe wt", { stdio: "ignore" });
+          return true;
+        } catch {
+          return false;
         }
-        if (terminal === "pwsh") {
-          spawn(
-            "cmd",
-            ["/c", "start", "pwsh.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`],
-            { detached: true, stdio: "ignore" },
-          ).unref();
-        } else if (terminal === "powershell") {
-          spawn(
-            "cmd",
-            ["/c", "start", "powershell.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`],
-            { detached: true, stdio: "ignore" },
-          ).unref();
-        } else {
-          // auto fallback (wt failed) or cmd: try pwsh first, then cmd.exe
-          try {
-            spawn(
-              "cmd",
-              ["/c", "start", "pwsh.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`],
-              { detached: true, stdio: "ignore" },
-            ).unref();
-          } catch {
-            spawn("cmd", ["/c", "start", "cmd", "/k", `${cdPrefix}${cmd}`], {
-              detached: true,
-              stdio: "ignore",
-            }).unref();
-          }
+      })();
+      if (terminal === "wt" || terminal === "auto") {
+        if (hasWt) {
+          const wtArgs = cwd
+            ? ["new-tab", "--startingDirectory", cwd, "--", "pwsh.exe", "-NoExit", "-Command", cmd]
+            : ["new-tab", "--", "pwsh.exe", "-NoExit", "-Command", cmd];
+          spawn("wt", wtArgs, { detached: true, stdio: "ignore" }).unref();
+          return { success: true };
         }
-      } else if (plat === "darwin") {
-        const script = cwd ? `cd "${cwd}" && ${cmd}` : cmd;
-        spawn("osascript", ["-e", `tell application "Terminal" to do script "${script}"`], {
-          detached: true,
-          stdio: "ignore",
-        }).unref();
+        if (terminal === "wt") return { success: false, error: "Windows Terminal (wt) not found in PATH" };
+        // auto: fall through to pwsh/cmd
+      }
+      if (terminal === "pwsh") {
+        spawn("cmd", ["/c", "start", "pwsh.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`], { detached: true, stdio: "ignore" }).unref();
+      } else if (terminal === "powershell") {
+        spawn("cmd", ["/c", "start", "powershell.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`], { detached: true, stdio: "ignore" }).unref();
       } else {
-        const bashCmd = `${cdPrefix}${cmd}`;
-        const linuxTerms = [
-          ["gnome-terminal", "--", "bash", "-c", `${bashCmd}; exec bash`],
-          ["xfce4-terminal", "-e", `bash -c '${bashCmd}; exec bash'`],
-          ["konsole", "-e", `bash -c '${bashCmd}; exec bash'`],
-          ["xterm", "-e", `bash -c '${bashCmd}; exec bash'`],
-        ];
-        for (const [bin, ...args] of linuxTerms) {
-          try {
-            spawn(bin, args, { detached: true, stdio: "ignore" }).unref();
-            break;
-          } catch {
-            /* try next */
-          }
+        // auto fallback (wt failed) or cmd: try pwsh first, then cmd.exe
+        try {
+          spawn("cmd", ["/c", "start", "pwsh.exe", "-NoExit", "-Command", `${pwshCdPrefix}${cmd}`], { detached: true, stdio: "ignore" }).unref();
+        } catch {
+          spawn("cmd", ["/c", "start", "cmd", "/k", `${cdPrefix}${cmd}`], { detached: true, stdio: "ignore" }).unref();
         }
       }
-      return { success: true };
-    } catch (err: unknown) {
-      return { success: false, error: (err as Error).message };
+    } else if (plat === "darwin") {
+      const script = cwd
+        ? `cd "${cwd}" && ${cmd}`
+        : cmd;
+      spawn("osascript", ["-e", `tell application "Terminal" to do script "${script}"`], {
+        detached: true, stdio: "ignore",
+      }).unref();
+    } else {
+      const bashCmd = `${cdPrefix}${cmd}`;
+      const linuxTerms = [
+        ["gnome-terminal", "--", "bash", "-c", `${bashCmd}; exec bash`],
+        ["xfce4-terminal", "-e", `bash -c '${bashCmd}; exec bash'`],
+        ["konsole", "-e", `bash -c '${bashCmd}; exec bash'`],
+        ["xterm", "-e", `bash -c '${bashCmd}; exec bash'`],
+      ];
+      for (const [bin, ...args] of linuxTerms) {
+        try {
+          spawn(bin, args, { detached: true, stdio: "ignore" }).unref();
+          break;
+        } catch { /* try next */ }
+      }
     }
-  },
-);
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+});
 
 ipcMain.handle("set-default-model", async (_event, tool: string, model: string) => {
   try {
@@ -2072,10 +2004,7 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
       const verifyText = existsSync(settingsPath) ? readFileSync(settingsPath, "utf-8") : "";
       const match = verifyText.match(/^model\s*=\s*["']?([^"'\n]+)["']?/m);
       if (match?.[1]?.trim() !== model) {
-        return {
-          success: false,
-          error: `Write verification failed: expected "${model}", got "${match?.[1] ?? ""}"`,
-        };
+        return { success: false, error: `Write verification failed: expected "${model}", got "${match?.[1] ?? ""}"` };
       }
       console.log(`[set-default-model] success: model=${model}`);
       return { success: true };
@@ -2094,10 +2023,7 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
     // Verify the write succeeded
     const verify = JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
     if (verify[key] !== model) {
-      return {
-        success: false,
-        error: `Write verification failed: expected "${model}", got "${String(verify[key])}"`,
-      };
+      return { success: false, error: `Write verification failed: expected "${model}", got "${String(verify[key])}"` };
     }
 
     console.log(`[set-default-model] success: ${key}=${model}`);
@@ -2168,7 +2094,12 @@ ipcMain.handle("ws-group-layout-get", (_e, workspaceId: string, groupId: string)
 
 ipcMain.handle(
   "ws-group-layout-save",
-  (_e, workspaceId: string, groupId: string, snapshot: GroupLayoutSnapshot) => {
+  (
+    _e,
+    workspaceId: string,
+    groupId: string,
+    snapshot: GroupLayoutSnapshot,
+  ) => {
     try {
       const saved = saveGroupLayout(workspaceId, groupId, snapshot);
       return { success: true, snapshot: saved };
@@ -2286,9 +2217,7 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle(
-  "profile-update",
-  (
+ipcMain.handle("profile-update", (
     _e,
     profileId: string,
     patch: {
@@ -2337,15 +2266,18 @@ ipcMain.handle("profile-delete", (_e, profileId: string) => {
   }
 });
 
-ipcMain.handle("profile-reorder", (_e, groupIdOrName: string, orderedProfileIds: string[]) => {
-  try {
-    const forest = reorderProfiles(groupIdOrName, orderedProfileIds);
-    refreshTrayMenu();
-    return { success: true, forest };
-  } catch (err: unknown) {
-    return { success: false, error: (err as Error).message };
-  }
-});
+ipcMain.handle(
+  "profile-reorder",
+  (_e, groupIdOrName: string, orderedProfileIds: string[]) => {
+    try {
+      const forest = reorderProfiles(groupIdOrName, orderedProfileIds);
+      refreshTrayMenu();
+      return { success: true, forest };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+);
 
 ipcMain.handle("export-backup", async (_event, localStorage: Record<string, string>) => {
   try {
@@ -2533,8 +2465,7 @@ ipcMain.handle(
 );
 
 ipcMain.handle("set-tray-pane-attention", (_event, count: unknown) => {
-  const n =
-    typeof count === "number" && Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+  const n = typeof count === "number" && Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
   syncTrayPaneAttention(n, getTrayDeps());
   return { ok: true, count: n };
 });
@@ -2558,63 +2489,57 @@ ipcMain.handle("flow-read-file", (_event, flowId: unknown) => {
   return readFlowFile(flowId.trim());
 });
 
-ipcMain.handle(
-  "flow-get-dag-node-command",
-  (_event, flowId: unknown, node: unknown, options: unknown) => {
-    if (typeof flowId !== "string" || !flowId.trim()) {
-      return { error: "Invalid flow id" };
-    }
-    if (!node || typeof node !== "object") {
-      return { error: "Invalid node" };
-    }
-    const n = node as {
-      kind?: unknown;
-      phaseId?: unknown;
-      phaseLabel?: unknown;
-      phaseMessage?: unknown;
+ipcMain.handle("flow-get-dag-node-command", (_event, flowId: unknown, node: unknown, options: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { error: "Invalid flow id" };
+  }
+  if (!node || typeof node !== "object") {
+    return { error: "Invalid node" };
+  }
+  const n = node as {
+    kind?: unknown;
+    phaseId?: unknown;
+    phaseLabel?: unknown;
+    phaseMessage?: unknown;
+  };
+  if (n.kind !== "trigger" && n.kind !== "phase" && n.kind !== "output") {
+    return { error: "Invalid node kind" };
+  }
+  let runOptions: {
+    globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs;
+    runId?: string;
+    outputPath?: string | null;
+  } = {};
+  if (options && typeof options === "object") {
+    const o = options as {
+      globalToolLaunchArgs?: unknown;
+      runId?: unknown;
+      outputPath?: unknown;
     };
-    if (n.kind !== "trigger" && n.kind !== "phase" && n.kind !== "output") {
-      return { error: "Invalid node kind" };
+    if (o.globalToolLaunchArgs && typeof o.globalToolLaunchArgs === "object") {
+      runOptions.globalToolLaunchArgs = o.globalToolLaunchArgs as import("../tool-launch.js").ToolLaunchArgs;
     }
-    let runOptions: {
-      globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs;
-      runId?: string;
-      outputPath?: string | null;
-    } = {};
-    if (options && typeof options === "object") {
-      const o = options as {
-        globalToolLaunchArgs?: unknown;
-        runId?: unknown;
-        outputPath?: unknown;
-      };
-      if (o.globalToolLaunchArgs && typeof o.globalToolLaunchArgs === "object") {
-        runOptions.globalToolLaunchArgs =
-          o.globalToolLaunchArgs as import("../tool-launch.js").ToolLaunchArgs;
-      }
-      if (typeof o.runId === "string" && o.runId.trim()) {
-        runOptions.runId = o.runId.trim();
-      }
-      if (typeof o.outputPath === "string") {
-        runOptions.outputPath = o.outputPath;
-      } else if (o.outputPath === null) {
-        runOptions.outputPath = null;
-      }
+    if (typeof o.runId === "string" && o.runId.trim()) {
+      runOptions.runId = o.runId.trim();
     }
-    return getFlowDagNodeCommand(
-      flowId.trim(),
-      {
-        kind: n.kind,
-        phaseId: typeof n.phaseId === "string" ? n.phaseId : undefined,
-        phaseLabel: typeof n.phaseLabel === "string" ? n.phaseLabel : undefined,
-        phaseMessage:
-          typeof n.phaseMessage === "string" || n.phaseMessage === null
-            ? n.phaseMessage
-            : undefined,
-      },
-      runOptions,
-    );
-  },
-);
+    if (typeof o.outputPath === "string") {
+      runOptions.outputPath = o.outputPath;
+    } else if (o.outputPath === null) {
+      runOptions.outputPath = null;
+    }
+  }
+  return getFlowDagNodeCommand(
+    flowId.trim(),
+    {
+      kind: n.kind,
+      phaseId: typeof n.phaseId === "string" ? n.phaseId : undefined,
+      phaseLabel: typeof n.phaseLabel === "string" ? n.phaseLabel : undefined,
+      phaseMessage:
+        typeof n.phaseMessage === "string" || n.phaseMessage === null ? n.phaseMessage : undefined,
+    },
+    runOptions,
+  );
+});
 
 ipcMain.handle("flow-run", (_event, flowId: unknown, options: unknown) => {
   if (typeof flowId !== "string" || !flowId.trim()) {
@@ -2657,15 +2582,13 @@ ipcMain.handle("flow-get-run-state", (_event, runId: unknown) => {
   return getFlowRunState(runId.trim());
 });
 ipcMain.handle("flow-list-recent-runs", (_event, limit: unknown) => {
-  const n =
-    typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 20;
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 20;
   return listRecentRuns(n);
 });
 
 ipcMain.handle("flow-list-runs-for-flow", (_event, flowId: unknown, limit: unknown) => {
   if (typeof flowId !== "string" || !flowId.trim()) return [];
-  const n =
-    typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 30;
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 30;
   return listRunsForFlow(flowId.trim(), n);
 });
 
@@ -2722,7 +2645,8 @@ ipcMain.handle("flow-set-schedule-prefs", (_event, partial: unknown) => {
   }
   const p = partial as { schedulerEnabled?: unknown };
   const next = writeFlowSchedulePrefs({
-    schedulerEnabled: typeof p.schedulerEnabled === "boolean" ? p.schedulerEnabled : undefined,
+    schedulerEnabled:
+      typeof p.schedulerEnabled === "boolean" ? p.schedulerEnabled : undefined,
   });
   return { ok: true, prefs: next };
 });
@@ -2736,7 +2660,11 @@ ipcMain.handle("flow-save-schedule", (_event, flowId: unknown, patch: unknown) =
   }
   const p = patch as { schedule?: unknown; timezone?: unknown };
   const schedule =
-    p.schedule === null ? null : typeof p.schedule === "string" ? p.schedule : undefined;
+    p.schedule === null
+      ? null
+      : typeof p.schedule === "string"
+        ? p.schedule
+        : undefined;
   if (schedule === undefined) {
     return { ok: false, error: "schedule is required (string or null)" };
   }
@@ -2878,8 +2806,7 @@ ipcMain.handle("flow-clear-chat", (_event, flowId: unknown) => {
 ipcMain.handle("flow-list-prompt-logs", (_event, flowId: unknown, limit: unknown) => {
   const id = normalizeChatFlowId(flowId);
   if (!id) return [];
-  const n =
-    typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 50;
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 50;
   return listFlowPromptLogs(id, n);
 });
 
@@ -2998,11 +2925,7 @@ function flushProfileLayoutsFromRenderer(): Promise<void> {
 function tearDownOnQuit(): void {
   setAppQuitting(true);
   for (const [, proc] of PTY_SESSIONS) {
-    try {
-      proc.kill();
-    } catch {
-      /* already dead */
-    }
+    try { proc.kill(); } catch { /* already dead */ }
   }
   PTY_SESSIONS.clear();
   closeWorkspaceContext();
