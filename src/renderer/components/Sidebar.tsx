@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
   FolderOpen,
@@ -6,13 +6,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  FolderKanban,
   Plus,
   Minus,
   Settings2,
   Trash2,
   X,
 } from "lucide-react";
+import { WorkspaceSlideSwitcher } from "./WorkspaceSlideSwitcher";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "../i18n/LocaleProvider";
 import { AccountSidebar } from "./AccountSidebar";
@@ -167,7 +167,6 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useLocale();
   const [internalCollapsed, setInternalCollapsed] = useState(false);
-  const [groupOpen, setGroupOpen] = useState(false);
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [draggingProfileId, setDraggingProfileId] = useState<string | null>(null);
   const [dragOverProfileId, setDragOverProfileId] = useState<string | null>(null);
@@ -175,7 +174,6 @@ export function Sidebar({
   const [draggingTerminal, setDraggingTerminal] = useState<{ profileId: string; terminalId: string } | null>(null);
   const [dragOverTerminal, setDragOverTerminal] = useState<{ profileId: string; terminalId: string; zone: "above" | "below" } | null>(null);
   const [query, setQuery] = useState("");
-  const groupMenuRef = useRef<HTMLDivElement | null>(null);
 
   const collapsed = controlledCollapsed ?? internalCollapsed;
   const setCollapsed = (next: boolean) => {
@@ -187,15 +185,6 @@ export function Sidebar({
     () => groups.find((g) => g.id === currentGroupId) ?? groups[0],
     [groups, currentGroupId],
   );
-
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (groupMenuRef.current && !groupMenuRef.current.contains(target)) setGroupOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
 
   useEffect(() => {
     if (!activeProfileId) return;
@@ -227,7 +216,9 @@ export function Sidebar({
       className="flex h-full w-full flex-col border-r border-chrome-border bg-chrome-bg transition-all duration-200"
     >
       <div className="flex items-center justify-between border-b border-chrome-border/80 p-2">
-        {!collapsed && <span className="px-1 text-xs font-medium text-chrome-text-muted">Workspace</span>}
+        {!collapsed && (
+          <span className="px-1 text-xs font-medium text-chrome-text-muted">{t("workspace.title")}</span>
+        )}
         <IconTooltipButton
           icon={collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -236,82 +227,49 @@ export function Sidebar({
         />
       </div>
 
-      <div className="p-2" ref={groupMenuRef}>
-        <button
-          type="button"
-          className={`flex w-full items-center gap-2 rounded-lg border border-chrome-border-input bg-chrome-surface px-2.5 py-2 text-left text-sm transition-all duration-200 hover:bg-chrome-hover ${
-            collapsed ? "justify-center px-0" : ""
-          }`}
-          onClick={() => setGroupOpen((v) => !v)}
-          title={collapsed ? currentGroup?.name : undefined}
-          aria-expanded={groupOpen}
-        >
-          {currentGroup?.icon ?? <FolderKanban className="h-4 w-4 text-chrome-text" />}
-          {!collapsed && (
-            <>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-chrome-text">
-                  {currentGroup?.name ?? t("workspace.empty")}
-                </div>
-                <div className="truncate text-xs text-chrome-text-muted">{t("workspace.groupSwitcher")}</div>
-              </div>
-              <ChevronDown className={`h-4 w-4 text-chrome-text-muted transition-transform ${groupOpen ? "rotate-180" : ""}`} />
-            </>
-          )}
-        </button>
-        {groupOpen && !collapsed && (
+      <div className="p-2">
+        <WorkspaceSlideSwitcher
+          groups={groups}
+          currentGroupId={currentGroupId}
+          collapsed={collapsed}
+          onGroupChange={onGroupChange}
+        />
+        {draggingProfileId && onProfileMoveToGroup && !collapsed && groups.length > 1 && (
           <div className="mt-1 space-y-1 rounded-lg border border-chrome-border-input bg-chrome-surface p-1">
-            {groups.map((group) => {
-              const canDrop =
-                Boolean(draggingProfileId) &&
-                Boolean(onProfileMoveToGroup) &&
-                group.id !== currentGroup?.id;
-              return (
-              <button
-                key={group.id}
-                type="button"
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-200 hover:bg-chrome-hover ${
-                  group.id === currentGroup?.id ? "bg-chrome-hover text-chrome-text" : "text-chrome-text-muted"
-                } ${
-                  dragOverGroupId === group.id && canDrop
-                    ? "ring-2 ring-chrome-ui-accent/35"
-                    : ""
-                }`}
-                onClick={() => {
-                  onGroupChange?.(group.id);
-                  setGroupOpen(false);
-                }}
-                title={
-                  canDrop ? t("profile.dialog.groupHint") : undefined
-                }
-                onDragOver={(e) => {
-                  if (!canDrop) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  setDragOverGroupId(group.id);
-                }}
-                onDragLeave={() => {
-                  if (dragOverGroupId === group.id) setDragOverGroupId(null);
-                }}
-                onDrop={(e) => {
-                  if (!canDrop || !draggingProfileId) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onProfileMoveToGroup?.(draggingProfileId, group.id);
-                  setDraggingProfileId(null);
-                  setDragOverGroupId(null);
-                  setGroupOpen(false);
-                }}
-              >
-                {group.icon ?? <FolderKanban className="h-4 w-4" />}
-                <span className="truncate">{group.name}</span>
-              </button>
-              );
-            })}
+            <div className="px-2 py-1 text-[11px] text-chrome-text-muted">{t("profile.dialog.groupHint")}</div>
+            {groups
+              .filter((group) => group.id !== currentGroup?.id)
+              .map((group) => (
+                <div
+                  key={group.id}
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-chrome-text-muted ${
+                    dragOverGroupId === group.id ? "bg-chrome-hover text-chrome-text ring-2 ring-chrome-ui-accent/35" : ""
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDragOverGroupId(group.id);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverGroupId === group.id) setDragOverGroupId(null);
+                  }}
+                  onDrop={(e) => {
+                    if (!draggingProfileId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onProfileMoveToGroup(draggingProfileId, group.id);
+                    setDraggingProfileId(null);
+                    setDragOverGroupId(null);
+                  }}
+                >
+                  {group.icon}
+                  <span className="truncate">{group.name}</span>
+                </div>
+              ))}
           </div>
         )}
         {!collapsed && (
-            <div className="mt-1.5 flex items-center gap-1 rounded-md border border-chrome-border-subtle bg-chrome-surface px-1 py-1">
+          <div className="mt-1.5 flex items-center gap-1 rounded-md border border-chrome-border-subtle bg-chrome-surface px-1 py-1">
             <IconAction title="New group" onClick={onCreateGroup}>
               <Plus className="h-3.5 w-3.5" />
             </IconAction>
@@ -496,7 +454,6 @@ export function Sidebar({
                         onDragStart={(e) => {
                           setDraggingProfileId(item.id);
                           e.dataTransfer.effectAllowed = "move";
-                          if (groups.length > 1 && onProfileMoveToGroup) setGroupOpen(true);
                         }}
                         onDragEnd={() => {
                           setDraggingProfileId(null);
