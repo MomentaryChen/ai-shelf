@@ -27,15 +27,51 @@ export default defineConfig({
   build: {
     outDir: "../../dist/renderer",
     emptyOutDir: true,
-    rollupOptions: {
+    /**
+     * Mermaid ships a single parser module that minifies above the default
+     * 500 kB reporter threshold; Rolldown cannot split one module further.
+     */
+    chunkSizeWarningLimit: 700,
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-          if (id.includes("@xterm")) return "xterm";
-          if (id.includes("/react-dom/") || id.includes("/react/")) return "react";
-          if (id.includes("/cmdk/")) return "cmdk";
-          if (id.includes("/lucide-react/")) return "lucide";
-          if (id.includes("/@radix-ui/")) return "radix";
+        codeSplitting: {
+          groups: [
+            {
+              name: "react",
+              test: /[\\/]node_modules[\\/](?:react|react-dom)[\\/]/,
+              priority: 20,
+            },
+            {
+              name: "xterm",
+              test: /[\\/]node_modules[\\/]@xterm[\\/]xterm[\\/]/,
+              priority: 20,
+            },
+            {
+              name: "xterm-webgl",
+              test: /[\\/]node_modules[\\/]@xterm[\\/]addon-webgl[\\/]/,
+              priority: 20,
+            },
+            {
+              name: "xterm-addons",
+              test: /[\\/]node_modules[\\/]@xterm[\\/]addon-(?:fit|search|web-links)[\\/]/,
+              priority: 20,
+            },
+            {
+              name: "cmdk",
+              test: /[\\/]node_modules[\\/]cmdk[\\/]/,
+              priority: 15,
+            },
+            {
+              name: "lucide",
+              test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
+              priority: 15,
+            },
+            {
+              name: "radix",
+              test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
+              priority: 15,
+            },
+          ],
         },
       },
     },
