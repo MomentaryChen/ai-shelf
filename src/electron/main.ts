@@ -507,9 +507,9 @@ function createSettingsWindow() {
     return;
   }
   settingsWindow = new BrowserWindow({
-    width: 520,
+    width: 680,
     height: 760,
-    minWidth: 440,
+    minWidth: 560,
     minHeight: 560,
     title: formatWindowTitle("Terminal Settings"),
     icon: APP_ICON,

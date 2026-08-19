@@ -108,8 +108,13 @@ export const en = {
   "inventory.filter.notInstalled": "Not installed",
   "inventory.search.noMatch": "No tools match your filters",
   "settings.title": "Terminal Settings",
-  "settings.subtitle":
-    "Language, app theme, working directory, external terminal, tool launch arguments, pane shortcuts, display, system tray, background, and data backup",
+  "settings.subtitle": "Appearance, terminal, shortcuts, alerts, and backup.",
+  "settings.categories": "Categories",
+  "settings.category.appearance": "Appearance",
+  "settings.category.terminal": "Terminal",
+  "settings.category.shortcuts": "Shortcuts",
+  "settings.category.alerts": "Alerts",
+  "settings.category.backup": "Backup",
   "settings.paneShortcut.title": "Pane shortcuts",
   "settings.paneShortcut.subtitle":
     "Split and focus shortcuts while a terminal pane is focused. Requires Ctrl (or Cmd on Mac). Close, clear, and restart shortcuts stay fixed.",
