@@ -51,7 +51,7 @@
 - **四種模式** — **Terminal**（預設）· **Inventory** · **Tools** · **AI Flow**
 - **Terminal** — Profile 側欄、內嵌多窗格 xterm.js + node-pty、廣播輸入、外部啟動
 - **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage**（花費／預算）
-- **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、YAML ↔ JSON、JWT、UUID、Diff
+- **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、YAML ↔ JSON、JWT、UUID、Diff、System、Ports
 - **AI Flow** — 撰寫、排程與執行多代理 `.flow.md` 工作流（範本、對話撰寫、執行紀錄）
 - **Profile 側欄** — 建立 / 重新命名 / 刪除 Profile；每個 Profile 的分割版面存入 SQLite
 - **外部啟動** — Windows 上為 Windows Terminal / PowerShell / CMD；macOS／Linux 依 `$SHELL`（bash / zsh / fish / sh）

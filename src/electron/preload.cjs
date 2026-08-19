@@ -293,4 +293,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("flow-console-chunk", handler);
     return () => ipcRenderer.off("flow-console-chunk", handler);
   },
+  portsList: (port) => ipcRenderer.invoke("ports-list", port),
+  portsKill: (pid) => ipcRenderer.invoke("ports-kill", pid),
+  portsAnalyzeEnv: (locale) => ipcRenderer.invoke("ports-analyze-env", locale),
+  portsHostStats: () => ipcRenderer.invoke("ports-host-stats"),
 });

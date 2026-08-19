@@ -93,6 +93,12 @@ const UuidToolsTab = lazy(() =>
 const DiffToolsTab = lazy(() =>
   import("./components/DiffToolsTab").then((m) => ({ default: m.DiffToolsTab })),
 );
+const PortsToolsTab = lazy(() =>
+  import("./components/PortsToolsTab").then((m) => ({ default: m.PortsToolsTab })),
+);
+const SystemToolsTab = lazy(() =>
+  import("./components/SystemToolsTab").then((m) => ({ default: m.SystemToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -129,7 +135,9 @@ type ToolId =
   | "yaml"
   | "jwt"
   | "uuid"
-  | "diff";
+  | "diff"
+  | "system"
+  | "ports";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -238,6 +246,8 @@ const TOOL_ICONS: Record<ToolId, string> = {
   jwt: "🪪",
   uuid: "🆔",
   diff: "≠",
+  system: "💻",
+  ports: "🔌",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
@@ -252,6 +262,8 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   jwt: "tools.tab.jwt",
   uuid: "tools.tab.uuid",
   diff: "tools.tab.diff",
+  system: "tools.tab.system",
+  ports: "tools.tab.ports",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -440,7 +452,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -514,7 +526,11 @@ export function App() {
                           ? "uuid nanoid ulid generate validate v4 v7"
                           : it.id === "diff"
                             ? "diff compare text unified patch lines whitespace"
-                            : "codec hash base64 image md5 tools",
+                            : it.id === "system"
+                              ? "system info cpu memory ram network gpu nvidia host meter usage analyze report"
+                              : it.id === "ports"
+                                ? "port ports listen listener netstat lsof pid kill occupy 3000"
+                                : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -538,7 +554,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -584,7 +600,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert",
+          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -823,6 +839,8 @@ export function App() {
                   {activeTool === "jwt" && <JwtToolsTab />}
                   {activeTool === "uuid" && <UuidToolsTab />}
                   {activeTool === "diff" && <DiffToolsTab />}
+                  {activeTool === "system" && <SystemToolsTab active={appMode === "tools"} />}
+                  {activeTool === "ports" && <PortsToolsTab active={appMode === "tools"} />}
                 </Suspense>
               </ViewTransition>
             </div>
