@@ -18,6 +18,7 @@ import { EmbeddedTerminal } from "./EmbeddedTerminal";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
 import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
@@ -166,6 +167,10 @@ function ChatTabInner({
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
+  const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const [pendingDeleteProfile, setPendingDeleteProfile] = useState<ProfileInfo | null>(null);
   const [createProfileOpen, setCreateProfileOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [renameGroupOpen, setRenameGroupOpen] = useState(false);
@@ -1185,12 +1190,7 @@ function ChatTabInner({
         onDeleteGroup={(groupId) => {
           const group = sidebarForest?.groups.find((g) => g.id === groupId);
           if (!group) return;
-          const ok = confirm(t("profileGroup.deleteConfirm", { name: group.name }));
-          if (!ok) return;
-          void (async () => {
-            await window.api.profileGroupDelete(groupId);
-            await refreshSidebarForest();
-          })();
+          setPendingDeleteGroup({ id: group.id, name: group.name });
         }}
         onCreateProfile={(groupId) => {
           setSelectedGroupId(groupId);
@@ -1429,15 +1429,8 @@ function ChatTabInner({
           setSettingsProfileId(null);
           await refreshSidebarForest();
         }}
-        onDelete={async (profile) => {
-          const ok = confirm(t("profile.deleteConfirm", { name: profile.name }));
-          if (!ok) return;
-          setSettingsBusy(true);
-          await window.api.profileDelete(profile.id);
-          setSettingsBusy(false);
-          handleProfileDeleted(profile.id);
-          setSettingsProfileId(null);
-          await refreshSidebarForest();
+        onDelete={(profile) => {
+          setPendingDeleteProfile(profile);
         }}
       />
       <BusyPaneCloseDialog
@@ -1447,6 +1440,44 @@ function ChatTabInner({
           const paneId = busyClosePaneId;
           setBusyClosePaneId(null);
           if (paneId) performClosePane(paneId);
+        }}
+      />
+      <ConfirmDialog
+        open={pendingDeleteGroup !== null}
+        title={t("profileGroup.deleteTitle")}
+        description={t("profileGroup.deleteConfirm", { name: pendingDeleteGroup?.name ?? "" })}
+        confirmLabel={t("profileGroup.deleteAction")}
+        confirmVariant="destructive"
+        onCancel={() => setPendingDeleteGroup(null)}
+        onConfirm={() => {
+          const group = pendingDeleteGroup;
+          setPendingDeleteGroup(null);
+          if (!group) return;
+          void (async () => {
+            await window.api.profileGroupDelete(group.id);
+            await refreshSidebarForest();
+          })();
+        }}
+      />
+      <ConfirmDialog
+        open={pendingDeleteProfile !== null}
+        title={t("profile.deleteTitle")}
+        description={t("profile.deleteConfirm", { name: pendingDeleteProfile?.name ?? "" })}
+        confirmLabel={t("profile.deleteAction")}
+        confirmVariant="destructive"
+        onCancel={() => setPendingDeleteProfile(null)}
+        onConfirm={() => {
+          const profile = pendingDeleteProfile;
+          setPendingDeleteProfile(null);
+          if (!profile) return;
+          void (async () => {
+            setSettingsBusy(true);
+            await window.api.profileDelete(profile.id);
+            setSettingsBusy(false);
+            handleProfileDeleted(profile.id);
+            setSettingsProfileId(null);
+            await refreshSidebarForest();
+          })();
         }}
       />
     </>

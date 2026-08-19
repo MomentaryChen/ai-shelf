@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { APP_THEME_OPTIONS, applyAppTheme } from "../app-theme";
 import { applyImportedLocalStorage, collectLocalStorageForBackup } from "../backup-storage";
 import {
@@ -135,6 +136,7 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
   const [backupMessage, setBackupMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null,
   );
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false);
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -201,8 +203,7 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
   }
 
   async function handleImportBackup() {
-    if (!window.confirm(t("settings.importConfirm"))) return;
-
+    setImportConfirmOpen(false);
     setBackupMessage(null);
     setBackupBusy("import");
     try {
@@ -234,6 +235,7 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
   const show = (id: SettingsCategoryId) => category === undefined || category === id;
 
   return (
+    <>
     <div className={compact ? "flex flex-col gap-5" : "flex flex-col gap-6"}>
       {show("appearance") && (
         <>
@@ -840,7 +842,7 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
           <Button
             type="button"
             variant="outline"
-            onClick={() => void handleImportBackup()}
+            onClick={() => setImportConfirmOpen(true)}
             disabled={backupBusy !== null}
           >
             {backupBusy === "import" ? "…" : t("settings.importBackup")}
@@ -859,5 +861,14 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
         </>
       )}
     </div>
+    <ConfirmDialog
+      open={importConfirmOpen}
+      title={t("settings.importTitle")}
+      description={t("settings.importConfirm")}
+      confirmLabel={t("settings.importAction")}
+      onCancel={() => setImportConfirmOpen(false)}
+      onConfirm={() => void handleImportBackup()}
+    />
+    </>
   );
 }
