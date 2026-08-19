@@ -223,6 +223,7 @@ See [docs/data-model.md](docs/data-model.md) for how profiles map to storage. [ç
 ai-shelf profile list
 ai-shelf profile create <name> [--cwd <path>] [--tool <tool>] [--color <hex>]
 ai-shelf profile update <profile> [--name] [--cwd] [--tool] [--broadcast|--no-broadcast]
+ai-shelf profile move <profile> --to-group <group>
 ai-shelf profile delete <profile>
 ai-shelf profile reorder <profile...>
 ai-shelf profile exec <profile> <command...> [--broadcast] [--session <name>]

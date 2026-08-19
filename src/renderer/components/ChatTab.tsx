@@ -266,6 +266,7 @@ function ChatTabInner({
     restoreLastProfile,
     discardProfileSessions,
     syncActiveProfile,
+    remapProfileWorkspace,
     getProfileDefaultCwd,
     getProfilePanes,
     getProfileFocusedPaneId,
@@ -1203,6 +1204,30 @@ function ChatTabInner({
             await refreshSidebarForest();
           })();
         }}
+        onProfileMoveToGroup={(profileId, targetGroupId) => {
+          const profile = allProfiles.find((p) => p.id === profileId);
+          if (!profile || profile.workspaceId === targetGroupId) return;
+          void (async () => {
+            if (profile.id === activeProfile?.id) {
+              await flushPersistCurrentProfile();
+            }
+            const r = await window.api.profileUpdate(profileId, { groupId: targetGroupId });
+            if (!r.success) {
+              window.alert(r.error ?? t("profile.failedSave"));
+              return;
+            }
+            if (r.profile) {
+              remapProfileWorkspace(profileId, profile.workspaceId, r.profile.workspaceId);
+              syncActiveProfile(r.profile);
+              if (r.profile.id === activeProfile?.id) {
+                updateSettings({ workingDir: r.profile.defaultCwd?.trim() ?? "" });
+                setBroadcastInput(r.profile.broadcastInput ?? false);
+                setSelectedGroupId(targetGroupId);
+              }
+            }
+            await refreshSidebarForest();
+          })();
+        }}
         onProfileSettings={(profileId) => setSettingsProfileId(profileId)}
         onProfileOpenFolder={(profileId) => {
           const profile = sidebarForest?.groups.flatMap((g) => g.profiles).find((p) => p.id === profileId);
@@ -1355,16 +1380,25 @@ function ChatTabInner({
       <ProfileSettingsDialog
         open={settingsProfileId !== null}
         profile={settingsProfile}
+        profileGroups={(sidebarForest?.groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         busy={settingsBusy}
         onClose={() => setSettingsProfileId(null)}
         onSave={async (profileId: string, patch: ProfileSettingsPatch) => {
           setSettingsBusy(true);
+          const previousWorkspaceId = settingsProfile?.workspaceId;
+          if (previousWorkspaceId && patch.groupId && patch.groupId !== previousWorkspaceId) {
+            await flushPersistCurrentProfile();
+          }
           const r = await window.api.profileUpdate(profileId, patch);
           setSettingsBusy(false);
-          if (!r.success) return;
+          if (!r.success) return r.error ?? t("profile.failedSave");
           if (r.profile) {
+            if (previousWorkspaceId && r.profile.workspaceId !== previousWorkspaceId) {
+              remapProfileWorkspace(profileId, previousWorkspaceId, r.profile.workspaceId);
+              setSelectedGroupId(r.profile.workspaceId);
+            }
             syncActiveProfile(r.profile);
             if (r.profile.id === activeProfile?.id) {
               updateSettings({ workingDir: r.profile.defaultCwd?.trim() ?? "" });

@@ -33,7 +33,9 @@ function groupOption(cmd: Command): Command {
 }
 
 export function registerProfileCommands(program: Command, getCtx: () => AppContext): void {
-  const profile = program.command("profile").description("Manage terminal profiles (primary data model)");
+  const profile = program
+    .command("profile")
+    .description("Manage terminal profiles (primary data model)");
 
   profile
     .command("list")
@@ -74,9 +76,7 @@ export function registerProfileCommands(program: Command, getCtx: () => AppConte
         }
         if (!any) {
           console.log(
-            chalk.yellow(
-              'No profiles yet. Run: ai-shelf profile create <name> [--group <group>]',
-            ),
+            chalk.yellow("No profiles yet. Run: ai-shelf profile create <name> [--group <group>]"),
           );
         } else {
           console.log();
@@ -95,10 +95,7 @@ export function registerProfileCommands(program: Command, getCtx: () => AppConte
       .option("--color <hex>", "Accent color (#RRGGBB) or omit for auto")
       .description("Create a profile"),
   ).action(
-    (
-      name: string,
-      opts: { group?: string; cwd?: string; tool?: string; color?: string },
-    ) => {
+    (name: string, opts: { group?: string; cwd?: string; tool?: string; color?: string }) => {
       try {
         const ctx = getCtx();
         const groupRef = opts.group ?? ctx.profileService.defaultGroupIdOrName();
@@ -165,7 +162,29 @@ export function registerProfileCommands(program: Command, getCtx: () => AppConte
   );
 
   groupOption(
-    profile.command("delete").argument("<profile>", "Profile id or name").description("Delete a profile"),
+    profile
+      .command("move")
+      .argument("<profile>", "Profile id or name")
+      .requiredOption("--to-group <name>", "Destination profile group name or id")
+      .description("Move a profile to another profile group (workspace)"),
+  ).action((profileRef: string, opts: { group?: string; toGroup: string }) => {
+    try {
+      const ctx = getCtx();
+      const existing = resolveProfile(ctx, profileRef, opts.group);
+      const updated = ctx.profileService.move(existing.id, opts.toGroup);
+      const dest = ctx.profileGroupService.resolve(updated.workspaceId);
+      console.log(chalk.green(`✓ Profile moved: ${updated.name}`));
+      console.log(chalk.dim(`  group: ${dest.name}`));
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+  groupOption(
+    profile
+      .command("delete")
+      .argument("<profile>", "Profile id or name")
+      .description("Delete a profile"),
   ).action((profileRef: string, opts: { group?: string }) => {
     try {
       const ctx = getCtx();
@@ -191,8 +210,7 @@ export function registerProfileCommands(program: Command, getCtx: () => AppConte
       const node = forest.groups.find((g) => g.id === ctx.profileService.resolveGroup(groupRef).id);
       console.log(chalk.green("✓ Profiles reordered"));
       for (const p of node?.profiles ?? []) {
-        const active =
-          node?.id === forest.lastActiveGroupId ? forest.lastActiveProfileId : null;
+        const active = node?.id === forest.lastActiveGroupId ? forest.lastActiveProfileId : null;
         console.log(formatProfile(p, active));
       }
       console.log();

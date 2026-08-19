@@ -362,6 +362,7 @@ export const en = {
   "profileGroup.failedDelete": "Failed to delete profile group",
   "profileGroup.failedReorder": "Failed to reorder profile groups",
   "profile.dialog.group": "Profile group",
+  "profile.dialog.groupHint": "Move this profile to another workspace.",
   "profile.search": "Search profiles…",
   "profile.collapseAll": "Collapse all",
   "profile.expandAll": "Expand all",

@@ -353,6 +353,7 @@ export const zh: Record<MessageKey, string> = {
   "profileGroup.failedDelete": "無法刪除 profile 群組",
   "profileGroup.failedReorder": "無法重新排序 profile 群組",
   "profile.dialog.group": "Profile 群組",
+  "profile.dialog.groupHint": "把這個 profile 換到另一個 workspace。",
   "profile.search": "搜尋 profile…",
   "profile.collapseAll": "收合全部",
   "profile.expandAll": "展開全部",
