@@ -30,7 +30,7 @@ The desktop app has **four** top-level modes in the header:
 |---|---|
 | **Terminal** (default) | Profiles sidebar, embedded multi-pane terminals, external launch |
 | **Inventory** | Tabbed dashboard: Overview, Models, Skills, MCP, Config, Doctor, Update, **Usage** |
-| **Tools** | Local utilities (Codec, Crypto, Time, Cron, Regex, JSON, Markdown, YAML ↔ JSON, JWT, UUID, Diff) |
+| **Tools** | Local utilities (Codec, Crypto, Time, Cron, Regex, JSON, Markdown, YAML ↔ JSON, JWT, UUID, Diff, System, Ports) |
 | **AI Flow** | Author, schedule, and run multi-agent `.flow.md` workflows |
 
 Use the header tabs to switch modes at any time. Command palette (`Cmd/Ctrl+K`) can jump to any mode or Inventory / Tools section.
@@ -353,6 +353,8 @@ Open **Inventory → Usage** from the header, or jump via the command palette.
 | **JWT** | Decode / inspect tokens |
 | **UUID** | Generate / validate UUID and NanoID |
 | **Diff** | Side-by-side text compare |
+| **System** | Live cpu, memory, network, and gpu |
+| **Ports** | Who is listening on a port, with optional stop |
 
 Dual-pane Tools layouts adapt with container queries on narrower windows.
 

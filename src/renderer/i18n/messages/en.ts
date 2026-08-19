@@ -1556,6 +1556,58 @@ export const en = {
   "diff.stats": "+{added} −{removed}",
   "diff.error.tooLarge":
     "Each side can be at most {max} lines — shorten the text and try again.",
+
+  // Tools mode — System
+  "tools.tab.system": "System",
+  "system.subtitle": "cpu, memory, network, and gpu on this machine.",
+  "system.meter.cpu": "cpu",
+  "system.meter.memory": "memory",
+  "system.meter.network": "network",
+  "system.meter.gpu": "gpu",
+  "system.meter.down": "down",
+  "system.meter.up": "up",
+  "system.meter.unavailable": "—",
+  "system.error.unavailable": "System stats are not available in this window.",
+  "system.analyze": "Ask AI",
+  "system.analyze.hint":
+    "Claude reads cpu, memory, network, gpu, and listening ports, then writes a short report.",
+  "system.analyze.working": "Analyzing",
+  "system.analyze.workingHint": "Collecting a snapshot, then asking Claude…",
+  "system.analyze.report": "Environment report",
+  "system.analyze.copy": "Copy",
+  "system.analyze.copied": "Copied",
+  "system.analyze.error.noClaude":
+    "Claude CLI is not available. Install it, then try again.",
+  "system.analyze.error.timeout": "The report took too long — try again in a moment.",
+  "system.analyze.error.failed": "Could not write the report. Check that Claude is signed in.",
+
+  // Tools mode — Ports
+  "tools.tab.ports": "Ports",
+  "ports.subtitle":
+    "See which process is listening on a port — look up 3000, then stop it if you need the port.",
+  "ports.port": "Port",
+  "ports.portPlaceholder": "3000, or leave empty for all",
+  "ports.lookup": "Look up",
+  "ports.refresh": "Refresh",
+  "ports.all": "All listeners",
+  "ports.looking": "Looking up…",
+  "ports.count.port": "{count} listening on {port}",
+  "ports.count.all": "{count} listening",
+  "ports.empty.port": "Nothing is listening on port {port}.",
+  "ports.empty.all": "No listening TCP ports were found.",
+  "ports.col.process": "Process",
+  "ports.col.pid": "Pid",
+  "ports.col.proto": "Protocol",
+  "ports.col.address": "Address",
+  "ports.col.action": "Action",
+  "ports.stop": "Stop",
+  "ports.stopping": "Stopping",
+  "ports.stopProtected": "This process cannot be stopped from here.",
+  "ports.killConfirm": "Stop {name} (pid {pid})? Port {port} will be freed.",
+  "ports.error.invalidPort": "Enter a port between 1 and 65535, or leave the field empty.",
+  "ports.error.unavailable": "Port lookup is not available in this window.",
+  "ports.error.listFailed": "Could not list listeners — try refresh.",
+  "ports.error.killFailed": "Could not stop that process. It may have already exited.",
 } as const;
 
 export type MessageKey = keyof typeof en;
