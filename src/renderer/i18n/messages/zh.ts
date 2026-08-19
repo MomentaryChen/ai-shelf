@@ -594,7 +594,7 @@ export const zh: Record<MessageKey, string> = {
   "workspace.prev": "上一個 workspace",
   "workspace.next": "下一個 workspace",
   "workspace.position": "{current} / {total}",
-  "workspace.slideHint": "左右滑動或用箭頭切換 workspace",
+  "workspace.slideHint": "在框內點左側／右側、拖曳或滾輪切換 workspace",
   "pane.dragHint": "拖曳到窗格上／下／左／右，中央為交換",
   "pane.clickChangeCwd": "點擊變更工作目錄",
   "pane.clickPickCwd": "點擊選擇工作目錄",

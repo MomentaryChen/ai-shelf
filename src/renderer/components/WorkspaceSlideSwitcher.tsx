@@ -8,13 +8,13 @@ import {
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
-  type WheelEvent,
 } from "react";
 import { ChevronLeft, ChevronRight, FolderKanban } from "lucide-react";
 import { useLocale } from "../i18n/LocaleProvider";
 import { groupIndexById, stepIndex } from "../utils/workspace-slide";
 
 const SWIPE_PX = 40;
+const CLICK_PX = 8;
 const WHEEL_LOCK_MS = 280;
 const MAX_DOTS = 8;
 
@@ -31,6 +31,10 @@ interface WorkspaceSlideSwitcherProps {
   onGroupChange?: (groupId: string) => void;
 }
 
+function isControlTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("button") != null;
+}
+
 export function WorkspaceSlideSwitcher({
   groups,
   currentGroupId,
@@ -39,6 +43,7 @@ export function WorkspaceSlideSwitcher({
 }: WorkspaceSlideSwitcherProps) {
   const { t } = useLocale();
   const hintId = useId();
+  const boxRef = useRef<HTMLDivElement | null>(null);
   const index = groupIndexById(groups, currentGroupId);
   const current = groups[index];
   const count = Math.max(groups.length, 1);
@@ -80,8 +85,30 @@ export function WorkspaceSlideSwitcher({
     [goToIndex, groups.length, index],
   );
 
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (groups.length < 2 || wheelLock.current) return;
+      const absX = Math.abs(e.deltaX);
+      const absY = Math.abs(e.deltaY);
+      const delta = absX > absY ? e.deltaX : e.deltaY;
+      if (Math.abs(delta) < 8) return;
+      e.preventDefault();
+      e.stopPropagation();
+      wheelLock.current = true;
+      go(delta > 0 ? 1 : -1);
+      window.clearTimeout(wheelTimer.current);
+      wheelTimer.current = window.setTimeout(() => {
+        wheelLock.current = false;
+      }, WHEEL_LOCK_MS);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [go, groups.length]);
+
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || groups.length < 2) return;
+    if (e.button !== 0 || groups.length < 2 || isControlTarget(e.target)) return;
     startX.current = e.clientX;
     setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -95,14 +122,27 @@ export function WorkspaceSlideSwitcher({
     setDragPx(dx);
   };
 
-  const finishDrag = (clientX: number) => {
+  const finishDrag = (e: PointerEvent<HTMLDivElement>) => {
     if (startX.current == null) return;
-    const dx = clientX - startX.current;
+    const dx = e.clientX - startX.current;
     startX.current = null;
     setDragging(false);
     setDragPx(0);
-    if (dx <= -SWIPE_PX) go(1);
-    else if (dx >= SWIPE_PX) go(-1);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    if (dx <= -SWIPE_PX) {
+      go(1);
+      return;
+    }
+    if (dx >= SWIPE_PX) {
+      go(-1);
+      return;
+    }
+    if (Math.abs(dx) > CLICK_PX || isControlTarget(e.target)) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (e.clientX < rect.left + rect.width / 2) go(-1);
+    else go(1);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -119,18 +159,6 @@ export function WorkspaceSlideSwitcher({
       e.preventDefault();
       goToIndex(groups.length - 1);
     }
-  };
-
-  const onWheel = (e: WheelEvent<HTMLDivElement>) => {
-    if (groups.length < 2 || wheelLock.current) return;
-    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || Math.abs(e.deltaX) < 12) return;
-    e.preventDefault();
-    wheelLock.current = true;
-    go(e.deltaX > 0 ? 1 : -1);
-    window.clearTimeout(wheelTimer.current);
-    wheelTimer.current = window.setTimeout(() => {
-      wheelLock.current = false;
-    }, WHEEL_LOCK_MS);
   };
 
   const trackStyle = useMemo(
@@ -166,15 +194,27 @@ export function WorkspaceSlideSwitcher({
 
   return (
     <div
-      className="rounded-lg border border-chrome-border-input bg-chrome-surface px-1 py-1"
+      ref={boxRef}
+      className={`rounded-lg border border-chrome-border-input bg-chrome-surface px-1 py-1 select-none ${
+        groups.length > 1 ? "cursor-grab active:cursor-grabbing" : ""
+      }`}
       role="group"
       aria-label={t("workspace.groupSwitcher")}
       aria-describedby={hintId}
+      title={t("workspace.slideHint")}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={finishDrag}
+      onPointerCancel={() => {
+        startX.current = null;
+        setDragging(false);
+        setDragPx(0);
+      }}
     >
       <div className="flex items-center gap-0.5">
         <SlideArrow direction="prev" disabled={!canPrev} label={t("workspace.prev")} onClick={() => go(-1)} />
         <div
-          className="min-w-0 flex-1 cursor-grab overflow-hidden touch-pan-y select-none active:cursor-grabbing"
+          className="min-w-0 flex-1 overflow-hidden"
           tabIndex={0}
           role="slider"
           aria-orientation="horizontal"
@@ -183,16 +223,6 @@ export function WorkspaceSlideSwitcher({
           aria-valuenow={groups.length === 0 ? 0 : index + 1}
           aria-valuetext={name}
           onKeyDown={onKeyDown}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={(e) => finishDrag(e.clientX)}
-          onPointerCancel={() => {
-            startX.current = null;
-            setDragging(false);
-            setDragPx(0);
-          }}
-          onWheel={onWheel}
-          title={t("workspace.slideHint")}
         >
           <div className="flex" style={trackStyle}>
             {slides.map((group) => (
@@ -225,9 +255,7 @@ export function WorkspaceSlideSwitcher({
             >
               <span
                 className={`block rounded-full transition-all duration-200 ${
-                  i === index
-                    ? "h-1.5 w-3.5 bg-chrome-text"
-                    : "h-1.5 w-1.5 bg-chrome-text-muted/50"
+                  i === index ? "h-1.5 w-3.5 bg-chrome-text" : "h-1.5 w-1.5 bg-chrome-text-muted/50"
                 }`}
               />
             </button>
