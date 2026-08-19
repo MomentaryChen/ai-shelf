@@ -9,9 +9,32 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-08-19
+
+Workspace slide switcher, System and Ports tools, grouped Terminal Settings, and in-app confirm dialogs.
+
 ### Added
 
-- **MIT license file** — Adds the SPDX MIT text at the repo root (and the published CLI package) so GitHub and npm can detect the license the README already declared.
+- **System meters and Ports** — Host CPU/memory/disk meters and a port listener list you can stop from Tools mode.
+- **Workspace slide switcher** — Switch workspaces from the sidebar box instead of a dropdown.
+- **Move profile to another workspace** — Relocate a profile between workspace groups.
+- **Flow run history pagination** — Run history lists 10 items per page.
+- **MIT license file** — SPDX MIT text at the repo root and published CLI package so GitHub and npm can detect the license.
+
+### Changed
+
+- **Terminal Settings categories** — Groups Terminal Settings into a sidebar of categories.
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIFs for the current UI.
+
+### Fixed
+
+- **In-app confirm dialogs** — Replaces native `confirm()` with in-app chrome for busy pane close, stopping a port listener, and remaining prompts.
+- **Gemini quota monitoring fallback** — Falls back to Cloud Monitoring when the Gemini Quota API is denied.
+- **Time now conversion** — Freezes conversion result rows so they do not tick with wall-clock now.
+- **Claude pane launch** — Launches Claude instead of cmd when the pane shows Claude.
+- **Hidden leftover panes** — Hides leftover terminal panes after every session is closed.
+
+[4.3.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.3.0
 
 ## [4.2.0] - 2026-08-05
 
