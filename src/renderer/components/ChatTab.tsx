@@ -17,6 +17,7 @@ import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
+import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
@@ -164,6 +165,7 @@ function ChatTabInner({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
   const [createProfileOpen, setCreateProfileOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [renameGroupOpen, setRenameGroupOpen] = useState(false);
@@ -729,14 +731,8 @@ function ChatTabInner({
     [layout],
   );
 
-  const closePane = useCallback(
-    (paneId: string, opts?: { skipConfirm?: boolean }) => {
-      if (!opts?.skipConfirm) {
-        const status = paneAgentStates[paneId];
-        if (status && isPaneAgentBusy(status)) {
-          if (!confirm(t("pane.closeBusyConfirm"))) return;
-        }
-      }
+  const performClosePane = useCallback(
+    (paneId: string) => {
       if (activeProfile) forgetMinimizedPane(activeProfile.id, paneId);
       setLayout((prev) => {
         if (prev) {
@@ -747,7 +743,21 @@ function ChatTabInner({
       });
       setFocusedPaneId((prev) => (prev === paneId ? null : prev));
     },
-    [activeProfile, forgetMinimizedPane, paneAgentStates, t],
+    [activeProfile, forgetMinimizedPane],
+  );
+
+  const closePane = useCallback(
+    (paneId: string, opts?: { skipConfirm?: boolean }) => {
+      if (!opts?.skipConfirm) {
+        const status = paneAgentStates[paneId];
+        if (status && isPaneAgentBusy(status)) {
+          setBusyClosePaneId(paneId);
+          return;
+        }
+      }
+      performClosePane(paneId);
+    },
+    [paneAgentStates, performClosePane],
   );
 
   const splitPane = useCallback(
@@ -1428,6 +1438,15 @@ function ChatTabInner({
           handleProfileDeleted(profile.id);
           setSettingsProfileId(null);
           await refreshSidebarForest();
+        }}
+      />
+      <BusyPaneCloseDialog
+        open={busyClosePaneId !== null}
+        onCancel={() => setBusyClosePaneId(null)}
+        onConfirm={() => {
+          const paneId = busyClosePaneId;
+          setBusyClosePaneId(null);
+          if (paneId) performClosePane(paneId);
         }}
       />
     </>
