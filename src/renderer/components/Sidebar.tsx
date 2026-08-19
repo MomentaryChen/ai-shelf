@@ -102,6 +102,7 @@ interface SidebarProps {
   onCreateProfile?: (groupId: string) => void;
   onProfileSelect?: (profileId: string) => void;
   onProfileReorder?: (dragProfileId: string, dropProfileId: string) => void;
+  onProfileMoveToGroup?: (profileId: string, targetGroupId: string) => void;
   onProfileSettings?: (profileId: string) => void;
   onProfileOpenFolder?: (profileId: string) => void;
   onProfileAddTerminal?: (profileId: string) => void;
@@ -149,6 +150,7 @@ export function Sidebar({
   onCreateProfile,
   onProfileSelect,
   onProfileReorder,
+  onProfileMoveToGroup,
   onProfileSettings,
   onProfileOpenFolder,
   onProfileAddTerminal,
@@ -168,6 +170,7 @@ export function Sidebar({
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [draggingProfileId, setDraggingProfileId] = useState<string | null>(null);
   const [dragOverProfileId, setDragOverProfileId] = useState<string | null>(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
   const [draggingTerminal, setDraggingTerminal] = useState<{ profileId: string; terminalId: string } | null>(null);
   const [dragOverTerminal, setDragOverTerminal] = useState<{ profileId: string; terminalId: string; zone: "above" | "below" } | null>(null);
   const [query, setQuery] = useState("");
@@ -204,8 +207,7 @@ export function Sidebar({
   const collapsedTerminals = useMemo(() => {
     if (!collapsed) return [];
     const active = profiles.find((p) => p.id === activeProfileId);
-    const fromActive = active?.terminals ?? [];
-    if (fromActive.length > 0) return fromActive.slice(0, 24);
+    if (active) return (active.terminals ?? []).slice(0, 24);
     return profiles.flatMap((p) => p.terminals ?? []).slice(0, 24);
   }, [collapsed, profiles, activeProfileId]);
 
@@ -232,6 +234,40 @@ export function Sidebar({
           collapsed={collapsed}
           onGroupChange={onGroupChange}
         />
+        {draggingProfileId && onProfileMoveToGroup && !collapsed && groups.length > 1 && (
+          <div className="mt-1 space-y-1 rounded-lg border border-chrome-border-input bg-chrome-surface p-1">
+            <div className="px-2 py-1 text-[11px] text-chrome-text-muted">{t("profile.dialog.groupHint")}</div>
+            {groups
+              .filter((group) => group.id !== currentGroup?.id)
+              .map((group) => (
+                <div
+                  key={group.id}
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-chrome-text-muted ${
+                    dragOverGroupId === group.id ? "bg-chrome-hover text-chrome-text ring-2 ring-chrome-ui-accent/35" : ""
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDragOverGroupId(group.id);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverGroupId === group.id) setDragOverGroupId(null);
+                  }}
+                  onDrop={(e) => {
+                    if (!draggingProfileId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onProfileMoveToGroup(draggingProfileId, group.id);
+                    setDraggingProfileId(null);
+                    setDragOverGroupId(null);
+                  }}
+                >
+                  {group.icon}
+                  <span className="truncate">{group.name}</span>
+                </div>
+              ))}
+          </div>
+        )}
         {!collapsed && (
           <div className="mt-1.5 flex items-center gap-1 rounded-md border border-chrome-border-subtle bg-chrome-surface px-1 py-1">
             <IconAction title="New group" onClick={onCreateGroup}>
@@ -422,6 +458,7 @@ export function Sidebar({
                         onDragEnd={() => {
                           setDraggingProfileId(null);
                           setDragOverProfileId(null);
+                          setDragOverGroupId(null);
                         }}
                         onClick={() => onProfileSelect?.(item.id)}
                         className={`flex w-full items-center justify-between gap-2 rounded-lg px-1.5 py-1 text-left text-sm transition-all duration-200 ${

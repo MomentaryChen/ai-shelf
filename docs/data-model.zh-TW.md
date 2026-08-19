@@ -57,6 +57,8 @@ Renderer 主 UI 使用 Profile API：
 
 - `profile-get-tree`、`profile-create`、`profile-update`、`profile-delete`、`profile-reorder`
 
+`profile-update` 可帶 `groupId`，把 profile 換到另一個 profile group（workspace）。版面鍵會跟著新的 `workspaceId:profileId`。
+
 版面持久化仍走內部 group-layout handler（`ws-group-layout-*`），鍵為 `workspaceId:groupId`，等同 Profile 儲存鍵。
 
 舊版 workspace tree IPC（`ws-get-tree`、`ws-workspace-create` 等）保留供 migration，桌面 UI 已不再使用。

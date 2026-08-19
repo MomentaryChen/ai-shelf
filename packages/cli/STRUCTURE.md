@@ -10,6 +10,7 @@ ai-shelf profile-group list|create|rename|delete|reorder
 ai-shelf profile list [--group <name>]
 ai-shelf profile create <name> [--group <name>] [--cwd <path>] [--tool <tool>] [--color <hex>]
 ai-shelf profile update <profile> [--group <name>] [--name] [--cwd] [--tool] [--broadcast|--no-broadcast] [--color]
+ai-shelf profile move <profile> --to-group <name> [--group <source>]
 ai-shelf profile delete <profile> [--group <name>]
 ai-shelf profile reorder <profile...> [--group <name>]
 ai-shelf profile exec <profile> <command...> [--group <name>] [--broadcast] [--session <name>]

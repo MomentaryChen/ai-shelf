@@ -27,22 +27,25 @@ export interface ProfileSettingsPatch {
   broadcastInput: boolean;
   accentColor: string | null;
   savedCommands: SavedCommandSnippet[];
+  groupId: string;
 }
 
 interface Props {
   open: boolean;
   profile: ProfileInfo | null;
+  profileGroups: { id: string; name: string }[];
   availableTools: string[];
   inventoryScanning?: boolean;
   busy?: boolean;
   onClose: () => void;
-  onSave: (profileId: string, patch: ProfileSettingsPatch) => void | Promise<void>;
+  onSave: (profileId: string, patch: ProfileSettingsPatch) => string | void | Promise<string | void>;
   onDelete: (profile: ProfileInfo) => void | Promise<void>;
 }
 
 export function ProfileSettingsDialog({
   open,
   profile,
+  profileGroups,
   availableTools,
   inventoryScanning = false,
   busy = false,
@@ -57,6 +60,8 @@ export function ProfileSettingsDialog({
   const [broadcastInput, setBroadcastInput] = useState(false);
   const [accentColor, setAccentColor] = useState<string | null>(null);
   const [savedCommands, setSavedCommands] = useState<SavedCommandSnippet[]>([]);
+  const [groupId, setGroupId] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const tools = profileToolChoices(availableTools, profile?.defaultTool);
 
@@ -68,6 +73,8 @@ export function ProfileSettingsDialog({
     setBroadcastInput(profile.broadcastInput ?? false);
     setAccentColor(profile.accentColor ?? null);
     setSavedCommands(profile.savedCommands ?? []);
+    setGroupId(profile.workspaceId);
+    setSaveError("");
   }, [open, profile]);
 
   if (!profile) return null;
@@ -79,16 +86,18 @@ export function ProfileSettingsDialog({
     if (picked) setCwd(picked);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    void onSave(profile!.id, {
+    setSaveError("");
+    const error = await onSave(profile!.id, {
       name: trimmedName,
       defaultCwd: cwd.trim(),
       defaultTool: effectiveTool,
       broadcastInput,
       accentColor,
+      groupId: groupId || profile!.workspaceId,
       savedCommands: savedCommands
         .map((s) => ({
           ...s,
@@ -97,6 +106,7 @@ export function ProfileSettingsDialog({
         }))
         .filter((s) => s.name && s.command),
     });
+    if (error) setSaveError(error);
   }
 
   return (
@@ -117,6 +127,27 @@ export function ProfileSettingsDialog({
             placeholder={t("profile.dialog.namePlaceholder")}
             className="border-chrome-border-subtle bg-chrome-bg text-[13px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-hover"
           />
+        </Label>
+
+        <Label className="mb-3 block">
+          <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
+            {t("profile.dialog.group")}
+          </span>
+          <p className="mb-1.5 text-[10px] font-normal text-chrome-text-dim">
+            {t("profile.dialog.groupHint")}
+          </p>
+          <select
+            value={groupId}
+            onChange={(e) => setGroupId(e.target.value)}
+            disabled={busy || profileGroups.length === 0}
+            className="w-full rounded-md border border-chrome-border-subtle bg-chrome-bg px-3 py-2 text-[13px] text-chrome-text focus:border-chrome-border-hover focus:outline-none disabled:opacity-40"
+          >
+            {profileGroups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
         </Label>
 
         <Label className="mb-3 block">
@@ -193,6 +224,8 @@ export function ProfileSettingsDialog({
         </Label>
 
         <SavedCommandsEditor value={savedCommands} onChange={setSavedCommands} disabled={busy} />
+
+        {saveError ? <p className="mb-3 text-[12px] text-fail">{saveError}</p> : null}
 
         <div className="flex items-center justify-between gap-2">
           <Button

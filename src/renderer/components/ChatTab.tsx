@@ -55,6 +55,7 @@ import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   hasProfilePaneDrag,
   readProfilePaneDrag,
+  shouldShowSavedTerminalPreview,
   visiblePanes,
 } from "../terminal/profile-pane-display";
 import { applyAppTheme, useAppThemeRevision } from "../app-theme";
@@ -266,6 +267,7 @@ function ChatTabInner({
     restoreLastProfile,
     discardProfileSessions,
     syncActiveProfile,
+    remapProfileWorkspace,
     getProfileDefaultCwd,
     getProfilePanes,
     getProfileFocusedPaneId,
@@ -401,7 +403,8 @@ function ChatTabInner({
     void refreshSidebarForest();
   }, [refreshSidebarForest, activeProfile?.id]);
 
-  // Keep active profile paneCount in sync locally — avoid full forest IPC on every split/close.
+  // Keep active profile paneCount / saved-terminal preview in sync locally —
+  // avoid full forest IPC on every split/close.
   useEffect(() => {
     if (!activeProfile?.id) return;
     setSidebarForest((prev) => {
@@ -410,9 +413,11 @@ function ChatTabInner({
       const groups = prev.groups.map((g) => ({
         ...g,
         profiles: g.profiles.map((p) => {
-          if (p.id !== activeProfile.id || p.paneCount === panes.length) return p;
+          if (p.id !== activeProfile.id) return p;
+          const nextTerminals = panes.length === 0 ? [] : p.terminals;
+          if (p.paneCount === panes.length && nextTerminals === p.terminals) return p;
           changed = true;
-          return { ...p, paneCount: panes.length };
+          return { ...p, paneCount: panes.length, terminals: nextTerminals };
         }),
       }));
       return changed ? { ...prev, groups } : prev;
@@ -1058,6 +1063,7 @@ function ChatTabInner({
     () =>
       (currentGroup?.profiles ?? []).map((p) => {
         const live = getProfilePanes(p.id);
+        const isActive = p.id === activeProfile?.id;
         const terminals =
           live.length > 0
             ? live.map((pane, idx) => ({
@@ -1067,16 +1073,18 @@ function ChatTabInner({
                 label: paneDisplayLabel(pane),
                 description: pane.cwd || `${toolLabel(pane.tool)} ${idx + 1}`,
                 live: true,
-                minimized: p.id === activeProfile?.id ? isPaneMinimized(p.id, pane.id) : false,
+                minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
               }))
-            : p.terminals.map((terminal, idx) => ({
-                id: `saved-${p.id}-${idx}`,
-                profileId: p.id,
-                tool: terminal.tool,
-                label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
-                description: terminal.cwd,
-                live: false,
-              }));
+            : shouldShowSavedTerminalPreview(live.length, isActive)
+              ? p.terminals.map((terminal, idx) => ({
+                  id: `saved-${p.id}-${idx}`,
+                  profileId: p.id,
+                  tool: terminal.tool,
+                  label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
+                  description: terminal.cwd,
+                  live: false,
+                }))
+              : [];
         return {
           id: p.id,
           name: p.name,
@@ -1088,7 +1096,14 @@ function ChatTabInner({
           terminals,
         };
       }),
-    [currentGroup?.profiles, getProfilePanes, activeProfile?.id, isPaneMinimized],
+    [
+      currentGroup?.profiles,
+      getProfilePanes,
+      activeProfile?.id,
+      isPaneMinimized,
+      layout,
+      minimizedPaneIds,
+    ],
   );
 
   useProfileQuickSwitch({
@@ -1199,6 +1214,30 @@ function ChatTabInner({
             if (!r.success) {
               setSidebarForest(prevForest);
               return;
+            }
+            await refreshSidebarForest();
+          })();
+        }}
+        onProfileMoveToGroup={(profileId, targetGroupId) => {
+          const profile = allProfiles.find((p) => p.id === profileId);
+          if (!profile || profile.workspaceId === targetGroupId) return;
+          void (async () => {
+            if (profile.id === activeProfile?.id) {
+              await flushPersistCurrentProfile();
+            }
+            const r = await window.api.profileUpdate(profileId, { groupId: targetGroupId });
+            if (!r.success) {
+              window.alert(r.error ?? t("profile.failedSave"));
+              return;
+            }
+            if (r.profile) {
+              remapProfileWorkspace(profileId, profile.workspaceId, r.profile.workspaceId);
+              syncActiveProfile(r.profile);
+              if (r.profile.id === activeProfile?.id) {
+                updateSettings({ workingDir: r.profile.defaultCwd?.trim() ?? "" });
+                setBroadcastInput(r.profile.broadcastInput ?? false);
+                setSelectedGroupId(targetGroupId);
+              }
             }
             await refreshSidebarForest();
           })();
@@ -1355,16 +1394,25 @@ function ChatTabInner({
       <ProfileSettingsDialog
         open={settingsProfileId !== null}
         profile={settingsProfile}
+        profileGroups={(sidebarForest?.groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         busy={settingsBusy}
         onClose={() => setSettingsProfileId(null)}
         onSave={async (profileId: string, patch: ProfileSettingsPatch) => {
           setSettingsBusy(true);
+          const previousWorkspaceId = settingsProfile?.workspaceId;
+          if (previousWorkspaceId && patch.groupId && patch.groupId !== previousWorkspaceId) {
+            await flushPersistCurrentProfile();
+          }
           const r = await window.api.profileUpdate(profileId, patch);
           setSettingsBusy(false);
-          if (!r.success) return;
+          if (!r.success) return r.error ?? t("profile.failedSave");
           if (r.profile) {
+            if (previousWorkspaceId && r.profile.workspaceId !== previousWorkspaceId) {
+              remapProfileWorkspace(profileId, previousWorkspaceId, r.profile.workspaceId);
+              setSelectedGroupId(r.profile.workspaceId);
+            }
             syncActiveProfile(r.profile);
             if (r.profile.id === activeProfile?.id) {
               updateSettings({ workingDir: r.profile.defaultCwd?.trim() ?? "" });
@@ -1591,7 +1639,7 @@ function ChatTabInner({
             </div>
           )}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
-          <TerminalStatusBar pane={focusedPane} />
+          <TerminalStatusBar pane={displayLayout ? focusedPane : null} />
         </div>
       </div>
     </TooltipProvider>

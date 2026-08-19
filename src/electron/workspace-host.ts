@@ -1,4 +1,9 @@
-import { bootstrap, type AppContext, type CreateProfileInput, type GroupLayoutSnapshot } from "ai-shelf";
+import {
+  bootstrap,
+  type AppContext,
+  type CreateProfileInput,
+  type GroupLayoutSnapshot,
+} from "ai-shelf";
 import { PREF_ONBOARDING_COMPLETED } from "../shared/onboarding-pref.js";
 
 let ctx: AppContext | null = null;
@@ -54,7 +59,11 @@ export function getGroupLayout(workspaceId: string, groupId: string) {
   return getWorkspaceContext().groupLayoutService.get(workspaceId, groupId);
 }
 
-export function saveGroupLayout(workspaceId: string, groupId: string, snapshot: GroupLayoutSnapshot) {
+export function saveGroupLayout(
+  workspaceId: string,
+  groupId: string,
+  snapshot: GroupLayoutSnapshot,
+) {
   return getWorkspaceContext().groupLayoutService.save(workspaceId, groupId, snapshot);
 }
 
@@ -63,9 +72,7 @@ export function setLastActiveGroup(workspaceId: string, groupId: string) {
 }
 
 export function getOnboardingCompleted(): boolean {
-  return (
-    getWorkspaceContext().groupLayoutService.getPreference(PREF_ONBOARDING_COMPLETED) === "1"
-  );
+  return getWorkspaceContext().groupLayoutService.getPreference(PREF_ONBOARDING_COMPLETED) === "1";
 }
 
 export function setOnboardingCompleted(): void {
@@ -105,8 +112,7 @@ export function createProfile(
   input?: CreateProfileInput & { groupId?: string; groupName?: string },
 ) {
   const ctx = getWorkspaceContext();
-  const groupRef =
-    input?.groupId ?? input?.groupName ?? ctx.profileService.defaultGroupIdOrName();
+  const groupRef = input?.groupId ?? input?.groupName ?? ctx.profileService.defaultGroupIdOrName();
   const { groupId: _g, groupName: _n, ...profileInput } = input ?? {};
   return ctx.profileService.create(groupRef, name, profileInput);
 }
@@ -125,6 +131,7 @@ export function updateProfile(
       command: string;
       broadcast?: boolean;
     }[];
+    groupId?: string;
   },
 ) {
   return getWorkspaceContext().profileService.update(profileId, {
