@@ -1162,6 +1162,17 @@ export function saveFlowRunner(
   }
 }
 
+function listRunIdsForFlow(flowId: string): string[] {
+  initFlowDirs();
+  if (!existsSync(runsDir())) return [];
+  const suffix = `-${flowId}`;
+  return readdirSync(runsDir(), { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.endsWith(suffix))
+    .map((d) => d.name)
+    .sort()
+    .reverse();
+}
+
 export function listRecentRuns(limit = 20): FlowRunState[] {
   initFlowDirs();
   if (!existsSync(runsDir())) return [];
@@ -1180,23 +1191,24 @@ export function listRecentRuns(limit = 20): FlowRunState[] {
   return states;
 }
 
-export function listRunsForFlow(flowId: string, limit = 30): FlowRunState[] {
-  initFlowDirs();
-  if (!existsSync(runsDir())) return [];
-  const suffix = `-${flowId}`;
-  const dirs = readdirSync(runsDir(), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name.endsWith(suffix))
-    .map((d) => d.name)
-    .sort()
-    .reverse()
-    .slice(0, limit);
-
-  const states: FlowRunState[] = [];
-  for (const runId of dirs) {
+export function listRunsPageForFlow(
+  flowId: string,
+  limit = 10,
+  offset = 0,
+): { items: FlowRunState[]; total: number } {
+  const start = Number.isFinite(offset) ? Math.max(0, Math.round(offset)) : 0;
+  const n = Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 10;
+  const ids = listRunIdsForFlow(flowId);
+  const items: FlowRunState[] = [];
+  for (const runId of ids.slice(start, start + n)) {
     const state = getFlowRunState(runId);
-    if (state) states.push(state);
+    if (state) items.push(state);
   }
-  return states;
+  return { items, total: ids.length };
+}
+
+export function listRunsForFlow(flowId: string, limit = 30, offset = 0): FlowRunState[] {
+  return listRunsPageForFlow(flowId, limit, offset).items;
 }
 
 export function getRunEvents(runId: string): FlowRunEvent[] {

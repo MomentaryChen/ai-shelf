@@ -12,6 +12,8 @@ import type {
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
+import type { PortListenerRow } from "../shared/port-listeners.js";
+import type { HostResourceSnapshot } from "../shared/host-env.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
@@ -555,6 +557,8 @@ export interface UsageQuotaWindow {
   usedUsd?: number;
   limitUsd?: number;
   remainingUsd?: number;
+  usedCount?: number;
+  limitCount?: number;
 }
 
 export interface UsageToolSnapshot {
@@ -563,6 +567,7 @@ export interface UsageToolSnapshot {
   status: "ok" | "not_configured" | "unsupported" | "error";
   error?: string;
   authSourceKey?: string;
+  quotaHintKey?: string;
   totalCostUsd?: number;
   totalInputTokens?: number;
   totalOutputTokens?: number;
@@ -880,6 +885,7 @@ export interface ElectronAPI {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      groupId?: string;
     },
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
   profileSetSavedCommands: (
@@ -1050,7 +1056,11 @@ export interface ElectronAPI {
   }>;
   flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
   flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;
-  flowListRunsForFlow: (flowId: string, limit?: number) => Promise<FlowRunState[]>;
+  flowListRunsForFlow: (
+    flowId: string,
+    limit?: number,
+    offset?: number,
+  ) => Promise<{ items: FlowRunState[]; total: number }>;
   flowGetRunEvents: (runId: string) => Promise<FlowRunEvent[]>;
   flowGetConsoleBuffer: (runId: string) => Promise<FlowConsoleBufferSnapshot>;
   flowOpenRunArtifact: (
@@ -1124,6 +1134,21 @@ export interface ElectronAPI {
   ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
   onFlowConsoleChunk: (cb: (chunk: FlowConsoleChunk) => void) => () => void;
+  portsList: (port?: number | null) => Promise<
+    { ok: true; listeners: PortListenerRow[]; port: number | null } | { ok: false; error: string }
+  >;
+  portsKill: (
+    pid: number,
+  ) => Promise<{ ok: true } | { ok: false; error: string; code?: "protected" | "failed" }>;
+  portsAnalyzeEnv: (
+    locale?: "en" | "zh",
+  ) => Promise<
+    | { ok: true; report: string }
+    | { ok: false; error: string; code?: "no-claude" | "timeout" | "failed" }
+  >;
+  portsHostStats: () => Promise<
+    { ok: true; stats: HostResourceSnapshot } | { ok: false; error: string }
+  >;
 }
 
 declare global {

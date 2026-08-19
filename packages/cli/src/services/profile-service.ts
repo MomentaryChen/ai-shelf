@@ -5,14 +5,8 @@ import type { GroupModel } from "../models/group.js";
 import type { GroupLayoutSnapshot, SavedCommandSnippet } from "../models/group-layout.js";
 import { AppError } from "../core/errors/app-error.js";
 import { homedir } from "node:os";
-import {
-  isProfileAccentColor,
-  pickNextProfileAccentColor,
-} from "../models/profile-colors.js";
-import {
-  DEFAULT_PROFILE_GROUP_NAME,
-  type ProfileGroupInfo,
-} from "./profile-group-service.js";
+import { isProfileAccentColor, pickNextProfileAccentColor } from "../models/profile-colors.js";
+import { DEFAULT_PROFILE_GROUP_NAME, type ProfileGroupInfo } from "./profile-group-service.js";
 
 /** @deprecated Use DEFAULT_PROFILE_GROUP_NAME */
 export const PROFILES_WORKSPACE_NAME = DEFAULT_PROFILE_GROUP_NAME;
@@ -59,8 +53,7 @@ export interface CreateProfileInput {
   copyFromProfileId?: string;
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class ProfileService {
   constructor(
@@ -104,8 +97,7 @@ export class ProfileService {
     const legacyWs = this.ensureLegacyWorkspace();
     const mirrorName = this.legacyMirrorName(sourceWorkspaceName, profileName);
     const existing = this.groups.findByName(legacyWs.id, mirrorName);
-    const mirror =
-      existing ?? this.groups.create({ workspace_id: legacyWs.id, name: mirrorName });
+    const mirror = existing ?? this.groups.create({ workspace_id: legacyWs.id, name: mirrorName });
     this.layouts.upsert(mirror.id, legacyWs.id, {
       ...snapshot,
       updatedAt: new Date().toISOString(),
@@ -169,9 +161,7 @@ export class ProfileService {
       return { workspaceId: ws.id, profiles: [], lastActiveProfileId: null };
     }
     const lastActiveProfileId =
-      defaultGroup.id === forest.lastActiveGroupId
-        ? forest.lastActiveProfileId
-        : null;
+      defaultGroup.id === forest.lastActiveGroupId ? forest.lastActiveProfileId : null;
     return {
       workspaceId: defaultGroup.id,
       profiles: defaultGroup.profiles,
@@ -195,14 +185,10 @@ export class ProfileService {
     const group = this.groups.create({ workspace_id: ws.id, name });
     this.eventBus.publish({ type: "GroupCreated", payload: group });
 
-    const cwd =
-      input.defaultCwd ?? source?.defaultCwd ?? ws.root_path ?? homedir();
-    const tool =
-      input.defaultTool ?? source?.defaultTool ?? DEFAULT_PROFILE_TOOL;
-    const broadcastInput =
-      input.broadcastInput ?? source?.broadcastInput ?? false;
-    const accentColor =
-      input.accentColor !== undefined ? input.accentColor : source?.accentColor;
+    const cwd = input.defaultCwd ?? source?.defaultCwd ?? ws.root_path ?? homedir();
+    const tool = input.defaultTool ?? source?.defaultTool ?? DEFAULT_PROFILE_TOOL;
+    const broadcastInput = input.broadcastInput ?? source?.broadcastInput ?? false;
+    const accentColor = input.accentColor !== undefined ? input.accentColor : source?.accentColor;
 
     const existingProfiles = this.groups.listByWorkspace(ws.id);
     const usedColors = existingProfiles.map(
@@ -239,12 +225,26 @@ export class ProfileService {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      groupId?: string;
     },
   ): ProfileInfo {
     const { workspaceId, group } = this.resolve(profileId);
     const ws = this.workspaces.findById(workspaceId)!;
     const previousName = group.name;
     let updatedGroup = group;
+
+    const nextName = patch.name !== undefined ? patch.name.trim() : group.name;
+    if (patch.groupId && patch.groupId !== workspaceId) {
+      const target = this.resolveGroup(patch.groupId);
+      const conflictName = nextName || group.name;
+      const conflict = this.groups.findByName(target.id, conflictName);
+      if (conflict) {
+        throw new AppError(
+          `Profile "${conflictName}" already exists in "${target.name}"`,
+          "PROFILE_EXISTS",
+        );
+      }
+    }
 
     if (patch.name !== undefined) {
       const trimmed = patch.name.trim();
@@ -278,10 +278,8 @@ export class ProfileService {
     }
 
     const prevDefaultCwd = snap.defaultCwd;
-    const nextDefaultCwd =
-      patch.defaultCwd !== undefined ? patch.defaultCwd : snap.defaultCwd;
-    const defaultCwdChanged =
-      patch.defaultCwd !== undefined && patch.defaultCwd !== prevDefaultCwd;
+    const nextDefaultCwd = patch.defaultCwd !== undefined ? patch.defaultCwd : snap.defaultCwd;
+    const defaultCwdChanged = patch.defaultCwd !== undefined && patch.defaultCwd !== prevDefaultCwd;
     const panes = defaultCwdChanged
       ? snap.panes.map((slot) => ({
           ...slot,
@@ -293,12 +291,13 @@ export class ProfileService {
       ...snap,
       defaultCwd: nextDefaultCwd,
       defaultTool:
-        patch.defaultTool !== undefined ? patch.defaultTool : (snap.defaultTool ?? DEFAULT_PROFILE_TOOL),
+        patch.defaultTool !== undefined
+          ? patch.defaultTool
+          : (snap.defaultTool ?? DEFAULT_PROFILE_TOOL),
       broadcastInput:
         patch.broadcastInput !== undefined ? patch.broadcastInput : (snap.broadcastInput ?? false),
       accentColor: nextAccent,
-      savedCommands:
-        patch.savedCommands !== undefined ? patch.savedCommands : snap.savedCommands,
+      savedCommands: patch.savedCommands !== undefined ? patch.savedCommands : snap.savedCommands,
       panes,
       updatedAt: new Date().toISOString(),
     };
@@ -310,7 +309,45 @@ export class ProfileService {
       this.upsertLegacyMirror(ws.name, updatedGroup.name, next);
     }
 
+    if (patch.groupId && patch.groupId !== workspaceId) {
+      return this.move(profileId, patch.groupId);
+    }
+
     return this.toProfileInfo(updatedGroup, workspaceId);
+  }
+
+  move(profileId: string, targetGroupIdOrName: string): ProfileInfo {
+    const { workspaceId, group } = this.resolve(profileId);
+    const sourceWs = this.workspaces.findById(workspaceId);
+    const target = this.resolveGroup(targetGroupIdOrName);
+    if (target.id === workspaceId) {
+      return this.toProfileInfo(group, workspaceId);
+    }
+
+    const conflict = this.groups.findByName(target.id, group.name);
+    if (conflict) {
+      throw new AppError(
+        `Profile "${group.name}" already exists in "${target.name}"`,
+        "PROFILE_EXISTS",
+      );
+    }
+
+    const lastKey = this.layouts.getLastActiveGroupKey();
+    const wasGlobalActive = lastKey === `${workspaceId}:${profileId}`;
+
+    const updated = this.groups.moveToWorkspace(profileId, target.id);
+    this.layouts.clearLastActiveForProfile(workspaceId, profileId);
+    if (wasGlobalActive) {
+      this.layouts.setLastActiveGroupKey(target.id, profileId);
+    }
+
+    const snap = this.layouts.findByGroupId(profileId);
+    if (sourceWs && snap) {
+      this.deleteLegacyMirror(sourceWs.name, updated.name);
+      this.upsertLegacyMirror(target.name, updated.name, snap);
+    }
+
+    return this.toProfileInfo(updated, target.id);
   }
 
   setSavedCommands(profileId: string, savedCommands: SavedCommandSnippet[]): ProfileInfo {

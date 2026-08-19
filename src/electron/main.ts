@@ -138,6 +138,7 @@ import { registerSyncHandlers } from "./sync-handlers.js";
 import { getRendererPageUrl, startRendererServer, stopRendererServer } from "./renderer-server.js";
 import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
+import { registerPortsHandlers } from "./ports-handlers.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
 app.commandLine.appendSwitch(
@@ -170,7 +171,7 @@ import {
   listActiveFlowRuns,
   listFlowPromptLogs,
   listRecentRuns,
-  listRunsForFlow,
+  listRunsPageForFlow,
   onFlowRunState,
   onFlowConsoleChunk,
   getFlowConsoleBuffer,
@@ -205,6 +206,7 @@ registerAuthHandlers();
 registerSettingsHandlers();
 registerSyncHandlers();
 registerUsageHandlers();
+registerPortsHandlers();
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
@@ -507,9 +509,9 @@ function createSettingsWindow() {
     return;
   }
   settingsWindow = new BrowserWindow({
-    width: 520,
+    width: 680,
     height: 760,
-    minWidth: 440,
+    minWidth: 560,
     minHeight: 560,
     title: formatWindowTitle("Terminal Settings"),
     icon: APP_ICON,
@@ -2227,6 +2229,7 @@ ipcMain.handle("profile-update", (
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: { id: string; name: string; command: string; broadcast?: boolean }[];
+      groupId?: string;
     },
   ) => {
     try {
@@ -2586,10 +2589,12 @@ ipcMain.handle("flow-list-recent-runs", (_event, limit: unknown) => {
   return listRecentRuns(n);
 });
 
-ipcMain.handle("flow-list-runs-for-flow", (_event, flowId: unknown, limit: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) return [];
-  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 30;
-  return listRunsForFlow(flowId.trim(), n);
+ipcMain.handle("flow-list-runs-for-flow", (_event, flowId: unknown, limit: unknown, offset: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) return { items: [], total: 0 };
+  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 10;
+  const o = typeof offset === "number" && Number.isFinite(offset) ? Math.max(0, Math.round(offset)) : 0;
+  const id = flowId.trim();
+  return listRunsPageForFlow(id, n, o);
 });
 
 ipcMain.handle("flow-get-console-buffer", (_event, runId: unknown) => {

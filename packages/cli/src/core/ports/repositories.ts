@@ -19,6 +19,7 @@ export interface GroupRepositoryPort {
   findByName(workspaceId: string, name: string): GroupModel | null;
   rename(workspaceId: string, groupId: string, name: string): GroupModel;
   reorder(workspaceId: string, orderedGroupIds: string[]): void;
+  moveToWorkspace(groupId: string, targetWorkspaceId: string): GroupModel;
   deleteByName(workspaceId: string, name: string): boolean;
 }
 

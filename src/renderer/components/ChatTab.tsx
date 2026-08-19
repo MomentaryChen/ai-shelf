@@ -17,6 +17,8 @@ import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
+import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
@@ -55,6 +57,7 @@ import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   hasProfilePaneDrag,
   readProfilePaneDrag,
+  shouldShowSavedTerminalPreview,
   visiblePanes,
 } from "../terminal/profile-pane-display";
 import { applyAppTheme, useAppThemeRevision } from "../app-theme";
@@ -78,6 +81,7 @@ import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 import {
   PLAIN_SHELL_TOOL_ID,
   profileToolLabel,
+  resolveEmbeddedPtyShell,
   resolveLaunchTool,
   toolIdsFromInventory,
 } from "../utils/available-tools";
@@ -162,6 +166,11 @@ function ChatTabInner({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
+  const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const [pendingDeleteProfile, setPendingDeleteProfile] = useState<ProfileInfo | null>(null);
   const [createProfileOpen, setCreateProfileOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [renameGroupOpen, setRenameGroupOpen] = useState(false);
@@ -220,15 +229,11 @@ function ChatTabInner({
 
   const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
-    // Prefer explicit embedded-shell setting; fall back to Windows external-terminal mapping.
-    const shell =
-      settings.preferredShell !== "auto"
-        ? settings.preferredShell
-        : settings.externalTerminal === "pwsh" ||
-            settings.externalTerminal === "powershell" ||
-            settings.externalTerminal === "cmd"
-          ? settings.externalTerminal
-          : "auto";
+    const shell = resolveEmbeddedPtyShell(
+      settings.preferredShell,
+      settings.externalTerminal,
+      tool,
+    );
     const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs, shell);
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
@@ -266,6 +271,7 @@ function ChatTabInner({
     restoreLastProfile,
     discardProfileSessions,
     syncActiveProfile,
+    remapProfileWorkspace,
     getProfileDefaultCwd,
     getProfilePanes,
     getProfileFocusedPaneId,
@@ -401,7 +407,8 @@ function ChatTabInner({
     void refreshSidebarForest();
   }, [refreshSidebarForest, activeProfile?.id]);
 
-  // Keep active profile paneCount in sync locally — avoid full forest IPC on every split/close.
+  // Keep active profile paneCount / saved-terminal preview in sync locally —
+  // avoid full forest IPC on every split/close.
   useEffect(() => {
     if (!activeProfile?.id) return;
     setSidebarForest((prev) => {
@@ -410,9 +417,11 @@ function ChatTabInner({
       const groups = prev.groups.map((g) => ({
         ...g,
         profiles: g.profiles.map((p) => {
-          if (p.id !== activeProfile.id || p.paneCount === panes.length) return p;
+          if (p.id !== activeProfile.id) return p;
+          const nextTerminals = panes.length === 0 ? [] : p.terminals;
+          if (p.paneCount === panes.length && nextTerminals === p.terminals) return p;
           changed = true;
-          return { ...p, paneCount: panes.length };
+          return { ...p, paneCount: panes.length, terminals: nextTerminals };
         }),
       }));
       return changed ? { ...prev, groups } : prev;
@@ -727,14 +736,8 @@ function ChatTabInner({
     [layout],
   );
 
-  const closePane = useCallback(
-    (paneId: string, opts?: { skipConfirm?: boolean }) => {
-      if (!opts?.skipConfirm) {
-        const status = paneAgentStates[paneId];
-        if (status && isPaneAgentBusy(status)) {
-          if (!confirm(t("pane.closeBusyConfirm"))) return;
-        }
-      }
+  const performClosePane = useCallback(
+    (paneId: string) => {
       if (activeProfile) forgetMinimizedPane(activeProfile.id, paneId);
       setLayout((prev) => {
         if (prev) {
@@ -745,7 +748,21 @@ function ChatTabInner({
       });
       setFocusedPaneId((prev) => (prev === paneId ? null : prev));
     },
-    [activeProfile, forgetMinimizedPane, paneAgentStates, t],
+    [activeProfile, forgetMinimizedPane],
+  );
+
+  const closePane = useCallback(
+    (paneId: string, opts?: { skipConfirm?: boolean }) => {
+      if (!opts?.skipConfirm) {
+        const status = paneAgentStates[paneId];
+        if (status && isPaneAgentBusy(status)) {
+          setBusyClosePaneId(paneId);
+          return;
+        }
+      }
+      performClosePane(paneId);
+    },
+    [paneAgentStates, performClosePane],
   );
 
   const splitPane = useCallback(
@@ -1058,6 +1075,7 @@ function ChatTabInner({
     () =>
       (currentGroup?.profiles ?? []).map((p) => {
         const live = getProfilePanes(p.id);
+        const isActive = p.id === activeProfile?.id;
         const terminals =
           live.length > 0
             ? live.map((pane, idx) => ({
@@ -1067,16 +1085,18 @@ function ChatTabInner({
                 label: paneDisplayLabel(pane),
                 description: pane.cwd || `${toolLabel(pane.tool)} ${idx + 1}`,
                 live: true,
-                minimized: p.id === activeProfile?.id ? isPaneMinimized(p.id, pane.id) : false,
+                minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
               }))
-            : p.terminals.map((terminal, idx) => ({
-                id: `saved-${p.id}-${idx}`,
-                profileId: p.id,
-                tool: terminal.tool,
-                label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
-                description: terminal.cwd,
-                live: false,
-              }));
+            : shouldShowSavedTerminalPreview(live.length, isActive)
+              ? p.terminals.map((terminal, idx) => ({
+                  id: `saved-${p.id}-${idx}`,
+                  profileId: p.id,
+                  tool: terminal.tool,
+                  label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
+                  description: terminal.cwd,
+                  live: false,
+                }))
+              : [];
         return {
           id: p.id,
           name: p.name,
@@ -1088,7 +1108,14 @@ function ChatTabInner({
           terminals,
         };
       }),
-    [currentGroup?.profiles, getProfilePanes, activeProfile?.id, isPaneMinimized],
+    [
+      currentGroup?.profiles,
+      getProfilePanes,
+      activeProfile?.id,
+      isPaneMinimized,
+      layout,
+      minimizedPaneIds,
+    ],
   );
 
   useProfileQuickSwitch({
@@ -1163,12 +1190,7 @@ function ChatTabInner({
         onDeleteGroup={(groupId) => {
           const group = sidebarForest?.groups.find((g) => g.id === groupId);
           if (!group) return;
-          const ok = confirm(t("profileGroup.deleteConfirm", { name: group.name }));
-          if (!ok) return;
-          void (async () => {
-            await window.api.profileGroupDelete(groupId);
-            await refreshSidebarForest();
-          })();
+          setPendingDeleteGroup({ id: group.id, name: group.name });
         }}
         onCreateProfile={(groupId) => {
           setSelectedGroupId(groupId);
@@ -1199,6 +1221,30 @@ function ChatTabInner({
             if (!r.success) {
               setSidebarForest(prevForest);
               return;
+            }
+            await refreshSidebarForest();
+          })();
+        }}
+        onProfileMoveToGroup={(profileId, targetGroupId) => {
+          const profile = allProfiles.find((p) => p.id === profileId);
+          if (!profile || profile.workspaceId === targetGroupId) return;
+          void (async () => {
+            if (profile.id === activeProfile?.id) {
+              await flushPersistCurrentProfile();
+            }
+            const r = await window.api.profileUpdate(profileId, { groupId: targetGroupId });
+            if (!r.success) {
+              window.alert(r.error ?? t("profile.failedSave"));
+              return;
+            }
+            if (r.profile) {
+              remapProfileWorkspace(profileId, profile.workspaceId, r.profile.workspaceId);
+              syncActiveProfile(r.profile);
+              if (r.profile.id === activeProfile?.id) {
+                updateSettings({ workingDir: r.profile.defaultCwd?.trim() ?? "" });
+                setBroadcastInput(r.profile.broadcastInput ?? false);
+                setSelectedGroupId(targetGroupId);
+              }
             }
             await refreshSidebarForest();
           })();
@@ -1355,16 +1401,25 @@ function ChatTabInner({
       <ProfileSettingsDialog
         open={settingsProfileId !== null}
         profile={settingsProfile}
+        profileGroups={(sidebarForest?.groups ?? []).map((g) => ({ id: g.id, name: g.name }))}
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         busy={settingsBusy}
         onClose={() => setSettingsProfileId(null)}
         onSave={async (profileId: string, patch: ProfileSettingsPatch) => {
           setSettingsBusy(true);
+          const previousWorkspaceId = settingsProfile?.workspaceId;
+          if (previousWorkspaceId && patch.groupId && patch.groupId !== previousWorkspaceId) {
+            await flushPersistCurrentProfile();
+          }
           const r = await window.api.profileUpdate(profileId, patch);
           setSettingsBusy(false);
-          if (!r.success) return;
+          if (!r.success) return r.error ?? t("profile.failedSave");
           if (r.profile) {
+            if (previousWorkspaceId && r.profile.workspaceId !== previousWorkspaceId) {
+              remapProfileWorkspace(profileId, previousWorkspaceId, r.profile.workspaceId);
+              setSelectedGroupId(r.profile.workspaceId);
+            }
             syncActiveProfile(r.profile);
             if (r.profile.id === activeProfile?.id) {
               updateSettings({ workingDir: r.profile.defaultCwd?.trim() ?? "" });
@@ -1374,15 +1429,55 @@ function ChatTabInner({
           setSettingsProfileId(null);
           await refreshSidebarForest();
         }}
-        onDelete={async (profile) => {
-          const ok = confirm(t("profile.deleteConfirm", { name: profile.name }));
-          if (!ok) return;
-          setSettingsBusy(true);
-          await window.api.profileDelete(profile.id);
-          setSettingsBusy(false);
-          handleProfileDeleted(profile.id);
-          setSettingsProfileId(null);
-          await refreshSidebarForest();
+        onDelete={(profile) => {
+          setPendingDeleteProfile(profile);
+        }}
+      />
+      <BusyPaneCloseDialog
+        open={busyClosePaneId !== null}
+        onCancel={() => setBusyClosePaneId(null)}
+        onConfirm={() => {
+          const paneId = busyClosePaneId;
+          setBusyClosePaneId(null);
+          if (paneId) performClosePane(paneId);
+        }}
+      />
+      <ConfirmDialog
+        open={pendingDeleteGroup !== null}
+        title={t("profileGroup.deleteTitle")}
+        description={t("profileGroup.deleteConfirm", { name: pendingDeleteGroup?.name ?? "" })}
+        confirmLabel={t("profileGroup.deleteAction")}
+        confirmVariant="destructive"
+        onCancel={() => setPendingDeleteGroup(null)}
+        onConfirm={() => {
+          const group = pendingDeleteGroup;
+          setPendingDeleteGroup(null);
+          if (!group) return;
+          void (async () => {
+            await window.api.profileGroupDelete(group.id);
+            await refreshSidebarForest();
+          })();
+        }}
+      />
+      <ConfirmDialog
+        open={pendingDeleteProfile !== null}
+        title={t("profile.deleteTitle")}
+        description={t("profile.deleteConfirm", { name: pendingDeleteProfile?.name ?? "" })}
+        confirmLabel={t("profile.deleteAction")}
+        confirmVariant="destructive"
+        onCancel={() => setPendingDeleteProfile(null)}
+        onConfirm={() => {
+          const profile = pendingDeleteProfile;
+          setPendingDeleteProfile(null);
+          if (!profile) return;
+          void (async () => {
+            setSettingsBusy(true);
+            await window.api.profileDelete(profile.id);
+            setSettingsBusy(false);
+            handleProfileDeleted(profile.id);
+            setSettingsProfileId(null);
+            await refreshSidebarForest();
+          })();
         }}
       />
     </>
@@ -1591,7 +1686,7 @@ function ChatTabInner({
             </div>
           )}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
-          <TerminalStatusBar pane={focusedPane} />
+          <TerminalStatusBar pane={displayLayout ? focusedPane : null} />
         </div>
       </div>
     </TooltipProvider>

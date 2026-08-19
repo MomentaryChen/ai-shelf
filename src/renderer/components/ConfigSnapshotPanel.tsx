@@ -3,6 +3,7 @@ import type { ConfigSnapshotDiffResult, ConfigSnapshotSummary } from "../types";
 import { Card } from "./Card";
 import { Badge } from "./Badge";
 import { DataTable, Td } from "./DataTable";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useLocale } from "../i18n/LocaleProvider";
 
 function formatWhen(iso: string): string {
@@ -30,6 +31,9 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
   const [diffB, setDiffB] = useState("");
   const [diffResult, setDiffResult] = useState<ConfigSnapshotDiffResult | null>(null);
   const [showUnchanged, setShowUnchanged] = useState(false);
+  const [pendingSnapshot, setPendingSnapshot] = useState<
+    { kind: "restore" | "delete"; id: string } | null
+  >(null);
 
   const refresh = useCallback(async () => {
     const res = await window.api.configSnapshotList();
@@ -76,22 +80,28 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
       }
     });
 
-  const restore = (id: string) =>
-    run(`restore-${id}`, async () => {
-      if (!window.confirm(t("configSnapshot.restoreConfirm"))) return;
-      const res = await window.api.configSnapshotRestore(id);
-      if (res.success) {
-        setMessage({ kind: "ok", text: t("configSnapshot.restored") });
-        onRestored?.();
-      } else {
-        setMessage({ kind: "err", text: res.error ?? t("configSnapshot.error") });
-      }
-    });
+  const restore = (id: string) => setPendingSnapshot({ kind: "restore", id });
 
-  const remove = (id: string) =>
-    run(`delete-${id}`, async () => {
-      if (!window.confirm(t("configSnapshot.deleteConfirm"))) return;
-      const res = await window.api.configSnapshotDelete(id);
+  const remove = (id: string) => setPendingSnapshot({ kind: "delete", id });
+
+  const confirmPendingSnapshot = () => {
+    const pending = pendingSnapshot;
+    setPendingSnapshot(null);
+    if (!pending) return;
+    if (pending.kind === "restore") {
+      void run(`restore-${pending.id}`, async () => {
+        const res = await window.api.configSnapshotRestore(pending.id);
+        if (res.success) {
+          setMessage({ kind: "ok", text: t("configSnapshot.restored") });
+          onRestored?.();
+        } else {
+          setMessage({ kind: "err", text: res.error ?? t("configSnapshot.error") });
+        }
+      });
+      return;
+    }
+    void run(`delete-${pending.id}`, async () => {
+      const res = await window.api.configSnapshotDelete(pending.id);
       if (res.success) {
         await refresh();
         setDiffResult(null);
@@ -99,6 +109,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
         setMessage({ kind: "err", text: res.error ?? t("configSnapshot.error") });
       }
     });
+  };
 
   const exportBundle = (id: string) =>
     run(`export-${id}`, async () => {
@@ -139,6 +150,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
     diffResult?.items.filter((item) => showUnchanged || item.status !== "unchanged") ?? [];
 
   return (
+    <>
     <Card className="mb-4" title={t("configSnapshot.title")}>
       <p className="mb-3 text-[13px] leading-snug text-text-secondary">{t("configSnapshot.hint")}</p>
 
@@ -299,5 +311,27 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
         </p>
       )}
     </Card>
+    <ConfirmDialog
+      open={pendingSnapshot !== null}
+      title={
+        pendingSnapshot?.kind === "delete"
+          ? t("configSnapshot.deleteTitle")
+          : t("configSnapshot.restoreTitle")
+      }
+      description={
+        pendingSnapshot?.kind === "delete"
+          ? t("configSnapshot.deleteConfirm")
+          : t("configSnapshot.restoreConfirm")
+      }
+      confirmLabel={
+        pendingSnapshot?.kind === "delete"
+          ? t("configSnapshot.delete")
+          : t("configSnapshot.restore")
+      }
+      confirmVariant={pendingSnapshot?.kind === "delete" ? "destructive" : "chromeSolid"}
+      onCancel={() => setPendingSnapshot(null)}
+      onConfirm={confirmPendingSnapshot}
+    />
+    </>
   );
 }

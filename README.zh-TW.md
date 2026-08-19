@@ -8,7 +8,7 @@
 
 [English](README.md) · [Changelog](CHANGELOG.md)
 
-**v4.2.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
+**v4.3.0** — pnpm monorepo，包含 Electron 桌面應用、輕量清單 CLI（`ai`）與終端機 Profile 管理 CLI（`ai-shelf`）。**Profile** 為桌面與 CLI 共用的主資料模型 — 見 [docs/data-model.md](docs/data-model.md)。
 
 ---
 
@@ -51,7 +51,7 @@
 - **四種模式** — **Terminal**（預設）· **Inventory** · **Tools** · **AI Flow**
 - **Terminal** — Profile 側欄、內嵌多窗格 xterm.js + node-pty、廣播輸入、外部啟動
 - **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage**（花費／預算）
-- **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、YAML ↔ JSON、JWT、UUID、Diff
+- **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、YAML ↔ JSON、JWT、UUID、Diff、System、Ports
 - **AI Flow** — 撰寫、排程與執行多代理 `.flow.md` 工作流（範本、對話撰寫、執行紀錄）
 - **Profile 側欄** — 建立 / 重新命名 / 刪除 Profile；每個 Profile 的分割版面存入 SQLite
 - **外部啟動** — Windows 上為 Windows Terminal / PowerShell / CMD；macOS／Linux 依 `$SHELL`（bash / zsh / fish / sh）
@@ -223,6 +223,7 @@ ai update self
 ai-shelf profile list
 ai-shelf profile create <名稱> [--cwd <路徑>] [--tool <工具>] [--color <hex>]
 ai-shelf profile update <profile> [--name] [--cwd] [--tool] [--broadcast|--no-broadcast]
+ai-shelf profile move <profile> --to-group <群組>
 ai-shelf profile delete <profile>
 ai-shelf profile reorder <profile...>
 ai-shelf profile exec <profile> <指令...> [--broadcast] [--session <名稱>]
@@ -312,4 +313,4 @@ ai-shelf/                 # 根 workspace（Electron + 清單 CLI）
 
 ## 授權條款
 
-MIT
+[MIT](LICENSE)

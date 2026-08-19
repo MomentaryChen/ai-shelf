@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { APP_THEME_OPTIONS, applyAppTheme } from "../app-theme";
 import { applyImportedLocalStorage, collectLocalStorageForBackup } from "../backup-storage";
 import {
@@ -37,8 +38,19 @@ import { syncMainProcessFromSettings } from "../system-tray-sync";
 import { useHealthMonitor } from "../hooks/useHealthMonitor";
 import { installPlatform } from "../utils/install-platform";
 
+export const SETTINGS_CATEGORIES = [
+  { id: "appearance", labelKey: "settings.category.appearance" },
+  { id: "terminal", labelKey: "settings.category.terminal" },
+  { id: "shortcuts", labelKey: "settings.category.shortcuts" },
+  { id: "alerts", labelKey: "settings.category.alerts" },
+  { id: "backup", labelKey: "settings.category.backup" },
+] as const;
+
+export type SettingsCategoryId = (typeof SETTINGS_CATEGORIES)[number]["id"];
+
 interface ChatSettingsPanelProps {
   compact?: boolean;
+  category?: SettingsCategoryId;
 }
 
 const TERMINAL_LABEL_KEYS: Record<ExternalTerminal, MessageKey> = {
@@ -116,7 +128,7 @@ function dirOptionLabel(dir: string): string {
   return `${name} — ${dir}`;
 }
 
-export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
+export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPanelProps) {
   const { localePreference, setLocale, t } = useLocale();
   const { state: healthState, setPrefs: setHealthPrefs } = useHealthMonitor();
   const [settings, setSettings] = useState<ChatSettings>(loadSettings);
@@ -124,6 +136,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   const [backupMessage, setBackupMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null,
   );
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false);
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -190,8 +203,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
   }
 
   async function handleImportBackup() {
-    if (!window.confirm(t("settings.importConfirm"))) return;
-
+    setImportConfirmOpen(false);
     setBackupMessage(null);
     setBackupBusy("import");
     try {
@@ -220,8 +232,13 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
     ? "mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary"
     : "mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-secondary";
 
+  const show = (id: SettingsCategoryId) => category === undefined || category === id;
+
   return (
+    <>
     <div className={compact ? "flex flex-col gap-5" : "flex flex-col gap-6"}>
+      {show("appearance") && (
+        <>
       {/* Language */}
       <div>
         <p className={sectionTitle}>{t("settings.language")}</p>
@@ -267,7 +284,11 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
         </ToggleGroup>
         <p className="mt-1.5 text-[11px] text-text-tertiary">{t("settings.themeHint")}</p>
       </div>
+        </>
+      )}
 
+      {show("terminal") && (
+        <>
       {/* Working directory */}
       <div>
         <p className={sectionTitle}>{t("settings.workingDir")}</p>
@@ -364,7 +385,11 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           onChange={(toolLaunchArgs) => updateSettings({ toolLaunchArgs })}
         />
       </div>
+        </>
+      )}
 
+      {show("appearance") && (
+        <>
       {/* Terminal background */}
       <div>
         <p className={sectionTitle}>{t("settings.terminalBg")}</p>
@@ -418,7 +443,11 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           </Label>
         </div>
       </div>
+        </>
+      )}
 
+      {show("shortcuts") && (
+        <>
       {/* Pane shortcuts */}
       <div>
         <p className={sectionTitle}>{t("settings.paneShortcut.title")}</p>
@@ -431,7 +460,11 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           onChange={(paneShortcuts) => updateSettings({ paneShortcuts })}
         />
       </div>
+        </>
+      )}
 
+      {show("appearance") && (
+        <>
       {/* Terminal display */}
       <div>
         <p className={sectionTitle}>{t("settings.terminalDisplay")}</p>
@@ -610,7 +643,11 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           </Label>
         </div>
       </div>
+        </>
+      )}
 
+      {show("alerts") && (
+        <>
       {/* Environment health monitor */}
       <div>
         <p className={sectionTitle}>{t("healthMonitor.settingsTitle")}</p>
@@ -784,7 +821,11 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           )}
         </div>
       </div>
+        </>
+      )}
 
+      {show("backup") && (
+        <>
       {/* Data backup & restore */}
       <div>
         <p className={sectionTitle}>{t("settings.backup")}</p>
@@ -801,7 +842,7 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => void handleImportBackup()}
+            onClick={() => setImportConfirmOpen(true)}
             disabled={backupBusy !== null}
           >
             {backupBusy === "import" ? "…" : t("settings.importBackup")}
@@ -817,6 +858,17 @@ export function ChatSettingsPanel({ compact = false }: ChatSettingsPanelProps) {
           </p>
         )}
       </div>
+        </>
+      )}
     </div>
+    <ConfirmDialog
+      open={importConfirmOpen}
+      title={t("settings.importTitle")}
+      description={t("settings.importConfirm")}
+      confirmLabel={t("settings.importAction")}
+      onCancel={() => setImportConfirmOpen(false)}
+      onConfirm={() => void handleImportBackup()}
+    />
+    </>
   );
 }
