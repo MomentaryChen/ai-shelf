@@ -51,7 +51,7 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 - **Four modes** — **Terminal** (default) · **Inventory** · **Tools** · **AI Flow**
 - **Terminal** — profiles sidebar, embedded multi-pane xterm.js + node-pty, broadcast input, external launch
 - **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage** (spend / budgets)
-- **Tools** — everyday utilities: Codec, Crypto, Time, Cron, Regex, JSON, Markdown, YAML ↔ JSON, JWT, UUID, Diff
+- **Tools** — everyday utilities: Codec, Crypto, Time, Cron, Regex, JSON, Markdown, YAML ↔ JSON, JWT, UUID, Diff, System, Ports
 - **AI Flow** — author, schedule, and run multi-agent `.flow.md` workflows (templates, chat authoring, run history)
 - **Profiles sidebar** — create/rename/delete profiles; each profile stores split-pane layout in SQLite
 - **External launch** — Windows Terminal / PowerShell / CMD on Windows; `$SHELL` (bash / zsh / fish / sh) on macOS and Linux

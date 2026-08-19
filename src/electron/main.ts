@@ -138,6 +138,7 @@ import { registerSyncHandlers } from "./sync-handlers.js";
 import { getRendererPageUrl, startRendererServer, stopRendererServer } from "./renderer-server.js";
 import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
+import { registerPortsHandlers } from "./ports-handlers.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
 app.commandLine.appendSwitch(
@@ -205,6 +206,7 @@ registerAuthHandlers();
 registerSettingsHandlers();
 registerSyncHandlers();
 registerUsageHandlers();
+registerPortsHandlers();
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
