@@ -99,6 +99,9 @@ const PortsToolsTab = lazy(() =>
 const SystemToolsTab = lazy(() =>
   import("./components/SystemToolsTab").then((m) => ({ default: m.SystemToolsTab })),
 );
+const WslToolsTab = lazy(() =>
+  import("./components/WslToolsTab").then((m) => ({ default: m.WslToolsTab })),
+);
 const AppUpdateModal = lazy(() =>
   import("./components/AppUpdateModal").then((m) => ({ default: m.AppUpdateModal })),
 );
@@ -137,7 +140,8 @@ type ToolId =
   | "uuid"
   | "diff"
   | "system"
-  | "ports";
+  | "ports"
+  | "wsl";
 
 const EMPTY_COMMANDS: Command[] = [];
 
@@ -248,6 +252,7 @@ const TOOL_ICONS: Record<ToolId, string> = {
   diff: "≠",
   system: "💻",
   ports: "🔌",
+  wsl: "🐧",
 };
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
@@ -264,6 +269,7 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   diff: "tools.tab.diff",
   system: "tools.tab.system",
   ports: "tools.tab.ports",
+  wsl: "tools.tab.wsl",
 };
 
 const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
@@ -841,6 +847,7 @@ export function App() {
                   {activeTool === "diff" && <DiffToolsTab />}
                   {activeTool === "system" && <SystemToolsTab active={appMode === "tools"} />}
                   {activeTool === "ports" && <PortsToolsTab active={appMode === "tools"} />}
+                  {activeTool === "wsl" && <WslToolsTab active={appMode === "tools"} />}
                 </Suspense>
               </ViewTransition>
             </div>

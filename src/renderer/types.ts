@@ -1149,6 +1149,28 @@ export interface ElectronAPI {
   portsHostStats: () => Promise<
     { ok: true; stats: HostResourceSnapshot } | { ok: false; error: string }
   >;
+  wslListDistros: () => Promise<
+    | { ok: true; distros: WslDistroRow[]; platformSupported: true }
+    | {
+        ok: false;
+        error: string;
+        code?: "unsupported" | "missing" | "failed";
+        platformSupported: boolean;
+      }
+  >;
+  wslDistroIp: (
+    distro: string,
+  ) => Promise<
+    | { ok: true; ip: string; distro: string }
+    | { ok: false; error: string; code?: "unsupported" | "missing" | "failed" | "invalid" }
+  >;
+}
+
+export type WslDistroRow = {
+  name: string;
+  state: string;
+  version: string;
+  isDefault: boolean;
 }
 
 declare global {

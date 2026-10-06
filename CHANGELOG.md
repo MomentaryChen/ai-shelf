@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **WSL tools** — Tools mode panel for Windows ↔ WSL path conversion (drive, `/mnt`, `\\wsl$`), distro list / IP via `wsl.exe`, and copyable everyday commands.
+
 ## [4.3.0] - 2026-08-19
 
 Workspace slide switcher, System and Ports tools, grouped Terminal Settings, and in-app confirm dialogs.
