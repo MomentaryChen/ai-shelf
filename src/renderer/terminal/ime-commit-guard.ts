@@ -8,10 +8,18 @@
  *
  * The drop has no repro that survives a debugger (timing), which is why the
  * earlier delivery-path attempts missed. This guard:
- *   1. Snapshots composition text on compositionupdate / compositionend.
- *   2. On blur, if a finalize is pending, restores textarea.value after
+ *   1. Remembers where each composition starts in xterm's helper textarea,
+ *      which keeps earlier commits until the next blur.
+ *   2. On blur inside a pending finalize, restores textarea.value after
  *      xterm's clearer so the scheduled finalize still sees the commit.
- *   3. As a backstop, if onData never carried the commit, injects it once.
+ *   3. As a backstop, if that blur still left onData without the commit,
+ *      injects it once.
+ *
+ * It never injects outside that window. Without a blur xterm delivers the
+ * commit itself (including the Enter path, which sends before compositionend),
+ * and a blur *before* compositionend is an OS cancel: IMEs such as Zhuyin keep
+ * their buffer and re-offer it on refocus, so injecting it would type the
+ * sentence twice.
  *
  * Position pinning stays in `./xterm-ime-anchor`; this only owns delivery.
  * Pure state helpers below are unit-tested without a DOM.
@@ -21,32 +29,44 @@ import type { Terminal } from "@xterm/xterm";
 
 export type ImeCommitGuardState = {
   composing: boolean;
+  /** Blur arrived mid-composition; the matching compositionend is not a commit. */
+  canceledByBlur: boolean;
+  /** Textarea index where the current composition began. */
+  compositionStart: number;
   expectingFinalize: boolean;
+  blurredDuringFinalize: boolean;
+  /** This composition's text only — never earlier commits left in the textarea. */
   pendingCommit: string;
+  /** Full textarea value seen at blur capture, for xterm's positional slice. */
+  restoreValue: string;
   sentSinceFinalize: boolean;
 };
 
 export function createImeCommitGuardState(): ImeCommitGuardState {
   return {
     composing: false,
+    canceledByBlur: false,
+    compositionStart: 0,
     expectingFinalize: false,
+    blurredDuringFinalize: false,
     pendingCommit: "",
+    restoreValue: "",
     sentSinceFinalize: false,
   };
 }
 
-function remember(state: ImeCommitGuardState, text: string): void {
-  if (text) state.pendingCommit = text;
-}
-
-export function noteCompositionStart(state: ImeCommitGuardState): void {
-  state.composing = true;
+function resetFinalize(state: ImeCommitGuardState): void {
+  state.expectingFinalize = false;
+  state.blurredDuringFinalize = false;
   state.pendingCommit = "";
+  state.restoreValue = "";
   state.sentSinceFinalize = false;
 }
 
-export function noteCompositionUpdate(state: ImeCommitGuardState, data: string): void {
-  remember(state, data);
+export function noteCompositionStart(state: ImeCommitGuardState, start: number): void {
+  state.composing = true;
+  state.canceledByBlur = false;
+  state.compositionStart = Math.max(0, start);
 }
 
 export function noteCompositionEnd(
@@ -54,22 +74,21 @@ export function noteCompositionEnd(
   textareaValue: string,
   data: string,
 ): void {
+  const canceled = state.canceledByBlur || !state.composing;
   state.composing = false;
-  remember(state, textareaValue || data || state.pendingCommit);
+  state.canceledByBlur = false;
+  resetFinalize(state);
+  if (canceled) return;
+  state.pendingCommit = textareaValue.slice(state.compositionStart) || data;
   state.expectingFinalize = true;
-  state.sentSinceFinalize = false;
 }
 
 /** Capture-phase blur: snapshot before xterm clears the textarea. */
 export function noteBlurCapture(state: ImeCommitGuardState, textareaValue: string): void {
-  if (!(state.composing || state.expectingFinalize)) return;
-  remember(state, textareaValue || state.pendingCommit);
-  // A blur without compositionend is an OS cancel — drop the composing flag so
-  // a later blur does not keep treating stale textarea text as a commit.
-  if (!state.expectingFinalize) {
-    state.composing = false;
-    state.pendingCommit = "";
-  }
+  if (state.composing) state.canceledByBlur = true;
+  if (!state.expectingFinalize) return;
+  state.blurredDuringFinalize = true;
+  state.restoreValue = textareaValue;
 }
 
 /**
@@ -77,30 +96,30 @@ export function noteBlurCapture(state: ImeCommitGuardState, textareaValue: strin
  * there is nothing to restore.
  */
 export function restoreValueAfterBlur(state: ImeCommitGuardState): string | null {
-  if (!state.expectingFinalize || !state.pendingCommit) return null;
-  return state.pendingCommit;
+  if (!state.expectingFinalize || !state.blurredDuringFinalize) return null;
+  if (!state.restoreValue || !state.pendingCommit) return null;
+  return state.restoreValue;
 }
 
 /** Watch xterm onData during the finalize window so we do not double-inject. */
 export function noteCommitDelivered(state: ImeCommitGuardState, data: string): void {
-  if (!state.expectingFinalize || !state.pendingCommit) return;
+  if (!data || !state.expectingFinalize || !state.pendingCommit) return;
   if (data.includes(state.pendingCommit) || state.pendingCommit.includes(data)) {
     state.sentSinceFinalize = true;
   }
 }
 
 /**
- * After the finalize delay: text to inject once if xterm dropped it, else null.
- * Clears the finalize window either way.
+ * After the finalize delay: text to inject once if a blur made xterm drop it,
+ * else null. Clears the finalize window either way.
  */
 export function takeFinalizeRescue(state: ImeCommitGuardState): string | null {
-  const commit = state.pendingCommit;
-  const alreadySent = state.sentSinceFinalize;
-  state.expectingFinalize = false;
-  state.pendingCommit = "";
-  state.sentSinceFinalize = false;
-  if (!commit || alreadySent) return null;
-  return commit;
+  const rescue =
+    state.blurredDuringFinalize && !state.sentSinceFinalize && state.pendingCommit
+      ? state.pendingCommit
+      : null;
+  resetFinalize(state);
+  return rescue;
 }
 
 export type AttachImeCommitGuardOptions = {
@@ -126,12 +145,12 @@ export function attachImeCommitGuard(
 
   const onCompositionStart = (ev: Event) => {
     if (!fromTextarea(ev)) return;
-    noteCompositionStart(state);
-  };
-
-  const onCompositionUpdate = (ev: Event) => {
-    if (!fromTextarea(ev)) return;
-    noteCompositionUpdate(state, (ev as CompositionEvent).data ?? "");
+    // Same anchor xterm's CompositionHelper slices from.
+    const start = Math.min(
+      textarea.selectionStart ?? textarea.value.length,
+      textarea.selectionEnd ?? textarea.value.length,
+    );
+    noteCompositionStart(state, start);
   };
 
   // Target-phase on the textarea, registered after xterm.open(), so this runs
@@ -172,7 +191,6 @@ export function attachImeCommitGuard(
   });
 
   root.addEventListener("compositionstart", onCompositionStart, true);
-  root.addEventListener("compositionupdate", onCompositionUpdate, true);
   textarea.addEventListener("compositionend", onCompositionEnd);
   textarea.addEventListener("blur", onBlurCapture, true);
   textarea.addEventListener("blur", onBlurBubble, false);
@@ -181,7 +199,6 @@ export function attachImeCommitGuard(
     window.clearTimeout(finalizeTimer);
     dataDisposable.dispose();
     root.removeEventListener("compositionstart", onCompositionStart, true);
-    root.removeEventListener("compositionupdate", onCompositionUpdate, true);
     textarea.removeEventListener("compositionend", onCompositionEnd);
     textarea.removeEventListener("blur", onBlurCapture, true);
     textarea.removeEventListener("blur", onBlurBubble, false);
