@@ -12,7 +12,8 @@ How maintainers ship **AI Shelf** desktop builds and how users install them on W
 - Prefer GitHub Actions for packaged builds (`release-windows` / `release-mac` / `release-linux`). Local packaging needs the matching OS (`pnpm dist:win` on Windows, `pnpm dist:mac` on macOS, `pnpm dist:linux` on Linux).
 - **ffmpeg** on `PATH` when running `pnpm gen:docs-assets` locally (GIF step; Windows: `choco install ffmpeg` or [ffmpeg builds](https://www.gyan.dev/ffmpeg/builds/))
 - Git tag `vX.Y.Z` must match the release version (e.g. tag `v2.0.0` ↔ `2.0.0`). CI runs [scripts/sync-version-from-tag.mjs](../scripts/sync-version-from-tag.mjs) so root and `packages/cli` `version` fields align with the tag before build/publish.
-- **npm:** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation token recommended for CI). Without it, the `publish-npm` job fails; desktop installer jobs still run.
+- **npm (preferred):** [Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) on the `ai-shelf` package — GitHub user `MomentaryChen`, repo `ai-shelf`, workflow filename `release.yml` (no path). Allows CI to publish via OIDC (`id-token: write`); no long-lived token required.
+- **npm (fallback):** GitHub repo secret **`NPM_TOKEN`** — [npm access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **Publish** (Automation / granular with publish on `ai-shelf`). Without Trusted Publishing **or** a valid token, `publish-npm` fails; desktop installer jobs still run.
 
 ### Branch flow
 
@@ -63,13 +64,43 @@ git push origin v1.0.0
 5. Confirm the **release description** matches **[CHANGELOG.md](../CHANGELOG.md)** for that version (CI builds it via [scripts/release-notes.mjs](../scripts/release-notes.mjs))
 6. Optionally tweak wording on GitHub only for hotfixes — then mirror edits back into `CHANGELOG.md` so they stay aligned
 
-#### GitHub secret: `NPM_TOKEN`
+#### Preferred: npm Trusted Publishing (OIDC)
 
-1. npm → **Access Tokens** → **Generate Token** → type **Granular** or **Classic** with publish rights for package `ai-shelf`
-2. GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
-3. Name: `NPM_TOKEN`, value: the token
+Avoids expired/revoked tokens. On [npmjs.com/package/ai-shelf](https://www.npmjs.com/package/ai-shelf) → **Settings** → **Trusted Publisher**:
+
+| Field | Value |
+|-------|-------|
+| Provider | GitHub Actions |
+| Organization or user | `MomentaryChen` |
+| Repository | `ai-shelf` |
+| Workflow filename | `release.yml` (filename only, not `.github/workflows/…`) |
+| Allowed actions | allow **`npm publish`** |
+
+Save, then complete a successful publish within **2 days** so npm binds the config. Workflow already has `permissions.id-token: write`. After Trusted Publishing works, you may remove `NPM_TOKEN` and optionally restrict token-based publishing in package settings.
+
+#### Fallback: GitHub secret `NPM_TOKEN`
+
+1. npm → **Access Tokens** → **Generate Token** → **Automation** (or granular with publish on `ai-shelf`)
+2. GitHub repo → **Settings** → **Secrets and variables** → **Actions** → create/update **`NPM_TOKEN`**
+3. Re-run the failed **publish-npm** job (or push a new tag)
+
+Granular tokens expire; Automation tokens do not. Prefer Trusted Publishing for CI.
 
 First publish: ensure the package name `ai-shelf` is available on npm (or change `packages/cli/package.json` `name` / scope before tagging).
+
+#### Troubleshooting: `E404` on `PUT https://registry.npmjs.org/ai-shelf`
+
+npm often returns **404 Not Found** for unauthorized publishes (missing, expired, or wrong-scope token) — even when the package already exists. Check:
+
+1. `npm view ai-shelf version` — if this works, the package exists; the failure is auth, not “name not found”
+2. Rotate or restore **`NPM_TOKEN`**, **or** configure Trusted Publishing as above
+3. Re-run **Actions → Release → publish-npm** for that tag (desktop assets can already be on the GitHub Release)
+
+Do **not** retag the same version solely for npm. After fixing auth:
+
+1. **Re-run** the failed **publish-npm** job on the existing Release workflow run, **or**
+2. **Actions → Release → Run workflow** with `npm_version` set (e.g. `4.3.1`) to publish CLI only from the latest workflow on the default branch, **or**
+3. Locally: `npm publish --access public` from `packages/cli` after `npm login`
 
 ### Release page vs changelog
 

@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Fixed
+
+- **npm publish CI** — Treat misleading `E404` on publish as auth failure; support OIDC Trusted Publishing, verify `NPM_TOKEN` before publish, and allow npm-only republish via workflow dispatch.
+
 ## [4.3.1] - 2026-10-07
 
 Compact Warp-style profile sidebar, WSL tools, steadier terminal attach/IME, and workspace slide cycling.
