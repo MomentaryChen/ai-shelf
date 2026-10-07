@@ -9,35 +9,15 @@ import {
   useTransition,
 } from "react";
 import {
-  BadgeCheck,
-  Braces,
-  Brain,
-  CalendarClock,
-  ChartColumn,
-  Clock3,
   Compass,
-  Cpu,
-  FileCode2,
   FileText,
-  Fingerprint,
-  GitCompare,
-  Hash,
-  KeyRound,
-  Keyboard,
-  LayoutDashboard,
   Monitor,
-  Network,
   Package,
   Plug,
   RefreshCw,
-  Regex,
-  Settings,
-  SquareTerminal,
   Stethoscope,
-  Workflow,
   Wrench,
   Zap,
-  type LucideIcon,
 } from "lucide-react";
 import { Spinner } from "./components/Spinner";
 import {
@@ -236,19 +216,19 @@ function buildGlobalCommands(
 
   return [...configCommands, ...skillCommands, ...mcpCommands];
 }
-const TAB_ICONS: Record<TabId, LucideIcon> = {
-  overview: LayoutDashboard,
-  models: Brain,
-  skills: Zap,
-  mcp: Plug,
-  config: Settings,
-  doctor: Stethoscope,
-  update: RefreshCw,
-  usage: ChartColumn,
+const TAB_ICONS: Record<TabId, string> = {
+  overview: "📋",
+  models: "🧠",
+  skills: "⚡",
+  mcp: "🔌",
+  config: "⚙️",
+  doctor: "🩺",
+  update: "🔄",
+  usage: "📊",
 };
 
-function navIcon(Icon: LucideIcon) {
-  return <Icon aria-hidden className="h-4 w-4" strokeWidth={1.75} />;
+function navEmoji(glyph: string) {
+  return <span className="text-[14px] leading-none">{glyph}</span>;
 }
 
 const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
@@ -265,26 +245,26 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
 const TAB_IDS = Object.keys(TAB_LABEL_KEYS) as TabId[];
 const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
   id,
-  icon: navIcon(TAB_ICONS[id]),
+  icon: navEmoji(TAB_ICONS[id]),
   labelKey: TAB_LABEL_KEYS[id],
 }));
 
-const TOOL_ICONS: Record<ToolId, LucideIcon> = {
-  codec: Hash,
-  crypto: KeyRound,
-  time: Clock3,
-  cron: CalendarClock,
-  regex: Regex,
-  json: Braces,
-  markdown: FileText,
-  mermaid: Workflow,
-  yaml: FileCode2,
-  jwt: BadgeCheck,
-  uuid: Fingerprint,
-  diff: GitCompare,
-  system: Cpu,
-  ports: Network,
-  wsl: SquareTerminal,
+const TOOL_ICONS: Record<ToolId, string> = {
+  codec: "🔐",
+  crypto: "🗝️",
+  time: "🕒",
+  cron: "⏰",
+  regex: "🔤",
+  json: "{}",
+  markdown: "📝",
+  mermaid: "🧜",
+  yaml: "📄",
+  jwt: "🪪",
+  uuid: "🆔",
+  diff: "≠",
+  system: "💻",
+  ports: "🔌",
+  wsl: "🐧",
 };
 
 /** Rail order — grouped so related tools sit together. */
@@ -338,7 +318,7 @@ const TOOL_KEYWORDS: Record<ToolId, string> = {
 const TOOLS: NavItem<ToolId>[] = TOOL_GROUPS.flatMap(({ groupKey, ids }) =>
   ids.map((id) => ({
     id,
-    icon: navIcon(TOOL_ICONS[id]),
+    icon: navEmoji(TOOL_ICONS[id]),
     labelKey: TOOL_LABEL_KEYS[id],
     groupKey,
     keywords: TOOL_KEYWORDS[id],
@@ -568,7 +548,7 @@ export function App() {
         id: "show-shortcuts",
         title: t("cmd.action.shortcuts"),
         group: t("cmd.group.actions"),
-        icon: <Keyboard className="h-4 w-4" />,
+        icon: "⌨️",
         keywords: "keyboard shortcuts cheatsheet help",
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
@@ -622,7 +602,7 @@ export function App() {
         id: "show-shortcuts",
         title: t("cmd.action.shortcuts"),
         group: t("cmd.group.actions"),
-        icon: <Keyboard className="h-4 w-4" />,
+        icon: "⌨️",
         keywords: "keyboard shortcuts cheatsheet help",
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
@@ -668,7 +648,7 @@ export function App() {
         id: "show-shortcuts",
         title: t("cmd.action.shortcuts"),
         group: t("cmd.group.actions"),
-        icon: <Keyboard className="h-4 w-4" />,
+        icon: "⌨️",
         keywords: "keyboard shortcuts cheatsheet help",
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
