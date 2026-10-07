@@ -12,7 +12,7 @@ const toggleGroupItemVariants = cva(
         default: "px-4 py-2",
         sm: "px-3.5 py-2",
         compact: "rounded-[5px] px-2.5 py-1 text-[12px] data-[state=on]:shadow-card",
-        chrome: "rounded-[5px] px-2.5 py-0.5 text-[11px] data-[state=on]:bg-bg-card data-[state=on]:font-medium data-[state=on]:text-text-primary data-[state=on]:shadow-card",
+        chrome: "gap-1.5 rounded-md px-2.5 py-1 text-[12px] data-[state=on]:bg-bg-card data-[state=on]:font-medium data-[state=on]:text-text-primary data-[state=on]:shadow-card",
       },
     },
     defaultVariants: {
