@@ -331,23 +331,24 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
         )}
       </div>
 
-      {/* Terminal preference */}
-      <div>
-        <p className={sectionTitle}>{t("settings.externalTerminal")}</p>
-        <ToggleGroup
-          type="single"
-          value={settings.externalTerminal}
-          onValueChange={(value) => {
-            if (value) updateSettings({ externalTerminal: value as ExternalTerminal });
-          }}
-        >
-          {TERMINAL_OPTIONS.map((opt) => (
-            <ToggleGroupItem key={opt.value} value={opt.value}>
-              {t(TERMINAL_LABEL_KEYS[opt.value])}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
+      {installPlatform() === "win32" && (
+        <div>
+          <p className={sectionTitle}>{t("settings.externalTerminal")}</p>
+          <ToggleGroup
+            type="single"
+            value={settings.externalTerminal}
+            onValueChange={(value) => {
+              if (value) updateSettings({ externalTerminal: value as ExternalTerminal });
+            }}
+          >
+            {TERMINAL_OPTIONS.map((opt) => (
+              <ToggleGroupItem key={opt.value} value={opt.value}>
+                {t(TERMINAL_LABEL_KEYS[opt.value])}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+      )}
 
       {/* Embedded PTY shell preference */}
       <div>

@@ -180,7 +180,7 @@ test("terminal mode demo GIF for README", async () => {
     await switchToTerminal(page);
     await frames.pause("terminal-home", 4, 350);
 
-    await page.getByTitle("New profile").click();
+    await page.getByTitle(/New profile|新增 profile/i).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await frames.pause("create-dialog", 3, 350);

@@ -50,6 +50,24 @@ export function resolveLaunchTool(tool: string | undefined, available: string[])
 }
 
 /**
+ * `resolveLaunchTool`, but a CLI the finished inventory scan reports as not
+ * installed opens a plain shell. Tools missing from inventory (scan pending)
+ * are kept, per `resolveLaunchTool`.
+ */
+export function resolveInstalledLaunchTool(
+  tool: string | undefined,
+  data: readonly Pick<ProviderEntry, "tool" | "available">[],
+): string {
+  const resolved = resolveLaunchTool(
+    tool,
+    data.filter((e) => e.available).map((e) => e.tool),
+  );
+  if (isPlainShellTool(resolved)) return resolved;
+  const entry = data.find((e) => e.tool === resolved);
+  return entry && !entry.available ? PLAIN_SHELL_TOOL_ID : resolved;
+}
+
+/**
  * Shell preference passed to PTY spawn.
  * Interactive (plain shell) panes honor cmd / external-terminal mapping.
  * AI CLI panes never force cmd — that host always exists, so npm shims never

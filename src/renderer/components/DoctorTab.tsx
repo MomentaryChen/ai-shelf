@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, Plug, Stethoscope, XCircle } from "lucide-
 import type { DoctorResult, McpPingResult, ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
-import { Badge, InstallStatusBadge } from "./Badge";
+import { Badge } from "./Badge";
 import { Button } from "@/components/ui/button";
 import { ToolNameCell } from "./ToolNameCell";
 import { InventorySectionHeader } from "./InventorySection";
@@ -111,9 +111,7 @@ function DoctorCards({
         className={installedCardClass(available)}
         title={<ToolNameCell entry={entry} />}
         trailing={
-          !available ? (
-            <InstallStatusBadge available={false} />
-          ) : r ? (
+          !available ? undefined : r ? (
             <Badge
               text={t("inventory.doctor.passed", { pass: passCount, total })}
               variant={allPass ? "ok" : "warn"}

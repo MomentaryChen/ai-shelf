@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { Monitor, Terminal, FolderOpen, Loader2, Hand } from "lucide-react";
+import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { Monitor, Terminal, FolderOpen, Loader2, Hand, SquareTerminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,7 +31,7 @@ import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
 import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
-import { formatProfileQuickSwitchLabels } from "../profile-quick-switch";
+import { formatProfileQuickSwitchLabels, modLabel } from "../profile-quick-switch";
 import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import {
@@ -40,6 +40,7 @@ import {
 } from "../terminal/pane-key-bindings";
 import {
   collectPanes,
+  equalizeRunAroundPane,
   findPane,
   mapPanesInTree,
   removePaneFromTree,
@@ -50,7 +51,12 @@ import {
   type PaneInfo,
   type SplitDirection,
 } from "../terminal/split-tree";
-import { normalizePaneTitle, paneDisplayLabel } from "../utils/pane-label";
+import {
+  normalizePaneTitle,
+  paneDisplayLabel,
+  paneDisplayLabels,
+  paneToolLabel,
+} from "../utils/pane-label";
 import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
@@ -67,7 +73,6 @@ import {
   profileTopBarLabelStyle,
 } from "../utils/profile-colors";
 import {
-  TERMINAL_OPTIONS,
   getAppBg,
   isAppThemeTerminalBg,
   bumpDirHistory,
@@ -75,29 +80,21 @@ import {
   saveSettings,
   subscribeSettingsChanges,
   type ChatSettings,
-  type ExternalTerminal,
 } from "../chat-settings";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 import {
   PLAIN_SHELL_TOOL_ID,
+  isPlainShellTool,
   profileToolLabel,
   resolveEmbeddedPtyShell,
+  resolveInstalledLaunchTool,
   resolveLaunchTool,
   toolIdsFromInventory,
 } from "../utils/available-tools";
 import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
-import type { MessageKey } from "../i18n/messages/en";
 import type { Command } from "./CommandPalette";
 import { useTerminalCommands } from "../hooks/useTerminalCommands";
-
-const TERMINAL_LABEL_KEYS: Record<ExternalTerminal, MessageKey> = {
-  auto: "terminal.auto",
-  wt: "terminal.wt",
-  pwsh: "terminal.pwsh",
-  powershell: "terminal.powershell",
-  cmd: "terminal.cmd",
-};
 
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
 const SIDEBAR_COLLAPSED_KEY = "ai-inventory-sidebar-collapsed";
@@ -186,6 +183,10 @@ function ChatTabInner({
   const lastActiveByGroupRef = useRef<Record<string, string>>({});
 
   const panes = layout ? collectPanes(layout) : [];
+  const paneLabels = useMemo(
+    () => paneDisplayLabels(layout ? collectPanes(layout) : []),
+    [layout],
+  );
   const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
 
   useEffect(() => {
@@ -553,7 +554,7 @@ function ChatTabInner({
         if (!prev) return { kind: "pane", pane };
         const targetId = splitTargetId ?? focusedPaneId ?? collectPanes(prev)[0]?.id;
         if (!targetId) return { kind: "pane", pane };
-        return splitPaneInTree(prev, targetId, direction, pane);
+        return equalizeRunAroundPane(splitPaneInTree(prev, targetId, direction, pane), pane.id);
       });
       setFocusedPaneId(pane.id);
       if (activeProfile) {
@@ -706,10 +707,7 @@ function ChatTabInner({
       const picked = await window.api.pickFolder(cwdHint?.trim() || resolveCwd() || undefined);
       if (!picked) return;
       recordDirHistory(picked);
-      const tool = resolveLaunchTool(
-        activeProfile?.defaultTool ?? availableTools[0],
-        availableTools,
-      );
+      const tool = resolveInstalledLaunchTool(activeProfile?.defaultTool ?? availableTools[0], data);
       const created = await addPane(tool, picked);
       if (!created) {
         setTerminalError((prev) => prev ?? t("chat.err.cannotOpen"));
@@ -723,6 +721,7 @@ function ChatTabInner({
       recordDirHistory,
       activeProfile?.defaultTool,
       availableTools,
+      data,
       addPane,
     ],
   );
@@ -916,7 +915,7 @@ function ChatTabInner({
       }
       const cwd = profile.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(
-        resolveLaunchTool(profile.defaultTool, availableTools),
+        resolveInstalledLaunchTool(profile.defaultTool, data),
         cwd || undefined,
       );
       if (!created) {
@@ -1052,7 +1051,11 @@ function ChatTabInner({
   }
 
   const sidebarGroups = useMemo(
-    () => (sidebarForest?.groups ?? []).map((g) => ({ id: g.id, name: g.name })),
+    () => (sidebarForest?.groups ?? []).map((g) => ({
+        id: g.id,
+        name: g.name,
+        profileCount: g.profiles.length,
+      })),
     [sidebarForest],
   );
   const currentGroupId =
@@ -1075,6 +1078,7 @@ function ChatTabInner({
     () =>
       (currentGroup?.profiles ?? []).map((p) => {
         const live = getProfilePanes(p.id);
+        const liveLabels = paneDisplayLabels(live);
         const isActive = p.id === activeProfile?.id;
         const terminals =
           live.length > 0
@@ -1082,8 +1086,8 @@ function ChatTabInner({
                 id: pane.id,
                 profileId: p.id,
                 tool: pane.tool,
-                label: paneDisplayLabel(pane),
-                description: pane.cwd || `${toolLabel(pane.tool)} ${idx + 1}`,
+                label: liveLabels[pane.id] ?? paneDisplayLabel(pane),
+                description: pane.cwd || `${paneToolLabel(pane.tool)} ${idx + 1}`,
                 live: true,
                 minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
               }))
@@ -1092,7 +1096,7 @@ function ChatTabInner({
                   id: `saved-${p.id}-${idx}`,
                   profileId: p.id,
                   tool: terminal.tool,
-                  label: terminal.title?.trim() || `${toolLabel(terminal.tool)} ${idx + 1}`,
+                  label: terminal.title?.trim() || `${paneToolLabel(terminal.tool)} ${idx + 1}`,
                   description: terminal.cwd,
                   live: false,
                 }))
@@ -1100,7 +1104,9 @@ function ChatTabInner({
         return {
           id: p.id,
           name: p.name,
-          defaultTool: p.defaultTool,
+          defaultTool: isPlainShellTool(resolveInstalledLaunchTool(p.defaultTool, data))
+            ? undefined
+            : p.defaultTool,
           accentColor: p.accentColor,
           terminalCount: terminals.length,
           broadcastInput: p.broadcastInput,
@@ -1115,6 +1121,7 @@ function ChatTabInner({
       isPaneMinimized,
       layout,
       minimizedPaneIds,
+      data,
     ],
   );
 
@@ -1492,8 +1499,6 @@ function ChatTabInner({
       canAddPane={canAddPane}
       broadcastInput={broadcastInput}
       restoring={profileBusy || restoring}
-      externalTerminal={settings.externalTerminal}
-      onExternalTerminalChange={(v) => updateSettings({ externalTerminal: v })}
       onAddPane={(tool) => void addPane(tool)}
       onOpenFolder={() => void openFolderPane()}
       available={data.filter((e) => e.available)}
@@ -1504,6 +1509,7 @@ function ChatTabInner({
     />
   );
 
+  const emptyStateTool = resolveInstalledLaunchTool(activeProfile?.defaultTool, data);
   const terminalArea = layout ? (
     <div
       className={`relative flex min-h-0 flex-1 flex-col overflow-hidden p-1.5 ${
@@ -1528,6 +1534,7 @@ function ChatTabInner({
         broadcastActive={broadcastActive}
         broadcastPaneCount={panes.length}
         paneAgentStates={paneAgentStates}
+        paneLabels={paneLabels}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
           else setFocusedPaneId(paneId);
@@ -1604,29 +1611,82 @@ function ChatTabInner({
   ) : (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-8 py-6">
       {activeProfile ? (
-        <div className="rounded-lg border border-chrome-border-subtle bg-chrome-surface px-4 py-3 text-[13px] text-chrome-text-muted">
-          Profile <span className="text-chrome-accent-text">{profileLabel}</span>
-          {restoring || profileBusy ? (
-            <span className="ml-2">{t("chat.restoring")}</span>
-          ) : (
-            <span className="ml-2">{t("chat.restorePaneHint", { max: maxPanes })}</span>
-          )}
-          {terminalError && (
-            <p className="mt-2 text-[12px] text-fail">{terminalError}</p>
-          )}
-          <p className="mt-2 text-[11px] text-chrome-text-dim">{t("chat.shortcutHint", paneShortcutLabels)}</p>
-          <p className="mt-1 text-[11px] text-chrome-text-dim">
-            {t("chat.profileShortcutHint", paneShortcutLabels)}
-          </p>
-          <p className="mt-1 text-[11px] text-chrome-text-dim">{t("chat.debugHint")}</p>
-          <button
-            type="button"
-            onClick={openShortcutCheatsheet}
-            className="mt-2 text-[11px] text-chrome-accent-text underline-offset-2 hover:underline"
-          >
-            {t("shortcuts.openLink")}
-          </button>
-        </div>
+        <EmptyState
+          tone="chrome"
+          bordered
+          icon={
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-chrome-ui-accent-soft">
+              <SquareTerminal aria-hidden className="h-7 w-7 text-chrome-ui-accent" />
+            </span>
+          }
+          title={t("chat.emptyPanes.title", { profile: profileLabel ?? activeProfile.name })}
+          description={
+            restoring || profileBusy ? (
+              t("chat.restoring")
+            ) : (
+              <>
+                {t("chat.emptyPanes.desc", { max: maxPanes })}
+                {terminalError && (
+                  <span className="mt-2 block text-[12px] text-fail">{terminalError}</span>
+                )}
+              </>
+            )
+          }
+          action={
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="chromeSolid"
+                  disabled={!canAddPane || restoring || profileBusy}
+                  onClick={() => void addPane(emptyStateTool)}
+                >
+                  {isPlainShellTool(emptyStateTool) ? (
+                    <SquareTerminal aria-hidden />
+                  ) : (
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/90">
+                      <ToolLogo tool={emptyStateTool} size={12} />
+                    </span>
+                  )}
+                  {isPlainShellTool(emptyStateTool)
+                    ? t("chat.emptyPanes.openShell")
+                    : t("chat.emptyPanes.openTool", { tool: toolLabel(emptyStateTool) })}
+                </Button>
+                <Button
+                  variant="chromeOutline"
+                  disabled={!canAddPane || restoring || profileBusy}
+                  onClick={() => void openFolderPane()}
+                  title={t("chat.pickFolderPane")}
+                >
+                  <FolderOpen />
+                  {t("chat.emptyPanes.pickFolder")}
+                </Button>
+              </div>
+              <dl className="grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1.5 text-[12px] text-chrome-text-muted">
+                {[
+                  { keys: paneShortcutLabels.splitRight, label: t("shortcuts.pane.splitHorizontal") },
+                  { keys: paneShortcutLabels.focusNext, label: t("shortcuts.pane.focusNext") },
+                  { keys: `${modLabel()}+K`, label: t("shortcuts.general.commandPalette") },
+                ].map((row) => (
+                  <Fragment key={row.label}>
+                    <dt className="text-right">
+                      <kbd className="rounded border border-chrome-border-subtle bg-chrome-surface-raised px-1.5 py-0.5 font-mono text-[11px] text-chrome-text-secondary">
+                        {row.keys}
+                      </kbd>
+                    </dt>
+                    <dd className="text-left">{row.label}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+              <button
+                type="button"
+                onClick={openShortcutCheatsheet}
+                className="cursor-pointer text-[12px] text-chrome-accent-text underline-offset-2 hover:underline"
+              >
+                {t("shortcuts.openLink")}
+              </button>
+            </div>
+          }
+        />
       ) : (
         <EmptyState
           tone="chrome"
@@ -1703,6 +1763,8 @@ export const ChatTab = memo(ChatTabInner, (prev, next) => {
   );
 });
 
+const PANES_LEFT_HINT_THRESHOLD = 2;
+
 function WarpTopBar({
   profileLabel,
   profileAccentColor = null,
@@ -1711,8 +1773,6 @@ function WarpTopBar({
   canAddPane,
   broadcastInput,
   restoring,
-  externalTerminal,
-  onExternalTerminalChange,
   onAddPane,
   onOpenFolder,
   available,
@@ -1725,8 +1785,6 @@ function WarpTopBar({
   canAddPane: boolean;
   broadcastInput: boolean;
   restoring: boolean;
-  externalTerminal: ExternalTerminal;
-  onExternalTerminalChange: (v: ExternalTerminal) => void;
   onAddPane: (tool: string) => void;
   onOpenFolder: () => void;
   available: ProviderEntry[];
@@ -1735,6 +1793,8 @@ function WarpTopBar({
   const { t } = useLocale();
   const accent = profileAccentColor;
   const hasAccent = Boolean(accent);
+  const panesLeft = Math.max(0, maxPanes - paneCount);
+  const limitTitle = t("chat.err.maxPanes", { max: maxPanes });
 
   return (
     <div className="relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
@@ -1757,11 +1817,6 @@ function WarpTopBar({
           >
             {profileLabel}
           </span>
-          {paneCount > 0 && (
-            <span className="shrink-0 text-[10px] tabular-nums text-chrome-text-faint">
-              {paneCount}/{maxPanes}
-            </span>
-          )}
           {broadcastInput && paneCount > 1 && (
             <span
               className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
@@ -1776,31 +1831,54 @@ function WarpTopBar({
       {restoring && <span className="text-[11px] text-chrome-text-subtle">{t("chat.restoringShort")}</span>}
 
       <div className="ml-auto flex items-center gap-2">
-        <Button
-          variant="chromeOutline"
-          size="sm"
-          disabled={!canAddPane || restoring}
-          onClick={onOpenFolder}
-          title={canAddPane ? t("chat.pickFolderPane") : t("chat.maxPanesTitle", { max: maxPanes })}
-        >
-          <FolderOpen />
-          {t("chat.folderBtn")}
-        </Button>
+        {panesLeft <= PANES_LEFT_HINT_THRESHOLD && (
+          <span
+            role="status"
+            title={
+              canAddPane
+                ? t("chat.panesLeftTitle", { count: panesLeft, max: maxPanes })
+                : limitTitle
+            }
+            className={`inline-flex items-center gap-1.5 text-[11px] tabular-nums ${
+              canAddPane ? "text-chrome-text-subtle" : "text-chrome-accent-text"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 rounded-full ${canAddPane ? "bg-chrome-text-dim" : "bg-chrome-ui-accent"}`}
+            />
+            {canAddPane
+              ? panesLeft === 1
+                ? t("chat.panesLeftOne")
+                : t("chat.panesLeft", { count: panesLeft })
+              : t("chat.panesFull", { max: maxPanes })}
+          </span>
+        )}
+        <span title={canAddPane ? undefined : limitTitle}>
+          <Button
+            variant="chromeOutline"
+            size="sm"
+            disabled={!canAddPane || restoring}
+            onClick={onOpenFolder}
+            title={canAddPane ? t("chat.pickFolderPane") : undefined}
+          >
+            <FolderOpen />
+            {t("chat.folderBtn")}
+          </Button>
+        </span>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="chromeOutline"
-              size="sm"
-              disabled={!canAddPane}
-              title={
-                canAddPane
-                  ? t("chat.addPaneTitle", splitShortcutLabels)
-                  : t("chat.maxPanesTitle", { max: maxPanes })
-              }
-            >
-              {t("chat.addPane")}
-            </Button>
-          </DropdownMenuTrigger>
+          <span title={canAddPane ? undefined : limitTitle}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="chromeOutline"
+                size="sm"
+                disabled={!canAddPane}
+                title={canAddPane ? t("chat.addPaneTitle", splitShortcutLabels) : undefined}
+              >
+                {t("chat.addPane")}
+              </Button>
+            </DropdownMenuTrigger>
+          </span>
           <DropdownMenuContent align="end" className="min-w-[160px]">
             <DropdownMenuItem
               title={t("chat.plainShellTitle")}
@@ -1818,7 +1896,6 @@ function WarpTopBar({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <TerminalSelector value={externalTerminal} onChange={onExternalTerminalChange} />
       </div>
     </div>
   );
@@ -1896,28 +1973,5 @@ function ToolCard({
         </div>
       )}
     </div>
-  );
-}
-
-function TerminalSelector({
-  value,
-  onChange,
-}: {
-  value: ExternalTerminal;
-  onChange: (v: ExternalTerminal) => void;
-}) {
-  const { t } = useLocale();
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as ExternalTerminal)}
-      className="cursor-pointer rounded-md border border-chrome-border-strong bg-chrome-surface px-2 py-1 text-[12px] focus:outline-none"
-    >
-      {TERMINAL_OPTIONS.map((o) => (
-        <option key={o.value} value={o.value}>
-          {t(TERMINAL_LABEL_KEYS[o.value])}
-        </option>
-      ))}
-    </select>
   );
 }

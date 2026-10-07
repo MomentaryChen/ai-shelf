@@ -19,7 +19,17 @@ async function waitForAppReady(page: Page) {
   await expect(inventoryTab).toBeEnabled({ timeout: 120_000 });
 }
 
+const PROFILE_CWDS = ["/tmp/optim-cloud-backend", "/tmp/optim-feature", "/tmp/openapi-docs"];
+
+async function isToolInstalled(page: Page, tool: string): Promise<boolean> {
+  return page.evaluate(async (id) => {
+    const entries = await window.api.getInventory();
+    return entries.some((e) => e.tool === id && e.available);
+  }, tool);
+}
+
 async function seedCompactProfiles(page: Page) {
+  for (const cwd of PROFILE_CWDS) mkdirSync(cwd, { recursive: true });
   const result = await page.evaluate(async () => {
     const forest = await window.api.profileGroupGetForest();
     if (!forest.success || !forest.forest) {
@@ -81,8 +91,14 @@ test("sidebar compact profile list visuals", async () => {
     await expect(backendRow).toBeVisible();
     await backendRow.getByText("Optim Cloud Backend", { exact: true }).click();
     await backendRow.hover();
-    await expect(backendRow.getByTitle(/Add terminal|新增 terminal/i)).toBeVisible();
-    await backendRow.getByTitle(/Add terminal|新增 terminal/i).click();
+    const addTerminal = backendRow.getByTitle(/Add terminal|新增 terminal/i);
+    await expect(addTerminal).toBeVisible();
+    // Profiles default to Claude; when it isn't installed the UI must not offer it.
+    const claudeInstalled = await isToolInstalled(page, "claude");
+    if (!claudeInstalled) {
+      await expect(addTerminal).not.toHaveAttribute("title", /Claude/i, { timeout: 30_000 });
+    }
+    await addTerminal.click();
 
     // Live terminal row should appear under the expanded profile with cwd subtitle.
     await expect(page.locator(".group\\/term").first()).toBeVisible({ timeout: 60_000 });
@@ -95,15 +111,22 @@ test("sidebar compact profile list visuals", async () => {
 
     await backendRow.hover();
     await backendRow.getByTitle(/Profile actions|Profile 操作/i).click();
-    await expect(
-      page.getByRole("menuitem", { name: /Add terminal|新增 terminal/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    const menuAdd = page.getByRole("menuitem", { name: /Add terminal|新增 terminal/i }).first();
+    await expect(menuAdd).toBeVisible({ timeout: 10_000 });
+    if (!claudeInstalled) await expect(menuAdd).not.toContainText(/Claude/i);
     const menuShot = join(OUT, "sidebar-compact-menu.png");
     await page.screenshot({ path: menuShot, animations: "disabled" });
 
     // Keep a second copy for PR embedding convenience.
     copyFileSync(shotPath, join(OUT, "sidebar-profile-compact.png"));
     copyFileSync(menuShot, join(OUT, "sidebar-profile-compact-menu.png"));
+
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^\+ (Pane|窗格)$/ }).click();
+    await expect(page.getByRole("menuitem").first()).toBeVisible();
+    if (!claudeInstalled) {
+      await expect(page.getByRole("menuitem", { name: /Claude/i })).toHaveCount(0);
+    }
   } finally {
     if (app) await app.close().catch(() => undefined);
   }

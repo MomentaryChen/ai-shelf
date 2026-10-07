@@ -10,10 +10,9 @@ import {
   Plus,
   Minus,
   Settings2,
-  Trash2,
   X,
 } from "lucide-react";
-import { WorkspaceSlideSwitcher } from "./WorkspaceSlideSwitcher";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -51,6 +50,7 @@ export interface SidebarGroup {
   id: string;
   name: string;
   icon?: ReactNode;
+  profileCount?: number;
 }
 
 export interface SidebarNavItem {
@@ -249,12 +249,17 @@ export function Sidebar({
       </div>
 
       <div className="p-2">
-        <WorkspaceSlideSwitcher
-          groups={groups}
-          currentGroupId={currentGroupId}
-          collapsed={collapsed}
-          onGroupChange={onGroupChange}
-        />
+        <div className={collapsed ? "flex justify-center" : undefined}>
+          <WorkspaceSwitcher
+            groups={groups}
+            currentGroupId={currentGroupId}
+            collapsed={collapsed}
+            onGroupChange={onGroupChange}
+            onCreateGroup={onCreateGroup}
+            onRenameGroup={onRenameGroup}
+            onDeleteGroup={onDeleteGroup}
+          />
+        </div>
         {draggingProfileId && onProfileMoveToGroup && !collapsed && groups.length > 1 && (
           <div className="mt-1 space-y-1 rounded-lg border border-chrome-border-input bg-chrome-surface p-1">
             <div className="px-2 py-1 text-[11px] text-chrome-text-muted">{t("profile.dialog.groupHint")}</div>
@@ -287,31 +292,6 @@ export function Sidebar({
                   <span className="truncate">{group.name}</span>
                 </div>
               ))}
-          </div>
-        )}
-        {!collapsed && (
-          <div className="mt-1.5 flex items-center gap-1 rounded-md border border-chrome-border-subtle bg-chrome-surface px-1 py-1">
-            <IconAction title="New group" onClick={onCreateGroup}>
-              <Plus className="h-3.5 w-3.5" />
-            </IconAction>
-            {currentGroup && (
-              <>
-                <IconAction title="Rename group" onClick={() => onRenameGroup?.(currentGroup.id)}>
-                  <Settings2 className="h-3.5 w-3.5" />
-                </IconAction>
-                <IconAction title="Delete group" onClick={() => onDeleteGroup?.(currentGroup.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </IconAction>
-              </>
-            )}
-            <div className="ml-auto">
-              <IconAction
-                title="New profile"
-                onClick={() => currentGroup && onCreateProfile?.(currentGroup.id)}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </IconAction>
-            </div>
           </div>
         )}
       </div>
@@ -389,6 +369,14 @@ export function Sidebar({
               <div className="min-w-0 flex-1 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-muted">
                 {t("profile.title")}
               </div>
+              {currentGroup && (
+                <IconAction
+                  title={t("profile.new")}
+                  onClick={() => onCreateProfile?.(currentGroup.id)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </IconAction>
+              )}
               <IconAction
                 title={searchOpen ? t("profile.hideSearch") : t("profile.showSearch")}
                 onClick={() => {
@@ -475,6 +463,18 @@ export function Sidebar({
                     query.trim() ? t("sidebar.noMatchingProfiles") : t("profile.empty")
                   }
                   description={query.trim() ? undefined : t("profile.emptyHint")}
+                  action={
+                    !query.trim() && currentGroup ? (
+                      <button
+                        type="button"
+                        onClick={() => onCreateProfile?.(currentGroup.id)}
+                        className="mt-1 inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-chrome-border-input bg-chrome-surface px-2.5 py-1.5 text-[12px] font-medium text-chrome-text transition-colors duration-200 hover:bg-chrome-hover"
+                      >
+                        <Plus aria-hidden className="h-3.5 w-3.5" />
+                        {t("profile.new")}
+                      </button>
+                    ) : undefined
+                  }
                 />
               )}
               {filteredProfiles.map((item) => {
@@ -646,13 +646,15 @@ export function Sidebar({
                     {expanded && (
                       <div className="ml-2 space-y-0.5 border-l border-chrome-border-subtle py-0.5 pl-1.5">
                         {(item.terminals ?? []).length === 0 && (
-                          <EmptyState
-                            tone="chrome"
-                            compact
-                            className="items-start px-1 py-1 text-left"
+                          <button
+                            type="button"
+                            onClick={() => onProfileAddTerminal?.(item.id)}
                             title={t("terminal.empty")}
-                            description={t("terminal.emptyHint")}
-                          />
+                            className="flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-left text-[12px] text-chrome-text-muted transition-colors duration-200 hover:bg-chrome-hover hover:text-chrome-text"
+                          >
+                            <Plus aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{addTerminalLabel}</span>
+                          </button>
                         )}
                         {(item.terminals ?? []).map((terminal) => {
                           const terminalActive = terminal.id === activeTerminalId;
