@@ -39,33 +39,37 @@ export function profileAccentMarkerStyle(
   };
 }
 
-/** Sidebar profile group card border. */
-export function profileSidebarGroupStyle(
+/** Sidebar profile row when selected — flat list with left accent bar (no card border). */
+export function profileSidebarProfileActiveStyle(
   accentColor: string | null | undefined,
 ): import("react").CSSProperties {
   if (!accentColor) {
-    return { borderColor: "var(--color-chrome-border-subtle)" };
+    return {
+      backgroundColor: "var(--color-chrome-hover)",
+      boxShadow: "inset 2px 0 0 var(--color-chrome-ui-accent)",
+    };
   }
-  return { borderColor: tint(accentColor, "77") };
+  return {
+    backgroundColor: tint(accentColor, "1f"),
+    boxShadow: `inset 2px 0 0 ${accentColor}`,
+  };
 }
 
-/** Sidebar profile row when selected. */
-export function profileSidebarProfileActiveStyle(
-  accentColor: string | null | undefined,
-): import("react").CSSProperties | undefined {
-  if (!accentColor) return undefined;
-  return { backgroundColor: tint(accentColor, "2b") };
-}
-
-/** Sidebar terminal tab row. */
+/** Sidebar terminal tab row — compact accent bar when selected. */
 export function profileSidebarTerminalStyle(
   accentColor: string | null | undefined,
   selected: boolean,
 ): import("react").CSSProperties | undefined {
-  if (!accentColor || !selected) return undefined;
+  if (!selected) return undefined;
+  if (!accentColor) {
+    return {
+      backgroundColor: "var(--color-chrome-hover)",
+      boxShadow: "inset 2px 0 0 var(--color-chrome-ui-accent)",
+    };
+  }
   return {
-    backgroundColor: tint(accentColor, "24"),
-    boxShadow: `inset 3px 0 0 ${accentColor}`,
+    backgroundColor: tint(accentColor, "1a"),
+    boxShadow: `inset 2px 0 0 ${accentColor}`,
   };
 }
 
