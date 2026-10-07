@@ -1415,6 +1415,32 @@ export const zh: Record<MessageKey, string> = {
   "markdown.hint.live": "輸入時即時更新 · mermaid 區塊會渲染成圖表",
   "markdown.mermaid.errorTitle": "Mermaid",
 
+  // Tools 模式 — Mermaid
+  "tools.tab.mermaid": "Mermaid",
+  "mermaid.subtitle":
+    "撰寫 Mermaid 圖表並即時預覽 — 可從範本開始，再複製原始碼、Markdown 程式碼區塊或 SVG。",
+  "mermaid.templates": "範本",
+  "mermaid.template.flowchart": "流程圖",
+  "mermaid.template.sequence": "時序圖",
+  "mermaid.template.class": "類別圖",
+  "mermaid.template.state": "狀態圖",
+  "mermaid.template.er": "ER 圖",
+  "mermaid.template.gantt": "甘特圖",
+  "mermaid.template.pie": "圓餅圖",
+  "mermaid.template.mindmap": "心智圖",
+  "mermaid.input": "原始碼",
+  "mermaid.preview": "預覽",
+  "mermaid.inputPlaceholder": "flowchart TD\n  A --> B",
+  "mermaid.empty": "輸入時預覽會顯示在這裡。",
+  "mermaid.unwrap": "去掉 fence",
+  "mermaid.copy": "複製原始碼",
+  "mermaid.copyFence": "複製 Markdown",
+  "mermaid.copySvg": "複製 SVG",
+  "mermaid.downloadSvg": "下載 SVG",
+  "mermaid.copied": "已複製",
+  "mermaid.clear": "清除",
+  "mermaid.hint.live": "輸入時即時更新 · 可貼上 ```mermaid 區塊後用「去掉 fence」",
+
   // Tools 模式 — YAML ↔ JSON
   "tools.tab.yaml": "YAML ↔ JSON",
   "yaml.subtitle": "在 YAML 與 JSON 之間轉換設定檔 — 左邊貼上，右邊複製。可選擇依 key 排序。",

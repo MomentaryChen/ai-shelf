@@ -5,6 +5,8 @@ import { useLocale } from "../i18n/LocaleProvider";
 type Props = {
   chart: string;
   className?: string;
+  /** Fires with the latest SVG markup after a successful render, or null on clear/error. */
+  onSvgChange?: (svg: string | null) => void;
 };
 
 type MermaidApi = typeof import("mermaid").default;
@@ -36,11 +38,13 @@ async function loadMermaid(theme: "dark" | "neutral"): Promise<MermaidApi> {
   return mermaidModule;
 }
 
-export function MermaidBlock({ chart, className = "" }: Props) {
+export function MermaidBlock({ chart, className = "", onSvgChange }: Props) {
   const { t } = useLocale();
   const reactId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const containerRef = useRef<HTMLDivElement>(null);
   const renderSeqRef = useRef(0);
+  const onSvgChangeRef = useRef(onSvgChange);
+  onSvgChangeRef.current = onSvgChange;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const themeRevision = useAppThemeRevision();
@@ -52,6 +56,7 @@ export function MermaidBlock({ chart, className = "" }: Props) {
       setBusy(false);
       setError(null);
       if (containerRef.current) containerRef.current.innerHTML = "";
+      onSvgChangeRef.current?.(null);
       return;
     }
 
@@ -76,10 +81,12 @@ export function MermaidBlock({ chart, className = "" }: Props) {
             containerRef.current.innerHTML = svg;
           }
           setError(null);
+          onSvgChangeRef.current?.(svg);
         } catch (err) {
           if (cancelled || seq !== renderSeqRef.current) return;
           if (containerRef.current) containerRef.current.innerHTML = "";
           setError(err instanceof Error ? err.message : String(err));
+          onSvgChangeRef.current?.(null);
         } finally {
           if (!cancelled && seq === renderSeqRef.current) setBusy(false);
         }

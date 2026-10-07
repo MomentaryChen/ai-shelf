@@ -81,6 +81,9 @@ const JsonToolsTab = lazy(() =>
 const MarkdownToolsTab = lazy(() =>
   import("./components/MarkdownToolsTab").then((m) => ({ default: m.MarkdownToolsTab })),
 );
+const MermaidToolsTab = lazy(() =>
+  import("./components/MermaidToolsTab").then((m) => ({ default: m.MermaidToolsTab })),
+);
 const YamlJsonToolsTab = lazy(() =>
   import("./components/YamlJsonToolsTab").then((m) => ({ default: m.YamlJsonToolsTab })),
 );
@@ -135,6 +138,7 @@ type ToolId =
   | "regex"
   | "json"
   | "markdown"
+  | "mermaid"
   | "yaml"
   | "jwt"
   | "uuid"
@@ -246,6 +250,7 @@ const TOOL_ICONS: Record<ToolId, string> = {
   regex: "🔤",
   json: "{}",
   markdown: "📝",
+  mermaid: "🔀",
   yaml: "📄",
   jwt: "🪪",
   uuid: "🆔",
@@ -263,6 +268,7 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   regex: "tools.tab.regex",
   json: "tools.tab.json",
   markdown: "tools.tab.markdown",
+  mermaid: "tools.tab.mermaid",
   yaml: "tools.tab.yaml",
   jwt: "tools.tab.jwt",
   uuid: "tools.tab.uuid",
@@ -458,7 +464,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -524,19 +530,21 @@ export function App() {
                   ? "json format minify pretty beautify validate sort keys"
                   : it.id === "markdown"
                     ? "markdown md preview mermaid flowchart diagram gfm"
-                    : it.id === "yaml"
-                      ? "yaml yml json convert config indent sort keys minify pretty"
-                      : it.id === "jwt"
-                        ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
-                        : it.id === "uuid"
-                          ? "uuid nanoid ulid generate validate v4 v7"
-                          : it.id === "diff"
-                            ? "diff compare text unified patch lines whitespace"
-                            : it.id === "system"
-                              ? "system info cpu memory ram network gpu nvidia host meter usage analyze report"
-                              : it.id === "ports"
-                                ? "port ports listen listener netstat lsof pid kill occupy 3000"
-                                : "codec hash base64 image md5 tools",
+                    : it.id === "mermaid"
+                      ? "mermaid flowchart sequence class state er gantt pie mindmap diagram svg preview generate"
+                      : it.id === "yaml"
+                        ? "yaml yml json convert config indent sort keys minify pretty"
+                        : it.id === "jwt"
+                          ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
+                          : it.id === "uuid"
+                            ? "uuid nanoid ulid generate validate v4 v7"
+                            : it.id === "diff"
+                              ? "diff compare text unified patch lines whitespace"
+                              : it.id === "system"
+                                ? "system info cpu memory ram network gpu nvidia host meter usage analyze report"
+                                : it.id === "ports"
+                                  ? "port ports listen listener netstat lsof pid kill occupy 3000"
+                                  : "codec hash base64 image md5 tools",
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -560,7 +568,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert token decode verify ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -606,7 +614,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -841,6 +849,7 @@ export function App() {
                   {activeTool === "regex" && <RegexToolsTab />}
                   {activeTool === "json" && <JsonToolsTab />}
                   {activeTool === "markdown" && <MarkdownToolsTab />}
+                  {activeTool === "mermaid" && <MermaidToolsTab />}
                   {activeTool === "yaml" && <YamlJsonToolsTab />}
                   {activeTool === "jwt" && <JwtToolsTab />}
                   {activeTool === "uuid" && <UuidToolsTab />}

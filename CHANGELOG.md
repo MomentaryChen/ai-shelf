@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **Mermaid tools** — Dedicated Tools panel with diagram templates, live preview, Markdown fence copy, and SVG copy/download.
+
 ### Fixed
 
 - **npm publish CI** — Treat misleading `E404` on publish as auth failure; support OIDC Trusted Publishing, verify `NPM_TOKEN` before publish, and allow npm-only republish via workflow dispatch.

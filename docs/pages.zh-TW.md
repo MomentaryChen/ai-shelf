@@ -30,7 +30,7 @@
 |---|---|
 | **Terminal**（預設） | Profile 側欄、內嵌多窗格終端機、外部啟動 |
 | **Inventory** | 儀表板：Overview、Models、Skills、MCP、Config、Doctor、Update、**Usage** |
-| **Tools** | 本機工具（Codec、Crypto、Time、Cron、Regex、JSON、Markdown、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL） |
+| **Tools** | 本機工具（Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL） |
 | **AI Flow** | 撰寫、排程與執行多代理 `.flow.md` 工作流 |
 
 隨時可用標題列切換模式。命令面板（`Cmd/Ctrl+K`）也可跳到任一模式或 Inventory／Tools 分頁。
@@ -336,7 +336,8 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 | **Cron** | Cron 表達式輔助 |
 | **Regex** | 測試／取代（含預設） |
 | **JSON** | 格式化／壓縮 |
-| **Markdown** | 預覽（含 Mermaid） |
+| **Markdown** | 預覽（含 Mermaid 程式碼區塊） |
+| **Mermaid** | 圖表編輯器：範本、即時預覽、SVG 匯出 |
 | **YAML ↔ JSON** | YAML 與 JSON 互轉 |
 | **JWT** | 解碼／檢視 token |
 | **UUID** | 產生／驗證 UUID 與 NanoID |
