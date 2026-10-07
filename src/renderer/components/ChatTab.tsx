@@ -1052,7 +1052,11 @@ function ChatTabInner({
   }
 
   const sidebarGroups = useMemo(
-    () => (sidebarForest?.groups ?? []).map((g) => ({ id: g.id, name: g.name })),
+    () => (sidebarForest?.groups ?? []).map((g) => ({
+        id: g.id,
+        name: g.name,
+        profileCount: g.profiles.length,
+      })),
     [sidebarForest],
   );
   const currentGroupId =
