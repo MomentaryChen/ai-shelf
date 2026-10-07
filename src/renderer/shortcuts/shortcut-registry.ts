@@ -70,6 +70,7 @@ export function buildShortcutSections(
       items: [
         { keys: `${m}+K`, labelKey: "shortcuts.general.commandPalette" },
         { keys: `${m}+/`, labelKey: "shortcuts.general.cheatsheet" },
+        { keys: `${modeSwitchModLabel()}+1–4`, labelKey: "shortcuts.general.switchMode" },
       ],
     },
     buildPaneSections(bindings),
@@ -92,6 +93,10 @@ export function buildShortcutSections(
       ],
     },
   ];
+}
+
+export function modeSwitchModLabel(): string {
+  return isMac() ? "Option" : "Alt";
 }
 
 export function cheatsheetToggleKeys(): string {

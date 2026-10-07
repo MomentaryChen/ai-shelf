@@ -84,6 +84,56 @@ export function splitPaneInTree(
   };
 }
 
+/** Members of a same-direction run: nested splits along `direction` are flattened, anything else is one slot. */
+function runSlotCount(node: LayoutNode, direction: SplitDirection): number {
+  if (node.kind === "split" && node.direction === direction) {
+    return runSlotCount(node.first, direction) + runSlotCount(node.second, direction);
+  }
+  return 1;
+}
+
+function equalizeRun(node: LayoutNode, direction: SplitDirection): LayoutNode {
+  if (node.kind !== "split" || node.direction !== direction) return node;
+  const first = runSlotCount(node.first, direction);
+  const second = runSlotCount(node.second, direction);
+  return {
+    ...node,
+    ratio: first / (first + second),
+    first: equalizeRun(node.first, direction),
+    second: equalizeRun(node.second, direction),
+  };
+}
+
+function splitPathToPane(node: LayoutNode, paneId: string): Extract<LayoutNode, { kind: "split" }>[] | null {
+  if (node.kind === "pane") return node.pane.id === paneId ? [] : null;
+  for (const child of [node.first, node.second]) {
+    const rest = splitPathToPane(child, paneId);
+    if (rest) return [node, ...rest];
+  }
+  return null;
+}
+
+/**
+ * Give every slot in the row/column that holds `paneId` the same size.
+ * Only the run of same-direction splits directly around the pane changes;
+ * ratios the user dragged elsewhere in the tree are kept.
+ */
+export function equalizeRunAroundPane(root: LayoutNode, paneId: string): LayoutNode {
+  const path = splitPathToPane(root, paneId);
+  if (!path || path.length === 0) return root;
+  const direction = path[path.length - 1]!.direction;
+  let top = path.length - 1;
+  while (top > 0 && path[top - 1]!.direction === direction) top--;
+  const runRootId = path[top]!.id;
+
+  function walk(node: LayoutNode): LayoutNode {
+    if (node.kind === "pane") return node;
+    if (node.id === runRootId) return equalizeRun(node, direction);
+    return { ...node, first: walk(node.first), second: walk(node.second) };
+  }
+  return walk(root);
+}
+
 export function mapPanesInTree(
   root: LayoutNode,
   fn: (pane: PaneInfo) => PaneInfo,

@@ -14,7 +14,6 @@ import { formatPaneCwdShort } from "../utils/pane-cwd";
 import { useLocale } from "../i18n/LocaleProvider";
 import {
   profilePaneChromeStyle,
-  profilePaneHeaderDotStyle,
   profilePaneHeaderStyle,
 } from "../utils/profile-colors";
 import { PaneAgentStatusDot } from "./PaneAgentStatusDot";
@@ -24,6 +23,18 @@ const DIVIDER_PX = 10;
 
 function clampRatio(ratio: number): number {
   return Math.min(0.9, Math.max(0.1, ratio));
+}
+
+/**
+ * Pixels taken by dividers nested along `direction`. Used as flex-basis so the
+ * ratio splits the remaining space; otherwise deeper panes in a row shrink by
+ * one divider per level.
+ */
+function nestedDividerPx(node: LayoutNode, direction: SplitDirection): number {
+  if (node.kind !== "split" || node.direction !== direction) return 0;
+  return (
+    DIVIDER_PX + nestedDividerPx(node.first, direction) + nestedDividerPx(node.second, direction)
+  );
 }
 
 interface Props {
@@ -46,6 +57,8 @@ interface Props {
   broadcastActive?: boolean;
   broadcastPaneCount?: number;
   paneAgentStates?: Record<string, PaneAgentStatus>;
+  /** Pane id → title (numbered when several panes share a tool). */
+  paneLabels?: Record<string, string>;
 }
 
 type ProfileDragOver = { targetPaneId: string; zone: PaneDropZone };
@@ -110,6 +123,7 @@ function SplitPaneLayoutInner({
   broadcastActive = false,
   broadcastPaneCount = 0,
   paneAgentStates,
+  paneLabels,
   drag,
 }: Props & { drag: PaneDragState }) {
   if (node.kind === "pane") {
@@ -125,6 +139,7 @@ function SplitPaneLayoutInner({
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStatus={paneAgentStates?.[node.pane.id]}
+          label={paneLabels?.[node.pane.id] ?? paneDisplayLabel(node.pane)}
           drag={drag}
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
@@ -154,7 +169,7 @@ function SplitPaneLayoutInner({
     >
       <div
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={{ flex: `${ratio} 1 0px` }}
+        style={{ flex: `${ratio} 1 ${nestedDividerPx(node.first, node.direction)}px` }}
       >
         <SplitPaneLayoutInner
           node={node.first}
@@ -173,6 +188,7 @@ function SplitPaneLayoutInner({
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStates={paneAgentStates}
+          paneLabels={paneLabels}
           drag={drag}
         />
       </div>
@@ -190,7 +206,7 @@ function SplitPaneLayoutInner({
 
       <div
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={{ flex: `${rest} 1 0px` }}
+        style={{ flex: `${rest} 1 ${nestedDividerPx(node.second, node.direction)}px` }}
       >
         <SplitPaneLayoutInner
           node={node.second}
@@ -209,6 +225,7 @@ function SplitPaneLayoutInner({
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStates={paneAgentStates}
+          paneLabels={paneLabels}
           drag={drag}
         />
       </div>
@@ -224,6 +241,7 @@ function WarpPaneShell({
   broadcastActive = false,
   broadcastPaneCount = 0,
   paneAgentStatus,
+  label,
   drag,
   onFocus,
   onClose,
@@ -241,6 +259,7 @@ function WarpPaneShell({
   broadcastActive?: boolean;
   broadcastPaneCount?: number;
   paneAgentStatus?: PaneAgentStatus;
+  label: string;
   sidebarPaneDragActive?: boolean;
   drag: PaneDragState;
   onFocus: () => void;
@@ -255,7 +274,6 @@ function WarpPaneShell({
   const cwdShort = formatPaneCwdShort(pane.cwd);
   const chromeStyle = profilePaneChromeStyle(profileAccentColor, focused);
   const headerStyle = profilePaneHeaderStyle(profileAccentColor, focused);
-  const dotStyle = profilePaneHeaderDotStyle(profileAccentColor);
   const shellRef = useRef<HTMLDivElement>(null);
   const {
     draggingPaneId,
@@ -389,27 +407,20 @@ function WarpPaneShell({
             <DragHandle />
           </span>
         )}
-        {profileAccentColor && (
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-full ${focused ? "" : "opacity-50"}`}
-            style={dotStyle}
-            aria-hidden
-          />
-        )}
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-chrome-border-subtle bg-chrome-surface-raised">
           <ToolLogo tool={pane.tool} size={14} />
         </span>
         {paneAgentStatus && <PaneAgentStatusDot status={paneAgentStatus} />}
         {onRename ? (
           <EditablePaneTitle
-            label={paneDisplayLabel(pane)}
+            label={label}
             onRename={onRename}
             className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text"
             inputClassName="text-[12px] font-medium"
           />
         ) : (
           <span className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text">
-            {paneDisplayLabel(pane)}
+            {label}
           </span>
         )}
         {broadcastActive && (
@@ -509,7 +520,7 @@ function WarpPaneShell({
         {(isDragOver || isProfileDragOver) && activeDropZone && (
           <PaneDropOverlay
             zone={activeDropZone}
-            targetLabel={isProfileDragOver ? paneDisplayLabel(pane) : undefined}
+            targetLabel={isProfileDragOver ? label : undefined}
           />
         )}
         {children}

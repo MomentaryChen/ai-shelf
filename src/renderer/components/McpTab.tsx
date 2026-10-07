@@ -3,7 +3,7 @@ import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
 import { StatCard } from "./StatCard";
-import { Badge, InstallStatusBadge } from "./Badge";
+import { Badge } from "./Badge";
 import { Tag } from "./Tag";
 import { McpSyncPanel } from "./McpSyncPanel";
 import { McpServerManager } from "./McpServerManager";
@@ -28,9 +28,7 @@ function McpCards({ entries }: { entries: ProviderEntry[] }) {
       className={installedCardClass(e.available)}
       title={<ToolNameCell entry={e} />}
       trailing={
-        !e.available ? (
-          <InstallStatusBadge available={false} />
-        ) : e.mcp.supported ? (
+        !e.available ? undefined : e.mcp.supported ? (
           <Badge text={t("inventory.mcp.supported")} variant="ok" />
         ) : (
           <Badge text={t("inventory.mcp.notSupported")} variant="neutral" />

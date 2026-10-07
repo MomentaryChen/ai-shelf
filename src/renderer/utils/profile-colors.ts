@@ -12,8 +12,6 @@ export const PROFILE_ACCENT_COLORS = [
 
 export type ProfileAccentColor = (typeof PROFILE_ACCENT_COLORS)[number];
 
-const DEFAULT_FOCUS = "#7eb6ff";
-
 function chromeVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -22,10 +20,6 @@ function chromeVar(name: string, fallback: string): string {
 
 function tint(hex: string, alpha: string): string {
   return `${hex}${alpha}`;
-}
-
-export function profileAccentOrDefault(accent?: string | null): string {
-  return accent ?? DEFAULT_FOCUS;
 }
 
 /** Accent swatch dot — sidebar, top bar, pane header. */
@@ -79,8 +73,8 @@ export function profileTopBarBadgeStyle(
 ): import("react").CSSProperties {
   if (accentColor) {
     return {
-      backgroundColor: tint(accentColor, "12"),
-      borderColor: tint(accentColor, "30"),
+      backgroundColor: tint(accentColor, "1f"),
+      borderColor: tint(accentColor, "66"),
     };
   }
   const fallback = chromeVar("--color-chrome-accent-text", "#8ab4ff");
@@ -90,11 +84,12 @@ export function profileTopBarBadgeStyle(
   };
 }
 
+/** Accent swatches are pastel; as text they vanish on light themes, so the accent stays on the marker. */
 export function profileTopBarLabelStyle(
   accentColor: string | null | undefined,
 ): import("react").CSSProperties {
-  const fallback = chromeVar("--color-chrome-accent-text", "#8ab4ff");
-  return { color: accentColor ?? fallback };
+  if (accentColor) return { color: "var(--color-chrome-text)" };
+  return { color: chromeVar("--color-chrome-accent-text", "#8ab4ff") };
 }
 
 /** Pane shell border — always tinted when profile has an accent; stronger when focused. */
@@ -111,29 +106,25 @@ export function profilePaneChromeStyle(
   };
 }
 
-/** Pane title bar — gradient + bottom border tied to profile accent. */
+/**
+ * Pane title bar — opaque chrome base with a soft accent wash on the left.
+ * The base must be opaque: the pane shell behind it is the dark terminal bg,
+ * so a translucent tint turns the title area dark under light-theme ink text.
+ */
 export function profilePaneHeaderStyle(
   accentColor: string | null | undefined,
   focused: boolean,
 ): import("react").CSSProperties {
-  const unfocusedBg = chromeVar("--color-chrome-pane-header-unfocused", "rgba(0,0,0,0.4)");
+  const base = "var(--color-chrome-bg)";
   if (!accentColor) {
     return {
-      background: unfocusedBg,
-      borderBottomColor: chromeVar("--color-chrome-border-subtle", "#2a2a30"),
+      backgroundColor: base,
+      borderBottomColor: "var(--color-chrome-border-subtle)",
     };
   }
   return {
-    background: focused
-      ? `linear-gradient(90deg, ${tint(accentColor, "18")} 0%, ${unfocusedBg} 48%)`
-      : `linear-gradient(90deg, ${tint(accentColor, "0a")} 0%, ${unfocusedBg} 52%)`,
-    borderBottomColor: tint(accentColor, focused ? "40" : "20"),
+    backgroundColor: base,
+    backgroundImage: `linear-gradient(90deg, ${tint(accentColor, focused ? "38" : "16")} 0%, transparent 65%)`,
+    borderBottomColor: tint(accentColor, focused ? "66" : "2a"),
   };
-}
-
-export function profilePaneHeaderDotStyle(
-  accentColor: string | null | undefined,
-): import("react").CSSProperties {
-  const accent = profileAccentOrDefault(accentColor);
-  return profileAccentMarkerStyle(accent, "sm");
 }
