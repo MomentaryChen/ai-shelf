@@ -1439,7 +1439,7 @@ export const zh: Record<MessageKey, string> = {
   "mermaid.downloadSvg": "下載 SVG",
   "mermaid.copied": "已複製",
   "mermaid.clear": "清除",
-  "mermaid.hint.live": "輸入時即時更新 · 可貼上 ```mermaid 區塊後用「去掉 fence」",
+  "mermaid.hint.live": "輸入時即時更新 · 可貼上 Mermaid 程式碼區塊後用「去掉 fence」",
 
   // Tools 模式 — YAML ↔ JSON
   "tools.tab.yaml": "YAML ↔ JSON",

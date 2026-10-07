@@ -1471,7 +1471,7 @@ export const en = {
   "mermaid.downloadSvg": "Download SVG",
   "mermaid.copied": "Copied",
   "mermaid.clear": "Clear",
-  "mermaid.hint.live": "Updates as you type · paste a ```mermaid fence and strip it if needed",
+  "mermaid.hint.live": "Updates as you type · paste a Mermaid fence and strip it if needed",
 
   // Tools mode — YAML ↔ JSON
   "tools.tab.yaml": "YAML ↔ JSON",
