@@ -3,7 +3,7 @@ import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
 import { DataTable, Td } from "./DataTable";
-import { Badge, InstallStatusBadge } from "./Badge";
+import { Badge } from "./Badge";
 import { ConfigPolicyPanel } from "./ConfigPolicyPanel";
 import { SkillsMcpDiffPanel } from "./SkillsMcpDiffPanel";
 import { SkillsSyncPanel } from "./SkillsSyncPanel";
@@ -25,9 +25,7 @@ function SkillsCards({ entries }: { entries: ProviderEntry[] }) {
       trailing={
         e.available ? (
           <Badge text={t("inventory.skills.count", { count: e.skills.length })} variant="info" />
-        ) : (
-          <InstallStatusBadge available={false} />
-        )
+        ) : undefined
       }
     >
       {e.available ? (
