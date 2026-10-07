@@ -626,7 +626,7 @@ export const en = {
   "workspace.prev": "Previous workspace",
   "workspace.next": "Next workspace",
   "workspace.position": "{current} of {total}",
-  "workspace.slideHint": "Click the left or right side, drag, or scroll to switch workspace",
+  "workspace.slideHint": "Click the left or right side, drag, or scroll to cycle workspaces",
   "pane.dragHint": "Drag to pane edges (top/bottom/left/right); center to swap",
   "pane.clickChangeCwd": "Click to change working directory",
   "pane.clickPickCwd": "Click to choose working directory",
