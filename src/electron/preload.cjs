@@ -297,4 +297,6 @@ contextBridge.exposeInMainWorld("api", {
   portsKill: (pid) => ipcRenderer.invoke("ports-kill", pid),
   portsAnalyzeEnv: (locale) => ipcRenderer.invoke("ports-analyze-env", locale),
   portsHostStats: () => ipcRenderer.invoke("ports-host-stats"),
+  wslListDistros: () => ipcRenderer.invoke("wsl-list-distros"),
+  wslDistroIp: (distro) => ipcRenderer.invoke("wsl-distro-ip", distro),
 });
