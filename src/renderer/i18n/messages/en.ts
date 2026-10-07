@@ -406,7 +406,6 @@ export const en = {
   "profile.newTerminal": "New Terminal",
   "terminal.title": "Terminals",
   "terminal.empty": "No terminals yet",
-  "terminal.emptyHint": "Open the ⋯ menu on a profile to add a terminal.",
   "terminal.new": "New terminal",
   "profile.minimizeTerminal": "Minimize to sidebar (keeps session running)",
   "profile.middleClickClose": "Middle-click to close",
@@ -641,6 +640,7 @@ export const en = {
   "workspace.delete": "Delete “{name}”",
   "workspace.cycleHint": "scroll or press ← → to cycle",
   "workspace.position": "{current} of {total}",
+  "pane.label.shell": "Shell",
   "pane.dragHint": "Drag to pane edges (top/bottom/left/right); center to swap",
   "pane.clickChangeCwd": "Click to change working directory",
   "pane.clickPickCwd": "Click to choose working directory",
@@ -681,14 +681,12 @@ export const en = {
   "terminal.ctx.restart": "Restart session",
   "terminal.ctx.exportOutput": "Export output…",
   "terminal.ctx.copyOutputForIssue": "Copy output for issue",
+  "chat.emptyPanes.title": "No terminals open in “{profile}”",
+  "chat.emptyPanes.desc": "The layout is saved automatically and restored when you come back (up to {max} panes).",
+  "chat.emptyPanes.openShell": "Open terminal",
+  "chat.emptyPanes.openTool": "Open {tool}",
+  "chat.emptyPanes.pickFolder": "Open in folder…",
   "chat.restoring": "Restoring terminals…",
-  "chat.restorePaneHint": "— click \"+ Pane\" above to open a terminal (up to {max}, layout is saved)",
-  "chat.shortcutHint":
-    "Pane shortcuts: {focusNext} previous terminal (any profile), {focusPrev} previous pane, {splitRight} split right, {splitDown} split down, {focusPane} pane 1–9; Ctrl+W close, Ctrl+L clear, Ctrl+Shift+R restart, Ctrl+F search. Right-click menu can also clear or restart.",
-  "chat.profileShortcutHint":
-    "Profile shortcuts: {profileByIndex} switch by group order (outside terminal); {profileCycle} next recent, {profileCyclePrev} previous recent.",
-  "chat.debugHint":
-    "Debug: press F12 or Ctrl+Shift+I for DevTools, or Alt → View → Developer Tools",
   "chat.pickProfileTitle": "No profile selected yet",
   "chat.pickProfile":
     "Pick or create a Profile on the left and we'll bring back your last terminals and working directory.",

@@ -646,13 +646,15 @@ export function Sidebar({
                     {expanded && (
                       <div className="ml-2 space-y-0.5 border-l border-chrome-border-subtle py-0.5 pl-1.5">
                         {(item.terminals ?? []).length === 0 && (
-                          <EmptyState
-                            tone="chrome"
-                            compact
-                            className="items-start px-1 py-1 text-left"
+                          <button
+                            type="button"
+                            onClick={() => onProfileAddTerminal?.(item.id)}
                             title={t("terminal.empty")}
-                            description={t("terminal.emptyHint")}
-                          />
+                            className="flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-left text-[12px] text-chrome-text-muted transition-colors duration-200 hover:bg-chrome-hover hover:text-chrome-text"
+                          >
+                            <Plus aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{addTerminalLabel}</span>
+                          </button>
                         )}
                         {(item.terminals ?? []).map((terminal) => {
                           const terminalActive = terminal.id === activeTerminalId;

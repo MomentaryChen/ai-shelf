@@ -46,6 +46,8 @@ interface Props {
   broadcastActive?: boolean;
   broadcastPaneCount?: number;
   paneAgentStates?: Record<string, PaneAgentStatus>;
+  /** Pane id → title (numbered when several panes share a tool). */
+  paneLabels?: Record<string, string>;
 }
 
 type ProfileDragOver = { targetPaneId: string; zone: PaneDropZone };
@@ -110,6 +112,7 @@ function SplitPaneLayoutInner({
   broadcastActive = false,
   broadcastPaneCount = 0,
   paneAgentStates,
+  paneLabels,
   drag,
 }: Props & { drag: PaneDragState }) {
   if (node.kind === "pane") {
@@ -125,6 +128,7 @@ function SplitPaneLayoutInner({
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStatus={paneAgentStates?.[node.pane.id]}
+          label={paneLabels?.[node.pane.id] ?? paneDisplayLabel(node.pane)}
           drag={drag}
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
@@ -173,6 +177,7 @@ function SplitPaneLayoutInner({
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStates={paneAgentStates}
+          paneLabels={paneLabels}
           drag={drag}
         />
       </div>
@@ -209,6 +214,7 @@ function SplitPaneLayoutInner({
           broadcastActive={broadcastActive}
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStates={paneAgentStates}
+          paneLabels={paneLabels}
           drag={drag}
         />
       </div>
@@ -224,6 +230,7 @@ function WarpPaneShell({
   broadcastActive = false,
   broadcastPaneCount = 0,
   paneAgentStatus,
+  label,
   drag,
   onFocus,
   onClose,
@@ -241,6 +248,7 @@ function WarpPaneShell({
   broadcastActive?: boolean;
   broadcastPaneCount?: number;
   paneAgentStatus?: PaneAgentStatus;
+  label: string;
   sidebarPaneDragActive?: boolean;
   drag: PaneDragState;
   onFocus: () => void;
@@ -402,14 +410,14 @@ function WarpPaneShell({
         {paneAgentStatus && <PaneAgentStatusDot status={paneAgentStatus} />}
         {onRename ? (
           <EditablePaneTitle
-            label={paneDisplayLabel(pane)}
+            label={label}
             onRename={onRename}
             className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text"
             inputClassName="text-[12px] font-medium"
           />
         ) : (
           <span className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text">
-            {paneDisplayLabel(pane)}
+            {label}
           </span>
         )}
         {broadcastActive && (
@@ -509,7 +517,7 @@ function WarpPaneShell({
         {(isDragOver || isProfileDragOver) && activeDropZone && (
           <PaneDropOverlay
             zone={activeDropZone}
-            targetLabel={isProfileDragOver ? paneDisplayLabel(pane) : undefined}
+            targetLabel={isProfileDragOver ? label : undefined}
           />
         )}
         {children}
