@@ -1460,6 +1460,32 @@ export const en = {
   "markdown.hint.live": "Updates as you type · Mermaid fences render as diagrams",
   "markdown.mermaid.errorTitle": "Mermaid",
 
+  // Tools mode — Mermaid
+  "tools.tab.mermaid": "Mermaid",
+  "mermaid.subtitle":
+    "Write Mermaid diagrams and preview them live — start from a template, then copy source, a Markdown fence, or SVG.",
+  "mermaid.templates": "Templates",
+  "mermaid.template.flowchart": "Flowchart",
+  "mermaid.template.sequence": "Sequence",
+  "mermaid.template.class": "Class",
+  "mermaid.template.state": "State",
+  "mermaid.template.er": "ER",
+  "mermaid.template.gantt": "Gantt",
+  "mermaid.template.pie": "Pie",
+  "mermaid.template.mindmap": "Mindmap",
+  "mermaid.input": "Source",
+  "mermaid.preview": "Preview",
+  "mermaid.inputPlaceholder": "flowchart TD\n  A --> B",
+  "mermaid.empty": "Preview appears here as you type.",
+  "mermaid.unwrap": "Strip fence",
+  "mermaid.copy": "Copy source",
+  "mermaid.copyFence": "Copy Markdown",
+  "mermaid.copySvg": "Copy SVG",
+  "mermaid.downloadSvg": "Download SVG",
+  "mermaid.copied": "Copied",
+  "mermaid.clear": "Clear",
+  "mermaid.hint.live": "Updates as you type · paste a Mermaid fence and strip it if needed",
+
   // Tools mode — YAML ↔ JSON
   "tools.tab.yaml": "YAML ↔ JSON",
   "yaml.subtitle":

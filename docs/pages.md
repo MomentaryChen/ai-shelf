@@ -30,7 +30,7 @@ The desktop app has **four** top-level modes in the header:
 |---|---|
 | **Terminal** (default) | Profiles sidebar, embedded multi-pane terminals, external launch |
 | **Inventory** | Tabbed dashboard: Overview, Models, Skills, MCP, Config, Doctor, Update, **Usage** |
-| **Tools** | Local utilities (Codec, Crypto, Time, Cron, Regex, JSON, Markdown, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL) |
+| **Tools** | Local utilities (Codec, Crypto, Time, Cron, Regex, JSON, Markdown, Mermaid, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL) |
 | **AI Flow** | Author, schedule, and run multi-agent `.flow.md` workflows |
 
 Use the header tabs to switch modes at any time. Command palette (`Cmd/Ctrl+K`) can jump to any mode or Inventory / Tools section.
@@ -348,7 +348,8 @@ Open **Inventory → Usage** from the header, or jump via the command palette.
 | **Cron** | Cron expression helpers |
 | **Regex** | Test / replace with presets |
 | **JSON** | Format / minify |
-| **Markdown** | Preview (including Mermaid) |
+| **Markdown** | Preview (including Mermaid fences) |
+| **Mermaid** | Diagram editor with templates, live preview, and SVG export |
 | **YAML ↔ JSON** | Convert between YAML and JSON |
 | **JWT** | Decode / inspect tokens |
 | **UUID** | Generate / validate UUID and NanoID |

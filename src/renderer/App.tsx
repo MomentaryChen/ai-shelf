@@ -34,6 +34,7 @@ import {
   Settings,
   SquareTerminal,
   Stethoscope,
+  Workflow,
   Wrench,
   Zap,
   type LucideIcon,
@@ -103,6 +104,9 @@ const JsonToolsTab = lazy(() =>
 const MarkdownToolsTab = lazy(() =>
   import("./components/MarkdownToolsTab").then((m) => ({ default: m.MarkdownToolsTab })),
 );
+const MermaidToolsTab = lazy(() =>
+  import("./components/MermaidToolsTab").then((m) => ({ default: m.MermaidToolsTab })),
+);
 const YamlJsonToolsTab = lazy(() =>
   import("./components/YamlJsonToolsTab").then((m) => ({ default: m.YamlJsonToolsTab })),
 );
@@ -157,6 +161,7 @@ type ToolId =
   | "regex"
   | "json"
   | "markdown"
+  | "mermaid"
   | "yaml"
   | "jwt"
   | "uuid"
@@ -272,6 +277,7 @@ const TOOL_ICONS: Record<ToolId, LucideIcon> = {
   regex: Regex,
   json: Braces,
   markdown: FileText,
+  mermaid: Workflow,
   yaml: FileCode2,
   jwt: BadgeCheck,
   uuid: Fingerprint,
@@ -284,7 +290,10 @@ const TOOL_ICONS: Record<ToolId, LucideIcon> = {
 /** Rail order — grouped so related tools sit together. */
 const TOOL_GROUPS: { groupKey: MessageKey; ids: ToolId[] }[] = [
   { groupKey: "tools.group.encode", ids: ["codec", "crypto", "jwt", "uuid"] },
-  { groupKey: "tools.group.text", ids: ["json", "yaml", "markdown", "regex", "diff"] },
+  {
+    groupKey: "tools.group.text",
+    ids: ["json", "yaml", "markdown", "mermaid", "regex", "diff"],
+  },
   { groupKey: "tools.group.time", ids: ["time", "cron"] },
   { groupKey: "tools.group.system", ids: ["system", "ports", "wsl"] },
 ];
@@ -297,6 +306,7 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   regex: "tools.tab.regex",
   json: "tools.tab.json",
   markdown: "tools.tab.markdown",
+  mermaid: "tools.tab.mermaid",
   yaml: "tools.tab.yaml",
   jwt: "tools.tab.jwt",
   uuid: "tools.tab.uuid",
@@ -314,6 +324,8 @@ const TOOL_KEYWORDS: Record<ToolId, string> = {
   regex: "regex regexp match replace flags capture preset pattern",
   json: "json format minify pretty beautify validate sort keys",
   markdown: "markdown md preview mermaid flowchart diagram gfm",
+  mermaid:
+    "mermaid flowchart sequence class state er gantt pie mindmap diagram svg preview generate",
   yaml: "yaml yml json convert config indent sort keys minify pretty",
   jwt: "jwt token decode verify encode hs256 rs256 es256 bearer claim",
   uuid: "uuid nanoid ulid generate validate v4 v7",
@@ -519,7 +531,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -596,7 +608,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert token decode verify ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -642,7 +654,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -878,6 +890,7 @@ export function App() {
                   {activeTool === "regex" && <RegexToolsTab />}
                   {activeTool === "json" && <JsonToolsTab />}
                   {activeTool === "markdown" && <MarkdownToolsTab />}
+                  {activeTool === "mermaid" && <MermaidToolsTab />}
                   {activeTool === "yaml" && <YamlJsonToolsTab />}
                   {activeTool === "jwt" && <JwtToolsTab />}
                   {activeTool === "uuid" && <UuidToolsTab />}
