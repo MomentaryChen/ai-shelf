@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Bump when script bodies change so cached files are rewritten. */
-const VERSION = 4;
+const VERSION = 5;
 
 const BASH_SCRIPT = [
   "# AI Shelf shell integration — emit OSC 7 so the desktop can track cwd.",
@@ -46,8 +46,10 @@ const BASH_SCRIPT = [
   '    *) PROMPT_COMMAND=(__aishelf_emit_osc7 "${PROMPT_COMMAND[@]}") ;;',
   "  esac",
   "else",
+  // Quote the `;` inside the pattern — bare `;` is a case-clause separator and
+  // makes bash reject the script with "syntax error near unexpected token `;`".
   '  case ";${PROMPT_COMMAND:-};" in',
-  "    *;__aishelf_emit_osc7;*|*;__aishelf_emit_osc7) ;;",
+  '    *";__aishelf_emit_osc7;"*) ;;',
   '    *) PROMPT_COMMAND="__aishelf_emit_osc7${PROMPT_COMMAND:+;}${PROMPT_COMMAND:-}" ;;',
   "  esac",
   "fi",

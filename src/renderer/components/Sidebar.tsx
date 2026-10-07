@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
   FolderOpen,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
   Search,
   Plus,
   Minus,
@@ -14,6 +15,14 @@ import {
 } from "lucide-react";
 import { WorkspaceSlideSwitcher } from "./WorkspaceSlideSwitcher";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useLocale } from "../i18n/LocaleProvider";
 import { AccountSidebar } from "./AccountSidebar";
 import { EmptyState } from "./EmptyState";
@@ -23,7 +32,6 @@ import { ToolLogo } from "./ToolLogo";
 import { profileToolLabel } from "../utils/available-tools";
 import {
   profileAccentMarkerStyle,
-  profileSidebarGroupStyle,
   profileSidebarProfileActiveStyle,
   profileSidebarTerminalStyle,
 } from "../utils/profile-colors";
@@ -174,8 +182,21 @@ export function Sidebar({
   const [draggingTerminal, setDraggingTerminal] = useState<{ profileId: string; terminalId: string } | null>(null);
   const [dragOverTerminal, setDragOverTerminal] = useState<{ profileId: string; terminalId: string; zone: "above" | "below" } | null>(null);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [profileMenuOpenId, setProfileMenuOpenId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const collapsed = controlledCollapsed ?? internalCollapsed;
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQuery("");
+  };
   const setCollapsed = (next: boolean) => {
     if (controlledCollapsed === undefined) setInternalCollapsed(next);
     onCollapsedChange?.(next);
@@ -364,25 +385,30 @@ export function Sidebar({
 
         {!collapsed && (
           <>
-            <div className="mt-3 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-muted">
-              {t("profile.title")}
-            </div>
-            <div className="mt-1 flex items-center gap-1 px-1">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-chrome-text-dim" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search profiles…"
-                  className="h-7 border-chrome-border-input bg-chrome-surface pl-7 text-[11px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-focus"
-                />
+            <div className="mt-3 flex items-center gap-1 px-1">
+              <div className="min-w-0 flex-1 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-muted">
+                {t("profile.title")}
               </div>
+              <IconAction
+                title={searchOpen ? t("profile.hideSearch") : t("profile.showSearch")}
+                onClick={() => {
+                  if (searchOpen) {
+                    closeSearch();
+                    return;
+                  }
+                  setSearchOpen(true);
+                }}
+              >
+                <Search
+                  className={`h-3.5 w-3.5 ${searchOpen || query.trim() ? "text-chrome-accent-text" : ""}`}
+                />
+              </IconAction>
               <IconAction
                 title={
                   filteredProfiles.length > 0 &&
                   filteredProfiles.every((p) => expandedProfiles.has(p.id))
-                    ? "Collapse all"
-                    : "Expand all"
+                    ? t("profile.collapseAll")
+                    : t("profile.expandAll")
                 }
                 onClick={() => {
                   const allExpanded =
@@ -405,7 +431,41 @@ export function Sidebar({
                 />
               </IconAction>
             </div>
-            <div className="mt-1 space-y-1">
+            {searchOpen && (
+              <div className="mt-1 flex items-center gap-1 px-1">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-chrome-text-dim" />
+                  <Input
+                    ref={searchInputRef}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        closeSearch();
+                      }
+                    }}
+                    placeholder={t("profile.search")}
+                    aria-label={t("profile.search")}
+                    className="h-7 border-chrome-border-input bg-chrome-surface pl-7 pr-7 text-[11px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-focus"
+                  />
+                  {query.trim() ? (
+                    <button
+                      type="button"
+                      title={t("profile.clearSearch")}
+                      onClick={() => {
+                        setQuery("");
+                        searchInputRef.current?.focus();
+                      }}
+                      className="absolute right-1.5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded text-chrome-text-dim transition-colors hover:bg-chrome-hover hover:text-chrome-text"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
+            <div className="mt-0.5 space-y-0.5">
               {filteredProfiles.length === 0 && (
                 <EmptyState
                   tone="chrome"
@@ -421,15 +481,18 @@ export function Sidebar({
                 const active = item.id === activeProfileId;
                 const expanded = expandedProfiles.has(item.id);
                 const accent = item.accentColor;
+                const menuOpen = profileMenuOpenId === item.id;
+                const addTerminalLabel = item.defaultTool
+                  ? t("profile.addTerminal", { tool: profileToolLabel(item.defaultTool) })
+                  : t("profile.addTerminalPlain");
                 return (
                   <div
                     key={item.id}
-                    className={`group rounded-lg border bg-chrome-surface/30 transition-colors ${
+                    className={`rounded-md transition-colors ${
                       dragOverProfileId === item.id && draggingProfileId !== item.id
-                        ? "ring-2 ring-chrome-ui-accent/35"
+                        ? "ring-1 ring-chrome-ui-accent/40"
                         : ""
                     }`}
-                    style={profileSidebarGroupStyle(accent)}
                     onDragOver={(e) => {
                       if (!draggingProfileId) return;
                       e.preventDefault();
@@ -447,7 +510,14 @@ export function Sidebar({
                       setDragOverProfileId(null);
                     }}
                   >
-                    <div className="px-1.5 py-1">
+                    <div
+                      className={`group/profile relative flex h-7 items-center gap-1 rounded-md pl-1.5 pr-0.5 ${
+                        active
+                          ? "text-chrome-text"
+                          : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
+                      }`}
+                      style={active ? profileSidebarProfileActiveStyle(accent) : undefined}
+                    >
                       <button
                         type="button"
                         draggable
@@ -461,80 +531,125 @@ export function Sidebar({
                           setDragOverGroupId(null);
                         }}
                         onClick={() => onProfileSelect?.(item.id)}
-                        className={`flex w-full items-center justify-between gap-2 rounded-lg px-1.5 py-1 text-left text-sm transition-all duration-200 ${
-                          active
-                            ? "bg-chrome-hover text-chrome-text"
-                            : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
-                        }`}
-                        style={active ? profileSidebarProfileActiveStyle(accent) : undefined}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[12px] leading-tight"
                       >
-                        <span className="inline-flex min-w-0 items-center gap-1.5">
-                          {accent && (
-                            <span
-                              className="h-2.5 w-2.5 shrink-0 rounded-[3px] shadow-sm"
-                              style={profileAccentMarkerStyle(accent)}
-                            />
-                          )}
-                          <span className="truncate font-medium">{item.name}</span>
-                        </span>
-                        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-chrome-text-muted">
-                          <span className="rounded bg-chrome-badge-bg px-1 py-0.5">{item.terminalCount}</span>
-                          <ChevronDown
-                            className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedProfiles((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(item.id)) next.delete(item.id);
-                                else next.add(item.id);
-                                return next;
-                              });
-                            }}
-                          />
-                        </span>
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-[3px]"
+                          style={
+                            accent
+                              ? profileAccentMarkerStyle(accent, "sm")
+                              : { backgroundColor: "var(--color-chrome-text-dim)" }
+                          }
+                        />
+                        <span className="truncate font-medium">{item.name}</span>
                       </button>
+                      <span
+                        className={`inline-flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums text-chrome-text-dim transition-opacity ${
+                          menuOpen
+                            ? "opacity-0"
+                            : "opacity-100 group-hover/profile:opacity-0 group-focus-within/profile:opacity-0"
+                        }`}
+                      >
+                        {item.terminalCount}
+                      </span>
                       <div
-                        className={`mt-1 flex items-center gap-1 pl-1 ${active ? "opacity-100" : "hidden"}`}
+                        className={`absolute right-5 top-1/2 z-10 flex -translate-y-1/2 items-center gap-0.5 ${
+                          menuOpen
+                            ? "opacity-100"
+                            : "opacity-0 pointer-events-none group-hover/profile:pointer-events-auto group-hover/profile:opacity-100 group-focus-within/profile:pointer-events-auto group-focus-within/profile:opacity-100"
+                        }`}
                       >
                         <IconAction
-                          title={
-                            item.defaultTool
-                              ? `Add terminal (${profileToolLabel(item.defaultTool)})`
-                              : "Add terminal"
-                          }
+                          title={addTerminalLabel}
                           onClick={() => onProfileAddTerminal?.(item.id)}
                         >
-                          <ToolLogo tool={item.defaultTool ?? "shell"} size={12} />
+                          <Plus className="h-3 w-3" />
                         </IconAction>
-                        <IconAction title="Open folder" onClick={() => onProfileOpenFolder?.(item.id)}>
-                          📁
-                        </IconAction>
-                        <IconAction title="Profile settings" onClick={() => onProfileSettings?.(item.id)}>
-                          ⚙
-                        </IconAction>
-                        <label
-                          className="ml-1 inline-flex items-center gap-1 text-[10px] text-chrome-text-muted"
-                          title={t("profile.syncBroadcastTitle")}
+                        <DropdownMenu
+                          open={menuOpen}
+                          onOpenChange={(open) =>
+                            setProfileMenuOpenId(open ? item.id : null)
+                          }
                         >
-                          <input
-                            type="checkbox"
-                            checked={item.broadcastInput ?? false}
-                            onChange={(e) => onProfileToggleBroadcast?.(item.id, e.target.checked)}
-                            className="h-3 w-3 rounded accent-chrome-ui-accent"
-                          />
-                          <span className={item.broadcastInput ? "text-chrome-accent-text" : undefined}>
-                            {t("chat.syncLabel")}
-                          </span>
-                        </label>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              title={t("profile.moreActions")}
+                              aria-label={t("profile.moreActions")}
+                              className="flex h-5 w-5 items-center justify-center rounded text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            side="bottom"
+                            className="min-w-[168px] border-chrome-border bg-chrome-surface text-chrome-text"
+                          >
+                            <DropdownMenuItem
+                              className="gap-2 text-[12px] focus:bg-chrome-hover focus:text-chrome-text"
+                              onSelect={() => onProfileAddTerminal?.(item.id)}
+                            >
+                              <ToolLogo tool={item.defaultTool ?? "shell"} size={12} />
+                              {addTerminalLabel}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2 text-[12px] focus:bg-chrome-hover focus:text-chrome-text"
+                              onSelect={() => onProfileOpenFolder?.(item.id)}
+                            >
+                              <FolderOpen className="h-3.5 w-3.5" />
+                              {t("profile.openFolder")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2 text-[12px] focus:bg-chrome-hover focus:text-chrome-text"
+                              onSelect={() => onProfileSettings?.(item.id)}
+                            >
+                              <Settings2 className="h-3.5 w-3.5" />
+                              {t("profile.settings")}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-chrome-border-subtle" />
+                            <DropdownMenuCheckboxItem
+                              checked={item.broadcastInput ?? false}
+                              className="text-[12px] focus:bg-chrome-hover focus:text-chrome-text"
+                              title={t("profile.syncBroadcastTitle")}
+                              onCheckedChange={(checked) =>
+                                onProfileToggleBroadcast?.(item.id, checked === true)
+                              }
+                              onSelect={(e) => e.preventDefault()}
+                            >
+                              {t("profile.syncBroadcast")}
+                            </DropdownMenuCheckboxItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
+                      <button
+                        type="button"
+                        title={expanded ? t("profile.collapse") : t("profile.expand")}
+                        aria-label={expanded ? t("profile.collapse") : t("profile.expand")}
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-chrome-text-dim transition-colors hover:bg-chrome-hover hover:text-chrome-text"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedProfiles((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(item.id)) next.delete(item.id);
+                            else next.add(item.id);
+                            return next;
+                          });
+                        }}
+                      >
+                        <ChevronDown
+                          className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+                        />
+                      </button>
                     </div>
                     {expanded && (
-                      <div className="mt-0.5 space-y-1 border-t border-chrome-border-subtle pl-2 pt-1">
+                      <div className="ml-2 space-y-0.5 border-l border-chrome-border-subtle py-0.5 pl-1.5">
                         {(item.terminals ?? []).length === 0 && (
                           <EmptyState
                             tone="chrome"
                             compact
-                            className="items-start px-1 py-1.5 text-left"
+                            className="items-start px-1 py-1 text-left"
                             title={t("terminal.empty")}
                             description={t("terminal.emptyHint")}
                           />
@@ -543,8 +658,9 @@ export function Sidebar({
                           const terminalActive = terminal.id === activeTerminalId;
                           const profileActive = item.id === activeProfileId;
                           const canMiddleClose = profileActive && terminal.live === true;
+                          const pathTitle = terminal.description ?? "";
                           const terminalTitle = terminal.description
-                            ? `${terminal.label} · ${terminal.description}`
+                            ? `${terminal.label}\n${terminal.description}`
                             : terminal.label;
                           return (
                             <button
@@ -578,7 +694,8 @@ export function Sidebar({
                                 }
                                 e.preventDefault();
                                 const rect = e.currentTarget.getBoundingClientRect();
-                                const zone = e.clientY < rect.top + rect.height / 2 ? "above" : "below";
+                                const zone =
+                                  e.clientY < rect.top + rect.height / 2 ? "above" : "below";
                                 setDragOverTerminal({
                                   profileId: terminal.profileId,
                                   terminalId: terminal.id,
@@ -604,15 +721,15 @@ export function Sidebar({
                                 setDraggingTerminal(null);
                                 setDragOverTerminal(null);
                               }}
-                              className={`group relative flex w-full items-center rounded-lg px-2 py-1.5 text-left text-xs transition-all duration-200 ${
+                              className={`group/term relative flex w-full items-start gap-1.5 rounded-md px-1.5 py-1 text-left transition-colors ${
                                 terminalActive
-                                  ? "bg-chrome-hover text-chrome-text"
+                                  ? "text-chrome-text"
                                   : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                               }`}
                               style={profileSidebarTerminalStyle(accent, terminalActive)}
                               title={
                                 canMiddleClose
-                                  ? `${terminalTitle} · ${t("profile.middleClickClose")}`
+                                  ? `${terminalTitle}\n${t("profile.middleClickClose")}`
                                   : terminalTitle
                               }
                               onMouseDown={(e) =>
@@ -634,68 +751,79 @@ export function Sidebar({
                                     }`}
                                   />
                                 )}
-                              <span className="mr-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-chrome-border-subtle bg-chrome-surface">
+                              <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center">
                                 <ToolLogo tool={terminal.tool ?? "shell"} size={12} />
                               </span>
-                              {terminal.live && onTerminalRename ? (
-                                <EditablePaneTitle
-                                  label={terminal.label}
-                                  onRename={(title) =>
-                                    onTerminalRename(terminal.profileId, terminal.id, title)
-                                  }
-                                  className="truncate text-[11px]"
-                                  inputClassName="text-[11px]"
-                                />
-                              ) : (
-                                <span className="truncate">{terminal.label}</span>
-                              )}
-                              {terminal.description && (
-                                <span className="ml-1 truncate text-[10px] text-chrome-text-muted">
-                                  · {terminal.description}
-                                </span>
-                              )}
-                              {terminal.live && (
-                                <span className="ml-auto inline-flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                                  {terminal.minimized ? (
-                                    <IconAction
-                                      title="Restore pane"
-                                      onClick={() =>
-                                        onTerminalRestore?.(terminal.profileId, terminal.id)
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-center gap-1">
+                                  {terminal.live && onTerminalRename ? (
+                                    <EditablePaneTitle
+                                      label={terminal.label}
+                                      onRename={(title) =>
+                                        onTerminalRename(terminal.profileId, terminal.id, title)
                                       }
-                                    >
-                                      <ArrowUpRight className="h-3 w-3" />
-                                    </IconAction>
+                                      className="truncate text-[11px] leading-tight"
+                                      inputClassName="text-[11px]"
+                                    />
                                   ) : (
-                                    <IconAction
-                                      title="Minimize pane"
-                                      onClick={() =>
-                                        onTerminalMinimize?.(terminal.profileId, terminal.id)
-                                      }
-                                    >
-                                      <Minus className="h-3 w-3" />
-                                    </IconAction>
+                                    <span className="truncate text-[11px] leading-tight">
+                                      {terminal.label}
+                                    </span>
                                   )}
-                                  <IconAction
-                                    title={t("pane.close")}
-                                    onClick={() => onTerminalClose?.(terminal.profileId, terminal.id)}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </IconAction>
+                                  {terminal.live && (
+                                    <span className="ml-auto inline-flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/term:opacity-100">
+                                      {terminal.minimized ? (
+                                        <IconAction
+                                          title="Restore pane"
+                                          onClick={() =>
+                                            onTerminalRestore?.(terminal.profileId, terminal.id)
+                                          }
+                                        >
+                                          <ArrowUpRight className="h-3 w-3" />
+                                        </IconAction>
+                                      ) : (
+                                        <IconAction
+                                          title="Minimize pane"
+                                          onClick={() =>
+                                            onTerminalMinimize?.(terminal.profileId, terminal.id)
+                                          }
+                                        >
+                                          <Minus className="h-3 w-3" />
+                                        </IconAction>
+                                      )}
+                                      <IconAction
+                                        title={t("pane.close")}
+                                        onClick={() =>
+                                          onTerminalClose?.(terminal.profileId, terminal.id)
+                                        }
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </IconAction>
+                                    </span>
+                                  )}
                                 </span>
-                              )}
+                                {terminal.description ? (
+                                  <span
+                                    className="mt-px block truncate text-[10px] leading-tight text-chrome-text-dim"
+                                    title={pathTitle}
+                                  >
+                                    {terminal.description}
+                                  </span>
+                                ) : null}
+                              </span>
                             </button>
                           );
                         })}
                         {(item.savedCommands ?? []).length > 0 && (
-                          <div className="mt-1 space-y-0.5 border-t border-chrome-border-subtle/60 pt-1">
-                            <p className="px-2 text-[9px] font-medium uppercase tracking-wide text-chrome-text-dim">
+                          <div className="mt-0.5 space-y-0.5 border-t border-chrome-border-subtle/60 pt-0.5">
+                            <p className="px-1.5 text-[9px] font-medium uppercase tracking-wide text-chrome-text-dim">
                               {t("sidebar.savedCommands")}
                             </p>
                             {(item.savedCommands ?? []).map((snippet) => (
                               <button
                                 key={snippet.id}
                                 type="button"
-                                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-[11px] text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
+                                className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[11px] text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
                                 title={snippet.command}
                                 onClick={() =>
                                   onSavedCommandRun?.(
@@ -754,8 +882,11 @@ function IconAction({
     <button
       type="button"
       title={title}
-      onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-md text-chrome-text-muted transition-all duration-200 hover:bg-chrome-hover hover:text-chrome-text"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      className="flex h-5 w-5 items-center justify-center rounded text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
     >
       {children}
     </button>

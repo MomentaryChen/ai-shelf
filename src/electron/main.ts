@@ -3,8 +3,16 @@ import type { MenuItemConstructorOptions } from "electron";
 import { join, normalize, dirname, basename } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, mkdir, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { execSync, spawn } from "node:child_process";
+import {
+  createPtyDataPendingState,
+  dropPtyDataPending,
+  queuePtyDataPending,
+  shouldDropPendingOnBufferAttach,
+  takePtyDataPending,
+} from "../shared/pty-data-pending.js";
 import {
   detectAll,
   detectTool,
@@ -1394,8 +1402,7 @@ const PTY_LOG_INFLIGHT = new Map<string, Promise<void>>();
 const PTY_LOG_FLUSH_TIMERS = new Map<string, ReturnType<typeof setTimeout>>();
 const PTY_LOG_FLUSH_IDLE_MS = 50;
 
-const PTY_DATA_PENDING = new Map<string, string>();
-const PTY_DATA_FLUSH_TIMERS = new Map<string, ReturnType<typeof setTimeout>>();
+const PTY_DATA_STATE = createPtyDataPendingState();
 const PTY_DATA_COALESCE_MS = 16;
 
 function enqueuePtyLog(sessionId: string, op: PtyLogOp) {
@@ -1522,14 +1529,13 @@ function sendPtyData(sessionId: string, data: string) {
 }
 
 function flushPtyDataBroadcast(sessionId: string) {
-  const timer = PTY_DATA_FLUSH_TIMERS.get(sessionId);
-  if (timer) {
-    clearTimeout(timer);
-    PTY_DATA_FLUSH_TIMERS.delete(sessionId);
-  }
-  const data = PTY_DATA_PENDING.get(sessionId);
-  PTY_DATA_PENDING.delete(sessionId);
+  const data = takePtyDataPending(PTY_DATA_STATE, sessionId);
   if (data) sendPtyData(sessionId, data);
+}
+
+/** Keep the in-memory / mirrored log after exit so Find and export still work. */
+function retainPtyBufferOnExit(sessionId: string) {
+  flushPtyDataBroadcast(sessionId);
 }
 
 function clearPtyBuffer(sessionId: string) {
@@ -1546,13 +1552,7 @@ function clearPtyBuffer(sessionId: string) {
 
 function broadcastPtyData(sessionId: string, data: string) {
   appendPtyBuffer(sessionId, data);
-  const prev = PTY_DATA_PENDING.get(sessionId) ?? "";
-  PTY_DATA_PENDING.set(sessionId, prev + data);
-  if (PTY_DATA_FLUSH_TIMERS.has(sessionId)) return;
-  const timer = setTimeout(() => {
-    flushPtyDataBroadcast(sessionId);
-  }, PTY_DATA_COALESCE_MS);
-  PTY_DATA_FLUSH_TIMERS.set(sessionId, timer);
+  queuePtyDataPending(PTY_DATA_STATE, sessionId, data, PTY_DATA_COALESCE_MS, flushPtyDataBroadcast);
 }
 
 function broadcastPtyExit(sessionId: string, exitCode: number) {
@@ -1655,7 +1655,8 @@ ipcMain.handle(
     const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
     if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
 
-    const sessionId = `${tool}-${Date.now()}`;
+    // Date.now() alone collides when the same tool spawns twice in one ms.
+    const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
     const workDirResult = resolvePtyWorkDir(cwd);
     if (!workDirResult.ok) {
       return { success: false, error: workDirResult.error };
@@ -1730,7 +1731,8 @@ ipcMain.handle(
 
       proc.onExit(({ exitCode }) => {
         PTY_SESSIONS.delete(sessionId);
-        clearPtyBuffer(sessionId);
+        // Keep the output buffer for Find / export until the pane is killed.
+        retainPtyBufferOnExit(sessionId);
         const meta = PTY_META.get(sessionId);
         if (meta) meta.exitCode = exitCode;
         broadcastPtyExit(sessionId, exitCode);
@@ -1751,6 +1753,11 @@ ipcMain.handle(
     const alive = PTY_SESSIONS.has(sessionId);
     const meta = PTY_META.get(sessionId);
     const includeBuffer = opts?.includeBuffer !== false;
+    // Full-buffer attach already contains any coalesced pending tail — drop it
+    // so the coalesce timer cannot re-deliver the same chunk to onPtyData.
+    if (shouldDropPendingOnBufferAttach(includeBuffer)) {
+      dropPtyDataPending(PTY_DATA_STATE, sessionId);
+    }
     return {
       success: true,
       alive,
@@ -1836,7 +1843,7 @@ function ptySessionGoneResult(sessionId: string): { success: false; error: strin
 
 function markPtySessionDead(sessionId: string, exitCode: number) {
   PTY_SESSIONS.delete(sessionId);
-  clearPtyBuffer(sessionId);
+  retainPtyBufferOnExit(sessionId);
   const meta = PTY_META.get(sessionId);
   if (meta && meta.exitCode == null) meta.exitCode = exitCode;
   broadcastPtyExit(sessionId, exitCode);
@@ -1883,7 +1890,11 @@ ipcMain.on("pty-kill", (_e, sessionId: string) => {
   PTY_SESSIONS.delete(sessionId);
   clearPtyBuffer(sessionId);
   // Keep PTY_META so the status bar can still show shell / last size / exit.
-  // Broadcast immediately so UI leaves "live" before onExit arrives with exitCode.
+  // Emit exit immediately so the UI never sits in a stale "live" gap waiting
+  // for node-pty's onExit (which may arrive later with the real code).
+  const meta = PTY_META.get(sessionId);
+  if (meta && meta.exitCode == null) meta.exitCode = -1;
+  broadcastPtyExit(sessionId, meta?.exitCode ?? -1);
   broadcastPtyMeta(sessionId);
 });
 

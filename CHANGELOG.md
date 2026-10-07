@@ -9,9 +9,26 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-10-07
+
+Compact Warp-style profile sidebar, WSL tools, steadier terminal attach/IME, and workspace slide cycling.
+
 ### Added
 
 - **WSL tools** — Tools mode panel for Windows ↔ WSL path conversion (drive, `/mnt`, `\\wsl$`), distro list / IP via `wsl.exe`, and copyable everyday commands.
+
+### Changed
+
+- **Compact profile sidebar** — Flat Warp-style profile list with accent selection, hover actions, and truncated path subtitles instead of bordered cards.
+- **Collapsed profile search** — Profile search stays hidden by default; expand it from the Profiles header when needed.
+- **Workspace slide cycling** — Workspace slide switcher wraps at both ends so you can cycle continuously.
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIFs for the current UI.
+
+### Fixed
+
+- **Terminal attach and IME races** — Closes PTY attach double-paint, CJK composition drops on blur, dead-session remounts, stale kill UI, and related session edge cases.
+
+[4.3.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.3.1
 
 ## [4.3.0] - 2026-08-19
 

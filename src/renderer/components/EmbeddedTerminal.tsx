@@ -18,7 +18,12 @@ import { bindTerminalLinks } from "../terminal/xterm-links";
 import { bindTerminalCwd } from "../terminal/xterm-cwd";
 import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
 import { recordImeAnchor } from "../terminal/ime-anchor-log";
+import { attachImeCommitGuard } from "../terminal/ime-commit-guard";
 import { attachImeInputTrace, recordImeInputData } from "../terminal/ime-input-trace";
+import {
+  shouldRespawnLostSession,
+  shouldWakeShellWithEnter,
+} from "../terminal/pty-attach-session";
 import { registerTerminalClear } from "../terminal/terminal-session-actions";
 import {
   copyTerminalOutputForIssue,
@@ -375,6 +380,8 @@ function EmbeddedTerminalInner({
     const unbindImeAnchor = attachImeAnchor(term, {
       onAnchor: (a) => recordImeAnchor(sessionId, a),
     });
+    // Rescue CJK commits dropped when blur clears the textarea mid-finalize.
+    const unbindImeCommitGuard = attachImeCommitGuard(term);
     // Dropped CJK input has no live repro; see terminal/ime-input-log.
     const unbindImeTrace = attachImeInputTrace(term, sessionId);
     const unbindLinks = bindTerminalLinks(term);
@@ -515,7 +522,22 @@ function EmbeddedTerminalInner({
     void window.api.ptyAttach(sessionId).then((r) => {
       if (cancelled) return;
       if (!r.alive) {
-        onSessionLostRef.current?.(sessionId);
+        // Replay history for a known-dead session (Find / "press any key") and
+        // only ask the parent to respawn when meta vanished entirely.
+        if (r.buffer) {
+          receivedBytes += r.buffer.length;
+          writeSafe(r.buffer);
+        }
+        markExited();
+        if (
+          shouldRespawnLostSession({
+            exitCode: r.exitCode,
+            shell: r.shell,
+            pid: r.pid,
+          })
+        ) {
+          onSessionLostRef.current?.(sessionId);
+        }
         return;
       }
       if (r.buffer) {
@@ -525,11 +547,15 @@ function EmbeddedTerminalInner({
       flushPending();
       scheduleFit();
 
-      wakeTimer = window.setTimeout(() => {
-        if (cancelled || exited || receivedBytes > 0) return;
-        writePty("\r");
-        scheduleFit();
-      }, 400);
+      // Auto-Enter is only safe for plain shells — AI CLIs can treat a
+      // premature CR as submit before the first prompt paints.
+      if (shouldWakeShellWithEnter(sessionId)) {
+        wakeTimer = window.setTimeout(() => {
+          if (cancelled || exited || receivedBytes > 0) return;
+          writePty("\r");
+          scheduleFit();
+        }, 400);
+      }
 
       statusTimer = window.setTimeout(() => {
         if (cancelled || receivedBytes > 0) return;
@@ -580,6 +606,7 @@ function EmbeddedTerminalInner({
       unregisterClear();
       unbindClipboard();
       unbindImeAnchor();
+      unbindImeCommitGuard();
       unbindImeTrace();
       unbindLinks();
       unbindCwd();
@@ -588,8 +615,9 @@ function EmbeddedTerminalInner({
       searchAddon.dispose();
       disposeTerminal(term);
     };
-    // fontFamily / fontSize / scrollback: applied live below — do not remount xterm
-  }, [sessionId, stableOnExit, bg, webglEnabled]);
+    // fontFamily / fontSize / scrollback / bg: applied live below — do not remount xterm.
+    // Remounting on bg used to respawn dead panes via onSessionLost.
+  }, [sessionId, stableOnExit, webglEnabled]);
 
   useEffect(() => {
     const term = termRef.current;
