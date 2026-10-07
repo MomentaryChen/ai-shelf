@@ -73,7 +73,7 @@ export function EditablePaneTitle({
 
   return (
     <span
-      className={`min-w-0 flex-1 truncate ${disabled ? "" : "cursor-text"} ${className}`}
+      className={`min-w-0 truncate ${disabled ? "" : "cursor-text"} ${className}`}
       title={title ?? (disabled ? label : t("pane.renameHint", { label }))}
       onDoubleClick={(e) => {
         if (disabled) return;

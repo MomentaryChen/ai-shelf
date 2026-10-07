@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetState
 import { ArrowUpCircle, Check, CheckCircle2, Package, PartyPopper, RefreshCw, XCircle } from "lucide-react";
 import type { ProviderEntry, ToolUpdateInfo } from "../types";
 import { Card } from "./Card";
-import { Badge, InstallStatusBadge } from "./Badge";
+import { Badge } from "./Badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "./EmptyState";
 import { ToolNameCell } from "./ToolNameCell";
@@ -303,7 +303,6 @@ function NotInstalledUpdateCard({
       dense
       className={installedCardClass(false)}
       title={<ToolNameCell entry={entry} />}
-      trailing={<InstallStatusBadge available={false} />}
     >
       <p className="mb-2 text-[13px] text-text-tertiary">{t("inventory.skipUpdate")}</p>
       <ToolInstallPanel tool={entry.tool} onInstalled={onRefresh} />

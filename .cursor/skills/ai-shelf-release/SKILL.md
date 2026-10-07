@@ -159,7 +159,7 @@ Pushing **`v*`** triggers [.github/workflows/release.yml](../../../.github/workf
 - **release-windows** — NSIS installer; attaches **`AI-Shelf-Setup-*.exe`**, **`latest.yml`**, **`*.blockmap`**.
 - **release-mac** — unsigned DMG/ZIP (`arm64` + `x64`); attaches **`AI-Shelf-*.dmg`**, **`.zip`**, **`latest-mac.yml`**.
 - **release-linux** — unsigned AppImage; attaches **`AI-Shelf-*.AppImage`**, **`latest-linux.yml`**.
-- **publish-npm** — publishes **`ai-shelf`** from `packages/cli` to npm (needs repo secret **`NPM_TOKEN`**; version synced from tag via [scripts/sync-version-from-tag.mjs](../../../scripts/sync-version-from-tag.mjs)).
+- **publish-npm** — publishes **`ai-shelf`** from `packages/cli` to npm via **Trusted Publishing (OIDC)** and/or repo secret **`NPM_TOKEN`** (version synced from tag via [scripts/sync-version-from-tag.mjs](../../../scripts/sync-version-from-tag.mjs)). See [docs/RELEASE.md](../../../docs/RELEASE.md).
 
 See [docs/RELEASE.md](../../../docs/RELEASE.md).
 
@@ -187,7 +187,7 @@ Tell the user to open **Actions → Release** and then **Releases**. Confirm:
 - Windows: **`AI-Shelf-Setup-X.Y.Z.exe`**, **`latest.yml`**, **`*.blockmap`**
 - macOS: **`AI-Shelf-X.Y.Z-{arm64,x64}.dmg`** (+ zip) and **`latest-mac.yml`**
 - Linux: **`AI-Shelf-X.Y.Z.AppImage`** and **`latest-linux.yml`**
-- **`npm view ai-shelf version`** shows `X.Y.Z` (if publish-npm failed, check **`NPM_TOKEN`** secret)
+- **`npm view ai-shelf version`** shows `X.Y.Z` (if publish-npm failed with **E404**, treat it as auth: rotate **`NPM_TOKEN`** or configure npm **Trusted Publishing** for `release.yml`, then re-run the job or **Actions → Release → Run workflow** with `npm_version` — see [docs/RELEASE.md](../../../docs/RELEASE.md))
 - Release description matches CHANGELOG
 - `origin/develop` matches (or includes) `origin/main` after sync
 

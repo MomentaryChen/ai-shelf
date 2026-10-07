@@ -9,6 +9,30 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-10-07
+
+Mermaid diagram tools, navigation and terminal polish, and sturdier npm publish CI.
+
+### Added
+
+- **Mermaid tools** — Dedicated Tools panel with diagram templates, live preview, Markdown fence copy, and SVG copy/download.
+- **Mode shortcuts** — Alt/Option+1–4 switches Terminal, Inventory, Tools, and AI Flow (also listed in the cheatsheet).
+
+### Changed
+
+- **Navigation icons** — Lucide line icons replace emoji in the rails and command palette; Tools rail is grouped with a filter box.
+- **Workspace dropdown** — Replaces the workspace slide carousel with a dropdown (avatar, counts, ←/→ / scroll cycling, new / rename / delete).
+- **Terminal empty states** — Centered empty-profile card with open / folder actions; quieter pane-limit hints; numbered untitled panes; even split when adding panes.
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIFs for the current UI.
+
+### Fixed
+
+- **npm publish CI** — Treat misleading `E404` on publish as auth failure; support OIDC Trusted Publishing, verify `NPM_TOKEN` before publish, and allow npm-only republish via workflow dispatch.
+- **Missing default CLI** — When a profile’s default tool is not installed, open a plain shell instead of offering the missing CLI.
+- **Pane header readability** — Opaque chrome header and chrome text on warm/light themes so titles stay legible over the terminal.
+
+[4.3.2]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.3.2
+
 ## [4.3.1] - 2026-10-07
 
 Compact Warp-style profile sidebar, WSL tools, steadier terminal attach/IME, and workspace slide cycling.

@@ -9,19 +9,42 @@ import {
   useTransition,
 } from "react";
 import {
-  BarChart3,
+  BadgeCheck,
+  Braces,
+  Brain,
+  CalendarClock,
+  ChartColumn,
+  Clock3,
   Compass,
+  Cpu,
+  FileCode2,
   FileText,
+  Fingerprint,
+  GitCompare,
+  Hash,
+  KeyRound,
+  Keyboard,
+  LayoutDashboard,
   Monitor,
+  Network,
   Package,
   Plug,
   RefreshCw,
+  Regex,
+  Settings,
+  SquareTerminal,
   Stethoscope,
+  Workflow,
   Wrench,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import { Spinner } from "./components/Spinner";
-import { AppModeSwitch, type AppMode } from "./components/AppModeSwitch";
+import {
+  AppModeSwitch,
+  matchModeSwitchShortcut,
+  type AppMode,
+} from "./components/AppModeSwitch";
 import { InventoryNav, type NavItem } from "./components/InventoryNav";
 import type { Command } from "./components/CommandPalette";
 import { ViewTransition } from "./components/ViewTransition";
@@ -81,6 +104,9 @@ const JsonToolsTab = lazy(() =>
 const MarkdownToolsTab = lazy(() =>
   import("./components/MarkdownToolsTab").then((m) => ({ default: m.MarkdownToolsTab })),
 );
+const MermaidToolsTab = lazy(() =>
+  import("./components/MermaidToolsTab").then((m) => ({ default: m.MermaidToolsTab })),
+);
 const YamlJsonToolsTab = lazy(() =>
   import("./components/YamlJsonToolsTab").then((m) => ({ default: m.YamlJsonToolsTab })),
 );
@@ -135,6 +161,7 @@ type ToolId =
   | "regex"
   | "json"
   | "markdown"
+  | "mermaid"
   | "yaml"
   | "jwt"
   | "uuid"
@@ -209,16 +236,20 @@ function buildGlobalCommands(
 
   return [...configCommands, ...skillCommands, ...mcpCommands];
 }
-const TAB_ICONS: Record<TabId, string> = {
-  overview: "📋",
-  models: "🧠",
-  skills: "⚡",
-  mcp: "🔌",
-  config: "⚙️",
-  doctor: "🩺",
-  update: "🔄",
-  usage: "📊",
+const TAB_ICONS: Record<TabId, LucideIcon> = {
+  overview: LayoutDashboard,
+  models: Brain,
+  skills: Zap,
+  mcp: Plug,
+  config: Settings,
+  doctor: Stethoscope,
+  update: RefreshCw,
+  usage: ChartColumn,
 };
+
+function navIcon(Icon: LucideIcon) {
+  return <Icon aria-hidden className="h-4 w-4" strokeWidth={1.75} />;
+}
 
 const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
   overview: "app.tab.overview",
@@ -234,26 +265,38 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
 const TAB_IDS = Object.keys(TAB_LABEL_KEYS) as TabId[];
 const TABS: NavItem<TabId>[] = TAB_IDS.map((id) => ({
   id,
-  icon: <span className="text-[14px] leading-none">{TAB_ICONS[id]}</span>,
+  icon: navIcon(TAB_ICONS[id]),
   labelKey: TAB_LABEL_KEYS[id],
 }));
 
-const TOOL_ICONS: Record<ToolId, string> = {
-  codec: "🔐",
-  crypto: "🗝️",
-  time: "🕒",
-  cron: "⏰",
-  regex: "🔤",
-  json: "{}",
-  markdown: "📝",
-  yaml: "📄",
-  jwt: "🪪",
-  uuid: "🆔",
-  diff: "≠",
-  system: "💻",
-  ports: "🔌",
-  wsl: "🐧",
+const TOOL_ICONS: Record<ToolId, LucideIcon> = {
+  codec: Hash,
+  crypto: KeyRound,
+  time: Clock3,
+  cron: CalendarClock,
+  regex: Regex,
+  json: Braces,
+  markdown: FileText,
+  mermaid: Workflow,
+  yaml: FileCode2,
+  jwt: BadgeCheck,
+  uuid: Fingerprint,
+  diff: GitCompare,
+  system: Cpu,
+  ports: Network,
+  wsl: SquareTerminal,
 };
+
+/** Rail order — grouped so related tools sit together. */
+const TOOL_GROUPS: { groupKey: MessageKey; ids: ToolId[] }[] = [
+  { groupKey: "tools.group.encode", ids: ["codec", "crypto", "jwt", "uuid"] },
+  {
+    groupKey: "tools.group.text",
+    ids: ["json", "yaml", "markdown", "mermaid", "regex", "diff"],
+  },
+  { groupKey: "tools.group.time", ids: ["time", "cron"] },
+  { groupKey: "tools.group.system", ids: ["system", "ports", "wsl"] },
+];
 
 const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   codec: "tools.tab.codec",
@@ -263,6 +306,7 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   regex: "tools.tab.regex",
   json: "tools.tab.json",
   markdown: "tools.tab.markdown",
+  mermaid: "tools.tab.mermaid",
   yaml: "tools.tab.yaml",
   jwt: "tools.tab.jwt",
   uuid: "tools.tab.uuid",
@@ -272,12 +316,34 @@ const TOOL_LABEL_KEYS: Record<ToolId, MessageKey> = {
   wsl: "tools.tab.wsl",
 };
 
-const TOOL_IDS = Object.keys(TOOL_LABEL_KEYS) as ToolId[];
-const TOOLS: NavItem<ToolId>[] = TOOL_IDS.map((id) => ({
-  id,
-  icon: <span className="text-[14px] leading-none">{TOOL_ICONS[id]}</span>,
-  labelKey: TOOL_LABEL_KEYS[id],
-}));
+const TOOL_KEYWORDS: Record<ToolId, string> = {
+  codec: "codec hash base64 image md5 sha url hex tools",
+  crypto: "crypto aes rsa ecdsa encrypt decrypt sign verify key pem",
+  time: "time timestamp unix timezone utc epoch ms us ns iso",
+  cron: "cron schedule expression timezone preset",
+  regex: "regex regexp match replace flags capture preset pattern",
+  json: "json format minify pretty beautify validate sort keys",
+  markdown: "markdown md preview mermaid flowchart diagram gfm",
+  mermaid:
+    "mermaid flowchart sequence class state er gantt pie mindmap diagram svg preview generate",
+  yaml: "yaml yml json convert config indent sort keys minify pretty",
+  jwt: "jwt token decode verify encode hs256 rs256 es256 bearer claim",
+  uuid: "uuid nanoid ulid generate validate v4 v7",
+  diff: "diff compare text unified patch lines whitespace",
+  system: "system info cpu memory ram network gpu nvidia host meter usage analyze report",
+  ports: "port ports listen listener netstat lsof pid kill occupy 3000",
+  wsl: "wsl linux distro path windows ubuntu",
+};
+
+const TOOLS: NavItem<ToolId>[] = TOOL_GROUPS.flatMap(({ groupKey, ids }) =>
+  ids.map((id) => ({
+    id,
+    icon: navIcon(TOOL_ICONS[id]),
+    labelKey: TOOL_LABEL_KEYS[id],
+    groupKey,
+    keywords: TOOL_KEYWORDS[id],
+  })),
+);
 
 const IS_MAC =
   typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
@@ -324,9 +390,9 @@ export function App() {
 
   const closeCheatsheet = useCallback(() => setCheatsheetOpen(false), []);
 
-  function handleModeChange(mode: AppMode) {
+  const handleModeChange = useCallback((mode: AppMode) => {
     startTransition(() => setAppMode(mode));
-  }
+  }, []);
 
   const {
     data,
@@ -377,6 +443,13 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (shouldIgnoreShortcutForIme(e)) return;
+      const targetMode = matchModeSwitchShortcut(e);
+      if (targetMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleModeChange(targetMode);
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
       if (e.key === "k" || e.key === "K") {
         e.preventDefault();
@@ -392,7 +465,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [togglePalette, openCheatsheet]);
+  }, [togglePalette, openCheatsheet, handleModeChange]);
 
   useEffect(() => {
     registerShortcutCheatsheetOpener(openCheatsheet);
@@ -458,7 +531,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -495,7 +568,7 @@ export function App() {
         id: "show-shortcuts",
         title: t("cmd.action.shortcuts"),
         group: t("cmd.group.actions"),
-        icon: "⌨️",
+        icon: <Keyboard className="h-4 w-4" />,
         keywords: "keyboard shortcuts cheatsheet help",
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
@@ -511,32 +584,7 @@ export function App() {
       title: `${t("cmd.go")} ${t(it.labelKey)}`,
       group: t("cmd.group.navigate"),
       icon: it.icon,
-      keywords:
-        it.id === "time"
-          ? "time timestamp unix timezone utc epoch ms us ns iso"
-          : it.id === "crypto"
-            ? "crypto aes rsa ecdsa encrypt decrypt sign verify key pem"
-            : it.id === "cron"
-              ? "cron schedule expression timezone preset"
-              : it.id === "regex"
-                ? "regex regexp match replace flags capture preset pattern"
-                : it.id === "json"
-                  ? "json format minify pretty beautify validate sort keys"
-                  : it.id === "markdown"
-                    ? "markdown md preview mermaid flowchart diagram gfm"
-                    : it.id === "yaml"
-                      ? "yaml yml json convert config indent sort keys minify pretty"
-                      : it.id === "jwt"
-                        ? "jwt token decode verify encode hs256 rs256 es256 bearer claim"
-                        : it.id === "uuid"
-                          ? "uuid nanoid ulid generate validate v4 v7"
-                          : it.id === "diff"
-                            ? "diff compare text unified patch lines whitespace"
-                            : it.id === "system"
-                              ? "system info cpu memory ram network gpu nvidia host meter usage analyze report"
-                              : it.id === "ports"
-                                ? "port ports listen listener netstat lsof pid kill occupy 3000"
-                                : "codec hash base64 image md5 tools",
+      keywords: it.keywords,
       run: () => goToTool(it.id),
     }));
     const actions: Command[] = [
@@ -560,7 +608,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert token decode verify ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert token decode verify ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -574,7 +622,7 @@ export function App() {
         id: "show-shortcuts",
         title: t("cmd.action.shortcuts"),
         group: t("cmd.group.actions"),
-        icon: "⌨️",
+        icon: <Keyboard className="h-4 w-4" />,
         keywords: "keyboard shortcuts cheatsheet help",
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
@@ -606,7 +654,7 @@ export function App() {
         group: t("cmd.group.actions"),
         icon: <Wrench className="h-4 w-4" />,
         keywords:
-          "tools codec crypto time cron regex json markdown yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify mermaid flowchart preview convert ports listen system cpu memory gpu",
+          "tools codec crypto time cron regex json markdown mermaid yaml yml jwt uuid nanoid diff compare text hash base64 image aes rsa ecdsa md5 timestamp unix timezone schedule regexp match replace format minify pretty beautify flowchart sequence diagram preview convert ports listen system cpu memory gpu",
         run: () => handleModeChange("tools"),
       },
       {
@@ -620,7 +668,7 @@ export function App() {
         id: "show-shortcuts",
         title: t("cmd.action.shortcuts"),
         group: t("cmd.group.actions"),
-        icon: "⌨️",
+        icon: <Keyboard className="h-4 w-4" />,
         keywords: "keyboard shortcuts cheatsheet help",
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
@@ -829,6 +877,7 @@ export function App() {
             active={activeTool}
             onSelect={selectTool}
             sectionLabelKey="app.nav.tools"
+            filterable
           />
           <main className="@container min-w-0 flex-1 overflow-y-auto px-3 pt-4 pb-8 sm:px-5 sm:pt-5 sm:pb-10 lg:px-6">
             <div className="mx-auto w-full max-w-[1400px]">
@@ -841,6 +890,7 @@ export function App() {
                   {activeTool === "regex" && <RegexToolsTab />}
                   {activeTool === "json" && <JsonToolsTab />}
                   {activeTool === "markdown" && <MarkdownToolsTab />}
+                  {activeTool === "mermaid" && <MermaidToolsTab />}
                   {activeTool === "yaml" && <YamlJsonToolsTab />}
                   {activeTool === "jwt" && <JwtToolsTab />}
                   {activeTool === "uuid" && <UuidToolsTab />}

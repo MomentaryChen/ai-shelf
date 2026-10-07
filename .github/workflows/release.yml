@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - "v*"
+  # Re-publish CLI to npm after fixing auth (e.g. rotated NPM_TOKEN / Trusted Publishing)
+  # without retagging. Desktop jobs are skipped.
+  workflow_dispatch:
+    inputs:
+      npm_version:
+        description: "Version to publish to npm (e.g. 4.3.1). Must not already exist on the registry."
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -25,6 +33,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # workflow_dispatch uses the selected branch's workflow YAML, but publish
+          # the tagged source so a republish matches the GitHub Release.
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.npm_version) || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -34,12 +46,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
+          # Trusted publishing needs Node ≥ 22.14 and npm ≥ 11.5.1.
           node-version: 22
           registry-url: https://registry.npmjs.org
           cache: pnpm
 
+      - name: Ensure npm CLI supports OIDC trusted publishing
+        run: npm install -g npm@^11.5.1
+
       - name: Sync version from tag
-        run: node scripts/sync-version-from-tag.mjs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            node scripts/sync-version-from-tag.mjs "${{ inputs.npm_version }}"
+          else
+            node scripts/sync-version-from-tag.mjs
+          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -47,14 +68,37 @@ jobs:
       - name: Build CLI package
         run: pnpm --filter ai-shelf run build
 
+      # Prefer npm Trusted Publishing (OIDC). NPM_TOKEN remains a fallback when set.
+      # A missing/expired token often surfaces as a misleading E404 on PUT — not "package missing".
       - name: Publish to npm
-        run: pnpm --filter ai-shelf publish --no-git-checks --access public
+        working-directory: packages/cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "npm $(npm -v) / node $(node -v)"
+
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "Using NPM_TOKEN; verifying registry auth…"
+            npm whoami --registry=https://registry.npmjs.org
+          else
+            unset NODE_AUTH_TOKEN
+            echo "NPM_TOKEN is empty — publishing via OIDC trusted publishing."
+            echo "Requires a Trusted Publisher on npmjs.com for MomentaryChen/ai-shelf + workflow release.yml."
+            if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+              echo "::error::No NPM_TOKEN and no GitHub OIDC token available. Set repo secret NPM_TOKEN, or configure npm Trusted Publishing (see docs/RELEASE.md)."
+              exit 1
+            fi
+          fi
+
+          # Use npm publish (not pnpm) so OIDC trusted publishing is detected reliably.
+          # Build already ran above; prepublishOnly would rebuild again via pnpm.
+          npm publish --access public
 
   # Create the GitHub Release once so platform jobs can attach assets without racing.
   create-release:
     name: Create GitHub Release
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -80,6 +124,7 @@ jobs:
 
   release-windows:
     needs: create-release
+    if: github.event_name == 'push'
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -176,6 +221,7 @@ jobs:
 
   release-mac:
     needs: create-release
+    if: github.event_name == 'push'
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -218,6 +264,7 @@ jobs:
 
   release-linux:
     needs: create-release
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
