@@ -115,7 +115,9 @@ export class PtyRuntime {
   }
 
   resize(runtimeId: string, cols: number, rows: number): void {
-    this.processes.get(runtimeId)?.resize(cols, rows);
+    const proc = this.processes.get(runtimeId);
+    if (!proc) throw new RuntimeError(`PTY not running: ${runtimeId}`);
+    proc.resize(cols, rows);
   }
 
   kill(runtimeId: string): void {
