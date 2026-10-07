@@ -9,6 +9,21 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.3.5] - 2026-10-07
+
+Emoji navigation glyphs and a tighter guard against duplicate CJK input.
+
+### Changed
+
+- **Navigation icons** — Inventory and Tools rails, and the command palette, use the original emoji glyphs again so those lists are easier to scan.
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIFs for the current UI.
+
+### Fixed
+
+- **CJK IME duplicate text** — The commit guard injects text only when a blur interrupted xterm's finalize and that commit is still missing, and it tracks only the current composition so earlier text is not repeated.
+
+[4.3.5]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.3.5
+
 ## [4.3.2] - 2026-10-07
 
 Mermaid diagram tools, navigation and terminal polish, and sturdier npm publish CI.
