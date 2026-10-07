@@ -40,6 +40,7 @@ import {
 } from "../terminal/pane-key-bindings";
 import {
   collectPanes,
+  equalizeRunAroundPane,
   findPane,
   mapPanesInTree,
   removePaneFromTree,
@@ -553,7 +554,7 @@ function ChatTabInner({
         if (!prev) return { kind: "pane", pane };
         const targetId = splitTargetId ?? focusedPaneId ?? collectPanes(prev)[0]?.id;
         if (!targetId) return { kind: "pane", pane };
-        return splitPaneInTree(prev, targetId, direction, pane);
+        return equalizeRunAroundPane(splitPaneInTree(prev, targetId, direction, pane), pane.id);
       });
       setFocusedPaneId(pane.id);
       if (activeProfile) {

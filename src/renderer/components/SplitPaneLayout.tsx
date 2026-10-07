@@ -26,6 +26,18 @@ function clampRatio(ratio: number): number {
   return Math.min(0.9, Math.max(0.1, ratio));
 }
 
+/**
+ * Pixels taken by dividers nested along `direction`. Used as flex-basis so the
+ * ratio splits the remaining space; otherwise deeper panes in a row shrink by
+ * one divider per level.
+ */
+function nestedDividerPx(node: LayoutNode, direction: SplitDirection): number {
+  if (node.kind !== "split" || node.direction !== direction) return 0;
+  return (
+    DIVIDER_PX + nestedDividerPx(node.first, direction) + nestedDividerPx(node.second, direction)
+  );
+}
+
 interface Props {
   node: LayoutNode;
   focusedPaneId: string | null;
@@ -158,7 +170,7 @@ function SplitPaneLayoutInner({
     >
       <div
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={{ flex: `${ratio} 1 0px` }}
+        style={{ flex: `${ratio} 1 ${nestedDividerPx(node.first, node.direction)}px` }}
       >
         <SplitPaneLayoutInner
           node={node.first}
@@ -195,7 +207,7 @@ function SplitPaneLayoutInner({
 
       <div
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={{ flex: `${rest} 1 0px` }}
+        style={{ flex: `${rest} 1 ${nestedDividerPx(node.second, node.direction)}px` }}
       >
         <SplitPaneLayoutInner
           node={node.second}
