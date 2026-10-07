@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
   FolderOpen,
@@ -174,8 +174,20 @@ export function Sidebar({
   const [draggingTerminal, setDraggingTerminal] = useState<{ profileId: string; terminalId: string } | null>(null);
   const [dragOverTerminal, setDragOverTerminal] = useState<{ profileId: string; terminalId: string; zone: "above" | "below" } | null>(null);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const collapsed = controlledCollapsed ?? internalCollapsed;
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQuery("");
+  };
   const setCollapsed = (next: boolean) => {
     if (controlledCollapsed === undefined) setInternalCollapsed(next);
     onCollapsedChange?.(next);
@@ -364,25 +376,30 @@ export function Sidebar({
 
         {!collapsed && (
           <>
-            <div className="mt-3 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-muted">
-              {t("profile.title")}
-            </div>
-            <div className="mt-1 flex items-center gap-1 px-1">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-chrome-text-dim" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search profiles…"
-                  className="h-7 border-chrome-border-input bg-chrome-surface pl-7 text-[11px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-focus"
-                />
+            <div className="mt-3 flex items-center gap-1 px-1">
+              <div className="min-w-0 flex-1 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-chrome-text-muted">
+                {t("profile.title")}
               </div>
+              <IconAction
+                title={searchOpen ? t("profile.hideSearch") : t("profile.showSearch")}
+                onClick={() => {
+                  if (searchOpen) {
+                    closeSearch();
+                    return;
+                  }
+                  setSearchOpen(true);
+                }}
+              >
+                <Search
+                  className={`h-3.5 w-3.5 ${searchOpen || query.trim() ? "text-chrome-accent-text" : ""}`}
+                />
+              </IconAction>
               <IconAction
                 title={
                   filteredProfiles.length > 0 &&
                   filteredProfiles.every((p) => expandedProfiles.has(p.id))
-                    ? "Collapse all"
-                    : "Expand all"
+                    ? t("profile.collapseAll")
+                    : t("profile.expandAll")
                 }
                 onClick={() => {
                   const allExpanded =
@@ -405,6 +422,40 @@ export function Sidebar({
                 />
               </IconAction>
             </div>
+            {searchOpen && (
+              <div className="mt-1 flex items-center gap-1 px-1">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-chrome-text-dim" />
+                  <Input
+                    ref={searchInputRef}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        closeSearch();
+                      }
+                    }}
+                    placeholder={t("profile.search")}
+                    aria-label={t("profile.search")}
+                    className="h-7 border-chrome-border-input bg-chrome-surface pl-7 pr-7 text-[11px] text-chrome-text placeholder:text-chrome-text-dim focus-visible:border-chrome-border-focus"
+                  />
+                  {query.trim() ? (
+                    <button
+                      type="button"
+                      title={t("profile.clearSearch")}
+                      onClick={() => {
+                        setQuery("");
+                        searchInputRef.current?.focus();
+                      }}
+                      className="absolute right-1.5 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded text-chrome-text-dim transition-colors hover:bg-chrome-hover hover:text-chrome-text"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
             <div className="mt-1 space-y-1">
               {filteredProfiles.length === 0 && (
                 <EmptyState
