@@ -1762,6 +1762,8 @@ export const ChatTab = memo(ChatTabInner, (prev, next) => {
   );
 });
 
+const PANES_LEFT_HINT_THRESHOLD = 2;
+
 function WarpTopBar({
   profileLabel,
   profileAccentColor = null,
@@ -1790,6 +1792,8 @@ function WarpTopBar({
   const { t } = useLocale();
   const accent = profileAccentColor;
   const hasAccent = Boolean(accent);
+  const panesLeft = Math.max(0, maxPanes - paneCount);
+  const limitTitle = t("chat.err.maxPanes", { max: maxPanes });
 
   return (
     <div className="relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
@@ -1812,11 +1816,6 @@ function WarpTopBar({
           >
             {profileLabel}
           </span>
-          {paneCount > 0 && (
-            <span className="shrink-0 text-[10px] tabular-nums text-chrome-text-faint">
-              {paneCount}/{maxPanes}
-            </span>
-          )}
           {broadcastInput && paneCount > 1 && (
             <span
               className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
@@ -1831,31 +1830,54 @@ function WarpTopBar({
       {restoring && <span className="text-[11px] text-chrome-text-subtle">{t("chat.restoringShort")}</span>}
 
       <div className="ml-auto flex items-center gap-2">
-        <Button
-          variant="chromeOutline"
-          size="sm"
-          disabled={!canAddPane || restoring}
-          onClick={onOpenFolder}
-          title={canAddPane ? t("chat.pickFolderPane") : t("chat.maxPanesTitle", { max: maxPanes })}
-        >
-          <FolderOpen />
-          {t("chat.folderBtn")}
-        </Button>
+        {panesLeft <= PANES_LEFT_HINT_THRESHOLD && (
+          <span
+            role="status"
+            title={
+              canAddPane
+                ? t("chat.panesLeftTitle", { count: panesLeft, max: maxPanes })
+                : limitTitle
+            }
+            className={`inline-flex items-center gap-1.5 text-[11px] tabular-nums ${
+              canAddPane ? "text-chrome-text-subtle" : "text-chrome-accent-text"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 rounded-full ${canAddPane ? "bg-chrome-text-dim" : "bg-chrome-ui-accent"}`}
+            />
+            {canAddPane
+              ? panesLeft === 1
+                ? t("chat.panesLeftOne")
+                : t("chat.panesLeft", { count: panesLeft })
+              : t("chat.panesFull", { max: maxPanes })}
+          </span>
+        )}
+        <span title={canAddPane ? undefined : limitTitle}>
+          <Button
+            variant="chromeOutline"
+            size="sm"
+            disabled={!canAddPane || restoring}
+            onClick={onOpenFolder}
+            title={canAddPane ? t("chat.pickFolderPane") : undefined}
+          >
+            <FolderOpen />
+            {t("chat.folderBtn")}
+          </Button>
+        </span>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="chromeOutline"
-              size="sm"
-              disabled={!canAddPane}
-              title={
-                canAddPane
-                  ? t("chat.addPaneTitle", splitShortcutLabels)
-                  : t("chat.maxPanesTitle", { max: maxPanes })
-              }
-            >
-              {t("chat.addPane")}
-            </Button>
-          </DropdownMenuTrigger>
+          <span title={canAddPane ? undefined : limitTitle}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="chromeOutline"
+                size="sm"
+                disabled={!canAddPane}
+                title={canAddPane ? t("chat.addPaneTitle", splitShortcutLabels) : undefined}
+              >
+                {t("chat.addPane")}
+              </Button>
+            </DropdownMenuTrigger>
+          </span>
           <DropdownMenuContent align="end" className="min-w-[160px]">
             <DropdownMenuItem
               title={t("chat.plainShellTitle")}
