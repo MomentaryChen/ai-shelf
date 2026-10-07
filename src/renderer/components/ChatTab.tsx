@@ -86,6 +86,7 @@ import {
   isPlainShellTool,
   profileToolLabel,
   resolveEmbeddedPtyShell,
+  resolveInstalledLaunchTool,
   resolveLaunchTool,
   toolIdsFromInventory,
 } from "../utils/available-tools";
@@ -705,10 +706,7 @@ function ChatTabInner({
       const picked = await window.api.pickFolder(cwdHint?.trim() || resolveCwd() || undefined);
       if (!picked) return;
       recordDirHistory(picked);
-      const tool = resolveLaunchTool(
-        activeProfile?.defaultTool ?? availableTools[0],
-        availableTools,
-      );
+      const tool = resolveInstalledLaunchTool(activeProfile?.defaultTool ?? availableTools[0], data);
       const created = await addPane(tool, picked);
       if (!created) {
         setTerminalError((prev) => prev ?? t("chat.err.cannotOpen"));
@@ -722,6 +720,7 @@ function ChatTabInner({
       recordDirHistory,
       activeProfile?.defaultTool,
       availableTools,
+      data,
       addPane,
     ],
   );
@@ -915,7 +914,7 @@ function ChatTabInner({
       }
       const cwd = profile.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(
-        resolveLaunchTool(profile.defaultTool, availableTools),
+        resolveInstalledLaunchTool(profile.defaultTool, data),
         cwd || undefined,
       );
       if (!created) {
@@ -1104,7 +1103,9 @@ function ChatTabInner({
         return {
           id: p.id,
           name: p.name,
-          defaultTool: p.defaultTool,
+          defaultTool: isPlainShellTool(resolveInstalledLaunchTool(p.defaultTool, data))
+            ? undefined
+            : p.defaultTool,
           accentColor: p.accentColor,
           terminalCount: terminals.length,
           broadcastInput: p.broadcastInput,
@@ -1119,6 +1120,7 @@ function ChatTabInner({
       isPaneMinimized,
       layout,
       minimizedPaneIds,
+      data,
     ],
   );
 
@@ -1506,11 +1508,7 @@ function ChatTabInner({
     />
   );
 
-  const profileLaunchTool = resolveLaunchTool(activeProfile?.defaultTool, availableTools);
-  const emptyStateTool =
-    isPlainShellTool(profileLaunchTool) || availableTools.includes(profileLaunchTool)
-      ? profileLaunchTool
-      : PLAIN_SHELL_TOOL_ID;
+  const emptyStateTool = resolveInstalledLaunchTool(activeProfile?.defaultTool, data);
   const terminalArea = layout ? (
     <div
       className={`relative flex min-h-0 flex-1 flex-col overflow-hidden p-1.5 ${
