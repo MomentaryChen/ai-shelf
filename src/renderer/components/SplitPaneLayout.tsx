@@ -14,7 +14,6 @@ import { formatPaneCwdShort } from "../utils/pane-cwd";
 import { useLocale } from "../i18n/LocaleProvider";
 import {
   profilePaneChromeStyle,
-  profilePaneHeaderDotStyle,
   profilePaneHeaderStyle,
 } from "../utils/profile-colors";
 import { PaneAgentStatusDot } from "./PaneAgentStatusDot";
@@ -275,7 +274,6 @@ function WarpPaneShell({
   const cwdShort = formatPaneCwdShort(pane.cwd);
   const chromeStyle = profilePaneChromeStyle(profileAccentColor, focused);
   const headerStyle = profilePaneHeaderStyle(profileAccentColor, focused);
-  const dotStyle = profilePaneHeaderDotStyle(profileAccentColor);
   const shellRef = useRef<HTMLDivElement>(null);
   const {
     draggingPaneId,
@@ -408,13 +406,6 @@ function WarpPaneShell({
           >
             <DragHandle />
           </span>
-        )}
-        {profileAccentColor && (
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-full ${focused ? "" : "opacity-50"}`}
-            style={dotStyle}
-            aria-hidden
-          />
         )}
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-chrome-border-subtle bg-chrome-surface-raised">
           <ToolLogo tool={pane.tool} size={14} />
