@@ -11,7 +11,7 @@ import {
 } from "react";
 import { ChevronLeft, ChevronRight, FolderKanban } from "lucide-react";
 import { useLocale } from "../i18n/LocaleProvider";
-import { groupIndexById, stepIndex } from "../utils/workspace-slide";
+import { groupIndexById, isWrapStep, stepIndex } from "../utils/workspace-slide";
 
 const SWIPE_PX = 40;
 const CLICK_PX = 8;
@@ -47,14 +47,14 @@ export function WorkspaceSlideSwitcher({
   const index = groupIndexById(groups, currentGroupId);
   const current = groups[index];
   const count = Math.max(groups.length, 1);
-  const canPrev = index > 0;
-  const canNext = index < groups.length - 1;
+  const canCycle = groups.length > 1;
   const emptyLabel = t("workspace.empty");
   const slides = groups.length > 0 ? groups : [{ id: "", name: emptyLabel }];
 
   const [dragPx, setDragPx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [skipTransition, setSkipTransition] = useState(false);
   const startX = useRef<number | null>(null);
   const wheelLock = useRef(false);
   const wheelTimer = useRef(0);
@@ -70,9 +70,10 @@ export function WorkspaceSlideSwitcher({
   }, []);
 
   const goToIndex = useCallback(
-    (nextIndex: number) => {
+    (nextIndex: number, opts?: { wrap?: boolean }) => {
       const id = groups[nextIndex]?.id;
       if (!id || id === currentGroupId) return;
+      if (opts?.wrap) setSkipTransition(true);
       onGroupChange?.(id);
     },
     [currentGroupId, groups, onGroupChange],
@@ -80,10 +81,17 @@ export function WorkspaceSlideSwitcher({
 
   const go = useCallback(
     (delta: number) => {
-      goToIndex(stepIndex(groups.length, index, delta));
+      const next = stepIndex(groups.length, index, delta);
+      goToIndex(next, { wrap: isWrapStep(groups.length, index, next) });
     },
     [goToIndex, groups.length, index],
   );
+
+  useEffect(() => {
+    if (!skipTransition) return;
+    const id = window.requestAnimationFrame(() => setSkipTransition(false));
+    return () => window.cancelAnimationFrame(id);
+  }, [skipTransition, index]);
 
   useEffect(() => {
     const el = boxRef.current;
@@ -116,10 +124,7 @@ export function WorkspaceSlideSwitcher({
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (startX.current == null) return;
-    let dx = e.clientX - startX.current;
-    if (!canPrev && dx > 0) dx *= 0.28;
-    if (!canNext && dx < 0) dx *= 0.28;
-    setDragPx(dx);
+    setDragPx(e.clientX - startX.current);
   };
 
   const finishDrag = (e: PointerEvent<HTMLDivElement>) => {
@@ -165,9 +170,9 @@ export function WorkspaceSlideSwitcher({
     () => ({
       width: `${count * 100}%`,
       transform: `translateX(calc(${(-index / count) * 100}% + ${dragPx}px))`,
-      transition: dragging || reduceMotion ? "none" : "transform 200ms ease",
+      transition: dragging || reduceMotion || skipTransition ? "none" : "transform 200ms ease",
     }),
-    [count, dragPx, dragging, index, reduceMotion],
+    [count, dragPx, dragging, index, reduceMotion, skipTransition],
   );
 
   const name = current?.name ?? emptyLabel;
@@ -179,7 +184,7 @@ export function WorkspaceSlideSwitcher({
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-0.5" role="group" aria-label={t("workspace.groupSwitcher")}>
-        <SlideArrow direction="prev" disabled={!canPrev} label={t("workspace.prev")} onClick={() => go(-1)} />
+        <SlideArrow direction="prev" disabled={!canCycle} label={t("workspace.prev")} onClick={() => go(-1)} />
         <div
           className="flex h-8 w-8 items-center justify-center rounded-lg text-chrome-text"
           title={name}
@@ -187,7 +192,7 @@ export function WorkspaceSlideSwitcher({
         >
           {current?.icon ?? <FolderKanban className="h-4 w-4" />}
         </div>
-        <SlideArrow direction="next" disabled={!canNext} label={t("workspace.next")} onClick={() => go(1)} />
+        <SlideArrow direction="next" disabled={!canCycle} label={t("workspace.next")} onClick={() => go(1)} />
       </div>
     );
   }
@@ -212,7 +217,7 @@ export function WorkspaceSlideSwitcher({
       }}
     >
       <div className="flex items-center gap-0.5">
-        <SlideArrow direction="prev" disabled={!canPrev} label={t("workspace.prev")} onClick={() => go(-1)} />
+        <SlideArrow direction="prev" disabled={!canCycle} label={t("workspace.prev")} onClick={() => go(-1)} />
         <div
           className="min-w-0 flex-1 overflow-hidden"
           tabIndex={0}
@@ -239,7 +244,7 @@ export function WorkspaceSlideSwitcher({
             ))}
           </div>
         </div>
-        <SlideArrow direction="next" disabled={!canNext} label={t("workspace.next")} onClick={() => go(1)} />
+        <SlideArrow direction="next" disabled={!canCycle} label={t("workspace.next")} onClick={() => go(1)} />
       </div>
       {groups.length > 1 && groups.length <= MAX_DOTS ? (
         <div className="flex flex-wrap items-center justify-center pb-0.5">
