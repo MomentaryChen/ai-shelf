@@ -28,7 +28,8 @@ function isJumpBranch(branch: FlowPhaseBranch | undefined): branch is string {
 /**
  * Static checks run before a flow is saved or started: branch targets must exist,
  * `depends_on` must reference known phases without cycles, and `next` / `on_fail` /
- * `on_reject` jumps must not form a loop (the orchestrator would otherwise spin forever).
+ * `on_reject` jumps must not form a loop (at runtime only the phase-visit cap in
+ * flow-loop-guard.ts would stop one, after spawning several paid agent runs).
  */
 export function validateFlowDefinition(flow: FlowDefinition): FlowValidationIssue[] {
   const issues: FlowValidationIssue[] = [];
