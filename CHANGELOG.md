@@ -12,6 +12,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 ### Fixed
 
 - **Flow phase loop guard** — Orchestrated flows whose `next:`, `on_fail:` or `on_reject:` cycles back to an earlier phase now fail with a "Phase loop detected" error after `phases × 3` phase executions instead of spawning agent runs forever; configured `retry:` attempts do not count toward the limit.
+- **Flow run matching** — Run history and flow deletion match run directories to the exact flow id (from `state.json`, else the parsed run name), so deleting `review` no longer removes or lists runs of `multi-agent-review`.
 
 ## [4.3.5] - 2026-10-07
 
