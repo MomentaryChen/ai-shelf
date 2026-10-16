@@ -14,7 +14,9 @@ export class RefreshCoordinator {
 
   start(ctx: AppContext, callbacks: RefreshCallbacks, intervalMs = 500): void {
     this.stop();
-    this.timer = setInterval(() => callbacks.onTick(), intervalMs);
+    this.timer = setInterval(() => {
+      callbacks.onTick();
+    }, intervalMs);
 
     if (callbacks.onEvent) {
       const handler = callbacks.onEvent;
