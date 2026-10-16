@@ -11,11 +11,19 @@ import {
   resolvePhaseBranch,
   type PhaseOutputContext,
 } from "../shared/flow-orchestration.js";
+import {
+  FLOW_DEFAULT_MAX_PARALLEL,
+  flowUsesDagScheduling,
+  phaseDependencies,
+  readyDagPhaseIds,
+} from "../shared/flow-dag.js";
 import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX } from "../shared/flow-protocol.js";
 import type {
   FlowDefinition,
   FlowPhaseBranch,
   FlowPhaseDef,
+  FlowPhaseRunState,
+  FlowPhaseStatus,
   FlowProgressEvent,
   FlowRunState,
 } from "../shared/flow-types.js";
@@ -41,6 +49,8 @@ export type OrchestratorRunContext = {
   runDir: string;
   state: FlowRunState;
   child?: ChildProcess;
+  /** All live agent processes (parallel DAG phases); cancel kills every entry. */
+  children?: Set<ChildProcess>;
   timeout?: NodeJS.Timeout;
   stopWatching?: () => void;
   mcpCleanup?: () => void;
@@ -69,6 +79,17 @@ const gateWaiters = new Map<string, GateWaiter>();
 function writeState(ctx: OrchestratorRunContext, hooks: OrchestratorHooks): void {
   writeRunState(ctx.runDir, ctx.state);
   hooks.broadcastState(ctx.state);
+}
+
+/**
+ * Look up the live phase record. Always re-read: the state-file watcher may replace
+ * `ctx.state.phases` with the copy the MCP server wrote, so captured references go stale.
+ */
+function phaseRunState(
+  ctx: OrchestratorRunContext,
+  phaseId: string,
+): FlowPhaseRunState | undefined {
+  return ctx.state.phases.find((p) => p.id === phaseId);
 }
 
 function appendEvent(ctx: OrchestratorRunContext, event: Record<string, unknown>): void {
@@ -118,8 +139,16 @@ function collectPreviousOutputs(
   beforePhaseId: string,
 ): PhaseOutputContext[] {
   const out: PhaseOutputContext[] = [];
+  // DAG mode: only direct upstream dependencies feed this node.
+  const upstream = flowUsesDagScheduling(flow.phases)
+    ? new Set(phaseDependencies(flow.phases, beforePhaseId))
+    : null;
   for (const phase of flow.phases) {
-    if (phase.id === beforePhaseId) break;
+    if (upstream) {
+      if (!upstream.has(phase.id)) continue;
+    } else if (phase.id === beforePhaseId) {
+      break;
+    }
     const runPhase = state.phases.find((p) => p.id === phase.id);
     if (!runPhase || (runPhase.status !== "done" && runPhase.status !== "skipped")) continue;
     const content =
@@ -255,10 +284,11 @@ async function runAgentPhaseOnce(
     return { ok: false, error: resolved.error };
   }
 
-  const runPhase = ctx.state.phases.find((p) => p.id === phase.id);
+  const runPhase = phaseRunState(ctx, phase.id);
   if (runPhase) {
     runPhase.tool = resolved.tool;
     runPhase.outputPath = outputPath;
+    runPhase.profileId = resolved.profileId ?? null;
   }
 
   const previous = collectPreviousOutputs(flow, ctx.state, ctx.runDir, phase.id);
@@ -272,14 +302,28 @@ async function runAgentPhaseOnce(
 
   writeFileSync(join(ctx.runDir, "phases", phase.id, "prompt.md"), prompt, "utf8");
 
-  const prep = prepareFlowAgentSpawn(resolved.tool, ctx.runId, outputPath, resolved.cwd, {
-    extraMcpServers: flow.extraMcpServers,
-    agentAllowedTools: flow.agentAllowedTools,
-  });
-  ctx.mcpCleanup = prep.mcpMount.cleanup;
+  const prep = prepareFlowAgentSpawn(
+    resolved.tool,
+    ctx.runId,
+    outputPath,
+    resolved.cwd,
+    {
+      extraMcpServers: flow.extraMcpServers,
+      agentAllowedTools: flow.agentAllowedTools,
+    },
+    { configKey: phase.id },
+  );
+  // Per-phase cleanup (parallel phases each own their MCP mount / temp config).
+  let mcpCleanup: (() => void) | undefined = prep.mcpMount.cleanup;
+  const releasePhaseMcp = () => {
+    const cleanup = mcpCleanup;
+    mcpCleanup = undefined;
+    cleanup?.();
+  };
 
   const env = {
     ...process.env,
+    ...resolved.env,
     AISHELF_RUN_ID: ctx.runId,
     AISHELF_APP_DATA_DIR: getAppDataDir(),
     AISHELF_FLOW_OUTPUT_PATH: outputPath,
@@ -294,16 +338,18 @@ async function runAgentPhaseOnce(
     const outputChunks: string[] = [];
     let stderr = "";
     let stdoutBuf = "";
+    let timer: NodeJS.Timeout | undefined;
+    let spawned: ChildProcess | undefined;
 
     const finish = (result: { ok: boolean; error?: string }) => {
       if (settled) return;
       settled = true;
-      if (ctx.timeout) {
-        clearTimeout(ctx.timeout);
-        ctx.timeout = undefined;
+      if (timer) clearTimeout(timer);
+      releasePhaseMcp();
+      if (spawned) {
+        ctx.children?.delete(spawned);
+        if (ctx.child === spawned) ctx.child = undefined;
       }
-      releaseMcp(ctx);
-      ctx.child = undefined;
       resolve(result);
     };
 
@@ -321,11 +367,12 @@ async function runAgentPhaseOnce(
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      releaseMcp(ctx);
       finish({ ok: false, error: message });
       return;
     }
+    spawned = child;
     ctx.child = child;
+    (ctx.children ??= new Set()).add(child);
 
     hooks.emitConsole?.({
       phaseId: phase.id,
@@ -333,7 +380,7 @@ async function runAgentPhaseOnce(
       data: `\n── ${phase.id}${phase.label ? ` · ${phase.label}` : ""} ──\n`,
     });
 
-    ctx.timeout = setTimeout(() => {
+    timer = setTimeout(() => {
       if (settled || ctx.cancelled) return;
       hooks.killChild(child);
       finish({ ok: false, error: `Timed out after ${timeoutSec}s` });
@@ -456,171 +503,363 @@ async function runHttpPhase(
   }
 }
 
+type OrchestratorOptions = { globalToolLaunchArgs?: ToolLaunchArgs };
+
+type AttemptResult = { ok: true } | { ok: false; error: string; stopped?: boolean };
+
+/** Run one agent/http node with its retry budget. Does not apply `on_fail`. */
+async function runPhaseAttempts(
+  flow: FlowDefinition,
+  phase: FlowPhaseDef,
+  ctx: OrchestratorRunContext,
+  hooks: OrchestratorHooks,
+  options: OrchestratorOptions,
+  shouldStop: () => boolean = () => false,
+): Promise<AttemptResult> {
+  const kind = phaseKind(phase);
+  const maxAttempts = 1 + phaseRetryLimit(phase);
+  let attempt = 0;
+  let lastError = "failed";
+
+  while (attempt < maxAttempts && !ctx.cancelled && !shouldStop()) {
+    attempt += 1;
+    const runPhase = phaseRunState(ctx, phase.id);
+    if (runPhase) {
+      runPhase.status = "running";
+      runPhase.startedAt = runPhase.startedAt ?? new Date().toISOString();
+      runPhase.attempts = attempt;
+      runPhase.message = attempt > 1 ? `Retry ${attempt}/${maxAttempts}` : null;
+    }
+    // A parallel gate may be waiting for approval — keep that status visible.
+    if (!ctx.state.pendingGatePhaseId) ctx.state.status = "running";
+    ctx.state.currentPhaseId = phase.id;
+    appendEvent(ctx, { type: "phase.started", phaseId: phase.id, attempt });
+    writeState(ctx, hooks);
+
+    const outPath = phaseOutputPath(ctx.runDir, phase.id);
+    // Remove previous attempt output so success requires a fresh write. Truncating
+    // would leave the file present, and the existsSync checks after the agent exits
+    // would then treat an empty file as this attempt's output.
+    try {
+      rmSync(outPath, { force: true });
+    } catch {
+      /* ignore */
+    }
+
+    const result =
+      kind === "http"
+        ? await runHttpPhase(flow, phase, ctx, hooks, outPath)
+        : await runAgentPhaseOnce(flow, phase, ctx, hooks, outPath, options.globalToolLaunchArgs);
+
+    if (ctx.cancelled) return { ok: false, error: "Cancelled", stopped: true };
+
+    if (result.ok) {
+      const done = phaseRunState(ctx, phase.id);
+      if (done) {
+        done.status = "done";
+        done.completedAt = new Date().toISOString();
+        done.outputPath = outPath;
+        done.message = attempt > 1 ? `Done after ${attempt} attempts` : null;
+      }
+      recomputeRunProgress(ctx.state);
+      appendEvent(ctx, { type: "phase.done", phaseId: phase.id, attempt });
+      writeState(ctx, hooks);
+      return { ok: true };
+    }
+
+    lastError = result.error ?? "Phase failed";
+    appendEvent(ctx, {
+      type: "phase.attempt_failed",
+      phaseId: phase.id,
+      attempt,
+      error: lastError,
+    });
+    writeState(ctx, hooks);
+  }
+
+  if (ctx.cancelled || shouldStop()) return { ok: false, error: lastError, stopped: true };
+  return { ok: false, error: lastError };
+}
+
+function markGateApproved(
+  ctx: OrchestratorRunContext,
+  hooks: OrchestratorHooks,
+  phase: FlowPhaseDef,
+): void {
+  const runPhase = phaseRunState(ctx, phase.id);
+  if (runPhase) {
+    runPhase.status = "done";
+    runPhase.completedAt = new Date().toISOString();
+    runPhase.message = "Approved";
+  }
+  if (ctx.state.status !== "failed") ctx.state.status = "running";
+  recomputeRunProgress(ctx.state);
+  appendEvent(ctx, { type: "gate.approved", phaseId: phase.id });
+  writeState(ctx, hooks);
+}
+
+/** Legacy linear walk: list order, `next`, and `on_fail` / `on_reject` jumps. */
+async function runSequentialPhases(
+  flow: FlowDefinition,
+  ctx: OrchestratorRunContext,
+  hooks: OrchestratorHooks,
+  options: OrchestratorOptions,
+): Promise<void> {
+  let currentId: string | null = flow.phases[0]?.id ?? null;
+  // Save-time / pre-run validation rejects branch loops; this visit cap (see
+  // flow-loop-guard.ts) is the runtime backstop. Retries are not counted.
+  let phaseVisits = 0;
+
+  while (currentId && !ctx.cancelled) {
+    phaseVisits += 1;
+    const loopError = phaseLoopError(phaseVisits, flow.phases.length, currentId);
+    if (loopError) {
+      ctx.state.status = "failed";
+      ctx.state.error = loopError;
+      ctx.state.currentPhaseId = null;
+      ctx.state.pendingGatePhaseId = null;
+      writeState(ctx, hooks);
+      break;
+    }
+
+    const phase = flow.phases.find((p) => p.id === currentId);
+    if (!phase) {
+      ctx.state.status = "failed";
+      ctx.state.error = `Unknown phase: ${currentId}`;
+      writeState(ctx, hooks);
+      break;
+    }
+
+    const kind = phaseKind(phase);
+    const needsGate = kind === "gate" || phase.requireApproval === true;
+
+    if (needsGate) {
+      if (ctx.cancelled) break;
+      const decision = await waitForGate(ctx, hooks, phase);
+      if (ctx.cancelled) break;
+
+      ctx.state.pendingGatePhaseId = null;
+      if (decision === "reject") {
+        const branch = resolvePhaseBranch(phase.onReject, "fail");
+        const next = applyPhaseBranch(flow, ctx, hooks, phase, branch, "Rejected by user");
+        if (next === "failed") break;
+        currentId = next;
+        if (ctx.state.status === "waiting_approval") {
+          ctx.state.status = "running";
+        }
+        continue;
+      }
+
+      // Approved gate with kind===gate and no agent work: mark done and continue.
+      if (kind === "gate") {
+        markGateApproved(ctx, hooks, phase);
+        currentId = nextPhaseIdAfterSuccess(flow.phases, phase.id);
+        continue;
+      }
+
+      ctx.state.status = "running";
+      appendEvent(ctx, { type: "gate.approved", phaseId: phase.id });
+      writeState(ctx, hooks);
+    }
+
+    const result = await runPhaseAttempts(flow, phase, ctx, hooks, options);
+    if (ctx.cancelled) break;
+
+    if (!result.ok) {
+      const branch = resolvePhaseBranch(phase.onFail, "fail");
+      const next = applyPhaseBranch(flow, ctx, hooks, phase, branch, result.error);
+      if (next === "failed") break;
+      currentId = next;
+      continue;
+    }
+
+    currentId = nextPhaseIdAfterSuccess(flow.phases, phase.id);
+  }
+}
+
+/** In DAG mode only `fail` / `skip` branches apply (jumps are rejected at save time). */
+function dagBranch(branch: FlowPhaseBranch | undefined): "fail" | "skip" {
+  return resolvePhaseBranch(branch, "fail") === "skip" ? "skip" : "fail";
+}
+
+function markPhaseStopped(
+  ctx: OrchestratorRunContext,
+  hooks: OrchestratorHooks,
+  phaseId: string,
+): void {
+  const runPhase = phaseRunState(ctx, phaseId);
+  if (runPhase && runPhase.status !== "done" && runPhase.status !== "failed") {
+    runPhase.status = "skipped";
+    runPhase.completedAt = new Date().toISOString();
+    runPhase.message = "Stopped: another phase failed";
+  }
+  recomputeRunProgress(ctx.state);
+  appendEvent(ctx, { type: "phase.skipped", phaseId, message: "stopped" });
+  writeState(ctx, hooks);
+}
+
 /**
- * Multi-node orchestrator: per-phase spawn, I/O piping, approval gates, retry & branch.
+ * DAG walk (`depends_on`): every phase whose dependencies are done/skipped starts,
+ * up to `max_parallel` at once. A failing phase (after retries, `on_fail: fail`) stops
+ * the run: running siblings are killed and pending phases are skipped.
+ */
+async function runDagPhases(
+  flow: FlowDefinition,
+  ctx: OrchestratorRunContext,
+  hooks: OrchestratorHooks,
+  options: OrchestratorOptions,
+): Promise<Map<string, FlowPhaseStatus>> {
+  // Scheduler-owned statuses: the state-file watcher may overwrite ctx.state.phases
+  // with a stale disk copy, so readiness is never derived from it.
+  const nodeStatus = new Map<string, FlowPhaseStatus>(
+    flow.phases.map((p) => [p.id, "pending" as FlowPhaseStatus]),
+  );
+  const running = new Map<string, Promise<void>>();
+  const maxParallel = Math.max(1, flow.maxParallel ?? FLOW_DEFAULT_MAX_PARALLEL);
+  let stopping = false;
+  const shouldStop = () => stopping;
+  // Gates resolve through a single per-flow waiter, so approvals are serialized.
+  let gateChain: Promise<unknown> = Promise.resolve();
+
+  const stopRun = () => {
+    if (stopping) return;
+    stopping = true;
+    for (const child of ctx.children ?? []) hooks.killChild(child);
+    if (ctx.state.pendingGatePhaseId) cancelFlowGateWait(ctx.flowId);
+  };
+
+  const runNode = async (phase: FlowPhaseDef): Promise<FlowPhaseStatus> => {
+    const kind = phaseKind(phase);
+    if (kind === "gate" || phase.requireApproval === true) {
+      const wait = gateChain.then(() =>
+        shouldStop() || ctx.cancelled ? ("reject" as const) : waitForGate(ctx, hooks, phase),
+      );
+      gateChain = wait.catch(() => undefined);
+      const decision = await wait;
+      if (ctx.cancelled) return "skipped";
+      ctx.state.pendingGatePhaseId = null;
+      if (shouldStop()) {
+        markPhaseStopped(ctx, hooks, phase.id);
+        return "skipped";
+      }
+      if (ctx.state.status === "waiting_approval") ctx.state.status = "running";
+      if (decision === "reject") {
+        const branch = dagBranch(phase.onReject);
+        const res = applyPhaseBranch(flow, ctx, hooks, phase, branch, "Rejected by user");
+        return res === "failed" ? "failed" : "skipped";
+      }
+      if (kind === "gate") {
+        markGateApproved(ctx, hooks, phase);
+        return "done";
+      }
+      appendEvent(ctx, { type: "gate.approved", phaseId: phase.id });
+      writeState(ctx, hooks);
+    }
+
+    const result = await runPhaseAttempts(flow, phase, ctx, hooks, options, shouldStop);
+    if (result.ok) return "done";
+    if (ctx.cancelled) return "skipped";
+    if (result.stopped) {
+      markPhaseStopped(ctx, hooks, phase.id);
+      return "skipped";
+    }
+    const res = applyPhaseBranch(flow, ctx, hooks, phase, dagBranch(phase.onFail), result.error);
+    return res === "failed" ? "failed" : "skipped";
+  };
+
+  while (!ctx.cancelled && !stopping) {
+    const ready = readyDagPhaseIds(flow.phases, nodeStatus);
+    for (const id of ready) {
+      if (running.size >= maxParallel) break;
+      const phase = flow.phases.find((p) => p.id === id)!;
+      nodeStatus.set(id, "running");
+      const task = runNode(phase)
+        .catch((err: unknown) => {
+          ctx.state.status = "failed";
+          ctx.state.error = err instanceof Error ? err.message : String(err);
+          return "failed" as FlowPhaseStatus;
+        })
+        .then((status) => {
+          nodeStatus.set(id, status);
+          if (status === "failed") stopRun();
+        })
+        .finally(() => {
+          running.delete(id);
+        });
+      running.set(id, task);
+    }
+
+    if (running.size === 0) {
+      const unresolved = flow.phases.filter((p) => {
+        const st = nodeStatus.get(p.id);
+        return st !== "done" && st !== "skipped";
+      });
+      if (unresolved.length > 0 && ctx.state.status !== "failed") {
+        ctx.state.status = "failed";
+        ctx.state.error = `Unsatisfiable dependencies: ${unresolved.map((p) => p.id).join(", ")}`;
+        writeState(ctx, hooks);
+      }
+      break;
+    }
+
+    await Promise.race(running.values());
+  }
+
+  if (stopping || ctx.cancelled) {
+    stopRun();
+    await Promise.allSettled(running.values());
+    if (!ctx.cancelled) {
+      for (const phase of flow.phases) {
+        if (nodeStatus.get(phase.id) === "pending") {
+          nodeStatus.set(phase.id, "skipped");
+          const runPhase = phaseRunState(ctx, phase.id);
+          if (runPhase && runPhase.status === "pending") runPhase.status = "skipped";
+        }
+      }
+    }
+  }
+
+  // Re-apply authoritative statuses in case the watcher replaced the phase array.
+  for (const phase of flow.phases) {
+    const st = nodeStatus.get(phase.id);
+    const runPhase = phaseRunState(ctx, phase.id);
+    if (runPhase && st && st !== "running" && runPhase.status !== st && !ctx.cancelled) {
+      runPhase.status = st;
+    }
+  }
+  recomputeRunProgress(ctx.state);
+  return nodeStatus;
+}
+
+/**
+ * Multi-node orchestrator: per-phase spawn, I/O piping, approval gates, retry & branch,
+ * and parallel DAG scheduling when phases declare `depends_on`.
  */
 export async function executeOrchestratedFlowRun(
   flow: FlowDefinition,
   ctx: OrchestratorRunContext,
   hooks: OrchestratorHooks,
-  options: { globalToolLaunchArgs?: ToolLaunchArgs } = {},
+  options: OrchestratorOptions = {},
 ): Promise<void> {
   ctx.state.orchestration = true;
   ctx.state.pendingGatePhaseId = null;
+  ctx.children ??= new Set();
   writeState(ctx, hooks);
 
   ctx.stopWatching = hooks.watchStateFile(ctx.runId, ctx.state);
 
-  let currentId: string | null = flow.phases[0]?.id ?? null;
-  let phaseVisits = 0;
+  const dag = flowUsesDagScheduling(flow.phases);
 
   try {
-    while (currentId && !ctx.cancelled) {
-      phaseVisits += 1;
-      const loopError = phaseLoopError(phaseVisits, flow.phases.length, currentId);
-      if (loopError) {
-        ctx.state.status = "failed";
-        ctx.state.error = loopError;
-        ctx.state.currentPhaseId = null;
-        ctx.state.pendingGatePhaseId = null;
-        writeState(ctx, hooks);
-        break;
-      }
-
-      const phase = flow.phases.find((p) => p.id === currentId);
-      if (!phase) {
-        ctx.state.status = "failed";
-        ctx.state.error = `Unknown phase: ${currentId}`;
-        writeState(ctx, hooks);
-        break;
-      }
-
-      const kind = phaseKind(phase);
-      const needsGate = kind === "gate" || phase.requireApproval === true;
-
-      if (needsGate) {
-        if (ctx.cancelled) break;
-        const decision = await waitForGate(ctx, hooks, phase);
-        if (ctx.cancelled) break;
-
-        ctx.state.pendingGatePhaseId = null;
-        if (decision === "reject") {
-          const branch = resolvePhaseBranch(phase.onReject, "fail");
-          const next = applyPhaseBranch(
-            flow,
-            ctx,
-            hooks,
-            phase,
-            branch,
-            "Rejected by user",
-          );
-          if (next === "failed") break;
-          currentId = next;
-          if (ctx.state.status === "waiting_approval") {
-            ctx.state.status = "running";
-          }
-          continue;
-        }
-
-        // Approved gate with kind===gate and no agent work: mark done and continue.
-        if (kind === "gate") {
-          const runPhase = ctx.state.phases.find((p) => p.id === phase.id);
-          if (runPhase) {
-            runPhase.status = "done";
-            runPhase.completedAt = new Date().toISOString();
-            runPhase.message = "Approved";
-          }
-          ctx.state.status = "running";
-          recomputeRunProgress(ctx.state);
-          appendEvent(ctx, { type: "gate.approved", phaseId: phase.id });
-          writeState(ctx, hooks);
-          currentId = nextPhaseIdAfterSuccess(flow.phases, phase.id);
-          continue;
-        }
-
-        ctx.state.status = "running";
-        appendEvent(ctx, { type: "gate.approved", phaseId: phase.id });
-        writeState(ctx, hooks);
-      }
-
-      const runPhase = ctx.state.phases.find((p) => p.id === phase.id);
-      const maxAttempts = 1 + phaseRetryLimit(phase);
-      let attempt = 0;
-      let lastError = "failed";
-      let succeeded = false;
-
-      while (attempt < maxAttempts && !ctx.cancelled) {
-        attempt += 1;
-        if (runPhase) {
-          runPhase.status = "running";
-          runPhase.startedAt = runPhase.startedAt ?? new Date().toISOString();
-          runPhase.attempts = attempt;
-          runPhase.message = attempt > 1 ? `Retry ${attempt}/${maxAttempts}` : null;
-        }
-        ctx.state.status = "running";
-        ctx.state.currentPhaseId = phase.id;
-        appendEvent(ctx, { type: "phase.started", phaseId: phase.id, attempt });
-        writeState(ctx, hooks);
-
-        const outPath = phaseOutputPath(ctx.runDir, phase.id);
-        // Remove previous attempt output so success requires a fresh write. Truncating
-        // would leave the file present, and the existsSync checks after the agent exits
-        // would then treat an empty file as this attempt's output.
-        try {
-          rmSync(outPath, { force: true });
-        } catch {
-          /* ignore */
-        }
-
-        const result =
-          kind === "http"
-            ? await runHttpPhase(flow, phase, ctx, hooks, outPath)
-            : await runAgentPhaseOnce(
-                flow,
-                phase,
-                ctx,
-                hooks,
-                outPath,
-                options.globalToolLaunchArgs,
-              );
-
-        if (ctx.cancelled) break;
-
-        if (result.ok) {
-          if (runPhase) {
-            runPhase.status = "done";
-            runPhase.completedAt = new Date().toISOString();
-            runPhase.outputPath = outPath;
-            runPhase.message = attempt > 1 ? `Done after ${attempt} attempts` : null;
-          }
-          recomputeRunProgress(ctx.state);
-          appendEvent(ctx, { type: "phase.done", phaseId: phase.id, attempt });
-          writeState(ctx, hooks);
-          succeeded = true;
-          break;
-        }
-
-        lastError = result.error ?? "Phase failed";
-        appendEvent(ctx, {
-          type: "phase.attempt_failed",
-          phaseId: phase.id,
-          attempt,
-          error: lastError,
-        });
-        writeState(ctx, hooks);
-      }
-
-      if (ctx.cancelled) break;
-
-      if (!succeeded) {
-        const branch = resolvePhaseBranch(phase.onFail, "fail");
-        const next = applyPhaseBranch(flow, ctx, hooks, phase, branch, lastError);
-        if (next === "failed") break;
-        currentId = next;
-        continue;
-      }
-
-      currentId = nextPhaseIdAfterSuccess(flow.phases, phase.id);
+    let dagStatus: Map<string, FlowPhaseStatus> | null = null;
+    if (dag) {
+      appendEvent(ctx, {
+        type: "run.dag",
+        maxParallel: flow.maxParallel ?? FLOW_DEFAULT_MAX_PARALLEL,
+      });
+      dagStatus = await runDagPhases(flow, ctx, hooks, options);
+    } else {
+      await runSequentialPhases(flow, ctx, hooks, options);
     }
 
     if (ctx.cancelled) {
@@ -637,11 +876,13 @@ export async function executeOrchestratedFlowRun(
     // Concatenate phase outputs into final run output.
     const finalParts: string[] = [];
     for (const phase of flow.phases) {
-      const rp = ctx.state.phases.find((p) => p.id === phase.id);
-      if (!rp || rp.status !== "done") continue;
-      const content = rp.outputPath && existsSync(rp.outputPath)
-        ? readFileSync(rp.outputPath, "utf8").trim()
-        : readPhaseOutput(ctx.runDir, phase.id).trim();
+      const rp = phaseRunState(ctx, phase.id);
+      const status = dagStatus?.get(phase.id) ?? rp?.status;
+      if (!rp || status !== "done") continue;
+      const content =
+        rp.outputPath && existsSync(rp.outputPath)
+          ? readFileSync(rp.outputPath, "utf8").trim()
+          : readPhaseOutput(ctx.runDir, phase.id).trim();
       if (content) {
         finalParts.push(`## 【${phase.id}】${phase.label}\n\n${content}`);
       }

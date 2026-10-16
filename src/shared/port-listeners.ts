@@ -8,9 +8,19 @@ export type PortListener = {
   address: string;
   pid: number;
   processName: string;
+  /** Set for sockets listed inside a WSL distro (pid is in the Linux namespace, 0 when unknown). */
+  wslDistro?: string;
 };
 
 export type PortListenerRow = PortListener & { canKill: boolean };
+
+/** Per-distro outcome of a WSL port scan (only running distros are scanned). */
+export type WslPortScan = {
+  distro: string;
+  ok: boolean;
+  count: number;
+  error?: string;
+};
 
 export type ParsedSocket = {
   protocol: PortProtocol;
@@ -74,8 +84,11 @@ export function isProtectedPid(
   return false;
 }
 
-export function listenerKey(row: Pick<PortListener, "protocol" | "address" | "port" | "pid">): string {
-  return `${row.protocol}|${row.address}|${String(row.port)}|${String(row.pid)}`;
+export function listenerKey(
+  row: Pick<PortListener, "protocol" | "address" | "port" | "pid" | "wslDistro">,
+): string {
+  const host = row.wslDistro ? `wsl:${row.wslDistro}` : "host";
+  return `${host}|${row.protocol}|${row.address}|${String(row.port)}|${String(row.pid)}`;
 }
 
 export function dedupeAndSortListeners(rows: PortListener[]): PortListener[] {
@@ -90,6 +103,9 @@ export function dedupeAndSortListeners(rows: PortListener[]): PortListener[] {
   out.sort((a, b) => {
     if (a.port !== b.port) return a.port - b.port;
     if (a.protocol !== b.protocol) return a.protocol.localeCompare(b.protocol);
+    const hostA = a.wslDistro ?? "";
+    const hostB = b.wslDistro ?? "";
+    if (hostA !== hostB) return hostA.localeCompare(hostB);
     const addr = a.address.localeCompare(b.address);
     if (addr !== 0) return addr;
     return a.pid - b.pid;
@@ -248,23 +264,47 @@ export function parseLsofFields(stdout: string): PortListener[] {
   return out;
 }
 
-export function parseSsListen(stdout: string): PortListener[] {
+export type ParseSsOptions = {
+  /** Keep rows without `users:((…))` — non-root `ss` cannot see other users' sockets. */
+  allowMissingPid?: boolean;
+};
+
+/** Drop an interface scope (`127.0.0.53%lo:53`, `[fe80::1%eth0]:546`). */
+function stripScopeId(local: string): string {
+  return local.replace(/%[^:\]\s]+(?=\]?:\d+$)/u, "");
+}
+
+/**
+ * Parse `ss -l[tu]n[p][H]` output. The leading Netid column (`tcp LISTEN …`,
+ * printed when several protocols are requested) is optional, and a header row
+ * (old `ss` without `-H`) is skipped because it does not match.
+ */
+export function parseSsListen(stdout: string, options: ParseSsOptions = {}): PortListener[] {
   const out: PortListener[] = [];
   for (const raw of stdout.split(/\r?\n/u)) {
     const line = raw.trim();
     if (!line) continue;
     const m = line.match(
-      /^(LISTEN|UNCONN)\s+\S+\s+\S+\s+(\S+)\s+\S+(?:\s+users:\(\((.*)\)\))?\s*$/u,
+      /^(?:(tcp6?|udp6?)\s+)?(LISTEN|UNCONN)\s+\S+\s+\S+\s+(\S+)\s+\S+(?:\s+users:\(\((.*)\)\))?\s*$/iu,
     );
     if (!m) continue;
-    const local = m[2];
+    const local = m[3];
     if (!local) continue;
-    const loc = splitHostPort(local);
+    const loc = splitHostPort(stripScopeId(local));
     if (!loc) continue;
-    const protocol: PortProtocol = m[1] === "UNCONN" ? "udp" : "tcp";
+    // Optional capture groups are undefined at runtime when they did not match.
+    const netid = (m[1] as string | undefined)?.toLowerCase();
+    const state = (m[2] as string | undefined)?.toUpperCase();
+    const protocol: PortProtocol = netid
+      ? netid.startsWith("udp")
+        ? "udp"
+        : "tcp"
+      : state === "UNCONN"
+        ? "udp"
+        : "tcp";
     let pid = 0;
     let processName = "";
-    const users = m[3];
+    const users = m[4];
     if (users) {
       const um = users.match(/"([^"]+)",pid=(\d+)/u);
       if (um) {
@@ -274,14 +314,67 @@ export function parseSsListen(stdout: string): PortListener[] {
         if (pidText) pid = Number(pidText);
       }
     }
-    if (!Number.isInteger(pid) || pid < 1) continue;
+    if (!Number.isInteger(pid) || pid < 0) continue;
+    if (pid < 1 && !options.allowMissingPid) continue;
     out.push({
       protocol,
       port: loc.port,
       address: loc.address,
       pid,
-      processName: processName || `pid ${String(pid)}`,
+      processName: processName || (pid > 0 ? `pid ${String(pid)}` : ""),
     });
   }
   return out;
 }
+
+/** `/proc/net/tcp` stores each 32-bit word in host (little-endian) byte order. */
+function procHexWord(word: string): string {
+  return [6, 4, 2, 0].map((i) => word.slice(i, i + 2)).join("");
+}
+
+function procHexToAddress(hex: string): string | null {
+  if (/^[0-9a-f]{8}$/iu.test(hex)) {
+    const be = procHexWord(hex);
+    return [0, 2, 4, 6].map((i) => String(parseInt(be.slice(i, i + 2), 16))).join(".");
+  }
+  if (/^[0-9a-f]{32}$/iu.test(hex)) {
+    const groups: number[] = [];
+    for (let w = 0; w < 4; w += 1) {
+      const be = procHexWord(hex.slice(w * 8, w * 8 + 8));
+      groups.push(parseInt(be.slice(0, 4), 16), parseInt(be.slice(4, 8), 16));
+    }
+    if (groups.every((g) => g === 0)) return "::";
+    if (groups.slice(0, 7).every((g) => g === 0) && groups[7] === 1) return "::1";
+    // IPv4-mapped (::ffff:a.b.c.d)
+    if (groups.slice(0, 5).every((g) => g === 0) && groups[5] === 0xffff) {
+      const a = groups[6] ?? 0;
+      const b = groups[7] ?? 0;
+      return `::ffff:${String(a >> 8)}.${String(a & 0xff)}.${String(b >> 8)}.${String(b & 0xff)}`;
+    }
+    return groups.map((g) => g.toString(16)).join(":");
+  }
+  return null;
+}
+
+/**
+ * Parse `/proc/net/tcp` + `/proc/net/tcp6` (concatenated) for LISTEN sockets
+ * (`st == 0A`). Fallback when `ss` is not installed — no pid / process name.
+ */
+export function parseProcNetTcp(stdout: string): PortListener[] {
+  const out: PortListener[] = [];
+  for (const raw of stdout.split(/\r?\n/u)) {
+    const parts = raw.trim().split(/\s+/u);
+    if (parts.length < 4 || !/^\d+:$/u.test(parts[0] ?? "")) continue;
+    if ((parts[3] ?? "").toUpperCase() !== "0A") continue;
+    const local = parts[1] ?? "";
+    const sep = local.lastIndexOf(":");
+    if (sep <= 0) continue;
+    const port = parseInt(local.slice(sep + 1), 16);
+    if (!isPortNumber(port)) continue;
+    const address = procHexToAddress(local.slice(0, sep));
+    if (!address) continue;
+    out.push({ protocol: "tcp", port, address, pid: 0, processName: "" });
+  }
+  return out;
+}
+

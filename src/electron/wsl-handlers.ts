@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import { ipcMain } from "electron";
 import { platform } from "node:os";
 import {
@@ -7,40 +6,7 @@ import {
   parseWslListVerbose,
   type WslDistro,
 } from "../shared/wsl-paths.js";
-
-const WSL_TIMEOUT_MS = 12_000;
-
-function runWsl(
-  args: string[],
-  opts?: { encoding?: "buffer" | "utf8" },
-): Promise<{ ok: true; stdout: Buffer | string } | { ok: false; error: string; code?: string }> {
-  return new Promise((resolve) => {
-    const encoding = opts?.encoding ?? "buffer";
-    execFile(
-      "wsl.exe",
-      args,
-      {
-        timeout: WSL_TIMEOUT_MS,
-        windowsHide: true,
-        shell: false,
-        encoding: encoding === "utf8" ? "utf8" : "buffer",
-      },
-      (err, stdout, stderr) => {
-        if (err) {
-          const message =
-            (typeof stderr === "string" ? stderr : stderr?.toString("utf8")) ||
-            err.message ||
-            "wsl.exe failed";
-          const code =
-            err && typeof err === "object" && "code" in err ? String(err.code) : undefined;
-          resolve({ ok: false, error: message.trim() || "wsl.exe failed", code });
-          return;
-        }
-        resolve({ ok: true, stdout: stdout as Buffer | string });
-      },
-    );
-  });
-}
+import { runWsl } from "./wsl-exec.js";
 
 async function listDistros(): Promise<
   | { ok: true; distros: WslDistro[]; platformSupported: true }

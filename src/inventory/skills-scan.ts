@@ -1,7 +1,15 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { home, cwd, tryReadJson } from "../utils/config.js";
+import {
+  home,
+  cwd,
+  tryReadJson,
+  xdgConfigHome,
+  claudeConfigDir,
+  codexHome,
+  opencodeConfigDir,
+} from "../utils/config.js";
 import type { ProviderEntry, SkillEntry, SkillScope } from "./types.js";
 
 export interface SkillScanRoot {
@@ -146,15 +154,11 @@ export function getLocalAppData(...segments: string[]): string {
   return join(local, ...segments);
 }
 
-function xdgConfigHome(): string {
-  return process.env["XDG_CONFIG_HOME"] ?? home(".config");
-}
-
 function readCrushConfigSkillsPaths(): SkillScanRoot[] {
   const configFiles = [
     cwd(".crush.json"),
     cwd("crush.json"),
-    join(xdgConfigHome(), "crush", "crush.json"),
+    xdgConfigHome("crush", "crush.json"),
   ];
   const roots: SkillScanRoot[] = [];
 
@@ -179,11 +183,59 @@ export function cursorSkillRoots(): SkillScanRoot[] {
 
 export function claudeSkillRoots(): SkillScanRoot[] {
   return [
-    { path: home(".claude", "skills"), scope: "global" },
+    { path: claudeConfigDir("skills"), scope: "global" },
     { path: cwd(".claude", "skills"), scope: "project" },
     { path: home(".agents", "skills"), scope: "global" },
     { path: cwd(".agents", "skills"), scope: "project" },
   ];
+}
+
+/**
+ * GitHub Copilot CLI: personal `$COPILOT_HOME/skills` (default `~/.copilot/skills`)
+ * and `~/.agents/skills`; project `.github/skills`, `.claude/skills`, `.agents/skills`.
+ */
+export function copilotSkillRoots(): SkillScanRoot[] {
+  const copilotHome = process.env["COPILOT_HOME"] || home(".copilot");
+  return [
+    { path: join(copilotHome, "skills"), scope: "global" },
+    { path: home(".agents", "skills"), scope: "global" },
+    { path: cwd(".github", "skills"), scope: "project" },
+    { path: cwd(".claude", "skills"), scope: "project" },
+    { path: cwd(".agents", "skills"), scope: "project" },
+  ];
+}
+
+/**
+ * OpenAI Codex: user `~/.agents/skills` (current) and `$CODEX_HOME/skills`
+ * (legacy, default `~/.codex/skills`); repo `.agents/skills` (and legacy `.codex/skills`).
+ */
+export function codexSkillRoots(): SkillScanRoot[] {
+  return [
+    { path: codexHome("skills"), scope: "global" },
+    { path: home(".agents", "skills"), scope: "global" },
+    { path: cwd(".codex", "skills"), scope: "project" },
+    { path: cwd(".agents", "skills"), scope: "project" },
+  ];
+}
+
+/**
+ * OpenCode: global `$XDG_CONFIG_HOME/opencode/skills` (plus `$OPENCODE_CONFIG_DIR/skills`),
+ * project `.opencode/skills`; also reads Claude- and agents-compatible directories.
+ */
+export function opencodeSkillRoots(): SkillScanRoot[] {
+  const roots: SkillScanRoot[] = [
+    { path: home(".claude", "skills"), scope: "global" },
+    { path: home(".agents", "skills"), scope: "global" },
+    { path: opencodeConfigDir("skills"), scope: "global" },
+  ];
+  const configDir = process.env["OPENCODE_CONFIG_DIR"];
+  if (configDir) roots.push({ path: join(configDir, "skills"), scope: "config" });
+  roots.push(
+    { path: cwd(".claude", "skills"), scope: "project" },
+    { path: cwd(".agents", "skills"), scope: "project" },
+    { path: cwd(".opencode", "skills"), scope: "project" },
+  );
+  return roots;
 }
 
 export function crushSkillRoots(): SkillScanRoot[] {
@@ -201,8 +253,8 @@ export function crushSkillRoots(): SkillScanRoot[] {
   }
 
   roots.push(
-    { path: join(xdgConfigHome(), "agents", "skills"), scope: "global" },
-    { path: join(xdgConfigHome(), "crush", "skills"), scope: "global" },
+    { path: xdgConfigHome("agents", "skills"), scope: "global" },
+    { path: xdgConfigHome("crush", "skills"), scope: "global" },
     { path: home(".agents", "skills"), scope: "global" },
     { path: home(".claude", "skills"), scope: "global" },
     { path: getLocalAppData("agents", "skills"), scope: "global" },
@@ -217,7 +269,7 @@ export function gooseSkillRoots(): SkillScanRoot[] {
     { path: cwd(".agents", "skills"), scope: "project" },
     { path: cwd(".goose", "skills"), scope: "project" },
     { path: cwd(".claude", "skills"), scope: "project" },
-    { path: join(xdgConfigHome(), "agents", "skills"), scope: "global" },
+    { path: xdgConfigHome("agents", "skills"), scope: "global" },
     { path: home(".goose", "skills"), scope: "global" },
     { path: home(".claude", "skills"), scope: "global" },
     { path: home(".agents", "skills"), scope: "global" },
