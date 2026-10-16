@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **Cross-platform "Run when app is closed"** — AI Flow can now register the every-minute `flow due` job with macOS launchd (LaunchAgent) and Linux systemd user timers, in addition to Windows Task Scheduler. Linux shows a clear message when `systemctl --user` is unavailable.
+
 ### Fixed
 
 - **Flow phase loop guard** — Orchestrated flows whose `next:`, `on_fail:` or `on_reject:` cycles back to an earlier phase now fail with a "Phase loop detected" error after `phases × 3` phase executions instead of spawning agent runs forever; configured `retry:` attempts do not count toward the limit.

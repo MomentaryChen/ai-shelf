@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { FlowListItem, FlowRunState } from "../types";
+import type { FlowListItem, FlowRunState, FlowTaskSchedulerStatus } from "../types";
 import { parseFlowDocument } from "../../shared/flow-parse.js";
 import type { FlowDefinition, FlowRunStatus } from "../../shared/flow-types.js";
 import { EmptyState } from "./EmptyState";
@@ -68,11 +68,7 @@ export function FlowTab() {
   const [draftChatEpoch, setDraftChatEpoch] = useState(0);
   const [historyRun, setHistoryRun] = useState<FlowRunState | null>(null);
   const [historyRefreshByFlowId, setHistoryRefreshByFlowId] = useState<Record<string, number>>({});
-  const [taskScheduler, setTaskScheduler] = useState<{
-    supported: boolean;
-    installed: boolean;
-    taskName: string;
-  } | null>(null);
+  const [taskScheduler, setTaskScheduler] = useState<FlowTaskSchedulerStatus | null>(null);
   const [taskSchedulerBusy, setTaskSchedulerBusy] = useState(false);
   const [lastOutput, setLastOutput] = useState<{
     runId: string;
