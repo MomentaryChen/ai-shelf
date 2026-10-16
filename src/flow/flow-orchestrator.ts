@@ -22,6 +22,7 @@ import type {
 import type { ToolLaunchArgs } from "../tool-launch.js";
 import { spawnAgentPrint } from "./claude-spawn.js";
 import { resolvePhaseRunner } from "./flow-runner-resolve.js";
+import { phaseLoopError } from "./flow-loop-guard.js";
 import { formatSystemSkillsSection, loadFlowSystemSkills } from "./flow-system-skills.js";
 import { prepareFlowAgentSpawn } from "./mcp-config.js";
 import {
@@ -470,17 +471,20 @@ export async function executeOrchestratedFlowRun(
   ctx.stopWatching = hooks.watchStateFile(ctx.runId, ctx.state);
 
   let currentId: string | null = flow.phases[0]?.id ?? null;
-  const visited = new Set<string>();
+  let phaseVisits = 0;
 
   try {
     while (currentId && !ctx.cancelled) {
-      if (visited.has(currentId) && visited.size > flow.phases.length * 3) {
+      phaseVisits += 1;
+      const loopError = phaseLoopError(phaseVisits, flow.phases.length, currentId);
+      if (loopError) {
         ctx.state.status = "failed";
-        ctx.state.error = "Phase loop detected";
+        ctx.state.error = loopError;
+        ctx.state.currentPhaseId = null;
+        ctx.state.pendingGatePhaseId = null;
         writeState(ctx, hooks);
         break;
       }
-      visited.add(currentId);
 
       const phase = flow.phases.find((p) => p.id === currentId);
       if (!phase) {
