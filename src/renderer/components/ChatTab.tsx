@@ -346,6 +346,31 @@ function ChatTabInner({
 
   const broadcastActive = broadcastInput && panes.length > 1;
 
+  const broadcastInputRef = useRef(broadcastInput);
+  broadcastInputRef.current = broadcastInput;
+
+  // Stable (refs) so memoized EmbeddedTerminals always see the live broadcast state.
+  const getPasteTargets = useCallback((sessionId: string): string[] => {
+    const current = panesRef.current;
+    if (broadcastInputRef.current && current.length > 1) return current.map((p) => p.sessionId);
+    return [sessionId];
+  }, []);
+
+  const pasteConfirm = useMemo(
+    () => ({
+      enabled: settings.terminalPasteConfirm,
+      maxLines: settings.terminalPasteConfirmMaxLines,
+      maxChars: settings.terminalPasteConfirmMaxChars,
+      alwaysWhenBroadcast: settings.terminalPasteConfirmBroadcast,
+    }),
+    [
+      settings.terminalPasteConfirm,
+      settings.terminalPasteConfirmMaxLines,
+      settings.terminalPasteConfirmMaxChars,
+      settings.terminalPasteConfirmBroadcast,
+    ],
+  );
+
   // Palette "broadcast command" — always sends to every pane and presses Enter,
   // independent of the broadcast-input toggle (which only mirrors keystrokes).
   const broadcastCommandToPanes = useCallback((text: string) => {
@@ -1567,6 +1592,8 @@ function ChatTabInner({
             webglEnabled={settings.terminalWebglEnabled}
             rightClickPaste={settings.terminalRightClickPaste}
             copyOnSelect={settings.terminalCopyOnSelect}
+            pasteConfirm={pasteConfirm}
+            getPasteTargets={getPasteTargets}
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}

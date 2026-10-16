@@ -14,6 +14,12 @@ import {
   normalizePaneShortcutBindings,
   type PaneShortcutBindings,
 } from "./terminal/pane-key-bindings";
+import {
+  DEFAULT_PASTE_CONFIRM_MAX_CHARS,
+  DEFAULT_PASTE_CONFIRM_MAX_LINES,
+  normalizePasteConfirmMaxChars,
+  normalizePasteConfirmMaxLines,
+} from "./terminal/paste-confirm";
 
 export type { AppColorTheme, AppLocale, LocalePreference };
 
@@ -64,6 +70,14 @@ export interface ChatSettings {
   terminalCopyOnSelect: boolean;
   /** Prefer WebGL terminal renderer; falls back to canvas if unavailable. */
   terminalWebglEnabled: boolean;
+  /** Ask before pasting text over the line / size thresholds below. */
+  terminalPasteConfirm: boolean;
+  /** Confirm pastes with more lines than this. */
+  terminalPasteConfirmMaxLines: number;
+  /** Confirm pastes with more characters than this. */
+  terminalPasteConfirmMaxChars: number;
+  /** Always confirm a paste that broadcast input would send to several panes. */
+  terminalPasteConfirmBroadcast: boolean;
   workingDir: string;
   dirHistory: string[];
   /** Pane split / focus shortcuts (Ctrl/Cmd combinations). */
@@ -231,6 +245,10 @@ const DEFAULTS: ChatSettings = {
   terminalRightClickPaste: true,
   terminalCopyOnSelect: true,
   terminalWebglEnabled: true,
+  terminalPasteConfirm: true,
+  terminalPasteConfirmMaxLines: DEFAULT_PASTE_CONFIRM_MAX_LINES,
+  terminalPasteConfirmMaxChars: DEFAULT_PASTE_CONFIRM_MAX_CHARS,
+  terminalPasteConfirmBroadcast: true,
   workingDir: "",
   dirHistory: [],
   paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
@@ -276,6 +294,10 @@ export function loadSettings(): ChatSettings {
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       terminalWebglEnabled: normalizeWebglEnabled(stored.terminalWebglEnabled),
+      terminalPasteConfirm: normalizePaneAgentBool(stored.terminalPasteConfirm, true),
+      terminalPasteConfirmMaxLines: normalizePasteConfirmMaxLines(stored.terminalPasteConfirmMaxLines),
+      terminalPasteConfirmMaxChars: normalizePasteConfirmMaxChars(stored.terminalPasteConfirmMaxChars),
+      terminalPasteConfirmBroadcast: normalizePaneAgentBool(stored.terminalPasteConfirmBroadcast, true),
       paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
       systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
       paneAgentAwarenessEnabled: normalizePaneAgentBool(stored.paneAgentAwarenessEnabled, true),

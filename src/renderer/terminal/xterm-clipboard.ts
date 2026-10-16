@@ -152,7 +152,8 @@ export interface TerminalClipboardOptions {
   getCopyOnSelect?: () => boolean;
   /**
    * Paste into this terminal. When omitted, uses term.paste (may fan out via onData broadcast).
-   * Prefer term.paste via a single-pane bypass in EmbeddedTerminal.
+   * EmbeddedTerminal routes it through paste confirmation and per-pane term.paste.
+   * When set, native DOM paste events are routed here too.
    */
   onPaste?: (text: string, term: Terminal) => void;
 }
@@ -466,6 +467,24 @@ export function bindTerminalClipboard(
   container.addEventListener("contextmenu", onContextMenu, { capture: true });
 
   /**
+   * Native paste events (Edit menu, middle-click, OS paste) would reach xterm's
+   * own handler and go out through onData — skipping paste confirmation and
+   * fanning one pane's bracketed bytes out to every broadcast pane. Route them
+   * through the same path as Ctrl+V. Capture phase runs before xterm's listener.
+   */
+  const onNativePaste = (ev: ClipboardEvent) => {
+    if (!options.onPaste) return;
+    const text = ev.clipboardData?.getData("text/plain") ?? "";
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    const now = Date.now();
+    if (!text || now < guards.pasteUntil) return;
+    guards.pasteUntil = now + GUARD_MS;
+    deliverPaste(text);
+  };
+  container.addEventListener("paste", onNativePaste, { capture: true });
+
+  /**
    * Copy-on-select via xterm's own selection event (more reliable than a DOM
    * mouseup, whose listener xterm's document-level drag handling can bypass).
    * Debounced so a drag copies once when it settles, and written directly so the
@@ -532,6 +551,7 @@ export function bindTerminalClipboard(
     cancelPendingAutoCopy();
     selectionDisposable.dispose();
     container.removeEventListener("contextmenu", onContextMenu, { capture: true });
+    container.removeEventListener("paste", onNativePaste, { capture: true });
     container.removeEventListener("mousedown", onMouseDown, { capture: true });
     container.removeEventListener("mouseup", onMouseUp, { capture: true });
     term.attachCustomKeyEventHandler(() => true);

@@ -187,6 +187,14 @@ export const en = {
   "settings.copyOnSelect": "Copy on selection",
   "settings.copyOnSelectHint":
     "When enabled, selecting text with the mouse copies it to the clipboard automatically — so you can paste it straight into another terminal.",
+  "settings.pasteConfirm": "Confirm large pastes",
+  "settings.pasteConfirmHint":
+    "Show a preview before pasting text longer than these limits, so a stray multi-line paste can't run commands by accident.",
+  "settings.pasteConfirmMaxLines": "More than (lines)",
+  "settings.pasteConfirmMaxChars": "More than (characters)",
+  "settings.pasteConfirmBroadcast": "Always confirm when broadcasting",
+  "settings.pasteConfirmBroadcastHint":
+    "When “Sync input to all terminals” is on, ask before every paste that would reach more than one terminal.",
   "settings.webgl": "WebGL renderer",
   "settings.webglHint":
     "Faster drawing with the GPU — helps with many panes and large scrollback. Falls back to canvas if WebGL is unavailable. Open panes reload on change.",
@@ -675,6 +683,17 @@ export const en = {
   "terminal.newOutput": "New output",
   "terminal.ctx.copy": "Copy",
   "terminal.ctx.paste": "Paste",
+  "terminal.pasteConfirm.title": "Paste this text?",
+  "terminal.pasteConfirm.titleBroadcast": "Paste into {count} terminals?",
+  "terminal.pasteConfirm.stats": "{lines} lines · {chars} characters",
+  "terminal.pasteConfirm.broadcastNote":
+    "Sync input is on — this paste goes to all {count} terminals in this profile.",
+  "terminal.pasteConfirm.unbracketedWarning":
+    "Bracketed paste is off in the target terminal — each line may run as a command as soon as it is pasted.",
+  "terminal.pasteConfirm.previewTruncated": "Preview shows the beginning only.",
+  "terminal.pasteConfirm.singleLine": "Paste as single line",
+  "terminal.pasteConfirm.paste": "Paste",
+  "terminal.pasteConfirm.pasteBroadcast": "Paste to {count}",
   "terminal.ctx.find": "Find…",
   "terminal.ctx.selectAll": "Select all",
   "terminal.ctx.clear": "Clear screen",
