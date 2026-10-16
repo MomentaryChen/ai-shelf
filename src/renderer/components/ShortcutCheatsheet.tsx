@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocale } from "../i18n/LocaleProvider";
-import { loadSettings } from "../chat-settings";
 import { buildShortcutSections } from "../shortcuts/shortcut-registry";
 
 export function ShortcutCheatsheet({
@@ -21,7 +20,8 @@ export function ShortcutCheatsheet({
 }) {
   const { t } = useLocale();
   const sections = useMemo(
-    () => buildShortcutSections(loadSettings().paneShortcuts),
+    () => buildShortcutSections(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild from settings each time it opens
     [open],
   );
 
@@ -73,7 +73,7 @@ export function ShortcutCheatsheet({
                 <ul className="flex flex-col gap-1.5">
                   {section.items.map((item) => (
                     <li
-                      key={`${section.titleKey}-${item.labelKey}`}
+                      key={item.id}
                       className={`flex items-center justify-between gap-3 rounded-[14px] px-2.5 py-1.5 text-[13px] ${
                         chrome ? "hover:bg-chrome-hover/60" : "hover:bg-cream/80"
                       }`}
@@ -83,12 +83,14 @@ export function ShortcutCheatsheet({
                       </span>
                       <kbd
                         className={`shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[11px] tabular-nums ${
+                          item.keys === null ? "italic opacity-60 " : ""
+                        }${
                           chrome
                             ? "border-chrome-border-subtle bg-chrome-surface-raised text-chrome-text-muted"
                             : "border-sand bg-cream text-ink"
                         }`}
                       >
-                        {item.keys}
+                        {item.keys ?? t("keybindings.unbound")}
                       </kbd>
                     </li>
                   ))}

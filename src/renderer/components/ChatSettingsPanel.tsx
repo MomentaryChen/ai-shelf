@@ -29,7 +29,7 @@ import {
   type PreferredShell,
 } from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
-import { PaneShortcutBindingsEditor } from "./PaneShortcutBindingsEditor";
+import { KeybindingsEditor } from "./KeybindingsEditor";
 import { ToolLaunchArgsEditor } from "./ToolLaunchArgsEditor";
 import type { AppColorTheme } from "../app-theme";
 import type { LocalePreference } from "../i18n/index";
@@ -449,16 +449,16 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
 
       {show("shortcuts") && (
         <>
-      {/* Pane shortcuts */}
+      {/* Keyboard shortcuts */}
       <div>
-        <p className={sectionTitle}>{t("settings.paneShortcut.title")}</p>
+        <p className={sectionTitle}>{t("keybindings.title")}</p>
         <p className="mb-3 text-[11px] leading-snug text-text-tertiary">
-          {t("settings.paneShortcut.subtitle")}
+          {t("keybindings.subtitle")}
         </p>
-        <PaneShortcutBindingsEditor
+        <KeybindingsEditor
           compact={compact}
-          bindings={settings.paneShortcuts}
-          onChange={(paneShortcuts) => updateSettings({ paneShortcuts })}
+          overrides={settings.keybindings}
+          onChange={(keybindings) => updateSettings({ keybindings })}
         />
       </div>
         </>
