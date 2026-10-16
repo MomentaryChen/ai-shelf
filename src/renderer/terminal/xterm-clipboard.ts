@@ -2,6 +2,7 @@ import type { Terminal } from "@xterm/xterm";
 import { shouldDeferImeKeyToXterm, shouldIgnoreShortcutForIme } from "./ime-keys";
 import { tryConsumePaneShortcut } from "./pane-shortcuts";
 import { getStoredT } from "../i18n/stored-locale.js";
+import { createSelectionAutoCopy, isProgrammaticSelection } from "./selection-copy";
 
 /** Serialize clipboard IPC so copy-then-paste across panes does not read mid-write (Windows). */
 let clipboardOp: Promise<void> = Promise.resolve();
@@ -228,17 +229,12 @@ export function bindTerminalClipboard(
   const POINTER_PASTE_DEDUPE_MS = 100;
   let lastPointerPasteAt = 0;
   let lastAutoCopied = { text: "", at: 0 };
-  let selCopyTimer = 0;
-  let selCopyGeneration = 0;
-  let pendingCopyText = "";
 
   const isRecentAutoCopy = (text: string) =>
     text === lastAutoCopied.text &&
     Date.now() - lastAutoCopied.at < AUTO_COPY_DEDUPE_MS;
 
   const runAutoCopy = (text: string) => {
-    selCopyTimer = 0;
-    pendingCopyText = "";
     if (!(options.getCopyOnSelect?.() ?? false)) return;
     if (isRecentAutoCopy(text)) {
       clearPendingSelectionCopy(text);
@@ -249,12 +245,30 @@ export function bindTerminalClipboard(
     });
   };
 
+  // Capture the text at selection time and write that exact value; re-reading
+  // on the timer could see an already-cleared selection after the pane lost
+  // focus. Search-driven selection changes never queue a copy.
+  const autoCopy = createSelectionAutoCopy({
+    delayMs: 50,
+    setTimer: (fn, ms) => window.setTimeout(fn, ms),
+    clearTimer: (handle) => window.clearTimeout(handle),
+    copy: runAutoCopy,
+    shouldSkip: isRecentAutoCopy,
+    // Publish immediately so a paste in another pane can flush before the
+    // debounce timer queues the OS write.
+    onQueued: notePendingSelectionCopy,
+    onDropped: clearPendingSelectionCopy,
+  });
+
   const cancelPendingAutoCopy = (clearPending = false) => {
-    pendingCopyText = "";
-    selCopyGeneration += 1;
-    window.clearTimeout(selCopyTimer);
-    selCopyTimer = 0;
+    autoCopy.cancel();
     if (clearPending) clearPendingSelectionCopy();
+  };
+
+  /** User-initiated select-all: a new selection of the user's own. */
+  const userSelectAll = () => {
+    autoCopy.userGesture();
+    selectAllTerminalBuffer(term);
   };
 
   const copyTerminalSelection = async (): Promise<boolean> => {
@@ -343,7 +357,7 @@ export function bindTerminalClipboard(
     // Select all: Ctrl+A (Windows), Cmd+A (Mac), Ctrl+Shift+A (Linux)
     if (isTerminalSelectAllShortcut(ev)) {
       consumeKey(ev);
-      selectAllTerminalBuffer(term);
+      userSelectAll();
       return false;
     }
 
@@ -405,7 +419,7 @@ export function bindTerminalClipboard(
     addItem(getStoredT("terminal.ctx.copy"), hasSelection, () => void copyTerminalSelection());
     addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal());
     addItem(getStoredT("terminal.ctx.find"), true, () => options?.onOpenFind?.());
-    addItem(getStoredT("terminal.ctx.selectAll"), true, () => selectAllTerminalBuffer(term));
+    addItem(getStoredT("terminal.ctx.selectAll"), true, userSelectAll);
     if (options.onExportOutput) {
       addItem(getStoredT("terminal.ctx.exportOutput"), true, options.onExportOutput);
     }
@@ -476,24 +490,7 @@ export function bindTerminalClipboard(
       cancelPendingAutoCopy(true);
       return;
     }
-    const text = term.getSelection();
-    // Selection cleared (e.g. focus moved to another pane). Leave any pending
-    // copy of the previous selection alone — cancelling it here is what made a
-    // quick copy-then-switch lose the text before it reached the clipboard.
-    if (!text || isRecentAutoCopy(text)) return;
-    // Publish immediately so a paste in another pane can flush before the
-    // debounce timer queues the OS write.
-    notePendingSelectionCopy(text);
-    // Capture `text` now and write that exact value; re-reading on the timer
-    // could see an already-cleared selection after the pane lost focus. Also
-    // tracked in `pendingCopyText` so mouseup can flush it immediately below.
-    const gen = ++selCopyGeneration;
-    pendingCopyText = text;
-    window.clearTimeout(selCopyTimer);
-    selCopyTimer = window.setTimeout(() => {
-      if (gen !== selCopyGeneration) return;
-      runAutoCopy(text);
-    }, 50);
+    autoCopy.selectionChanged(term.getSelection(), isProgrammaticSelection(term));
   };
   const selectionDisposable = term.onSelectionChange(onSelectionChange);
 
@@ -501,6 +498,8 @@ export function bindTerminalClipboard(
 
   const onMouseDown = (ev: MouseEvent) => {
     if (ev.button === 0) {
+      // A fresh drag / click: whatever search selected no longer owns it.
+      autoCopy.userGesture();
       term.focus();
       return;
     }
@@ -515,13 +514,8 @@ export function bindTerminalClipboard(
    * select-then-paste into another pane can read a stale clipboard value.
    */
   const onMouseUp = (ev: MouseEvent) => {
-    if (ev.button !== 0 || !selCopyTimer || !pendingCopyText) return;
-    const text = pendingCopyText;
-    const gen = selCopyGeneration;
-    window.clearTimeout(selCopyTimer);
-    selCopyTimer = 0;
-    if (gen !== selCopyGeneration) return;
-    runAutoCopy(text);
+    if (ev.button !== 0) return;
+    autoCopy.flush();
   };
 
   container.addEventListener("mousedown", onMouseDown, { capture: true });
