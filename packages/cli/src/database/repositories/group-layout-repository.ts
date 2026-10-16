@@ -28,7 +28,7 @@ export class GroupLayoutRepository {
           panes_json: string;
           broadcast_input: number;
           accent_color: string | null;
-          saved_commands_json: string;
+          saved_commands_json: string | null;
           updated_at: string;
         }
       | undefined;
@@ -99,12 +99,12 @@ export class GroupLayoutRepository {
         group_id: groupId,
         workspace_id: workspaceId,
         default_cwd: parsed.defaultCwd,
-        default_tool: parsed.defaultTool ?? "claude",
+        default_tool: parsed.defaultTool,
         layout_json: parsed.layout ? JSON.stringify(parsed.layout) : null,
         panes_json: JSON.stringify(parsed.panes),
         broadcast_input: parsed.broadcastInput ? 1 : 0,
         accent_color: accentColor,
-        saved_commands_json: JSON.stringify(stored.savedCommands ?? []),
+        saved_commands_json: JSON.stringify(stored.savedCommands),
         updated_at: now,
       });
 
@@ -208,16 +208,16 @@ export class GroupLayoutRepository {
   clearLastActiveForGroup(workspaceId: string): void {
     const map = this.readLastActiveByGroup();
     if (!(workspaceId in map)) return;
-    delete map[workspaceId];
-    this.setPreference(PREF_LAST_ACTIVE_BY_GROUP, JSON.stringify(map));
+    const next = Object.fromEntries(Object.entries(map).filter(([key]) => key !== workspaceId));
+    this.setPreference(PREF_LAST_ACTIVE_BY_GROUP, JSON.stringify(next));
   }
 
   /** Drop a remembered profile if it matches (e.g. profile deleted). */
   clearLastActiveForProfile(workspaceId: string, profileId: string): void {
     const map = this.readLastActiveByGroup();
     if (map[workspaceId] !== profileId) return;
-    delete map[workspaceId];
-    this.setPreference(PREF_LAST_ACTIVE_BY_GROUP, JSON.stringify(map));
+    const next = Object.fromEntries(Object.entries(map).filter(([key]) => key !== workspaceId));
+    this.setPreference(PREF_LAST_ACTIVE_BY_GROUP, JSON.stringify(next));
   }
 
   private readLastActiveByGroup(): Record<string, string> {

@@ -99,8 +99,8 @@ contextBridge.exposeInMainWorld("api", {
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   launchInTerminal: (tool, terminal, cwd, extraArgs) =>
     ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
-  ptySpawn: (tool, cwd, extraArgs, shell) =>
-    ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell),
+  ptySpawn: (tool, cwd, extraArgs, shell, options) =>
+    ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell, options),
   ptyAttach: (sessionId, opts)              => ipcRenderer.invoke("pty-attach", sessionId, opts),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
   ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),

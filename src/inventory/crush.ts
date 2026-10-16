@@ -1,9 +1,8 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { crushSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
-import { home, cwd, findExistingPaths } from "../utils/config.js";
+import { cwd, findExistingPaths, xdgConfigHome } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
-import { join } from "node:path";
 
 export async function detectCrush(_opts: DetectOptions = {}): Promise<ProviderEntry> {
   const versionResult = await run("crush", ["--version"], 5_000);
@@ -12,11 +11,10 @@ export async function detectCrush(_opts: DetectOptions = {}): Promise<ProviderEn
     ? parseCliVersionLine(versionResult.stdout.split("\n")[0] ?? "")
     : undefined;
 
-  const xdgConfig = process.env["XDG_CONFIG_HOME"] ?? home(".config");
   const configCandidates = [
     cwd(".crush.json"),
     cwd("crush.json"),
-    join(xdgConfig, "crush", "crush.json"),
+    xdgConfigHome("crush", "crush.json"),
   ];
   const instructionCandidates = [
     cwd("AGENTS.md"),

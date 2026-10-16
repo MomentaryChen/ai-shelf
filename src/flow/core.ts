@@ -14,7 +14,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getAppDataDir } from "ai-shelf";
 import { cronNextRun, shouldRunFlowNow, validateFlowCronMinInterval } from "../shared/flow-cron.js";
-import { parseFlowDocument } from "../shared/flow-parse.js";
+import { isSafeFlowPathSegment, parseFlowDocument } from "../shared/flow-parse.js";
 import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX } from "../shared/flow-protocol.js";
 import {
   claimFlowScheduleSlot,
@@ -47,7 +47,7 @@ import {
 } from "./flow-command-preview.js";
 import { prepareFlowAgentSpawn } from "./mcp-config.js";
 import { resolveFlowRunner } from "./flow-runner-resolve.js";
-import { buildFallbackOutputMarkdown, writeRunOutputIfMissing } from "./flow-output.js";
+import { appendBoundedTail, buildFallbackOutputMarkdown, writeRunOutputIfMissing } from "./flow-output.js";
 import { buildFlowRunPrompt } from "./flow-system-skills.js";
 import { spawnAgentPrint } from "./claude-spawn.js";
 import { parseAgentCostFromText } from "../usage/parse-agent-cost.js";
@@ -143,8 +143,15 @@ function expandPathTemplate(template: string, flowId: string): string {
     .replace(/^~(?=\/|\\)/, homedir());
 }
 
+function isTerminalRunStatus(status: FlowRunState["status"]): boolean {
+  return status === "completed" || status === "failed" || status === "cancelled";
+}
+
 function broadcastState(state: FlowRunState): void {
-  activeRuns.set(state.runId, state);
+  // Only in-progress runs stay cached; finished runs are read back from disk
+  // (state is always written before broadcast), so the map can't grow forever.
+  if (isTerminalRunStatus(state.status)) activeRuns.delete(state.runId);
+  else activeRuns.set(state.runId, state);
   for (const listener of runListeners) listener(state);
 }
 
@@ -361,6 +368,7 @@ export function getFlowDefinition(flowId: string): FlowDefinition | null {
 export function getFlowRunState(runId: string): FlowRunState | null {
   const cached = activeRuns.get(runId);
   if (cached) return cached;
+  if (!isSafeFlowPathSegment(runId)) return null;
   const statePath = join(runsDir(), runId, "state.json");
   if (!existsSync(statePath)) return null;
   try {
@@ -519,7 +527,7 @@ export type RunDueFlowsOptions = {
   /**
    * Await each scheduled run to completion (default). The app scheduler passes
    * false: a long run must not block this loop, or every other flow's fire
-   * minute is silently missed while it waits (cron has no catch-up).
+   * minute is delayed while it waits (only the latest missed slot is caught up).
    */
   wait?: boolean;
 };
@@ -840,7 +848,7 @@ async function executeFlowRun(
     child.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString("utf8");
       emitFlowConsole(ctx, "stderr", text, state.currentPhaseId);
-      stderr += text;
+      stderr = appendBoundedTail(stderr, text);
     });
 
     child.on("close", (code) => {
@@ -1053,6 +1061,7 @@ function ensureRunOutput(
 export function readRunOutput(
   runId: string,
 ): { ok: boolean; content?: string; outputPath?: string; startedAt?: string; error?: string } {
+  if (!isSafeFlowPathSegment(runId)) return { ok: false, error: "Invalid run id" };
   const state = getFlowRunState(runId);
   let outputPath = state?.outputPath ?? null;
   if (!outputPath || !existsSync(outputPath)) {
@@ -1212,6 +1221,7 @@ export function listRunsForFlow(flowId: string, limit = 30, offset = 0): FlowRun
 }
 
 export function getRunEvents(runId: string): FlowRunEvent[] {
+  if (!isSafeFlowPathSegment(runId)) return [];
   const path = join(runsDir(), runId, "events.jsonl");
   if (!existsSync(path)) return [];
   const lines = readFileSync(path, "utf8").split(/\r?\n/).filter(Boolean);
@@ -1227,6 +1237,7 @@ export function getRunEvents(runId: string): FlowRunEvent[] {
 }
 
 export function getRunArtifactPath(runId: string, artifact: FlowRunArtifact): string | null {
+  if (!isSafeFlowPathSegment(runId)) return null;
   const runDir = join(runsDir(), runId);
   if (!existsSync(runDir)) return null;
 
