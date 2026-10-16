@@ -10,6 +10,8 @@ export const SessionModelSchema = z.object({
   shell: z.string(),
   tool: z.string().nullable(),
   pid: z.number().int().nullable(),
+  /** PID of the process that spawned the PTY (null when not running or unknown). */
+  owner_pid: z.number().int().nullable().default(null),
   status: z.enum(SESSION_STATUSES),
   created_at: z.string(),
   updated_at: z.string(),

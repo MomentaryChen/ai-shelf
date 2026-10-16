@@ -70,8 +70,9 @@ export class SessionService {
   }
 
   stop(workspaceName: string, groupName: string, sessionName: string): SessionModel {
-    const session = this.resolveSession(workspaceName, groupName, sessionName);
-    this.sessionRuntime.stop(session.id);
+    // Raw row (not reconciled): stopping a stale `running` row just marks it stopped.
+    const session = this.findSession(workspaceName, groupName, sessionName);
+    this.sessionRuntime.stop(session);
     return this.sessions.findById(session.id) ?? session;
   }
 
@@ -82,14 +83,19 @@ export class SessionService {
     }
 
     if (!groupName) {
-      return this.sessions.listByWorkspace(workspace.id);
+      return this.reconcileAll(this.sessions.listByWorkspace(workspace.id));
     }
 
     const group = this.groups.findByName(workspace.id, groupName);
     if (!group) {
       throw new AppError(`Group "${groupName}" not found`, "GROUP_NOT_FOUND");
     }
-    return this.sessions.listByGroup(workspace.id, group.id);
+    return this.reconcileAll(this.sessions.listByGroup(workspace.id, group.id));
+  }
+
+  /** Clear `running` rows whose owning process or PTY no longer exists. */
+  private reconcileAll(sessions: SessionModel[]): SessionModel[] {
+    return sessions.map((s) => this.sessionRuntime.reconcile(s));
   }
 
   resolveSession(
@@ -97,6 +103,10 @@ export class SessionService {
     groupName: string,
     sessionName: string,
   ): SessionModel {
+    return this.sessionRuntime.reconcile(this.findSession(workspaceName, groupName, sessionName));
+  }
+
+  private findSession(workspaceName: string, groupName: string, sessionName: string): SessionModel {
     const workspace = this.workspaces.findByName(workspaceName);
     if (!workspace) {
       throw new AppError(`Workspace "${workspaceName}" not found`, "WORKSPACE_NOT_FOUND");
@@ -120,7 +130,7 @@ export class SessionService {
       for (const session of this.sessions.listByGroup(workspace.id, group.id)) {
         if (session.status === "running") {
           try {
-            this.sessionRuntime.stop(session.id);
+            this.sessionRuntime.stop(session);
           } catch {
             /* already stopped */
           }
@@ -132,7 +142,7 @@ export class SessionService {
   delete(workspaceName: string, groupName: string, sessionName: string): void {
     const session = this.resolveSession(workspaceName, groupName, sessionName);
     try {
-      this.sessionRuntime.stop(session.id);
+      this.sessionRuntime.stop(session);
     } catch {
       /* not running */
     }

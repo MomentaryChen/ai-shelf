@@ -25,6 +25,7 @@ export class SessionRepository implements SessionRepositoryPort {
       shell: parsed.shell ?? "auto",
       tool: parsed.tool ?? null,
       pid: null,
+      owner_pid: null,
       status: "pending" as const,
       created_at: now,
       updated_at: now,
@@ -67,7 +68,7 @@ export class SessionRepository implements SessionRepositoryPort {
 
   updateRuntime(
     id: string,
-    patch: { pid?: number | null; status: SessionModel["status"] },
+    patch: { pid?: number | null; owner_pid?: number | null; status: SessionModel["status"] },
   ): SessionModel {
     const existing = this.findById(id);
     if (!existing) throw new DatabaseError(`Session not found: ${id}`);
@@ -75,13 +76,14 @@ export class SessionRepository implements SessionRepositoryPort {
     const updated = {
       ...existing,
       pid: patch.pid !== undefined ? patch.pid : existing.pid,
+      owner_pid: patch.owner_pid !== undefined ? patch.owner_pid : existing.owner_pid,
       status: patch.status,
       updated_at: new Date().toISOString(),
     };
 
     this.db
       .prepare(
-        `UPDATE sessions SET pid = @pid, status = @status, updated_at = @updated_at WHERE id = @id`,
+        `UPDATE sessions SET pid = @pid, owner_pid = @owner_pid, status = @status, updated_at = @updated_at WHERE id = @id`,
       )
       .run(updated);
 

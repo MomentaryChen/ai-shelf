@@ -1,7 +1,9 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
-import { AppError } from "../../core/errors/app-error.js";
+import type { SessionModel } from "../../models/session.js";
+import { handleError } from "../errors.js";
+import { attachSession } from "../attach.js";
 import { DEFAULT_PROFILE_GROUP_NAME } from "../../services/profile-group-service.js";
 import { warnLegacyWorkspaceModel } from "../deprecation.js";
 
@@ -24,7 +26,9 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     )
     .option("--tool <tool>", "AI tool to launch (claude, copilot, cursor, codex, gemini, aider, opencode)")
     .option("--no-start", "Only create metadata, do not spawn PTY")
-    .description("Create session and optionally start PTY")
+    .description(
+      "Create session and start its PTY attached to this terminal (the session stops when you detach)",
+    )
     .action(
       async (
         workspaceName: string,
@@ -34,14 +38,18 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
       ) => {
         warnLegacyWorkspaceModel(SESSION_DEPRECATION);
         try {
-          const s = await getCtx().sessionService.create(workspaceName, groupName, sessionName, {
+          const ctx = getCtx();
+          const s = await ctx.sessionService.create(workspaceName, groupName, sessionName, {
             cwd: opts.cwd,
             shell: opts.shell,
             tool: opts.tool,
             start: opts.start,
           });
           console.log(chalk.green(`✓ Session created: ${workspaceName}/${groupName}/${s.name}`));
-          console.log(chalk.dim(`  cwd: ${s.cwd}  status: ${s.status}${s.pid ? `  pid: ${s.pid}` : ""}`));
+          console.log(
+            chalk.dim(`  cwd: ${s.cwd}  status: ${s.status}${s.pid ? `  pid: ${String(s.pid)}` : ""}`),
+          );
+          if (s.status === "running") await attachAndReport(ctx, s);
         } catch (err) {
           handleError(err);
         }
@@ -53,12 +61,16 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     .argument("<workspace>", "Workspace name")
     .argument("<group>", "Group name")
     .argument("<name>", "Session name")
-    .description("Start PTY for an existing session")
+    .description(
+      "Start PTY for an existing session, attached to this terminal (stops when you detach)",
+    )
     .action(async (workspaceName: string, groupName: string, sessionName: string) => {
       warnLegacyWorkspaceModel(SESSION_DEPRECATION);
       try {
-        const s = await getCtx().sessionService.start(workspaceName, groupName, sessionName);
-        console.log(chalk.green(`✓ Session started: ${s.name} (pid ${s.pid ?? "—"})`));
+        const ctx = getCtx();
+        const s = await ctx.sessionService.start(workspaceName, groupName, sessionName);
+        console.log(chalk.green(`✓ Session started: ${s.name} (pid ${String(s.pid ?? "—")})`));
+        await attachAndReport(ctx, s);
       } catch (err) {
         handleError(err);
       }
@@ -69,7 +81,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     .argument("<workspace>", "Workspace name")
     .argument("<group>", "Group name")
     .argument("<name>", "Session name")
-    .description("Stop session PTY")
+    .description("Stop session PTY (also works for sessions started by another ai-shelf process)")
     .action((workspaceName: string, groupName: string, sessionName: string) => {
       warnLegacyWorkspaceModel(SESSION_DEPRECATION);
       try {
@@ -133,7 +145,9 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
 
           if ("sent" in result) {
             console.log(
-              chalk.green(`✓ Broadcast to ${result.sent.length} session(s): ${result.sent.join(", ")}`),
+              chalk.green(
+                `✓ Broadcast to ${String(result.sent.length)} session(s): ${result.sent.join(", ")}`,
+              ),
             );
             console.log(chalk.dim(`  command: ${command}`));
             for (const s of result.skipped) {
@@ -165,11 +179,17 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
     });
 }
 
-function handleError(err: unknown): never {
-  if (err instanceof AppError) {
-    console.error(chalk.red(`Error: ${err.message}`));
-    process.exitCode = 1;
-    throw err;
-  }
-  throw err;
+/**
+ * PTYs die with the process that spawned them, so `create` / `start` stay attached until the
+ * PTY exits or the user detaches; the postAction hook then stops it and closes the DB.
+ */
+async function attachAndReport(ctx: AppContext, session: SessionModel): Promise<void> {
+  const result = await attachSession(ctx, session);
+  console.log(
+    chalk.dim(
+      result === "exited"
+        ? `\n  session ${session.name} exited`
+        : `\n  detached — stopping session ${session.name}`,
+    ),
+  );
 }

@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const MIGRATION_V2 = `
 ALTER TABLE sessions ADD COLUMN tool TEXT;
@@ -57,6 +57,14 @@ ALTER TABLE workspaces ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
 
 const MIGRATION_V10 = `
 ALTER TABLE group_layouts ADD COLUMN saved_commands_json TEXT NOT NULL DEFAULT '[]';
+`;
+
+/**
+ * PID of the process (CLI, TUI or desktop main) that owns a running session's PTY.
+ * Nullable + additive so older desktop builds sharing this DB keep working.
+ */
+const MIGRATION_V11 = `
+ALTER TABLE sessions ADD COLUMN owner_pid INTEGER;
 `;
 
 const INITIAL_SCHEMA = `
@@ -193,6 +201,15 @@ export function runMigrations(db: Database.Database): void {
       /* column may exist */
     }
     db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(10);
+  }
+
+  if (current < 11) {
+    try {
+      db.exec(MIGRATION_V11);
+    } catch {
+      /* column may exist */
+    }
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(11);
   }
 }
 

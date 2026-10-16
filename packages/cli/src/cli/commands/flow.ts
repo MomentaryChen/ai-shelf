@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
+import { AppError } from "../../core/errors/app-error.js";
 
 type FlowCore = typeof import("../../../../../dist/flow/core.js");
 
@@ -15,13 +16,11 @@ async function loadFlowCore(): Promise<FlowCore> {
 function handleFlowCliError(err: unknown): never {
   const message = err instanceof Error ? err.message : String(err);
   if (message.includes("Cannot find module") || message.includes("ERR_MODULE_NOT_FOUND")) {
-    console.error(
-      chalk.red(
-        "Flow module not built. Run `pnpm build` from the ai-shelf repo root, then retry.",
-      ),
+    throw new AppError(
+      "Flow module not built. Run `pnpm build` from the ai-shelf repo root, then retry.",
+      "FLOW_MODULE_NOT_BUILT",
+      err,
     );
-    process.exitCode = 1;
-    throw err;
   }
   throw err;
 }

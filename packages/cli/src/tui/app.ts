@@ -20,7 +20,17 @@ interface TuiState {
   selectedSession: SessionModel | null;
 }
 
-export function startTui(ctx: AppContext): void {
+/**
+ * Run the TUI until the user quits. Resolves after PTYs started from the TUI are stopped
+ * and the screen is torn down; the caller owns (and closes) `ctx`.
+ */
+export function startTui(ctx: AppContext): Promise<void> {
+  return new Promise<void>((resolve) => {
+    runTui(ctx, resolve);
+  });
+}
+
+function runTui(ctx: AppContext, onExit: () => void): void {
   const screen = blessed.screen({
     smartCSR: true,
     title: APP_TITLE,
@@ -276,10 +286,19 @@ export function startTui(ctx: AppContext): void {
     );
   }
 
+  let exiting = false;
   screen.key(["q", "C-c"], () => {
+    if (exiting) return;
+    exiting = true;
     refreshCoordinator.stop();
-    ctx.close();
-    process.exit(0);
+    try {
+      ctx.sessionRuntime.stopAllOwned();
+    } finally {
+      state.sessions = [];
+      state.selectedSession = null;
+      screen.destroy();
+      onExit();
+    }
   });
 
   screen.key(["r"], () => fullRefresh());
