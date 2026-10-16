@@ -1,6 +1,7 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
-import { home, cwd, findExistingPaths, envPresent } from "../utils/config.js";
+import { codexSkillRoots, withScannedSkills } from "./skills-scan.js";
+import { codexHome, cwd, findExistingPaths, envPresent } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
 import { parseCodexMcpServers, parseCodexModel } from "./mcp-helpers.js";
 
@@ -21,7 +22,7 @@ export async function detectCodex(_opts: DetectOptions = {}): Promise<ProviderEn
     ? parseCliVersionLine(versionResult.stdout.split("\n")[0] ?? "")
     : undefined;
 
-  const configPath = home(".codex", "config.toml");
+  const configPath = codexHome("config.toml");
   const projectConfigPath = cwd(".codex", "config.toml");
 
   const auth = envPresent("OPENAI_API_KEY")
@@ -43,6 +44,8 @@ export async function detectCodex(_opts: DetectOptions = {}): Promise<ProviderEn
     ? (modelFromConfig ?? "gpt-5.3-codex")
     : modelFromConfig;
 
+  const scanned = withScannedSkills(codexSkillRoots());
+
   return {
     tool: "codex",
     provider: "OpenAI Codex",
@@ -51,8 +54,7 @@ export async function detectCodex(_opts: DetectOptions = {}): Promise<ProviderEn
     auth,
     model,
     models: available ? CODEX_MODELS : [],
-    skills: [],
-    skillDetails: [],
+    ...scanned,
     mcp: {
       supported: true,
       servers: [...new Set(mcpServers)],

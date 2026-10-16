@@ -15,4 +15,11 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // node:test's describe()/it() return promises the runner tracks itself.
+    files: ["**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
+    },
+  },
 );

@@ -25,19 +25,27 @@ import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSetti
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
-import { usePaneAgentAwareness } from "../hooks/usePaneAgentAwareness";
+import {
+  usePaneAgentAwareness,
+  type BackgroundAgentNotice,
+  type BackgroundAgentOptions,
+  type BackgroundAgentPane,
+} from "../hooks/usePaneAgentAwareness";
+import {
+  enqueuePaneNotice,
+  strongestAttention,
+} from "../../shared/background-agent-attention.js";
+import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
 import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
 import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
-import { formatProfileQuickSwitchLabels, modLabel } from "../profile-quick-switch";
+import { getActiveKeybindings } from "../shortcuts/active-keybindings";
 import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
-import {
-  formatFocusPaneBinding,
-  formatPaneKeyChord,
-} from "../terminal/pane-key-bindings";
+import { matchShortcut, resolveKeybindings } from "../shortcuts/keybindings";
+import { shortcutKeys } from "../shortcuts/shortcut-registry";
 import {
   collectPanes,
   equalizeRunAroundPane,
@@ -200,27 +208,19 @@ function ChatTabInner({
     };
   }, []);
 
-  const { paneAgentStates, recordPaneAgentInput } = usePaneAgentAwareness(
-    panes,
-    focusedPaneId,
-    settings,
-    t,
-    windowFocused,
+  const keymap = useMemo(
+    () => resolveKeybindings(settings.keybindings),
+    [settings.keybindings],
   );
-  const paneShortcutLabels = useMemo(() => {
-    const b = settings.paneShortcuts;
-    const profile = formatProfileQuickSwitchLabels();
-    return {
-      focusNext: formatPaneKeyChord(b.focusNext),
-      focusPrev: formatPaneKeyChord(b.focusPrev),
-      splitRight: formatPaneKeyChord(b.splitHorizontal),
-      splitDown: formatPaneKeyChord(b.splitVertical),
-      focusPane: formatFocusPaneBinding(b.focusPane),
-      profileByIndex: profile.profileByIndex,
-      profileCycle: profile.profileCycle,
-      profileCyclePrev: profile.profileCyclePrev,
-    };
-  }, [settings.paneShortcuts]);
+  const paneShortcutLabels = useMemo(
+    () => ({
+      focusNext: shortcutKeys("focusNext", keymap),
+      splitRight: shortcutKeys("splitHorizontal", keymap),
+      splitDown: shortcutKeys("splitVertical", keymap),
+      commandPalette: shortcutKeys("commandPalette", keymap),
+    }),
+    [keymap],
+  );
   const useAppThemeBg = isAppThemeTerminalBg(settings.terminalBg);
   const bg = useAppThemeBg ? getAppBg() : settings.terminalBg;
   const terminalFontFamily = settings.terminalFontFamily;
@@ -235,7 +235,13 @@ function ChatTabInner({
       settings.externalTerminal,
       tool,
     );
-    const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs, shell);
+    const result = await window.api.ptySpawn(
+      tool,
+      cwd || undefined,
+      extraArgs,
+      shell,
+      shell === "wsl" ? { wslDistro: settings.wslDistro } : undefined,
+    );
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
@@ -249,7 +255,13 @@ function ChatTabInner({
       sessionId: result.sessionId,
       cwd: result.cwd || cwd || "",
     };
-  }, [settings.externalTerminal, settings.preferredShell, settings.toolLaunchArgs, t]);
+  }, [
+    settings.externalTerminal,
+    settings.preferredShell,
+    settings.toolLaunchArgs,
+    settings.wslDistro,
+    t,
+  ]);
 
   const spawnPaneResilient = useCallback(
     async (tool: string, cwd: string): Promise<PaneInfo | null> => {
@@ -265,6 +277,7 @@ function ChatTabInner({
 
   const {
     activeProfile,
+    backgroundProfilePanes,
     restoring,
     isRestoring,
     migrationDone,
@@ -299,6 +312,46 @@ function ChatTabInner({
     settings.workingDir,
     broadcastInput,
   );
+
+  /** Live panes of non-active profiles, labelled for notifications. */
+  const backgroundAgentPanes = useMemo<BackgroundAgentPane[]>(() => {
+    if (backgroundProfilePanes.length === 0) return [];
+    const names = new Map<string, string>();
+    for (const g of sidebarForest?.groups ?? []) {
+      for (const p of g.profiles) names.set(p.id, p.name);
+    }
+    return backgroundProfilePanes.map((b) => ({
+      pane: b.pane,
+      profileId: b.profileId,
+      profileName: names.get(b.profileId) ?? b.profileId,
+    }));
+  }, [backgroundProfilePanes, sidebarForest]);
+  const backgroundAgentPanesRef = useRef(backgroundAgentPanes);
+  backgroundAgentPanesRef.current = backgroundAgentPanes;
+
+  const [backgroundToasts, setBackgroundToasts] = useState<BackgroundAgentToast[]>([]);
+  const backgroundToastSeqRef = useRef(0);
+  const handleBackgroundNotice = useCallback((notice: BackgroundAgentNotice) => {
+    const id = ++backgroundToastSeqRef.current;
+    setBackgroundToasts((prev) => enqueuePaneNotice(prev, { ...notice, id }));
+  }, []);
+  const dismissBackgroundToast = useCallback((id: number) => {
+    setBackgroundToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+  const backgroundAgentOptions = useMemo<BackgroundAgentOptions>(
+    () => ({ panes: backgroundAgentPanes, onNotice: handleBackgroundNotice }),
+    [backgroundAgentPanes, handleBackgroundNotice],
+  );
+
+  const { paneAgentStates, recordPaneAgentInput, backgroundAttention, backgroundPaneAttention } =
+    usePaneAgentAwareness(
+      panes,
+      focusedPaneId,
+      settings,
+      t,
+      windowFocused,
+      backgroundAgentOptions,
+    );
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -345,6 +398,31 @@ function ChatTabInner({
   );
 
   const broadcastActive = broadcastInput && panes.length > 1;
+
+  const broadcastInputRef = useRef(broadcastInput);
+  broadcastInputRef.current = broadcastInput;
+
+  // Stable (refs) so memoized EmbeddedTerminals always see the live broadcast state.
+  const getPasteTargets = useCallback((sessionId: string): string[] => {
+    const current = panesRef.current;
+    if (broadcastInputRef.current && current.length > 1) return current.map((p) => p.sessionId);
+    return [sessionId];
+  }, []);
+
+  const pasteConfirm = useMemo(
+    () => ({
+      enabled: settings.terminalPasteConfirm,
+      maxLines: settings.terminalPasteConfirmMaxLines,
+      maxChars: settings.terminalPasteConfirmMaxChars,
+      alwaysWhenBroadcast: settings.terminalPasteConfirmBroadcast,
+    }),
+    [
+      settings.terminalPasteConfirm,
+      settings.terminalPasteConfirmMaxLines,
+      settings.terminalPasteConfirmMaxChars,
+      settings.terminalPasteConfirmBroadcast,
+    ],
+  );
 
   // Palette "broadcast command" — always sends to every pane and presses Enter,
   // independent of the broadcast-input toggle (which only mirrors keystrokes).
@@ -453,9 +531,7 @@ function ChatTabInner({
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
       if (shouldIgnoreShortcutForIme(ev)) return;
-      const hasMod = ev.ctrlKey || ev.metaKey;
-      if (!hasMod || ev.shiftKey || ev.altKey) return;
-      if (ev.key.toLowerCase() !== "s") return;
+      if (!matchShortcut(ev, getActiveKeybindings(), ["toggleSidebar"])) return;
 
       const target = ev.target as HTMLElement | null;
       // xterm uses a hidden textarea; still allow sidebar toggle (same as pane shortcuts).
@@ -821,6 +897,11 @@ function ChatTabInner({
 
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
+      const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
+      if (bg) {
+        void openBackgroundPaneRef.current(bg.profileId, paneId);
+        return;
+      }
       if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
       else setFocusedPaneId(paneId);
     });
@@ -1055,8 +1136,9 @@ function ChatTabInner({
         id: g.id,
         name: g.name,
         profileCount: g.profiles.length,
+        agentAttention: strongestAttention(g.profiles.map((p) => backgroundAttention[p.id]?.kind)),
       })),
-    [sidebarForest],
+    [sidebarForest, backgroundAttention],
   );
   const currentGroupId =
     selectedGroupId ??
@@ -1070,6 +1152,21 @@ function ChatTabInner({
     () => sidebarForest?.groups.flatMap((g) => g.profiles) ?? [],
     [sidebarForest],
   );
+  /** Switch to a background profile and focus the pane (notification / toast click). */
+  const openBackgroundPaneRef = useRef(async (_profileId: string, _paneId: string) => {});
+  openBackgroundPaneRef.current = async (profileId: string, paneId: string) => {
+    const profile = allProfiles.find((p) => p.id === profileId);
+    if (!profile) return;
+    await restorePaneToDisplay(profile, paneId);
+  };
+  const openBackgroundToast = useCallback(
+    (toast: BackgroundAgentToast) => {
+      dismissBackgroundToast(toast.id);
+      void openBackgroundPaneRef.current(toast.profileId, toast.paneId);
+    },
+    [dismissBackgroundToast],
+  );
+
   const settingsProfile = useMemo(
     () => allProfiles.find((p) => p.id === settingsProfileId) ?? null,
     [allProfiles, settingsProfileId],
@@ -1090,6 +1187,7 @@ function ChatTabInner({
                 description: pane.cwd || `${paneToolLabel(pane.tool)} ${idx + 1}`,
                 live: true,
                 minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
+                agentAttention: isActive ? null : (backgroundPaneAttention[pane.id]?.kind ?? null),
               }))
             : shouldShowSavedTerminalPreview(live.length, isActive)
               ? p.terminals.map((terminal, idx) => ({
@@ -1112,9 +1210,12 @@ function ChatTabInner({
           broadcastInput: p.broadcastInput,
           savedCommands: p.savedCommands ?? [],
           terminals,
+          agentAttention: isActive ? null : (backgroundAttention[p.id] ?? null),
         };
       }),
     [
+      backgroundAttention,
+      backgroundPaneAttention,
       currentGroup?.profiles,
       getProfilePanes,
       activeProfile?.id,
@@ -1503,8 +1604,8 @@ function ChatTabInner({
       onOpenFolder={() => void openFolderPane()}
       available={data.filter((e) => e.available)}
       splitShortcutLabels={{
-        splitRight: paneShortcutLabels.splitRight,
-        splitDown: paneShortcutLabels.splitDown,
+        splitRight: paneShortcutLabels.splitRight ?? t("keybindings.unbound"),
+        splitDown: paneShortcutLabels.splitDown ?? t("keybindings.unbound"),
       }}
     />
   );
@@ -1567,6 +1668,8 @@ function ChatTabInner({
             webglEnabled={settings.terminalWebglEnabled}
             rightClickPaste={settings.terminalRightClickPaste}
             copyOnSelect={settings.terminalCopyOnSelect}
+            pasteConfirm={pasteConfirm}
+            getPasteTargets={getPasteTargets}
             active={active}
             focused={paneFocused}
             onWrite={handlePtyWrite}
@@ -1665,17 +1768,22 @@ function ChatTabInner({
                 {[
                   { keys: paneShortcutLabels.splitRight, label: t("shortcuts.pane.splitHorizontal") },
                   { keys: paneShortcutLabels.focusNext, label: t("shortcuts.pane.focusNext") },
-                  { keys: `${modLabel()}+K`, label: t("shortcuts.general.commandPalette") },
-                ].map((row) => (
-                  <Fragment key={row.label}>
-                    <dt className="text-right">
-                      <kbd className="rounded border border-chrome-border-subtle bg-chrome-surface-raised px-1.5 py-0.5 font-mono text-[11px] text-chrome-text-secondary">
-                        {row.keys}
-                      </kbd>
-                    </dt>
-                    <dd className="text-left">{row.label}</dd>
-                  </Fragment>
-                ))}
+                  {
+                    keys: paneShortcutLabels.commandPalette,
+                    label: t("shortcuts.general.commandPalette"),
+                  },
+                ]
+                  .filter((row) => row.keys)
+                  .map((row) => (
+                    <Fragment key={row.label}>
+                      <dt className="text-right">
+                        <kbd className="rounded border border-chrome-border-subtle bg-chrome-surface-raised px-1.5 py-0.5 font-mono text-[11px] text-chrome-text-secondary">
+                          {row.keys}
+                        </kbd>
+                      </dt>
+                      <dd className="text-left">{row.label}</dd>
+                    </Fragment>
+                  ))}
               </dl>
               <button
                 type="button"
@@ -1727,6 +1835,11 @@ function ChatTabInner({
       <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text" data-surface="chrome">
         {sidebarDialogs}
         {sidebar}
+        <BackgroundAgentToasts
+          toasts={backgroundToasts}
+          onOpen={openBackgroundToast}
+          onDismiss={dismissBackgroundToast}
+        />
         {!sidebarCollapsed && (
           <div className="w-2.5 shrink-0 self-stretch" style={{ width: 10 }}>
             <ResizeDivider

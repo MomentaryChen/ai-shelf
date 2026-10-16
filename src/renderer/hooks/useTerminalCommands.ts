@@ -3,7 +3,7 @@ import { AppWindow, Monitor, Radio, Terminal, User, Zap, type LucideIcon } from 
 import type { Command } from "../components/CommandPalette";
 import type { ProfileForest, ProviderEntry, SavedCommandSnippet } from "../types";
 import { findProviderEntry } from "../utils/claude-cursor-diff";
-import { modLabel } from "../profile-quick-switch";
+import { digitShortcutKeys } from "../shortcuts/shortcut-registry";
 import { toolLabel } from "../utils";
 
 export interface TerminalCommandActions {
@@ -104,14 +104,16 @@ export function useTerminalCommands(
       });
     }
 
-    const mod = modLabel();
     const profiles =
       forest?.groups.flatMap((g) =>
         g.profiles.map((p, idx) => ({
           ...p,
           groupName: g.name,
           // Ctrl+1–9 only switch within the currently displayed group.
-          shortcut: g.id === currentGroupId && idx < 9 ? `${mod}+${idx + 1}` : undefined,
+          shortcut:
+            g.id === currentGroupId && idx < 9
+              ? digitShortcutKeys("profileByIndex", idx)
+              : undefined,
         })),
       ) ?? [];
 
