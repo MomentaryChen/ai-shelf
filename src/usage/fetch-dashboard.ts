@@ -46,8 +46,9 @@ function buildCostInsights(tools: UsageToolSnapshot[], days: number): UsageCostI
         .reduce((s, d) => s + d.costUsd, 0);
       return sum + inWeek;
     }, 0);
-  const weekSpendUsd =
-    weekFromDaily > 0 ? weekFromDaily : sumAttributedCost(weekAttr) || periodInsights.byTool.reduce((s, r) => s + r.costUsd, 0);
+  // Never fall back to the whole-period total — that inflates "this week" by up to
+  // the full range (e.g. 30 days) and trips false budget alerts.
+  const weekSpendUsd = weekFromDaily > 0 ? weekFromDaily : sumAttributedCost(weekAttr);
 
   const alert = evaluateBudgetAlert(weekSpendUsd, budget, collectProviderQuotaAlerts(tools));
 

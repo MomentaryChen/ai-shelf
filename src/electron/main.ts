@@ -2444,7 +2444,9 @@ ipcMain.handle("config-snapshot-import", async (_event, label?: string) => {
 
 ipcMain.handle("relaunch-app", () => {
   app.relaunch();
-  app.exit(0);
+  // Go through the normal quit flow (layout flush, PTY teardown, scheduler/server
+  // shutdown) — app.exit() would skip before-quit / will-quit entirely.
+  app.quit();
   return { ok: true };
 });
 
