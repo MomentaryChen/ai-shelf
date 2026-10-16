@@ -157,6 +157,13 @@ export const en = {
   "shell.zsh": "Zsh",
   "shell.fish": "Fish",
   "shell.sh": "sh",
+  "shell.wsl": "WSL",
+  "settings.wslDistro": "WSL distro",
+  "settings.wslDistro.default": "Default distro (wsl.exe default)",
+  "settings.wslDistro.missing": "not installed",
+  "settings.wslDistro.hint":
+    "New panes open in this distro via wsl.exe, starting in the pane's folder. AI tools run inside the distro with a login bash, so install them there.",
+  "settings.wslDistro.loadFailed": "Could not list WSL distros.",
 
   "settings.toolLaunchArgs.title": "Tool launch arguments",
   "settings.toolLaunchArgs.subtitle":
@@ -1662,6 +1669,11 @@ export const en = {
   "ports.error.unavailable": "Port lookup is not available in this window.",
   "ports.error.listFailed": "Could not list listeners — try refresh.",
   "ports.error.killFailed": "Could not stop that process. It may have already exited.",
+  "ports.wsl.badge": "WSL · {distro}",
+  "ports.wsl.stopHint": "Runs inside WSL ({distro}) — stop it from a shell in that distro.",
+  "ports.wsl.scanned": "WSL: {list}",
+  "ports.wsl.scanFailed": "{distro} (not scanned)",
+  "ports.wsl.stoppedHint": "Only running distros are scanned; stopped distros are not started.",
 
   // Tools mode — WSL
   "tools.tab.wsl": "WSL",

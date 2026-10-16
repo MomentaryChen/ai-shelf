@@ -152,6 +152,13 @@ export const zh: Record<MessageKey, string> = {
   "shell.zsh": "Zsh",
   "shell.fish": "Fish",
   "shell.sh": "sh",
+  "shell.wsl": "WSL",
+  "settings.wslDistro": "WSL 發行版",
+  "settings.wslDistro.default": "預設發行版（wsl.exe 預設）",
+  "settings.wslDistro.missing": "未安裝",
+  "settings.wslDistro.hint":
+    "新面板會透過 wsl.exe 在這個發行版中開啟，並從面板的資料夾開始。AI 工具會以登入 bash 在發行版內執行，請先在該發行版中安裝。",
+  "settings.wslDistro.loadFailed": "無法列出 WSL 發行版。",
 
   "settings.toolLaunchArgs.title": "工具啟動參數",
   "settings.toolLaunchArgs.subtitle":
@@ -1623,6 +1630,11 @@ export const zh: Record<MessageKey, string> = {
   "ports.error.unavailable": "這個視窗無法查詢埠。",
   "ports.error.listFailed": "無法列出 listener — 請再整理一次。",
   "ports.error.killFailed": "無法停止該行程，可能已經結束。",
+  "ports.wsl.badge": "WSL · {distro}",
+  "ports.wsl.stopHint": "在 WSL（{distro}）內執行 — 請在該發行版的 Shell 中停止它。",
+  "ports.wsl.scanned": "WSL：{list}",
+  "ports.wsl.scanFailed": "{distro}（未能掃描）",
+  "ports.wsl.stoppedHint": "只掃描執行中的發行版；不會為此啟動已停止的發行版。",
 
   // Tools 模式 — WSL
   "tools.tab.wsl": "WSL",

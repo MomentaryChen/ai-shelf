@@ -12,7 +12,7 @@ import type {
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
-import type { PortListenerRow } from "../shared/port-listeners.js";
+import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
@@ -773,8 +773,10 @@ export interface ElectronAPI {
     tool: string,
     cwd?: string,
     extraArgs?: string,
-    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | bash | zsh | fish | sh. */
+    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | wsl | bash | zsh | fish | sh. */
     shell?: string,
+    /** `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro. */
+    options?: { wslDistro?: string },
   ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
   ptyAttach: (
     sessionId: string,
@@ -1135,7 +1137,14 @@ export interface ElectronAPI {
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
   onFlowConsoleChunk: (cb: (chunk: FlowConsoleChunk) => void) => () => void;
   portsList: (port?: number | null) => Promise<
-    { ok: true; listeners: PortListenerRow[]; port: number | null } | { ok: false; error: string }
+    | {
+        ok: true;
+        listeners: PortListenerRow[];
+        port: number | null;
+        /** Running WSL distros that were scanned (Windows only; stopped distros are skipped). */
+        wslDistros?: WslPortScan[];
+      }
+    | { ok: false; error: string }
   >;
   portsKill: (
     pid: number,

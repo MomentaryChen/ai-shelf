@@ -37,6 +37,7 @@ import type { MessageKey } from "../i18n/messages/en";
 import { syncMainProcessFromSettings } from "../system-tray-sync";
 import { useHealthMonitor } from "../hooks/useHealthMonitor";
 import { installPlatform } from "../utils/install-platform";
+import type { WslDistroRow } from "../types";
 
 export const SETTINGS_CATEGORIES = [
   { id: "appearance", labelKey: "settings.category.appearance" },
@@ -66,6 +67,7 @@ const SHELL_LABEL_KEYS: Record<PreferredShell, MessageKey> = {
   pwsh: "terminal.pwsh",
   powershell: "terminal.powershell",
   cmd: "terminal.cmd",
+  wsl: "shell.wsl",
   bash: "shell.bash",
   zsh: "shell.zsh",
   fish: "shell.fish",
@@ -126,6 +128,91 @@ function buildDirOptions(workingDir: string, dirHistory: string[]): string[] {
 function dirOptionLabel(dir: string): string {
   const name = dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
   return `${name} — ${dir}`;
+}
+
+/** Distro choice for the WSL embedded shell; empty value keeps the WSL default distro. */
+function WslDistroPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (distro: string) => void;
+}) {
+  const { t } = useLocale();
+  const [distros, setDistros] = useState<WslDistroRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!window.api?.wslListDistros) {
+      setError(t("wsl.error.unavailable"));
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await window.api.wslListDistros();
+      if (result.ok) {
+        setDistros(result.distros);
+        setError(null);
+      } else {
+        setDistros([]);
+        setError(result.error || t("settings.wslDistro.loadFailed"));
+      }
+    } catch (err) {
+      setDistros([]);
+      setError(err instanceof Error ? err.message : t("settings.wslDistro.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const names = distros.map((d) => d.name);
+  // Keep a saved distro selectable even if it is not installed (anymore).
+  const options = value && !names.includes(value) ? [value, ...names] : names;
+
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      <p className="text-[12px] font-medium text-text-secondary">{t("settings.wslDistro")}</p>
+      <div className="flex items-center gap-2">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={loading}
+          className="min-w-0 max-w-xs flex-1 cursor-pointer truncate rounded-lg border border-border bg-bg-secondary px-3 py-2 text-[12px] text-text-primary focus:border-accent/40 focus:outline-none"
+        >
+          <option value="">{t("settings.wslDistro.default")}</option>
+          {options.map((name) => {
+            const row = distros.find((d) => d.name === name);
+            const suffix = row
+              ? ` (${row.isDefault ? `${t("wsl.default")}, ` : ""}${row.state})`
+              : ` (${t("settings.wslDistro.missing")})`;
+            return (
+              <option key={name} value={name}>
+                {name}
+                {suffix}
+              </option>
+            );
+          })}
+        </select>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={loading}
+          onClick={() => void refresh()}
+        >
+          {loading ? t("wsl.refreshing") : t("wsl.refresh")}
+        </Button>
+      </div>
+      <p className="text-[11px] leading-snug text-text-tertiary">
+        {error ?? t("settings.wslDistro.hint")}
+      </p>
+    </div>
+  );
 }
 
 export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPanelProps) {
@@ -372,6 +459,12 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+        {installPlatform() === "win32" && settings.preferredShell === "wsl" && (
+          <WslDistroPicker
+            value={settings.wslDistro}
+            onChange={(wslDistro) => updateSettings({ wslDistro })}
+          />
+        )}
       </div>
 
       {/* Tool launch arguments */}

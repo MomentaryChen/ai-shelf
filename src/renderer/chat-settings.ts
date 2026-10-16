@@ -25,6 +25,7 @@ export type PreferredShell =
   | "pwsh"
   | "powershell"
   | "cmd"
+  | "wsl"
   | "bash"
   | "zsh"
   | "fish"
@@ -52,6 +53,8 @@ export interface ChatSettings {
   externalTerminal: ExternalTerminal;
   /** Preferred shell for embedded PTY panes (`auto` uses $SHELL on Unix / pwsh-first on Windows). */
   preferredShell: PreferredShell;
+  /** WSL distro for `preferredShell: "wsl"` (Windows only); empty = WSL default distro. */
+  wslDistro: string;
   terminalBg: string;
   terminalFontFamily: string;
   terminalFontSize: number;
@@ -106,6 +109,7 @@ const PREFERRED_SHELL_SET = new Set<string>([
   "pwsh",
   "powershell",
   "cmd",
+  "wsl",
   "bash",
   "zsh",
   "fish",
@@ -117,6 +121,7 @@ export const WINDOWS_PREFERRED_SHELL_OPTIONS: PreferredShell[] = [
   "pwsh",
   "powershell",
   "cmd",
+  "wsl",
 ];
 
 export const UNIX_PREFERRED_SHELL_OPTIONS: PreferredShell[] = [
@@ -132,6 +137,13 @@ function normalizePreferredShell(raw: unknown): PreferredShell {
     return raw as PreferredShell;
   }
   return "auto";
+}
+
+/** Mirrors `isValidWslDistroName` in the main process; invalid → WSL default distro. */
+function normalizeWslDistro(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const t = raw.trim();
+  return /^[A-Za-z0-9][\w.-]{0,63}$/u.test(t) ? t : "";
 }
 
 /** Stored in settings when terminal background should follow the active app theme. */
@@ -223,6 +235,7 @@ const DEFAULTS: ChatSettings = {
   appTheme: DEFAULT_APP_THEME,
   externalTerminal: "auto",
   preferredShell: "auto",
+  wslDistro: "",
   terminalBg: "#2c2420",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
@@ -253,6 +266,7 @@ export function loadSettings(): ChatSettings {
       locale: normalizeLocalePreference(stored.locale ?? DEFAULTS.locale),
       appTheme: normalizeAppTheme(stored.appTheme),
       preferredShell: normalizePreferredShell(stored.preferredShell),
+      wslDistro: normalizeWslDistro(stored.wslDistro),
       terminalBg: normalizeTerminalBg(stored.terminalBg),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),
       terminalFontSize: clampInt(
