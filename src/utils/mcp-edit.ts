@@ -9,6 +9,13 @@ import {
   upsertCodexMcpServer,
   type McpServerEntry,
 } from "./mcp-codex-toml.js";
+import {
+  OPENCODE_MCP_KEY,
+  adaptMcpForOpenCode,
+  adaptMcpFromOpenCode,
+  isOpenCodeMcpEnabled,
+  migrateOpenCodeLegacyMcp,
+} from "./mcp-opencode.js";
 
 /**
  * Server-level CRUD on a tool's MCP config — add / replace / delete / toggle.
@@ -18,6 +25,8 @@ import {
  * into a sidecar `mcpServersDisabled` object so the tool stops loading them
  * while the definition is preserved and reversible.
  * Codex (TOML): native `enabled` flag on each `[mcp_servers.*]` block.
+ * OpenCode: servers live under `mcp` with a native `enabled` flag; legacy
+ * `mcpServers` / `mcpServersDisabled` blocks are migrated into `mcp` on write.
  */
 
 const DISABLED_KEY = "mcpServersDisabled";
@@ -52,11 +61,11 @@ function errMsg(err: unknown): string {
 function formatFor(tool: string, configPath: string): McpConfigFormat {
   if (!configPath) return "unknown";
   if (tool === "codex" || configPath.endsWith(".toml")) return "toml";
-  if (configPath.endsWith(".json")) return "json";
+  if (configPath.endsWith(".json") || configPath.endsWith(".jsonc")) return "json";
   return "unknown";
 }
 
-function readJsonMaps(configPath: string): {
+function readJsonMaps(configPath: string, tool = ""): {
   data: Record<string, unknown>;
   enabled: Record<string, McpServerEntry>;
   disabled: Record<string, McpServerEntry>;
@@ -64,8 +73,38 @@ function readJsonMaps(configPath: string): {
   const data = existsSync(configPath)
     ? (tryReadJson<Record<string, unknown>>(configPath) ?? {})
     : {};
+  if (tool === "opencode") return readOpenCodeMaps(data);
   const enabled = (data["mcpServers"] as Record<string, McpServerEntry>) ?? {};
   const disabled = (data[DISABLED_KEY] as Record<string, McpServerEntry>) ?? {};
+  return { data, enabled, disabled };
+}
+
+/**
+ * OpenCode: split `mcp` (plus migrated legacy blocks) into canonical
+ * enabled/disabled maps keyed off OpenCode's native `enabled` flag.
+ */
+function readOpenCodeMaps(data: Record<string, unknown>): {
+  data: Record<string, unknown>;
+  enabled: Record<string, McpServerEntry>;
+  disabled: Record<string, McpServerEntry>;
+} {
+  const legacyDisabled = data[DISABLED_KEY] as Record<string, McpServerEntry> | undefined;
+  migrateOpenCodeLegacyMcp(data);
+  const mcp = { ...((data[OPENCODE_MCP_KEY] as Record<string, McpServerEntry>) ?? {}) };
+  if (legacyDisabled && typeof legacyDisabled === "object") {
+    for (const [name, entry] of Object.entries(legacyDisabled)) {
+      if (!(name in mcp)) mcp[name] = adaptMcpForOpenCode(entry, false);
+    }
+  }
+  delete data[DISABLED_KEY];
+
+  const enabled: Record<string, McpServerEntry> = {};
+  const disabled: Record<string, McpServerEntry> = {};
+  for (const [name, entry] of Object.entries(mcp)) {
+    if (!entry || typeof entry !== "object") continue;
+    if (isOpenCodeMcpEnabled(entry)) enabled[name] = adaptMcpFromOpenCode(entry);
+    else disabled[name] = adaptMcpFromOpenCode(entry);
+  }
   return { data, enabled, disabled };
 }
 
@@ -74,10 +113,20 @@ function writeJsonMaps(
   data: Record<string, unknown>,
   enabled: Record<string, McpServerEntry>,
   disabled: Record<string, McpServerEntry>,
+  tool = "",
 ): void {
-  data["mcpServers"] = enabled;
-  if (Object.keys(disabled).length > 0) data[DISABLED_KEY] = disabled;
-  else delete data[DISABLED_KEY];
+  if (tool === "opencode") {
+    const mcp: Record<string, McpServerEntry> = {};
+    for (const [name, entry] of Object.entries(enabled)) mcp[name] = adaptMcpForOpenCode(entry, true);
+    for (const [name, entry] of Object.entries(disabled)) mcp[name] = adaptMcpForOpenCode(entry, false);
+    data[OPENCODE_MCP_KEY] = mcp;
+    delete data["mcpServers"];
+    delete data[DISABLED_KEY];
+  } else {
+    data["mcpServers"] = enabled;
+    if (Object.keys(disabled).length > 0) data[DISABLED_KEY] = disabled;
+    else delete data[DISABLED_KEY];
+  }
   if (existsSync(configPath)) backupFile(configPath);
   mkdirSync(dirname(configPath), { recursive: true });
   writeJson(configPath, data);
@@ -103,7 +152,7 @@ export function listMcpServersDetailed(tool: string): McpListResult {
     }
 
     if (format === "json") {
-      const { enabled, disabled } = readJsonMaps(configPath);
+      const { enabled, disabled } = readJsonMaps(configPath, tool);
       const servers: McpServerRecord[] = [
         ...Object.entries(enabled).map(([name, entry]) => ({ name, entry, enabled: true })),
         ...Object.entries(disabled).map(([name, entry]) => ({ name, entry, enabled: false })),
@@ -141,12 +190,12 @@ export function upsertMcpServer(
     }
     if (format !== "json") return { success: false, error: "Unsupported config format" };
 
-    const { data, enabled: enabledMap, disabled: disabledMap } = readJsonMaps(configPath);
+    const { data, enabled: enabledMap, disabled: disabledMap } = readJsonMaps(configPath, tool);
     delete enabledMap[serverName];
     delete disabledMap[serverName];
     if (enabled) enabledMap[serverName] = entry;
     else disabledMap[serverName] = entry;
-    writeJsonMaps(configPath, data, enabledMap, disabledMap);
+    writeJsonMaps(configPath, data, enabledMap, disabledMap, tool);
     return { success: true };
   } catch (err) {
     return { success: false, error: errMsg(err) };
@@ -168,13 +217,13 @@ export function deleteMcpServer(tool: string, name: string): McpEditResult {
     }
     if (format !== "json") return { success: false, error: "Unsupported config format" };
 
-    const { data, enabled: enabledMap, disabled: disabledMap } = readJsonMaps(configPath);
+    const { data, enabled: enabledMap, disabled: disabledMap } = readJsonMaps(configPath, tool);
     if (!(name in enabledMap) && !(name in disabledMap)) {
       return { success: false, error: `Server "${name}" not found` };
     }
     delete enabledMap[name];
     delete disabledMap[name];
-    writeJsonMaps(configPath, data, enabledMap, disabledMap);
+    writeJsonMaps(configPath, data, enabledMap, disabledMap, tool);
     return { success: true };
   } catch (err) {
     return { success: false, error: errMsg(err) };
@@ -200,14 +249,14 @@ export function setMcpServerEnabled(
     }
     if (format !== "json") return { success: false, error: "Unsupported config format" };
 
-    const { data, enabled: enabledMap, disabled: disabledMap } = readJsonMaps(configPath);
+    const { data, enabled: enabledMap, disabled: disabledMap } = readJsonMaps(configPath, tool);
     const entry = enabledMap[name] ?? disabledMap[name];
     if (!entry) return { success: false, error: `Server "${name}" not found` };
     delete enabledMap[name];
     delete disabledMap[name];
     if (enabled) enabledMap[name] = entry;
     else disabledMap[name] = entry;
-    writeJsonMaps(configPath, data, enabledMap, disabledMap);
+    writeJsonMaps(configPath, data, enabledMap, disabledMap, tool);
     return { success: true };
   } catch (err) {
     return { success: false, error: errMsg(err) };

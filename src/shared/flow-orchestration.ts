@@ -7,7 +7,10 @@ import type {
 
 const PHASE_TAG_RE = /【([a-z0-9][a-z0-9_-]*)】/gi;
 
-/** True when this flow should run as a multi-node orchestrator (not one agent for all phases). */
+/**
+ * True when this flow should run as a multi-node orchestrator (not one agent for all phases).
+ * `depends_on` (DAG scheduling) and per-phase `profile` also imply orchestration.
+ */
 export function flowUsesNodeOrchestration(flow: FlowDefinition): boolean {
   if (flow.runner === "http") return false;
   if (flow.orchestration === true) return true;
@@ -18,6 +21,8 @@ export function flowUsesNodeOrchestration(flow: FlowDefinition): boolean {
       (typeof p.tool === "string" && p.tool.trim().length > 0) ||
       (typeof p.retry === "number" && p.retry > 0) ||
       p.requireApproval === true ||
+      Array.isArray(p.dependsOn) ||
+      (typeof p.profileId === "string" && p.profileId.trim().length > 0) ||
       typeof p.next === "string" ||
       typeof p.onFail === "string" ||
       typeof p.onReject === "string",

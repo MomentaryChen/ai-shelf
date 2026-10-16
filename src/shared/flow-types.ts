@@ -49,6 +49,47 @@ export interface FlowPhaseDef {
   next?: string;
   /** Branch when a gate is rejected. Default `fail`. */
   onReject?: FlowPhaseBranch;
+  /**
+   * DAG dependencies (`depends_on`). When any phase sets this, the run uses
+   * dependency scheduling: phases whose dependencies are resolved run in parallel.
+   * Omitted = depends on the previous phase in the list; `[]` = root node.
+   */
+  dependsOn?: string[];
+  /** Per-phase Terminal profile binding (cwd / tool / env); overrides flow `profile`. */
+  profileId?: string;
+}
+
+/** Which run outcomes fire a notification channel. */
+export type FlowNotifyEvent = "success" | "failure";
+
+/** Desktop notification policy (`notify`). Default `all`. */
+export type FlowDesktopNotifyMode = "all" | "success" | "failure" | "none";
+
+export type FlowWebhookMethod = "POST" | "PUT" | "PATCH" | "GET";
+
+/** Generic outbound webhook (`webhooks:` list in frontmatter). */
+export interface FlowWebhookDef {
+  url: string;
+  /** Default `POST`. */
+  method: FlowWebhookMethod;
+  /** Outcomes that fire this webhook. Default both. */
+  on: FlowNotifyEvent[];
+  /**
+   * Body template. Placeholders: `{flow_id}` `{run_id}` `{status}` `{error}`
+   * `{output_path}` `{duration_sec}` `{started_at}` `{completed_at}`; `${ENV_VAR}` expands
+   * from the process environment. Omit for a default JSON body.
+   */
+  payload?: string;
+  /** Default `application/json`. */
+  contentType?: string;
+  /** Optional `Authorization` header value (supports `${ENV_VAR}`). */
+  authorization?: string;
+}
+
+/** Run history retention (GC of old `runs/{runId}` folders). `null` = unlimited. */
+export interface FlowRunRetentionPolicy {
+  maxRuns: number | null;
+  maxAgeDays: number | null;
 }
 
 export interface FlowDefinition {
@@ -72,6 +113,17 @@ export interface FlowDefinition {
   timeoutSec: number;
   outputTemplate?: string;
   onFail: "slack" | "none";
+  /** Post to Slack (`AISHELF_FLOW_SLACK_WEBHOOK`) when a run completes (`on_success: slack`). */
+  onSuccess: "slack" | "none";
+  /** Desktop notification policy (`notify`). */
+  notify: FlowDesktopNotifyMode;
+  /** Generic webhooks fired on success and/or failure. */
+  webhooks?: FlowWebhookDef[];
+  /** Per-flow history retention overrides (`history_max_runs` / `history_max_days`). */
+  historyMaxRuns?: number;
+  historyMaxDays?: number;
+  /** Max phases running at once in DAG mode (`max_parallel`, default 4). */
+  maxParallel?: number;
   /** CLI tool id when runner is `claude` (default `claude`). */
   agentTool: string;
   /** When true, `profile` may supply the tool if frontmatter omits `tool`. */
@@ -80,8 +132,10 @@ export interface FlowDefinition {
   toolArgs?: string;
   /** Working directory for the agent process. */
   cwd?: string;
-  /** Profile id/name — fills `cwd` / `tool` when omitted. */
+  /** Profile id/name — fills `cwd` / `tool` when omitted; exported as `AISHELF_PROFILE_*` env. */
   profileId?: string;
+  /** Extra environment variables for the agent process (`env:` map). */
+  env?: Record<string, string>;
   /** MCP server names from Claude config to merge at run time (`extra_mcp_servers`). */
   extraMcpServers?: string[];
   /** Extra tool permission patterns for `--allowedTools` (`allowed_tools`). */
@@ -103,6 +157,8 @@ export interface FlowPhaseRunState {
   attempts?: number;
   /** Resolved tool for this phase (orchestration). */
   tool?: string | null;
+  /** Resolved Terminal profile for this phase (orchestration). */
+  profileId?: string | null;
 }
 
 export interface FlowRunState {
@@ -157,4 +213,6 @@ export interface FlowListItem {
   phaseCount: number;
   /** ISO timestamp of next cron fire, when scheduled. */
   nextRunAt?: string | null;
+  /** Validation errors (unknown branch targets, cycles…); runs are refused while non-empty. */
+  issues?: string[];
 }

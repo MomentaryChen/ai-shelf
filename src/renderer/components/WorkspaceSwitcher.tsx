@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLocale } from "../i18n/LocaleProvider";
 import { groupIndexById, stepIndex } from "../utils/workspace-slide";
+import { BackgroundAttentionBadge } from "./BackgroundAttentionBadge";
+import {
+  strongestAttention,
+  type BackgroundAttentionKind,
+} from "../../shared/background-agent-attention.js";
 
 const WHEEL_LOCK_MS = 280;
 
@@ -18,6 +23,8 @@ export interface WorkspaceSwitcherGroup {
   name: string;
   icon?: ReactNode;
   profileCount?: number;
+  /** Strongest background agent attention among this group's profiles. */
+  agentAttention?: BackgroundAttentionKind | null;
 }
 
 interface WorkspaceSwitcherProps {
@@ -133,6 +140,10 @@ export function WorkspaceSwitcher({
     ? t("workspace.position", { current: index + 1, total: groups.length })
     : null;
   const subtitle = [countLabel, position].filter(Boolean).join(" · ");
+  /** Hint on the trigger that another group has a background agent needing attention. */
+  const otherGroupAttention = strongestAttention(
+    groups.filter((g) => g.id !== current?.id).map((g) => g.agentAttention),
+  );
   const triggerTitle = canCycle ? `${name} — ${t("workspace.cycleHint")}` : name;
 
   return (
@@ -167,6 +178,7 @@ export function WorkspaceSwitcher({
                   </span>
                 )}
               </span>
+              {otherGroupAttention && <BackgroundAttentionBadge kind={otherGroupAttention} />}
               <ChevronsUpDown aria-hidden className="h-3.5 w-3.5 shrink-0 text-chrome-text-muted" />
             </>
           )}
@@ -205,6 +217,9 @@ export function WorkspaceSwitcher({
                   </span>
                 )}
               </span>
+              {!active && group.agentAttention && (
+                <BackgroundAttentionBadge kind={group.agentAttention} />
+              )}
               {active && <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-chrome-accent-text" />}
             </DropdownMenuItem>
           );

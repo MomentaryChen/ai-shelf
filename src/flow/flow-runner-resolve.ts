@@ -9,6 +9,7 @@ import {
 } from "../tool-launch.js";
 import { TOOL_LAUNCH_CMD, canonicalToolId } from "../tools.js";
 import { flowAgentSupportsMcp } from "../shared/flow-runner-tools.js";
+import { buildFlowRunnerEnv } from "../shared/flow-env.js";
 
 export { flowAgentSupportsMcp, FLOW_MCP_AGENT_TOOLS } from "../shared/flow-runner-tools.js";
 
@@ -17,17 +18,25 @@ export type ResolvedFlowRunner = {
   /** Base command including per-flow / global tool args (before `-p`). */
   launchCommand: string;
   cwd: string;
+  /** Extra env for the agent process (flow `env:` + bound profile vars). */
+  env: Record<string, string>;
+  /** Resolved Terminal profile id, when one is bound to the flow or phase. */
+  profileId?: string;
 };
 
 export function expandFlowPath(template: string): string {
   return template.replace(/^~(?=\/|\\)/, homedir());
 }
 
-function resolveProfileDefaults(profileId: string): { cwd?: string; tool?: string } | null {
+function resolveProfileDefaults(
+  profileId: string,
+): { id: string; name: string; cwd?: string; tool?: string } | null {
   try {
     const ctx = bootstrap();
     const profile = ctx.profileService.findProfile(profileId);
     return {
+      id: profile.id,
+      name: profile.name,
       cwd: profile.defaultCwd,
       tool: profile.defaultTool !== "shell" ? profile.defaultTool : undefined,
     };
@@ -42,6 +51,8 @@ export type ResolveFlowRunnerOptions = {
   phaseTool?: string;
   /** Override tool_args for a single phase. */
   phaseToolArgs?: string;
+  /** Override the bound Terminal profile for a single phase. */
+  phaseProfileId?: string;
 };
 
 export function resolveFlowRunner(
@@ -55,13 +66,19 @@ export function resolveFlowRunner(
   let tool = options.phaseTool?.trim() || flow.agentTool || "claude";
   let cwd = flow.cwd?.trim() || "";
 
-  if (flow.profileId?.trim()) {
-    const fromProfile = resolveProfileDefaults(flow.profileId.trim());
+  const phaseProfile = options.phaseProfileId?.trim();
+  const profileRef = phaseProfile || flow.profileId?.trim();
+  let profileBinding: { id: string; name: string } | null = null;
+  if (profileRef) {
+    const fromProfile = resolveProfileDefaults(profileRef);
     if (!fromProfile) {
-      return { error: `Profile not found: ${flow.profileId}` };
+      return { error: `Profile not found: ${profileRef}` };
     }
-    if (!flow.cwd?.trim() && fromProfile.cwd) cwd = fromProfile.cwd;
-    if (!options.phaseTool?.trim() && flow.profileInheritsTool && fromProfile.tool) {
+    profileBinding = { id: fromProfile.id, name: fromProfile.name };
+    // A phase-level profile wins over the flow cwd; the flow profile only fills gaps.
+    if ((phaseProfile || !flow.cwd?.trim()) && fromProfile.cwd) cwd = fromProfile.cwd;
+    const toolInherits = phaseProfile ? true : flow.profileInheritsTool;
+    if (!options.phaseTool?.trim() && toolInherits && fromProfile.tool) {
       tool = fromProfile.tool;
     }
   }
@@ -101,7 +118,19 @@ export function resolveFlowRunner(
     resolveToolLaunchCommand(canonical === "cursor" ? "agent" : tool, mergedExtra) ??
     buildToolLaunchCommand(launchBase, mergedExtra);
 
-  return { tool: canonical, launchCommand, cwd };
+  const env = buildFlowRunnerEnv({
+    flowEnv: flow.env,
+    profile: profileBinding,
+    baseEnv: process.env,
+  });
+
+  return {
+    tool: canonical,
+    launchCommand,
+    cwd,
+    env,
+    ...(profileBinding ? { profileId: profileBinding.id } : {}),
+  };
 }
 
 /** Resolve runner for one orchestrated phase (inherits flow defaults). */
@@ -114,5 +143,6 @@ export function resolvePhaseRunner(
     globalToolLaunchArgs: options.globalToolLaunchArgs,
     phaseTool: phase.tool,
     phaseToolArgs: phase.toolArgs,
+    phaseProfileId: phase.profileId,
   });
 }
