@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   applyPaneShortcutAction,
+  matchPaneShortcut,
   shouldConsumePaneShortcut,
   type PaneShortcutHandlers,
 } from "./pane-shortcuts.js";
@@ -92,5 +93,73 @@ describe("shouldConsumePaneShortcut", () => {
       shouldConsumePaneShortcut({ type: "close" }, { panes: [pane("a")] }),
       true,
     );
+  });
+});
+
+/** Minimal HTMLElement stand-in: node:test has no DOM. */
+class FakeElement {
+  tagName: string;
+  isContentEditable = false;
+  constructor(
+    tagName: string,
+    private readonly ancestors: string[] = [],
+  ) {
+    this.tagName = tagName;
+  }
+  closest(selector: string): FakeElement | null {
+    return this.ancestors.includes(selector) ? this : null;
+  }
+}
+(globalThis as { HTMLElement?: unknown }).HTMLElement ??= FakeElement;
+
+function keydown(
+  key: string,
+  target: FakeElement,
+  mods: { ctrl?: boolean; meta?: boolean; shift?: boolean } = { ctrl: true },
+): KeyboardEvent {
+  return {
+    type: "keydown",
+    key,
+    ctrlKey: Boolean(mods.ctrl),
+    metaKey: Boolean(mods.meta),
+    shiftKey: Boolean(mods.shift),
+    altKey: false,
+    target,
+  } as unknown as KeyboardEvent;
+}
+
+describe("matchPaneShortcut close", () => {
+  const xtermTextarea = () => new FakeElement("TEXTAREA", [".xterm"]);
+  const sidebarButton = () => new FakeElement("BUTTON");
+
+  it("passes Ctrl+W through to the shell inside xterm", () => {
+    assert.equal(matchPaneShortcut(keydown("w", xtermTextarea())), null);
+  });
+
+  it("closes the pane with Ctrl+Shift+W inside xterm", () => {
+    assert.deepEqual(
+      matchPaneShortcut(keydown("W", xtermTextarea(), { ctrl: true, shift: true })),
+      { type: "close" },
+    );
+  });
+
+  it("keeps Cmd+W as close inside xterm (macOS)", () => {
+    assert.deepEqual(matchPaneShortcut(keydown("w", xtermTextarea(), { meta: true })), {
+      type: "close",
+    });
+  });
+
+  it("keeps Ctrl+W as close outside xterm", () => {
+    assert.deepEqual(matchPaneShortcut(keydown("w", sidebarButton())), { type: "close" });
+  });
+
+  it("still ignores Ctrl+W in form inputs", () => {
+    assert.equal(matchPaneShortcut(keydown("w", new FakeElement("INPUT"))), null);
+  });
+
+  it("keeps Ctrl+L as clear-screen inside xterm", () => {
+    assert.deepEqual(matchPaneShortcut(keydown("l", xtermTextarea())), {
+      type: "clear-screen",
+    });
   });
 });

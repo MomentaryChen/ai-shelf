@@ -132,7 +132,7 @@ Ignored while typing in inputs (e.g. profile rename).
 | **Ctrl+Tab** (default) | Return to the previously used terminal (any profile or workspace) — customizable in **Settings → Pane shortcuts** |
 | **Ctrl+Shift+Tab** (default) | Previous pane — customizable in Settings |
 | **Ctrl+1 … Ctrl+9** (default) | Focus pane N (tree order) — modifier customizable in Settings |
-| **Ctrl+W** | Close focused pane |
+| **Ctrl+Shift+W** | Close focused pane (plain **Ctrl+W** also works outside the terminal; inside the terminal it is passed to the shell as delete-previous-word) |
 | **Ctrl+\\** (default) | Split right (horizontal) — customizable in Settings |
 | **Ctrl+Shift+\\** (default) | Split down (vertical) — customizable in Settings |
 

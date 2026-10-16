@@ -26,6 +26,10 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest("[contenteditable='true']"));
 }
 
+function isXtermTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest(".xterm"));
+}
+
 /** Apply a matched pane shortcut. Exported for unit tests. */
 export function applyPaneShortcutAction(
   action: PaneShortcutAction,
@@ -116,7 +120,14 @@ export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null 
 
   const key = ev.key.toLowerCase();
 
+  // Ctrl+Shift+W closes the pane everywhere, including inside the terminal.
+  if (ev.shiftKey && key === "w") {
+    return { type: "close" };
+  }
+  // Plain Ctrl+W is "delete previous word" in bash/zsh/fish and most AI CLI
+  // prompts — inside xterm let it reach the PTY. Cmd+W (macOS) still closes.
   if (!ev.shiftKey && key === "w") {
+    if (ev.ctrlKey && !ev.metaKey && isXtermTarget(ev.target)) return null;
     return { type: "close" };
   }
 

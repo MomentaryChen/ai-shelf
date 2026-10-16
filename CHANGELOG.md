@@ -12,6 +12,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 ### Fixed
 
 - **Flow phase loop guard** — Orchestrated flows whose `next:`, `on_fail:` or `on_reject:` cycles back to an earlier phase now fail with a "Phase loop detected" error after `phases × 3` phase executions instead of spawning agent runs forever; configured `retry:` attempts do not count toward the limit.
+- **Ctrl+W in terminal** — Ctrl+W inside a terminal pane now reaches the shell (delete previous word) instead of closing the pane; use Ctrl+Shift+W to close a pane from the terminal.
 
 ## [4.3.5] - 2026-10-07
 

@@ -44,7 +44,8 @@ function buildPaneSections(bindings: PaneShortcutBindings): ShortcutSection {
         labelKey: "shortcuts.pane.splitVertical",
       },
       { keys: formatFocusPaneBinding(bindings.focusPane), labelKey: "shortcuts.pane.focusPane" },
-      { keys: `${mod()}+W`, labelKey: "shortcuts.pane.close" },
+      // Plain Ctrl+W inside a terminal is passed to the shell (delete word).
+      { keys: isMac() ? `${mod()}+W` : `${mod()}+Shift+W`, labelKey: "shortcuts.pane.close" },
       { keys: `${mod()}+L`, labelKey: "shortcuts.pane.clear" },
       { keys: `${mod()}+Shift+R`, labelKey: "shortcuts.pane.restart" },
     ],
