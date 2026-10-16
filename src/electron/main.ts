@@ -30,7 +30,16 @@ import {
   fetchRemoteLatestVersion,
   resolveToolLatestVersion,
 } from "../utils/latest-version.js";
-import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
+import {
+  getMcpConfigPath,
+  tryReadJson,
+  backupFile,
+  writeJson,
+  parseJsonLoose,
+  claudeConfigDir,
+  codexHome,
+  opencodeConfigPath,
+} from "../utils/config.js";
 import {
   collectAllMcpServers,
   readMcpServers,
@@ -76,6 +85,7 @@ import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import {
   NO_SUITABLE_UNIX_SHELL_ERROR,
   NO_SUITABLE_WINDOWS_SHELL_ERROR,
+  isValidWslDistroName,
   resolvePtySpawnPlan,
   type GroupLayoutSnapshot,
 } from "ai-shelf";
@@ -1647,7 +1657,14 @@ ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
 
 ipcMain.handle(
   "pty-spawn",
-  async (_event, tool: string, cwd?: string, extraArgs?: string, shell?: string) => {
+  async (
+    _event,
+    tool: string,
+    cwd?: string,
+    extraArgs?: string,
+    shell?: string,
+    spawnOptions?: { wslDistro?: unknown },
+  ) => {
     let pty: PtyModule;
     try {
       pty = await getPty();
@@ -1679,7 +1696,15 @@ ipcMain.handle(
       console.warn("[pty-spawn] shell integration unavailable:", err);
     }
 
-    const plan = resolvePtySpawnPlan({ command: cmd, shell, shellIntegration });
+    const rawDistro =
+      typeof spawnOptions?.wslDistro === "string" ? spawnOptions.wslDistro.trim() : "";
+    const wslDistro = rawDistro && isValidWslDistroName(rawDistro) ? rawDistro : "";
+    const plan = resolvePtySpawnPlan({
+      command: cmd,
+      shell,
+      shellIntegration,
+      wsl: { distro: wslDistro, cwd: workDir },
+    });
 
     const ptyOpts = {
       name: "xterm-256color",
@@ -1715,7 +1740,10 @@ ipcMain.handle(
       PTY_SESSIONS.set(sessionId, proc);
       PTY_META.set(sessionId, {
         pid: typeof proc.pid === "number" ? proc.pid : null,
-        shell: basename(shellPath) || shellPath,
+        shell:
+          shellPath === "wsl.exe" && wslDistro
+            ? `wsl:${wslDistro}`
+            : basename(shellPath) || shellPath,
         cols: ptyOpts.cols,
         rows: ptyOpts.rows,
         exitCode: null,
@@ -1985,8 +2013,8 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
     let key: string;
 
     if (tool === "claude") {
-      settingsPath = join(homedir(), ".claude", "settings.json");
-      mkdirSync(join(homedir(), ".claude"), { recursive: true });
+      settingsPath = claudeConfigDir("settings.json");
+      mkdirSync(claudeConfigDir(), { recursive: true });
       key = "model";
     } else if (tool === "copilot") {
       const copilotHome = process.env["COPILOT_HOME"] ?? join(homedir(), ".copilot");
@@ -2002,11 +2030,11 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
       mkdirSync(join(homedir(), ".gemini"), { recursive: true });
       key = "model";
     } else if (tool === "codex") {
-      settingsPath = join(homedir(), ".codex", "config.toml");
+      settingsPath = codexHome("config.toml");
       key = "model";
     } else if (tool === "opencode") {
-      settingsPath = join(homedir(), ".config", "opencode", "opencode.json");
-      mkdirSync(join(homedir(), ".config", "opencode"), { recursive: true });
+      settingsPath = opencodeConfigPath();
+      mkdirSync(dirname(settingsPath), { recursive: true });
       key = "model";
     } else {
       return { success: false, error: `Unknown tool: ${tool}` };
@@ -2447,7 +2475,9 @@ ipcMain.handle("config-snapshot-import", async (_event, label?: string) => {
 
 ipcMain.handle("relaunch-app", () => {
   app.relaunch();
-  app.exit(0);
+  // Go through the normal quit flow (layout flush, PTY teardown, scheduler/server
+  // shutdown) — app.exit() would skip before-quit / will-quit entirely.
+  app.quit();
   return { ok: true };
 });
 

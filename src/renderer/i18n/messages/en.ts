@@ -122,16 +122,21 @@ export const en = {
   "settings.category.shortcuts": "Shortcuts",
   "settings.category.alerts": "Alerts",
   "settings.category.backup": "Backup",
-  "settings.paneShortcut.title": "Pane shortcuts",
-  "settings.paneShortcut.subtitle":
-    "Split and focus shortcuts while a terminal pane is focused. Requires Ctrl (or Cmd on Mac). Close, clear, and restart shortcuts stay fixed.",
-  "settings.paneShortcut.focusNext": "Return to previous terminal",
-  "settings.paneShortcut.focusPrev": "Focus previous pane",
-  "settings.paneShortcut.splitRight": "Split right",
-  "settings.paneShortcut.splitDown": "Split down",
-  "settings.paneShortcut.focusPane": "Focus pane 1–9",
-  "settings.paneShortcut.hint": "Click a shortcut, press the new key combination, or Esc to cancel.",
   "settings.paneShortcut.pressKeys": "Press keys…",
+  "keybindings.title": "Keyboard shortcuts",
+  "keybindings.subtitle":
+    "Rebind any app shortcut, or disable it so the key reaches the terminal (e.g. Ctrl+W / Ctrl+K for shells and TUIs).",
+  "keybindings.hint":
+    "Click a shortcut and press the new key combination (Esc cancels). Shortcuts need Ctrl/Cmd or Alt, except F1–F24.",
+  "keybindings.unbound": "Disabled",
+  "keybindings.disable": "Disable (pass key to terminal)",
+  "keybindings.resetOne": "Reset to default ({keys})",
+  "keybindings.resetAll": "Reset all shortcuts",
+  "keybindings.recordAria": "Change shortcut for {label}",
+  "keybindings.recordHint": "Press a combination with Ctrl/Cmd or Alt (Esc to cancel).",
+  "keybindings.recordDigitHint":
+    "Press a modifier with any digit 1–9, e.g. Ctrl+1 (Esc to cancel).",
+  "keybindings.conflict": "Same keys as: {names}",
   "settings.language": "Language",
   "settings.theme": "App color theme",
   "settings.theme.system": "Follow system",
@@ -157,6 +162,13 @@ export const en = {
   "shell.zsh": "Zsh",
   "shell.fish": "Fish",
   "shell.sh": "sh",
+  "shell.wsl": "WSL",
+  "settings.wslDistro": "WSL distro",
+  "settings.wslDistro.default": "Default distro (wsl.exe default)",
+  "settings.wslDistro.missing": "not installed",
+  "settings.wslDistro.hint":
+    "New panes open in this distro via wsl.exe, starting in the pane's folder. AI tools run inside the distro with a login bash, so install them there.",
+  "settings.wslDistro.loadFailed": "Could not list WSL distros.",
 
   "settings.toolLaunchArgs.title": "Tool launch arguments",
   "settings.toolLaunchArgs.subtitle":
@@ -890,8 +902,10 @@ export const en = {
   "usage.credential.testFailed": "Connection failed",
   "usage.credential.howToGet": "How to get a key",
   "usage.badge.api": "API supported",
-  "usage.badge.comingSoon": "API pending",
-  "usage.tool.unsupported": "No public usage API for this tool yet",
+  "usage.badge.local": "Local data",
+  "usage.badge.unavailable": "Not available",
+  "usage.tool.unsupported": "This tool has no usage data source AI Shelf can read",
+  "usage.tool.learnMore": "Learn more",
   "usage.tool.notConfigured": "Add an API key below to load usage",
   "usage.metric.inputTokens": "Input tokens",
   "usage.metric.outputTokens": "Output tokens",
@@ -909,7 +923,8 @@ export const en = {
   "usage.compare.view": "View",
   "usage.status.ok": "Reporting",
   "usage.status.notConfigured": "No API key",
-  "usage.status.unsupported": "API pending",
+  "usage.status.unsupported": "Not available",
+  "usage.status.noLocalData": "No local data",
   "usage.status.error": "Error",
   "usage.fetchedAt": "Last refreshed {time} · {days}-day window",
   "usage.range.7d": "Last 7 days",
@@ -999,6 +1014,18 @@ export const en = {
   "usage.copilot.auth.enterprise.note":
     "If set, fetches enterprise-level 28-day reports instead of organization reports.",
   "usage.copilot.auth.enterprise.field": "Enterprise slug",
+  "usage.local.source": "Local session data",
+  "usage.local.noKey": "No API key needed — read-only, straight from the tool's own session data on this computer.",
+  "usage.local.notFound":
+    "No local session data found for this tool yet. Use it at least once on this computer, then refresh.",
+  "usage.opencode.intro":
+    "Reads per-message tokens and cost from OpenCode's local database (~/.local/share/opencode/opencode.db, or legacy storage/message JSON). Cost is what OpenCode recorded for each reply; subscription or free models show $0.",
+  "usage.crush.intro":
+    "Reads session totals from each project's .crush/crush.db listed in Crush's projects.json. Crush stores tokens and cost per session, so each session is counted on the day it was last active.",
+  "usage.goose.intro":
+    "Reads Goose's local sessions.db: the per-request usage ledger when present, otherwise per-session token totals. Cost appears only when Goose recorded it for your provider.",
+  "usage.aider.unavailable":
+    "Aider keeps no usage history AI Shelf can read. It only prints token and cost totals in the chat (and in each repo's .aider.chat.history.md), and its analytics are opt-in and sent to Aider's own service.",
 
   "flow.sidebar.title": "Flows",
   "flow.loading": "Loading flows…",
@@ -1260,7 +1287,10 @@ export const en = {
   "shortcuts.section.terminal": "Terminal input",
   "shortcuts.general.commandPalette": "Open command palette",
   "shortcuts.general.cheatsheet": "Show this cheatsheet",
-  "shortcuts.general.switchMode": "Switch mode (Terminal / Inventory / Tools / AI Flow)",
+  "shortcuts.general.modeTerminal": "Switch to Terminal mode",
+  "shortcuts.general.modeInventory": "Switch to Inventory mode",
+  "shortcuts.general.modeTools": "Switch to Tools mode",
+  "shortcuts.general.modeFlow": "Switch to AI Flow mode",
   "shortcuts.terminal.toggleSidebar": "Toggle profile sidebar (Terminal mode)",
   "shortcuts.pane.focusNext": "Previous terminal (cross-profile)",
   "shortcuts.pane.focusPrev": "Previous pane in profile",
@@ -1276,6 +1306,7 @@ export const en = {
   "shortcuts.terminal.find": "Find in terminal",
   "shortcuts.terminal.copy": "Copy selection",
   "shortcuts.terminal.paste": "Paste",
+  "shortcuts.terminal.pasteAlt": "Paste (alternate)",
   "shortcuts.terminal.selectAll": "Select all scrollback",
 
   // Tools mode — Codec
@@ -1702,6 +1733,11 @@ export const en = {
   "ports.error.unavailable": "Port lookup is not available in this window.",
   "ports.error.listFailed": "Could not list listeners — try refresh.",
   "ports.error.killFailed": "Could not stop that process. It may have already exited.",
+  "ports.wsl.badge": "WSL · {distro}",
+  "ports.wsl.stopHint": "Runs inside WSL ({distro}) — stop it from a shell in that distro.",
+  "ports.wsl.scanned": "WSL: {list}",
+  "ports.wsl.scanFailed": "{distro} (not scanned)",
+  "ports.wsl.stoppedHint": "Only running distros are scanned; stopped distros are not started.",
 
   // Tools mode — WSL
   "tools.tab.wsl": "WSL",

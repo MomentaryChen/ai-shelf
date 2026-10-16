@@ -1,5 +1,14 @@
 /** Tools with usage/cost API integration in AI Shelf. */
-export type UsageToolId = "claude" | "codex" | "cursor" | "gemini" | "copilot";
+export type UsageToolId =
+  | "claude"
+  | "codex"
+  | "cursor"
+  | "gemini"
+  | "copilot"
+  | "opencode"
+  | "crush"
+  | "goose"
+  | "aider";
 
 export interface UsageCredentialFieldMeta {
   key: string;
@@ -17,7 +26,11 @@ export interface UsageProviderMeta {
   toolId: UsageToolId;
   label: string;
   supported: boolean;
+  /** "api" (default) needs credentials; "local" reads the tool's own session data on disk. */
+  dataSource?: "api" | "local";
   unsupportedReason?: string;
+  /** i18n key explaining why no usage source exists (shown instead of unsupportedReason). */
+  unsupportedReasonKey?: string;
   credentialNoteKey?: string;
   docsUrl?: string;
   fields: UsageCredentialFieldMeta[];
@@ -81,6 +94,10 @@ export interface UsageToolSnapshot {
   status: "ok" | "not_configured" | "unsupported" | "error";
   error?: string;
   authSourceKey?: string;
+  /** i18n key for the not_configured / unsupported explanation (e.g. local data not found). */
+  messageKey?: string;
+  /** i18n key overriding the short status label in the comparison table. */
+  statusKey?: string;
   /** Overrides the default per-tool quota hint in the usage panel. */
   quotaHintKey?: string;
   totalCostUsd?: number;

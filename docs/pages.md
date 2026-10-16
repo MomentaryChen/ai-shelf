@@ -125,16 +125,16 @@ The **可用的 Agent** section lists installed tools. Each card shows version, 
 
 ### Pane keyboard shortcuts (Terminal mode, when panes are open)
 
-Ignored while typing in inputs (e.g. profile rename).
+Ignored while typing in inputs (e.g. profile rename). Every app shortcut (these, plus command palette, cheatsheet, mode switch, profile switching and terminal copy/paste/find) can be rebound or **disabled** in **Settings → Keyboard shortcuts** — a disabled shortcut passes the key through to the terminal (e.g. keep Ctrl+W / Ctrl+K for your shell or TUI). Duplicate combos are flagged there.
 
-| Shortcut | Action |
+| Shortcut (default) | Action |
 |---|---|
-| **Ctrl+Tab** (default) | Return to the previously used terminal (any profile or workspace) — customizable in **Settings → Pane shortcuts** |
-| **Ctrl+Shift+Tab** (default) | Previous pane — customizable in Settings |
-| **Ctrl+1 … Ctrl+9** (default) | Focus pane N (tree order) — modifier customizable in Settings |
+| **Ctrl+Tab** | Return to the previously used terminal (any profile or workspace) |
+| **Ctrl+Shift+Tab** | Previous pane |
+| **Ctrl+1 … Ctrl+9** | Focus pane N (tree order) |
 | **Ctrl+W** | Close focused pane |
-| **Ctrl+\\** (default) | Split right (horizontal) — customizable in Settings |
-| **Ctrl+Shift+\\** (default) | Split down (vertical) — customizable in Settings |
+| **Ctrl+\\** | Split right (horizontal) |
+| **Ctrl+Shift+\\** | Split down (vertical) |
 
 ---
 
@@ -328,7 +328,7 @@ The **Re-check All** button at the top re-runs the version scan for all tools wi
 
 Typical capabilities:
 
-- Daily rollups and provider breakdowns (Claude, Codex, Cursor, Gemini, Copilot where credentials allow)
+- Daily rollups and provider breakdowns (Claude, Codex, Cursor, Gemini, Copilot where credentials allow; OpenCode, Crush and Goose read from their local session data with no key; Aider is shown as not available because it keeps no readable usage history)
 - Weekly budget targets and attribution back to Flow authoring / runs when applicable
 - Credentials stored via OS `safeStorage` when available; some providers need API keys or account cookies configured in-app
 

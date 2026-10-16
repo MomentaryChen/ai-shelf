@@ -13,7 +13,7 @@ import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
 import type { FlowSchedulePrefs } from "../shared/flow-schedule-pref.js";
 import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
-import type { PortListenerRow } from "../shared/port-listeners.js";
+import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
@@ -27,10 +27,28 @@ export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boole
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
+/**
+ * Where an MCP server is defined. Mirrors Claude Code scopes:
+ * `user` (global), `local` (per-project entry in the user config),
+ * `project` (checked-in `.mcp.json` at a project root).
+ */
+export type McpServerScope = "user" | "local" | "project";
+
+export interface McpServerDetail {
+  name: string;
+  scope: McpServerScope;
+  /** Config file the server was read from. */
+  source: string;
+  /** Project root for `local` / `project` scoped servers. */
+  project?: string;
+}
+
 export interface MCPInfo {
   supported: boolean;
   servers: string[];
   configPaths: string[];
+  /** Per-server scope metadata; omitted for tools without scoped MCP configs. */
+  serverDetails?: McpServerDetail[];
 }
 
 export interface Capabilities {
@@ -490,7 +508,16 @@ export interface PtySearchResult {
   capped: boolean;
 }
 
-export type UsageToolId = "claude" | "codex" | "cursor" | "gemini" | "copilot";
+export type UsageToolId =
+  | "claude"
+  | "codex"
+  | "cursor"
+  | "gemini"
+  | "copilot"
+  | "opencode"
+  | "crush"
+  | "goose"
+  | "aider";
 
 export interface UsageCredentialFieldMeta {
   key: string;
@@ -508,7 +535,9 @@ export interface UsageProviderMeta {
   toolId: UsageToolId;
   label: string;
   supported: boolean;
+  dataSource?: "api" | "local";
   unsupportedReason?: string;
+  unsupportedReasonKey?: string;
   credentialNoteKey?: string;
   docsUrl?: string;
   fields: UsageCredentialFieldMeta[];
@@ -568,6 +597,8 @@ export interface UsageToolSnapshot {
   status: "ok" | "not_configured" | "unsupported" | "error";
   error?: string;
   authSourceKey?: string;
+  messageKey?: string;
+  statusKey?: string;
   quotaHintKey?: string;
   totalCostUsd?: number;
   totalInputTokens?: number;
@@ -774,8 +805,10 @@ export interface ElectronAPI {
     tool: string,
     cwd?: string,
     extraArgs?: string,
-    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | bash | zsh | fish | sh. */
+    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | wsl | bash | zsh | fish | sh. */
     shell?: string,
+    /** `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro. */
+    options?: { wslDistro?: string },
   ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
   ptyAttach: (
     sessionId: string,
@@ -1157,7 +1190,14 @@ export interface ElectronAPI {
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
   onFlowConsoleChunk: (cb: (chunk: FlowConsoleChunk) => void) => () => void;
   portsList: (port?: number | null) => Promise<
-    { ok: true; listeners: PortListenerRow[]; port: number | null } | { ok: false; error: string }
+    | {
+        ok: true;
+        listeners: PortListenerRow[];
+        port: number | null;
+        /** Running WSL distros that were scanned (Windows only; stopped distros are skipped). */
+        wslDistros?: WslPortScan[];
+      }
+    | { ok: false; error: string }
   >;
   portsKill: (
     pid: number,

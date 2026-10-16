@@ -1,9 +1,9 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { run } from "../utils/exec.js";
-import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
+import { opencodeSkillRoots, withScannedSkills } from "./skills-scan.js";
+import { cwd, findExistingPaths, tryReadJson, opencodeConfigDir } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
 import { collectMcpServersFromJsonFiles } from "./mcp-helpers.js";
-import { join } from "node:path";
 
 const OPENCODE_MODELS = [
   "claude-sonnet-4-6",
@@ -20,15 +20,25 @@ export async function detectOpenCode(_opts: DetectOptions = {}): Promise<Provide
     ? parseCliVersionLine(versionResult.stdout.split("\n")[0] ?? versionResult.stderr.split("\n")[0] ?? "")
     : undefined;
 
-  const globalConfig = join(home(".config", "opencode"), "opencode.json");
-  const projectConfig = cwd("opencode.json");
+  // Global config honors $XDG_CONFIG_HOME; both `.json` and `.jsonc` are accepted.
+  const globalCandidates = [opencodeConfigDir("opencode.json"), opencodeConfigDir("opencode.jsonc")];
+  const projectCandidates = [cwd("opencode.json"), cwd("opencode.jsonc")];
+  const globalConfig = findExistingPaths(globalCandidates)[0] ?? globalCandidates[0]!;
+  const projectConfig = findExistingPaths(projectCandidates)[0] ?? projectCandidates[0]!;
   const configCandidates = [globalConfig, projectConfig];
-  const instructionCandidates = [cwd("AGENTS.md"), cwd("OPENCODE.md")];
+  const instructionCandidates = [
+    cwd("AGENTS.md"),
+    cwd("OPENCODE.md"),
+    opencodeConfigDir("AGENTS.md"),
+  ];
   const mcpCandidates = [globalConfig, projectConfig];
 
+  // OpenCode's MCP key is `mcp`; the helper also folds in legacy `mcpServers`
+  // blocks written by older AI Shelf versions.
   const { servers: mcpServers, configPaths: mcpConfigPaths } = collectMcpServersFromJsonFiles(
     mcpCandidates,
-    "mcpServers",
+    "mcp",
+    ["mcpServers"],
   );
 
   const settings =
@@ -47,6 +57,8 @@ export async function detectOpenCode(_opts: DetectOptions = {}): Promise<Provide
 
   const auth = available ? ("ok" as ProviderEntry["auth"]) : ("unknown" as ProviderEntry["auth"]);
 
+  const scanned = withScannedSkills(opencodeSkillRoots());
+
   return {
     tool: "opencode",
     provider: "OpenCode",
@@ -55,8 +67,7 @@ export async function detectOpenCode(_opts: DetectOptions = {}): Promise<Provide
     auth,
     model,
     models: available ? OPENCODE_MODELS : [],
-    skills: [],
-    skillDetails: [],
+    ...scanned,
     mcp: {
       supported: true,
       servers: mcpServers,

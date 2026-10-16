@@ -12,6 +12,21 @@ import {
 
 const PHASE_TAG_RE = /【([a-z0-9][a-z0-9_-]*)】/gi;
 
+/**
+ * Flow / run ids become file and directory names under app data, so they must be a
+ * single safe path segment: no separators, no `.`/`..`, no Windows-reserved or
+ * control characters (otherwise `id: ../x` writes outside the flows directory).
+ */
+export function isSafeFlowPathSegment(id: string): boolean {
+  if (!id || id.length > 200) return false;
+  if (id === "." || id === "..") return false;
+  if (id.includes("..")) return false;
+  // eslint-disable-next-line no-control-regex
+  if (/[<>:"/\\|?*\x00-\x1f]/.test(id)) return false;
+  if (/^[\s.]|[\s.]$/.test(id)) return false;
+  return true;
+}
+
 function slugLabel(id: string): string {
   return id
     .split(/[-_]/g)
@@ -412,6 +427,9 @@ export function parseFlowDocument(
   const id = typeof fm.id === "string" ? fm.id.trim() : "";
   if (!id) {
     return { error: "Frontmatter field 'id' is required" };
+  }
+  if (!isSafeFlowPathSegment(id)) {
+    return { error: `Invalid flow id '${id}': must not contain path separators, '..', or reserved characters` };
   }
 
   let phases = parsePhasesFromFrontmatter(fm.phases);

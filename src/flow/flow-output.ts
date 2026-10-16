@@ -31,6 +31,15 @@ export function buildFallbackOutputMarkdown(options: {
   return lines.join("\n");
 }
 
+/** Cap for captured agent stderr — long runs must not grow it without bound. */
+export const FLOW_STDERR_MAX_CHARS = 256 * 1024;
+
+/** Append `chunk` to `buf`, keeping only the last `max` chars (errors/cost lines sit at the end). */
+export function appendBoundedTail(buf: string, chunk: string, max = FLOW_STDERR_MAX_CHARS): string {
+  const next = buf + chunk;
+  return next.length > max ? next.slice(next.length - max) : next;
+}
+
 /** Write markdown to outputPath when the run has not produced output yet. */
 export function writeRunOutputIfMissing(
   state: FlowRunState,

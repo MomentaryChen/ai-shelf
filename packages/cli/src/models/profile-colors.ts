@@ -22,5 +22,5 @@ export function pickNextProfileAccentColor(used: (string | null | undefined)[]):
   for (const c of PROFILE_ACCENT_COLORS) {
     if (!usedSet.has(c)) return c;
   }
-  return PROFILE_ACCENT_COLORS[usedSet.size % PROFILE_ACCENT_COLORS.length]!;
+  return PROFILE_ACCENT_COLORS[usedSet.size % PROFILE_ACCENT_COLORS.length] ?? PROFILE_ACCENT_COLORS[0];
 }

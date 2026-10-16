@@ -35,6 +35,8 @@ import type { MessageKey } from "./i18n/messages/en";
 import type { ProviderEntry } from "./types";
 import { registerShortcutCheatsheetOpener } from "./shortcuts/open-shortcuts";
 import { cheatsheetToggleKeys } from "./shortcuts/shortcut-registry";
+import { getActiveKeybindings } from "./shortcuts/active-keybindings";
+import { matchShortcut } from "./shortcuts/keybindings";
 import {
   buildGlobalSearchCommands,
   mergePaletteCommands,
@@ -419,25 +421,26 @@ export function App() {
 
   const dismissOnboarding = useCallback(() => setOnboardingOpen(false), []);
 
-  // Cmd/Ctrl+K toggles the command palette; Cmd/Ctrl+/ opens the shortcuts cheatsheet.
+  // Configurable (defaults: Cmd/Ctrl+K palette, Cmd/Ctrl+/ cheatsheet, Alt+1–4 modes).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (shouldIgnoreShortcutForIme(e)) return;
-      const targetMode = matchModeSwitchShortcut(e);
+      const keymap = getActiveKeybindings();
+      const targetMode = matchModeSwitchShortcut(e, keymap);
       if (targetMode) {
         e.preventDefault();
         e.stopPropagation();
         handleModeChange(targetMode);
         return;
       }
-      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
-      if (e.key === "k" || e.key === "K") {
+      const m = matchShortcut(e, keymap, ["commandPalette", "cheatsheet"]);
+      if (m?.id === "commandPalette") {
         e.preventDefault();
         e.stopPropagation();
         togglePalette();
         return;
       }
-      if (e.key === "/") {
+      if (m?.id === "cheatsheet") {
         e.preventDefault();
         e.stopPropagation();
         openCheatsheet();

@@ -5,10 +5,12 @@ import {
   dedupeAndSortListeners,
   filterListeners,
   isProtectedPid,
+  listenerKey,
   netstatToListeners,
   parseLsofFields,
   parseNetstatAno,
   parsePortQuery,
+  parseProcNetTcp,
   parseSsListen,
   parseTasklistCsv,
   splitHostPort,
@@ -61,6 +63,26 @@ LISTEN 0 511 0.0.0.0:3000 0.0.0.0:* users:(("node",pid=12345,fd=23))
 LISTEN 0 511 *:5173 *:* users:(("node",pid=111,fd=18),("node",pid=111,fd=19))
 UNCONN 0 0 0.0.0.0:5353 0.0.0.0:* users:(("svchost",pid=2345,fd=4))
 LISTEN 0 128 *:22 *:*
+`;
+
+// `ss -ltnp` as a non-root WSL user: no Netid column, header row, other users' sockets lack users:().
+const SS_WSL = `
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port Process
+LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*
+LISTEN 0      128          0.0.0.0:22         0.0.0.0:*
+LISTEN 0      511                *:5173             *:*     users:(("node",pid=311,fd=21))
+LISTEN 0      511            [::1]:8080          [::]:*
+LISTEN 0      5    [fe80::1%eth0]:546           [::]:*
+`;
+
+const PROC_NET_TCP = `
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 3500007F:0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000   101        0 1 1
+   1: 00000000:0BB8 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 2 1
+   2: 0100007F:0BB8 0100007F:D431 01 00000000:00000000 00:00000000 00000000  1000        0 3 1
+  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 00000000000000000000000000000000:0016 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 4 1
+   1: 00000000000000000000000001000000:1F90 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 5 1
 `;
 
 describe("parsePortQuery", () => {
@@ -157,6 +179,58 @@ describe("parseSsListen", () => {
       rows.some((row) => row.port === 22),
       false,
     );
+  });
+
+  it("reads the Netid column printed by `ss -lptunH`", () => {
+    const rows = parseSsListen(
+      [
+        'tcp   LISTEN 0 511 0.0.0.0:3000 0.0.0.0:* users:(("node",pid=42,fd=20))',
+        'udp   UNCONN 0 0   0.0.0.0:5353 0.0.0.0:* users:(("avahi",pid=7,fd=12))',
+      ].join("\n"),
+    );
+    assert.deepEqual(
+      rows.map((r) => [r.protocol, r.port, r.pid, r.processName]),
+      [
+        ["tcp", 3000, 42, "node"],
+        ["udp", 5353, 7, "avahi"],
+      ],
+    );
+  });
+
+  it("keeps pid-less WSL rows, strips scope ids and skips the header", () => {
+    const rows = parseSsListen(SS_WSL, { allowMissingPid: true });
+    assert.deepEqual(
+      rows.map((r) => [r.address, r.port, r.pid, r.processName]),
+      [
+        ["127.0.0.53", 53, 0, ""],
+        ["0.0.0.0", 22, 0, ""],
+        ["*", 5173, 311, "node"],
+        ["::1", 8080, 0, ""],
+        ["fe80::1", 546, 0, ""],
+      ],
+    );
+  });
+});
+
+describe("parseProcNetTcp", () => {
+  it("reads LISTEN rows from /proc/net/tcp and tcp6", () => {
+    const rows = parseProcNetTcp(PROC_NET_TCP);
+    assert.deepEqual(
+      rows.map((r) => [r.address, r.port, r.pid]),
+      [
+        ["127.0.0.53", 53, 0],
+        ["0.0.0.0", 3000, 0],
+        ["::", 22, 0],
+        ["::1", 8080, 0],
+      ],
+    );
+  });
+});
+
+describe("listenerKey", () => {
+  it("separates host and WSL rows with the same socket", () => {
+    const host = { protocol: "tcp" as const, address: "0.0.0.0", port: 3000, pid: 0 };
+    assert.notEqual(listenerKey(host), listenerKey({ ...host, wslDistro: "Ubuntu" }));
   });
 });
 
