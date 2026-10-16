@@ -3,7 +3,8 @@ import { cursorSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import path, { join } from "node:path";
 
 const CURSOR_MODELS = [
   "claude-3-5-sonnet-20241022",
@@ -49,6 +50,30 @@ async function fetchCursorModelIds(toolCmd: string, available: boolean): Promise
   return models.length > 0 ? models : CURSOR_MODELS;
 }
 
+/** Pure: Cursor's VS Code-style user settings.json location for the given platform. */
+export function cursorUserSettingsPath(ctx: {
+  platform: NodeJS.Platform;
+  env: NodeJS.ProcessEnv;
+  homeDir: string;
+}): string {
+  if (ctx.platform === "win32") {
+    const appData = ctx.env["APPDATA"] ?? path.win32.join(ctx.homeDir, "AppData", "Roaming");
+    return path.win32.join(appData, "Cursor", "User", "settings.json");
+  }
+  if (ctx.platform === "darwin") {
+    return path.posix.join(
+      ctx.homeDir,
+      "Library",
+      "Application Support",
+      "Cursor",
+      "User",
+      "settings.json",
+    );
+  }
+  const configHome = ctx.env["XDG_CONFIG_HOME"] || path.posix.join(ctx.homeDir, ".config");
+  return path.posix.join(configHome, "Cursor", "User", "settings.json");
+}
+
 function withDefaultModel(models: string[], model: string): string[] {
   return models.includes(model) ? models : [model, ...models];
 }
@@ -67,11 +92,10 @@ export async function detectCursor(opts: DetectOptions = {}): Promise<ProviderEn
     : undefined;
   const toolCmd = found?.cmd ?? "cursor";
 
-  // Cursor config paths (Windows)
-  const appData = process.env["APPDATA"] ?? home("AppData", "Roaming");
+  // Cursor config paths (per-platform user settings.json)
   const configCandidates = [
     home(".cursor", "mcp.json"),
-    join(appData, "Cursor", "User", "settings.json"),
+    cursorUserSettingsPath({ platform: process.platform, env: process.env, homeDir: homedir() }),
   ];
   const instructionCandidates = [
     cwd(".cursorrules"),

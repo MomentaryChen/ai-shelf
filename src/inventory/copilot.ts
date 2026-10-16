@@ -1,8 +1,10 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { copilotSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
-import { home, cwd, findExistingPaths, tryReadJson, envPresent } from "../utils/config.js";
+import { cwd, findExistingPaths, tryReadJson, envPresent } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
+import { homedir } from "node:os";
+import path from "node:path";
 
 const COPILOT_MODELS = [
   "claude-sonnet-4.6",
@@ -20,6 +22,39 @@ const COPILOT_MODELS = [
   "gpt-5-mini",
   "gpt-4.1",
 ];
+
+export interface CopilotPathContext {
+  platform: NodeJS.Platform;
+  env: NodeJS.ProcessEnv;
+  homeDir: string;
+  cwd: string;
+}
+
+export interface CopilotPathCandidates {
+  settings: string;
+  config: string[];
+  instructions: string[];
+  mcp: string[];
+}
+
+/** Pure: build Copilot config/instruction/MCP candidate paths for the given platform. */
+export function copilotPathCandidates(ctx: CopilotPathContext): CopilotPathCandidates {
+  const p = ctx.platform === "win32" ? path.win32 : path.posix;
+  const copilotHome = ctx.env["COPILOT_HOME"] ?? p.join(ctx.homeDir, ".copilot");
+  const settings = p.join(copilotHome, "settings.json");
+  return {
+    settings,
+    config: [p.join(copilotHome, "config.json"), settings],
+    instructions: [
+      p.join(copilotHome, "copilot-instructions.md"),
+      p.join(ctx.cwd, ".github", "copilot-instructions.md"),
+      p.join(ctx.cwd, "AGENTS.md"),
+      p.join(ctx.cwd, "CLAUDE.md"),
+      p.join(ctx.cwd, "GEMINI.md"),
+    ],
+    mcp: [p.join(copilotHome, "mcp-config.json"), p.join(ctx.cwd, ".mcp.json")],
+  };
+}
 
 async function listCopilotModels(): Promise<string[]> {
   const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"];
@@ -58,29 +93,20 @@ export async function detectCopilot(opts: DetectOptions = {}): Promise<ProviderE
   ]);
 
   // Copilot home
-  const copilotHome = process.env["COPILOT_HOME"] ?? home(".copilot");
-  const copilotSettings = tryReadJson<Record<string, unknown>>(
-    `${copilotHome}\\settings.json`
-  );
+  const candidates = copilotPathCandidates({
+    platform: process.platform,
+    env: process.env,
+    homeDir: homedir(),
+    cwd: process.cwd(),
+  });
+  const copilotSettings = tryReadJson<Record<string, unknown>>(candidates.settings);
   const model = typeof copilotSettings?.["model"] === "string"
     ? copilotSettings["model"]
     : "claude-sonnet-4.6";
 
-  const configCandidates = [
-    `${copilotHome}\\config.json`,
-    `${copilotHome}\\settings.json`,
-  ];
-  const instructionCandidates = [
-    `${copilotHome}\\copilot-instructions.md`,
-    cwd(".github", "copilot-instructions.md"),
-    cwd("AGENTS.md"),
-    cwd("CLAUDE.md"),
-    cwd("GEMINI.md"),
-  ];
-  const mcpCandidates = [
-    `${copilotHome}\\mcp-config.json`,
-    cwd(".mcp.json"),
-  ];
+  const configCandidates = candidates.config;
+  const instructionCandidates = candidates.instructions;
+  const mcpCandidates = candidates.mcp;
 
   // MCP servers
   const mcpConfigPaths = findExistingPaths(mcpCandidates);
