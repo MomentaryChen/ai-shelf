@@ -328,7 +328,7 @@ The **Re-check All** button at the top re-runs the version scan for all tools wi
 
 Typical capabilities:
 
-- Daily rollups and provider breakdowns (Claude, Codex, Cursor, Gemini, Copilot where credentials allow)
+- Daily rollups and provider breakdowns (Claude, Codex, Cursor, Gemini, Copilot where credentials allow; OpenCode, Crush and Goose read from their local session data with no key; Aider is shown as not available because it keeps no readable usage history)
 - Weekly budget targets and attribution back to Flow authoring / runs when applicable
 - Credentials stored via OS `safeStorage` when available; some providers need API keys or account cookies configured in-app
 

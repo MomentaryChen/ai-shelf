@@ -895,8 +895,10 @@ export const en = {
   "usage.credential.testFailed": "Connection failed",
   "usage.credential.howToGet": "How to get a key",
   "usage.badge.api": "API supported",
-  "usage.badge.comingSoon": "API pending",
-  "usage.tool.unsupported": "No public usage API for this tool yet",
+  "usage.badge.local": "Local data",
+  "usage.badge.unavailable": "Not available",
+  "usage.tool.unsupported": "This tool has no usage data source AI Shelf can read",
+  "usage.tool.learnMore": "Learn more",
   "usage.tool.notConfigured": "Add an API key below to load usage",
   "usage.metric.inputTokens": "Input tokens",
   "usage.metric.outputTokens": "Output tokens",
@@ -914,7 +916,8 @@ export const en = {
   "usage.compare.view": "View",
   "usage.status.ok": "Reporting",
   "usage.status.notConfigured": "No API key",
-  "usage.status.unsupported": "API pending",
+  "usage.status.unsupported": "Not available",
+  "usage.status.noLocalData": "No local data",
   "usage.status.error": "Error",
   "usage.fetchedAt": "Last refreshed {time} · {days}-day window",
   "usage.range.7d": "Last 7 days",
@@ -1004,6 +1007,18 @@ export const en = {
   "usage.copilot.auth.enterprise.note":
     "If set, fetches enterprise-level 28-day reports instead of organization reports.",
   "usage.copilot.auth.enterprise.field": "Enterprise slug",
+  "usage.local.source": "Local session data",
+  "usage.local.noKey": "No API key needed — read-only, straight from the tool's own session data on this computer.",
+  "usage.local.notFound":
+    "No local session data found for this tool yet. Use it at least once on this computer, then refresh.",
+  "usage.opencode.intro":
+    "Reads per-message tokens and cost from OpenCode's local database (~/.local/share/opencode/opencode.db, or legacy storage/message JSON). Cost is what OpenCode recorded for each reply; subscription or free models show $0.",
+  "usage.crush.intro":
+    "Reads session totals from each project's .crush/crush.db listed in Crush's projects.json. Crush stores tokens and cost per session, so each session is counted on the day it was last active.",
+  "usage.goose.intro":
+    "Reads Goose's local sessions.db: the per-request usage ledger when present, otherwise per-session token totals. Cost appears only when Goose recorded it for your provider.",
+  "usage.aider.unavailable":
+    "Aider keeps no usage history AI Shelf can read. It only prints token and cost totals in the chat (and in each repo's .aider.chat.history.md), and its analytics are opt-in and sent to Aider's own service.",
 
   "flow.sidebar.title": "Flows",
   "flow.loading": "Loading flows…",

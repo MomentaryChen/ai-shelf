@@ -9,7 +9,16 @@ import type {
   UsageToolSnapshot,
 } from "./types.js";
 
-const USAGE_TOOL_IDS: UsageToolId[] = ["claude", "codex", "cursor", "gemini", "copilot"];
+const USAGE_TOOL_IDS: UsageToolId[] = [
+  "claude",
+  "codex",
+  "cursor",
+  "gemini",
+  "copilot",
+  "opencode",
+  "crush",
+  "goose",
+];
 
 export type AttributionRunInput = Pick<
   FlowRunState,
