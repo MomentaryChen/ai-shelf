@@ -43,9 +43,15 @@ Optional frontmatter:
 - extra_mcp_servers: list of MCP server names from the inventory below when the flow needs external MCP
 - allowed_tools: optional extra \`--allowedTools\` patterns (e.g. mcp__atlassian__jira_search)
 - cwd / profile: optional runner environment
+- env: optional KEY: value map for the agent process (\${VAR} expands; never hardcode secrets)
 - url / method: when runner is http
-- on_fail: slack
+- on_fail: slack / on_success: slack
+- notify: all | failure | success | none (desktop notifications)
+- webhooks: list of { url, method (POST default), on (success|failure|both), payload } — put secrets in \${ENV_VAR}
 - output: path template with {date} {id} {time}
+- Per-phase depends_on: [ids] runs independent phases in parallel (depends_on: [] = start immediately); do not combine with next / on_fail jumps
+- Per-phase profile: bind one phase to a Terminal profile (cwd / tool / env)
+- Branch targets (next / on_fail / on_reject) must be existing phase ids and must not form a loop
 
 Body rules:
 - Markdown prompt for the Claude agent when runner is claude

@@ -11,7 +11,22 @@ export type HealthMonitorPrefs = {
   trayBadgeEnabled: boolean;
   /** Optional weekly desktop notification with doctor summary. */
   weeklyDoctorSummary: boolean;
+  /** Minutes between background checks (clamped to MIN/MAX_HEALTH_CHECK_INTERVAL_MINUTES). */
+  checkIntervalMinutes: number;
 };
+
+export const DEFAULT_HEALTH_CHECK_INTERVAL_MINUTES = 6 * 60;
+export const MIN_HEALTH_CHECK_INTERVAL_MINUTES = 15;
+export const MAX_HEALTH_CHECK_INTERVAL_MINUTES = 7 * 24 * 60;
+
+export function clampHealthCheckIntervalMinutes(n: unknown): number {
+  const v = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(v)) return DEFAULT_HEALTH_CHECK_INTERVAL_MINUTES;
+  return Math.min(
+    MAX_HEALTH_CHECK_INTERVAL_MINUTES,
+    Math.max(MIN_HEALTH_CHECK_INTERVAL_MINUTES, Math.round(v)),
+  );
+}
 
 type HealthMonitorStore = HealthMonitorPrefs & {
   lastWeeklySummaryAt?: string | null;
@@ -21,6 +36,7 @@ export const DEFAULT_HEALTH_MONITOR_PREFS: HealthMonitorPrefs = {
   backgroundChecksEnabled: true,
   trayBadgeEnabled: true,
   weeklyDoctorSummary: false,
+  checkIntervalMinutes: DEFAULT_HEALTH_CHECK_INTERVAL_MINUTES,
 };
 
 function prefPath(): string {
@@ -37,6 +53,10 @@ export function readHealthMonitorPrefs(): HealthMonitorPrefs {
         data.backgroundChecksEnabled !== false,
       trayBadgeEnabled: data.trayBadgeEnabled !== false,
       weeklyDoctorSummary: data.weeklyDoctorSummary === true,
+      checkIntervalMinutes:
+        data.checkIntervalMinutes === undefined
+          ? DEFAULT_HEALTH_CHECK_INTERVAL_MINUTES
+          : clampHealthCheckIntervalMinutes(data.checkIntervalMinutes),
     };
   } catch {
     return { ...DEFAULT_HEALTH_MONITOR_PREFS };
@@ -66,6 +86,7 @@ export function writeHealthMonitorPrefs(partial: Partial<HealthMonitorPrefs>): H
     existsSync(prefPath()) ? readFileSync(prefPath(), "utf-8") : "{}",
   ) as HealthMonitorStore;
   const next: HealthMonitorStore = { ...DEFAULT_HEALTH_MONITOR_PREFS, ...existing, ...partial };
+  next.checkIntervalMinutes = clampHealthCheckIntervalMinutes(next.checkIntervalMinutes);
   const dir = app.getPath("userData");
   mkdirSync(dir, { recursive: true });
   writeFileSync(prefPath(), JSON.stringify(next, null, 2), "utf-8");

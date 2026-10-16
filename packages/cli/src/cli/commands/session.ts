@@ -41,7 +41,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
             start: opts.start,
           });
           console.log(chalk.green(`✓ Session created: ${workspaceName}/${groupName}/${s.name}`));
-          console.log(chalk.dim(`  cwd: ${s.cwd}  status: ${s.status}${s.pid ? `  pid: ${s.pid}` : ""}`));
+          console.log(chalk.dim(`  cwd: ${s.cwd}  status: ${s.status}${s.pid ? `  pid: ${String(s.pid)}` : ""}`));
         } catch (err) {
           handleError(err);
         }
@@ -58,7 +58,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
       warnLegacyWorkspaceModel(SESSION_DEPRECATION);
       try {
         const s = await getCtx().sessionService.start(workspaceName, groupName, sessionName);
-        console.log(chalk.green(`✓ Session started: ${s.name} (pid ${s.pid ?? "—"})`));
+        console.log(chalk.green(`✓ Session started: ${s.name} (pid ${s.pid != null ? String(s.pid) : "—"})`));
       } catch (err) {
         handleError(err);
       }
@@ -133,7 +133,7 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
 
           if ("sent" in result) {
             console.log(
-              chalk.green(`✓ Broadcast to ${result.sent.length} session(s): ${result.sent.join(", ")}`),
+              chalk.green(`✓ Broadcast to ${String(result.sent.length)} session(s): ${result.sent.join(", ")}`),
             );
             console.log(chalk.dim(`  command: ${command}`));
             for (const s of result.skipped) {

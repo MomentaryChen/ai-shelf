@@ -18,7 +18,6 @@ import {
 import { setTrayHealthAlert } from "./tray.js";
 
 const STARTUP_DELAY_MS = 45_000;
-const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const WEEKLY_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type HealthAlertKind = "update" | "doctor-fail" | "doctor-warn" | "auth";
@@ -44,6 +43,7 @@ export type HealthMonitorState = {
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 let startupTimer: ReturnType<typeof setTimeout> | null = null;
 let intervalTimer: ReturnType<typeof setInterval> | null = null;
+let intervalMinutesScheduled: number | null = null;
 let checkInFlight = false;
 
 const state: HealthMonitorState = {
@@ -252,10 +252,27 @@ export function getHealthMonitorState(): HealthMonitorState {
   };
 }
 
+/** (Re)arm the periodic check timer from the current prefs — no restart needed. */
+function scheduleIntervalTimer(): void {
+  const minutes = state.prefs.checkIntervalMinutes;
+  if (intervalTimer && intervalMinutesScheduled === minutes) return;
+  if (intervalTimer) clearInterval(intervalTimer);
+  intervalMinutesScheduled = minutes;
+  intervalTimer = setInterval(() => {
+    void runHealthCheck();
+  }, minutes * 60 * 1000);
+}
+
 export function applyHealthMonitorPrefs(partial: Partial<HealthMonitorPrefs>): HealthMonitorPrefs {
+  const prev = state.prefs;
   state.prefs = writeHealthMonitorPrefs(partial);
+  scheduleIntervalTimer();
   broadcastState();
-  if (state.prefs.backgroundChecksEnabled) {
+  const onlyIntervalChanged =
+    prev.backgroundChecksEnabled === state.prefs.backgroundChecksEnabled &&
+    prev.trayBadgeEnabled === state.prefs.trayBadgeEnabled &&
+    prev.weeklyDoctorSummary === state.prefs.weeklyDoctorSummary;
+  if (state.prefs.backgroundChecksEnabled && !onlyIntervalChanged) {
     void runHealthCheck();
   }
   return state.prefs;
@@ -272,9 +289,8 @@ export function initHealthMonitor(getWindow: () => BrowserWindow | null): void {
   }, STARTUP_DELAY_MS);
 
   if (intervalTimer) clearInterval(intervalTimer);
-  intervalTimer = setInterval(() => {
-    void runHealthCheck();
-  }, CHECK_INTERVAL_MS);
+  intervalTimer = null;
+  scheduleIntervalTimer();
 }
 
 export function onAppUpdateStateChanged(): void {

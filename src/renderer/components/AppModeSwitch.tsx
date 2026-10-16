@@ -3,7 +3,14 @@ import { Compass, Package, SquareTerminal, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
-import { modeSwitchModLabel } from "../shortcuts/shortcut-registry";
+import { useKeybindings } from "../hooks/useKeybindings";
+import {
+  formatCombo,
+  matchShortcut,
+  type KeybindingMap,
+  type KeyEventLike,
+  type ShortcutId,
+} from "../shortcuts/keybindings";
 
 export type AppMode = "terminal" | "inventory" | "tools" | "flow";
 
@@ -13,24 +20,35 @@ interface AppModeSwitchProps {
   disabled?: boolean;
 }
 
-export const APP_MODES: { id: AppMode; labelKey: MessageKey; icon: LucideIcon }[] = [
-  { id: "terminal", labelKey: "app.mode.terminal", icon: SquareTerminal },
-  { id: "inventory", labelKey: "app.mode.inventory", icon: Package },
-  { id: "tools", labelKey: "app.mode.tools", icon: Wrench },
-  { id: "flow", labelKey: "app.mode.flow", icon: Compass },
+export const APP_MODES: {
+  id: AppMode;
+  labelKey: MessageKey;
+  icon: LucideIcon;
+  shortcutId: ShortcutId;
+}[] = [
+  { id: "terminal", labelKey: "app.mode.terminal", icon: SquareTerminal, shortcutId: "modeTerminal" },
+  { id: "inventory", labelKey: "app.mode.inventory", icon: Package, shortcutId: "modeInventory" },
+  { id: "tools", labelKey: "app.mode.tools", icon: Wrench, shortcutId: "modeTools" },
+  { id: "flow", labelKey: "app.mode.flow", icon: Compass, shortcutId: "modeFlow" },
 ];
 
-/** Alt/Option+1–4 → mode index; uses `code` so macOS Option+digit glyphs still match. */
-export function matchModeSwitchShortcut(ev: KeyboardEvent): AppMode | null {
-  if (!ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return null;
-  const m = /^Digit([1-9])$/.exec(ev.code);
+/**
+ * Mode switch shortcuts (default Alt/Option+1–4). Matching falls back to `code`
+ * so macOS Option+digit glyphs still match.
+ */
+export function matchModeSwitchShortcut(ev: KeyEventLike, map: KeybindingMap): AppMode | null {
+  const m = matchShortcut(
+    ev,
+    map,
+    APP_MODES.map((mode) => mode.shortcutId),
+  );
   if (!m) return null;
-  return APP_MODES[Number(m[1]) - 1]?.id ?? null;
+  return APP_MODES.find((mode) => mode.shortcutId === m.id)?.id ?? null;
 }
 
 export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitchProps) {
   const { t } = useLocale();
-  const modKey = modeSwitchModLabel();
+  const keymap = useKeybindings();
 
   return (
     <nav
@@ -47,17 +65,18 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
         disabled={disabled}
         className="gap-0.5"
       >
-        {APP_MODES.map((m, i) => {
+        {APP_MODES.map((m) => {
           const Icon = m.icon;
           const label = t(m.labelKey);
+          const keys = formatCombo(keymap[m.shortcutId]);
           return (
             <ToggleGroupItem
               key={m.id}
               value={m.id}
               role="tab"
               aria-selected={mode === m.id}
-              aria-keyshortcuts={`Alt+${i + 1}`}
-              title={t("app.mode.shortcutHint", { label, keys: `${modKey}+${i + 1}` })}
+              aria-keyshortcuts={keys || undefined}
+              title={keys ? t("app.mode.shortcutHint", { label, keys }) : label}
               size="chrome"
               className="border-transparent data-[state=off]:border-transparent data-[state=off]:hover:border-transparent"
             >

@@ -1,7 +1,12 @@
-import { loadSettings } from "../chat-settings";
 import type { PaneInfo } from "./split-tree";
 import { shouldIgnoreShortcutForIme } from "./ime-keys";
-import { matchPaneFocusSplitShortcut } from "./pane-key-bindings";
+import { getActiveKeybindings } from "../shortcuts/active-keybindings";
+import {
+  matchShortcut,
+  type KeybindingMap,
+  type KeyEventLike,
+  type ShortcutId,
+} from "../shortcuts/keybindings";
 
 export type PaneShortcutAction =
   | { type: "focus-next" }
@@ -11,10 +16,6 @@ export type PaneShortcutAction =
   | { type: "clear-screen" }
   | { type: "restart-session" }
   | { type: "split"; direction: "horizontal" | "vertical" };
-
-function hasMod(ev: KeyboardEvent): boolean {
-  return ev.ctrlKey || ev.metaKey;
-}
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -105,29 +106,51 @@ export function registerPaneShortcutHandlers(
   getHandlers = source;
 }
 
+const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
+  "focusNext",
+  "focusPrev",
+  "splitHorizontal",
+  "splitVertical",
+  "focusPane",
+  "closePane",
+  "clearScreen",
+  "restartSession",
+];
+
+/** Map a key event to a pane action using the given keybindings (pure; unit tested). */
+export function matchPaneShortcutWithBindings(
+  ev: KeyEventLike,
+  map: KeybindingMap,
+): PaneShortcutAction | null {
+  const m = matchShortcut(ev, map, PANE_SHORTCUT_IDS);
+  if (!m) return null;
+  switch (m.id) {
+    case "focusNext":
+      return { type: "focus-next" };
+    case "focusPrev":
+      return { type: "focus-prev" };
+    case "splitHorizontal":
+      return { type: "split", direction: "horizontal" };
+    case "splitVertical":
+      return { type: "split", direction: "vertical" };
+    case "focusPane":
+      return { type: "focus-index", index: m.index ?? 0 };
+    case "closePane":
+      return { type: "close" };
+    case "clearScreen":
+      return { type: "clear-screen" };
+    case "restartSession":
+      return { type: "restart-session" };
+    default:
+      return null;
+  }
+}
+
 /** Returns a pane action when the event matches a global pane shortcut. */
 export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null {
-  if (ev.type !== "keydown" || !hasMod(ev) || ev.altKey) return null;
+  if (ev.type !== "keydown") return null;
   if (shouldIgnoreShortcutTarget(ev.target)) return null;
-
-  const bindings = loadSettings().paneShortcuts;
-  const focusSplit = matchPaneFocusSplitShortcut(ev, bindings);
-  if (focusSplit) return focusSplit;
-
-  const key = ev.key.toLowerCase();
-
-  if (!ev.shiftKey && key === "w") {
-    return { type: "close" };
-  }
-
-  if (!ev.shiftKey && key === "l") {
-    return { type: "clear-screen" };
-  }
-  if (ev.shiftKey && key === "r") {
-    return { type: "restart-session" };
-  }
-
-  return null;
+  return matchPaneShortcutWithBindings(ev, getActiveKeybindings());
 }
 
 /**
