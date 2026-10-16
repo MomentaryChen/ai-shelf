@@ -26,10 +26,28 @@ export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boole
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
+/**
+ * Where an MCP server is defined. Mirrors Claude Code scopes:
+ * `user` (global), `local` (per-project entry in the user config),
+ * `project` (checked-in `.mcp.json` at a project root).
+ */
+export type McpServerScope = "user" | "local" | "project";
+
+export interface McpServerDetail {
+  name: string;
+  scope: McpServerScope;
+  /** Config file the server was read from. */
+  source: string;
+  /** Project root for `local` / `project` scoped servers. */
+  project?: string;
+}
+
 export interface MCPInfo {
   supported: boolean;
   servers: string[];
   configPaths: string[];
+  /** Per-server scope metadata; omitted for tools without scoped MCP configs. */
+  serverDetails?: McpServerDetail[];
 }
 
 export interface Capabilities {
