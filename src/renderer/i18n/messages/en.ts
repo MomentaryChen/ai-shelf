@@ -1118,13 +1118,20 @@ export const en = {
   "flow.scheduler.hint":
     "Turn off to pause all cron runs while the app is open or closed. Each flow still keeps its own cron.",
   "flow.scheduler.enabled": "Enable scheduled runs",
-  "flow.scheduler.paused": "Paused — in-app checks and the Windows due job will not start flows.",
+  "flow.scheduler.paused": "Paused — in-app checks and the OS due job will not start flows.",
   "flow.taskScheduler.title": "Run when app is closed",
-  "flow.taskScheduler.hint":
+  "flow.taskScheduler.hint.windows-task-scheduler":
     "Optional Windows Task Scheduler job that runs flow due every minute. Requires scheduled runs enabled above.",
+  "flow.taskScheduler.hint.launchd":
+    "Optional launchd LaunchAgent (~/Library/LaunchAgents) that runs flow due every minute. Requires scheduled runs enabled above.",
+  "flow.taskScheduler.hint.systemd":
+    "Optional systemd user timer (~/.config/systemd/user) that runs flow due every minute. Requires scheduled runs enabled above.",
+  "flow.taskScheduler.unavailable": "Not available on this system: {reason}",
   "flow.taskScheduler.installed": "Configured: {name}",
   "flow.taskScheduler.notInstalled": "Not configured",
-  "flow.taskScheduler.install": "Set up Task Scheduler",
+  "flow.taskScheduler.install.windows-task-scheduler": "Set up Task Scheduler",
+  "flow.taskScheduler.install.launchd": "Set up launchd job",
+  "flow.taskScheduler.install.systemd": "Set up systemd timer",
   "flow.taskScheduler.installing": "Setting up…",
   "flow.taskScheduler.remove": "Remove schedule",
   "flow.taskScheduler.removing": "Removing…",

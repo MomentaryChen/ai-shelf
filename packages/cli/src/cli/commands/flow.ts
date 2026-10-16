@@ -77,7 +77,7 @@ export function registerFlowCommands(program: Command): void {
 
   flow
     .command("due")
-    .description("Run flows whose cron schedule is due this minute (for Task Scheduler)")
+    .description("Run flows whose cron schedule is due this minute (for Task Scheduler / launchd / systemd timers)")
     .action(async () => {
       try {
         const core = await loadFlowCore();

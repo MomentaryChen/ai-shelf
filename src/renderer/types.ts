@@ -24,6 +24,18 @@ export type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 
 export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boolean };
 
+/** OS-level "run when app is closed" job (Task Scheduler / launchd / systemd user timer). */
+export type FlowTaskSchedulerStatus = {
+  supported: boolean;
+  installed: boolean;
+  taskName: string;
+  backend?: "windows-task-scheduler" | "launchd" | "systemd";
+  launcherPath?: string;
+  definitionPath?: string;
+  /** Set when the platform has a backend but it cannot be used (e.g. no systemd --user). */
+  unavailableReason?: string;
+};
+
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
 export interface MCPInfo {
@@ -1038,21 +1050,16 @@ export interface ElectronAPI {
   flowCancelRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
   flowApproveGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowRejectGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
-  flowGetTaskSchedulerStatus: () => Promise<{
-    supported: boolean;
-    installed: boolean;
-    taskName: string;
-    launcherPath?: string;
-  }>;
+  flowGetTaskSchedulerStatus: () => Promise<FlowTaskSchedulerStatus>;
   flowInstallTaskScheduler: () => Promise<{
     ok: boolean;
     error?: string;
-    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+    status?: FlowTaskSchedulerStatus;
   }>;
   flowRemoveTaskScheduler: () => Promise<{
     ok: boolean;
     error?: string;
-    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+    status?: FlowTaskSchedulerStatus;
   }>;
   flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
   flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;

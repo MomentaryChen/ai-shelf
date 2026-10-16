@@ -7,17 +7,11 @@ import {
 } from "@/components/ui/dialog";
 import { parseFlowDocument } from "../../shared/flow-parse.js";
 import type { FlowDefinition } from "../../shared/flow-types.js";
-import type { FlowListItem, ProfileInfo } from "../types";
+import type { FlowListItem, FlowTaskSchedulerStatus, ProfileInfo } from "../types";
 import { FlowRunnerSettingsEditor } from "./FlowRunnerSettingsEditor";
 import { FlowScheduleEditor } from "./FlowScheduleEditor";
 import { FlowSchedulerPanel } from "./FlowSchedulerPanel";
 import { useLocale } from "../i18n/LocaleProvider";
-
-type TaskSchedulerStatus = {
-  supported: boolean;
-  installed: boolean;
-  taskName: string;
-};
 
 type Props = {
   flowId: string;
@@ -25,7 +19,7 @@ type Props = {
   schedulerEnabled: boolean;
   schedulerSaving: boolean;
   onSchedulerToggle: () => void;
-  taskScheduler: TaskSchedulerStatus | null;
+  taskScheduler: FlowTaskSchedulerStatus | null;
   taskSchedulerBusy: boolean;
   onInstallTaskScheduler: () => void;
   onRemoveTaskScheduler: () => void;
