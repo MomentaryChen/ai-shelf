@@ -18,6 +18,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 - **Flow phase loop guard** — Orchestrated flows whose `next:`, `on_fail:` or `on_reject:` cycles back to an earlier phase now fail with a "Phase loop detected" error after `phases × 3` phase executions instead of spawning agent runs forever; configured `retry:` attempts do not count toward the limit.
 - **Flow run matching** — Run history and flow deletion match run directories to the exact flow id (from `state.json`, else the parsed run name), so deleting `review` no longer removes or lists runs of `multi-agent-review`.
 - **`ai update` timeouts** — Tool updates now stream package-manager output live, allow up to 10 minutes instead of being killed after 10 seconds, report a timeout separately from a failed exit, and `ai update self` uses the package manager that actually installed ai-shelf.
+- **Terminal broadcast toggle** — Turning broadcast input on or off now takes effect immediately in panes that are already open, instead of only after some unrelated pane setting changed.
 
 ## [4.3.5] - 2026-10-07
 
