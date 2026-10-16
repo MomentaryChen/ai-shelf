@@ -190,6 +190,8 @@ export interface FlowRunState {
   costEstimated?: boolean;
   inputTokens?: number | null;
   outputTokens?: number | null;
+  /** Pid of the process executing the run (app or headless CLI); used to detect orphaned runs. */
+  ownerPid?: number | null;
 }
 
 export interface FlowProgressEvent {
