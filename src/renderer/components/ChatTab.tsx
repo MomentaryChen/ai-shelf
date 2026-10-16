@@ -25,7 +25,17 @@ import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSetti
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
-import { usePaneAgentAwareness } from "../hooks/usePaneAgentAwareness";
+import {
+  usePaneAgentAwareness,
+  type BackgroundAgentNotice,
+  type BackgroundAgentOptions,
+  type BackgroundAgentPane,
+} from "../hooks/usePaneAgentAwareness";
+import {
+  enqueuePaneNotice,
+  strongestAttention,
+} from "../../shared/background-agent-attention.js";
+import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
 import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
@@ -198,13 +208,6 @@ function ChatTabInner({
     };
   }, []);
 
-  const { paneAgentStates, recordPaneAgentInput } = usePaneAgentAwareness(
-    panes,
-    focusedPaneId,
-    settings,
-    t,
-    windowFocused,
-  );
   const keymap = useMemo(
     () => resolveKeybindings(settings.keybindings),
     [settings.keybindings],
@@ -274,6 +277,7 @@ function ChatTabInner({
 
   const {
     activeProfile,
+    backgroundProfilePanes,
     restoring,
     isRestoring,
     migrationDone,
@@ -308,6 +312,46 @@ function ChatTabInner({
     settings.workingDir,
     broadcastInput,
   );
+
+  /** Live panes of non-active profiles, labelled for notifications. */
+  const backgroundAgentPanes = useMemo<BackgroundAgentPane[]>(() => {
+    if (backgroundProfilePanes.length === 0) return [];
+    const names = new Map<string, string>();
+    for (const g of sidebarForest?.groups ?? []) {
+      for (const p of g.profiles) names.set(p.id, p.name);
+    }
+    return backgroundProfilePanes.map((b) => ({
+      pane: b.pane,
+      profileId: b.profileId,
+      profileName: names.get(b.profileId) ?? b.profileId,
+    }));
+  }, [backgroundProfilePanes, sidebarForest]);
+  const backgroundAgentPanesRef = useRef(backgroundAgentPanes);
+  backgroundAgentPanesRef.current = backgroundAgentPanes;
+
+  const [backgroundToasts, setBackgroundToasts] = useState<BackgroundAgentToast[]>([]);
+  const backgroundToastSeqRef = useRef(0);
+  const handleBackgroundNotice = useCallback((notice: BackgroundAgentNotice) => {
+    const id = ++backgroundToastSeqRef.current;
+    setBackgroundToasts((prev) => enqueuePaneNotice(prev, { ...notice, id }));
+  }, []);
+  const dismissBackgroundToast = useCallback((id: number) => {
+    setBackgroundToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+  const backgroundAgentOptions = useMemo<BackgroundAgentOptions>(
+    () => ({ panes: backgroundAgentPanes, onNotice: handleBackgroundNotice }),
+    [backgroundAgentPanes, handleBackgroundNotice],
+  );
+
+  const { paneAgentStates, recordPaneAgentInput, backgroundAttention, backgroundPaneAttention } =
+    usePaneAgentAwareness(
+      panes,
+      focusedPaneId,
+      settings,
+      t,
+      windowFocused,
+      backgroundAgentOptions,
+    );
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -853,6 +897,11 @@ function ChatTabInner({
 
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
+      const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
+      if (bg) {
+        void openBackgroundPaneRef.current(bg.profileId, paneId);
+        return;
+      }
       if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
       else setFocusedPaneId(paneId);
     });
@@ -1087,8 +1136,9 @@ function ChatTabInner({
         id: g.id,
         name: g.name,
         profileCount: g.profiles.length,
+        agentAttention: strongestAttention(g.profiles.map((p) => backgroundAttention[p.id]?.kind)),
       })),
-    [sidebarForest],
+    [sidebarForest, backgroundAttention],
   );
   const currentGroupId =
     selectedGroupId ??
@@ -1102,6 +1152,21 @@ function ChatTabInner({
     () => sidebarForest?.groups.flatMap((g) => g.profiles) ?? [],
     [sidebarForest],
   );
+  /** Switch to a background profile and focus the pane (notification / toast click). */
+  const openBackgroundPaneRef = useRef(async (_profileId: string, _paneId: string) => {});
+  openBackgroundPaneRef.current = async (profileId: string, paneId: string) => {
+    const profile = allProfiles.find((p) => p.id === profileId);
+    if (!profile) return;
+    await restorePaneToDisplay(profile, paneId);
+  };
+  const openBackgroundToast = useCallback(
+    (toast: BackgroundAgentToast) => {
+      dismissBackgroundToast(toast.id);
+      void openBackgroundPaneRef.current(toast.profileId, toast.paneId);
+    },
+    [dismissBackgroundToast],
+  );
+
   const settingsProfile = useMemo(
     () => allProfiles.find((p) => p.id === settingsProfileId) ?? null,
     [allProfiles, settingsProfileId],
@@ -1122,6 +1187,7 @@ function ChatTabInner({
                 description: pane.cwd || `${paneToolLabel(pane.tool)} ${idx + 1}`,
                 live: true,
                 minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
+                agentAttention: isActive ? null : (backgroundPaneAttention[pane.id]?.kind ?? null),
               }))
             : shouldShowSavedTerminalPreview(live.length, isActive)
               ? p.terminals.map((terminal, idx) => ({
@@ -1144,9 +1210,12 @@ function ChatTabInner({
           broadcastInput: p.broadcastInput,
           savedCommands: p.savedCommands ?? [],
           terminals,
+          agentAttention: isActive ? null : (backgroundAttention[p.id] ?? null),
         };
       }),
     [
+      backgroundAttention,
+      backgroundPaneAttention,
       currentGroup?.profiles,
       getProfilePanes,
       activeProfile?.id,
@@ -1766,6 +1835,11 @@ function ChatTabInner({
       <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text" data-surface="chrome">
         {sidebarDialogs}
         {sidebar}
+        <BackgroundAgentToasts
+          toasts={backgroundToasts}
+          onOpen={openBackgroundToast}
+          onDismiss={dismissBackgroundToast}
+        />
         {!sidebarCollapsed && (
           <div className="w-2.5 shrink-0 self-stretch" style={{ width: 10 }}>
             <ResizeDivider
