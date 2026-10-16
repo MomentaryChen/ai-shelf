@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import type { FlowListItem, FlowRunState } from "../types";
 import { parseFlowDocument } from "../../shared/flow-parse.js";
+import { flowUsesDagScheduling, phaseDependencies } from "../../shared/flow-dag.js";
+import { validateFlowDefinition } from "../../shared/flow-validate.js";
 import type { FlowDefinition, FlowRunStatus } from "../../shared/flow-types.js";
 import { EmptyState } from "./EmptyState";
 import { FlowCreateChat } from "./FlowCreateChat";
@@ -220,14 +222,33 @@ export function FlowTab() {
     return resolveToolLaunchExtraArgs(loadSettings().toolLaunchArgs, tool);
   }, [flowDef]);
 
+  const validationIssues = useMemo(
+    () => (flowDef ? validateFlowDefinition(flowDef).map((i) => i.message) : []),
+    [flowDef],
+  );
+
   const dagPhases = useMemo((): FlowDagPhase[] => {
     const base = flowDef?.phases ?? [];
+    const dag = flowUsesDagScheduling(base);
+    // DAG mode: show upstream ids so parallel branches are visible in the linear strip.
+    const depsHint = (id: string): string | null => {
+      if (!dag) return null;
+      const deps = phaseDependencies(base, id);
+      return deps.length > 0
+        ? t("flow.dag.after", { ids: deps.join(", ") })
+        : t("flow.dag.root");
+    };
     if (!selectedActiveRun || selectedActiveRun.flowId !== selectedId || !isLiveRunStatus(selectedActiveRun.status)) {
       return base.map((p) => ({
         id: p.id,
         label: p.label,
         status: "pending" as const,
-        message: [p.tool ? `@${p.tool}` : null, p.kind === "gate" ? "gate" : null]
+        message: [
+          depsHint(p.id),
+          p.tool ? `@${p.tool}` : null,
+          p.profileId ? `⌂ ${p.profileId}` : null,
+          p.kind === "gate" ? "gate" : null,
+        ]
           .filter(Boolean)
           .join(" · ") || undefined,
       }));
@@ -235,7 +256,12 @@ export function FlowTab() {
     return base.map((p) => {
       const live = selectedActiveRun.phases.find((x) => x.id === p.id);
       const toolHint = live?.tool || p.tool;
-      const parts = [live?.message, toolHint ? `@${toolHint}` : null, p.kind === "gate" ? "gate" : null]
+      const parts = [
+        live?.message,
+        depsHint(p.id),
+        toolHint ? `@${toolHint}` : null,
+        p.kind === "gate" ? "gate" : null,
+      ]
         .filter(Boolean)
         .join(" · ");
       return {
@@ -245,7 +271,7 @@ export function FlowTab() {
         message: parts || undefined,
       };
     });
-  }, [flowDef, selectedActiveRun, selectedId]);
+  }, [flowDef, selectedActiveRun, selectedId, t]);
 
   const handleRun = async () => {
     if (!selectedId) return;
@@ -512,6 +538,13 @@ export function FlowTab() {
                     />
                   )}
                   <span className="truncate">{flow.id}</span>
+                  {flow.issues && flow.issues.length > 0 && (
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full bg-fail"
+                      title={flow.issues.join("\n")}
+                      aria-label={t("flow.validation.title")}
+                    />
+                  )}
                 </div>
                 <div className="mt-0.5 truncate text-[11px] text-text-secondary">
                   {flow.schedule ?? t("flow.manualOnly")}
@@ -633,7 +666,7 @@ export function FlowTab() {
                   </Button>
                   <Button
                     type="button"
-                    disabled={selectedRunning || !selected.enabled}
+                    disabled={selectedRunning || !selected.enabled || validationIssues.length > 0}
                     onClick={() => void handleRun()}
                     className="rounded-[22px]"
                   >
@@ -674,6 +707,23 @@ export function FlowTab() {
                   )}
                 </div>
               </header>
+
+              {validationIssues.length > 0 && (
+                <div
+                  role="alert"
+                  className="rounded-[20px] border border-fail/30 bg-fail/10 px-4 py-3 text-[13px] text-fail"
+                >
+                  <p className="font-medium">{t("flow.validation.title")}</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12px]">
+                    {validationIssues.map((issue) => (
+                      <li key={issue} className="break-words">
+                        {issue}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-[11px] text-text-secondary">{t("flow.validation.hint")}</p>
+                </div>
+              )}
 
               {selectedError && !showLiveRun && (
                 <p className="rounded-[20px] border border-fail/30 bg-fail/10 px-4 py-3 text-[13px] text-fail">

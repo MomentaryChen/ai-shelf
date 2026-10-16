@@ -196,6 +196,9 @@ import {
   saveFlowSchedule,
   saveFlowRunner,
   saveFlowChat,
+  saveFlowSource,
+  saveFlowNotifications,
+  pruneAllFlowRunHistory,
 } from "./flow-service.js";
 import {
   getFlowTaskSchedulerStatus,
@@ -2661,12 +2664,100 @@ ipcMain.handle("flow-set-schedule-prefs", (_event, partial: unknown) => {
   if (!partial || typeof partial !== "object") {
     return { ok: false, error: "Invalid prefs" };
   }
-  const p = partial as { schedulerEnabled?: unknown };
+  const p = partial as {
+    schedulerEnabled?: unknown;
+    historyMaxRuns?: unknown;
+    historyMaxDays?: unknown;
+  };
+  const limit = (v: unknown): number | null | undefined => {
+    if (v === null) return null;
+    if (typeof v === "number" && Number.isFinite(v)) return v > 0 ? Math.floor(v) : null;
+    return undefined;
+  };
   const next = writeFlowSchedulePrefs({
     schedulerEnabled:
       typeof p.schedulerEnabled === "boolean" ? p.schedulerEnabled : undefined,
+    historyMaxRuns: limit(p.historyMaxRuns),
+    historyMaxDays: limit(p.historyMaxDays),
   });
   return { ok: true, prefs: next };
+});
+
+ipcMain.handle("flow-prune-history", (_event, flowId: unknown) => {
+  const id = typeof flowId === "string" && flowId.trim() ? flowId.trim() : undefined;
+  try {
+    return { ok: true, ...pruneAllFlowRunHistory({ flowId: id }) };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("flow-save-source", (_event, flowId: unknown, content: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  if (typeof content !== "string" || !content.trim()) {
+    return { ok: false, error: "Invalid flow content" };
+  }
+  return saveFlowSource(flowId.trim(), content);
+});
+
+ipcMain.handle("flow-save-notify-settings", (_event, flowId: unknown, patch: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  if (!patch || typeof patch !== "object") {
+    return { ok: false, error: "Invalid notification patch" };
+  }
+  const p = patch as Record<string, unknown>;
+  const notify =
+    p.notify === "all" || p.notify === "success" || p.notify === "failure" || p.notify === "none"
+      ? p.notify
+      : undefined;
+  const slack = (v: unknown) => (v === "slack" ? "slack" : v === "none" ? "none" : undefined);
+  const limit = (v: unknown): number | null | undefined => {
+    if (v === null) return null;
+    if (typeof v === "number" && Number.isFinite(v)) return v > 0 ? Math.floor(v) : null;
+    return undefined;
+  };
+  let webhooks: import("../shared/flow-types.js").FlowWebhookDef[] | null | undefined;
+  if (p.webhooks === null) {
+    webhooks = null;
+  } else if (Array.isArray(p.webhooks)) {
+    webhooks = [];
+    for (const raw of p.webhooks) {
+      if (!raw || typeof raw !== "object") continue;
+      const h = raw as Record<string, unknown>;
+      if (typeof h.url !== "string" || !h.url.trim()) {
+        return { ok: false, error: "Each webhook needs a url" };
+      }
+      const method =
+        h.method === "PUT" || h.method === "PATCH" || h.method === "GET" ? h.method : "POST";
+      const on = Array.isArray(h.on)
+        ? h.on.filter((v): v is "success" | "failure" => v === "success" || v === "failure")
+        : [];
+      webhooks.push({
+        url: h.url.trim(),
+        method,
+        on: on.length > 0 ? on : ["success", "failure"],
+        payload: typeof h.payload === "string" && h.payload.trim() ? h.payload : undefined,
+        contentType:
+          typeof h.contentType === "string" && h.contentType.trim() ? h.contentType.trim() : undefined,
+        authorization:
+          typeof h.authorization === "string" && h.authorization.trim()
+            ? h.authorization.trim()
+            : undefined,
+      });
+    }
+  }
+  return saveFlowNotifications(flowId.trim(), {
+    notify,
+    onSuccess: slack(p.onSuccess),
+    onFail: slack(p.onFail),
+    webhooks,
+    historyMaxRuns: limit(p.historyMaxRuns),
+    historyMaxDays: limit(p.historyMaxDays),
+  });
 });
 
 ipcMain.handle("flow-save-schedule", (_event, flowId: unknown, patch: unknown) => {
@@ -2709,6 +2800,7 @@ ipcMain.handle("flow-save-runner-settings", (_event, flowId: unknown, patch: unk
     toolArgs?: unknown;
     cwd?: unknown;
     profile?: unknown;
+    env?: unknown;
   };
   if (typeof p.tool !== "string" || !p.tool.trim()) {
     return { ok: false, error: "tool is required" };
@@ -2724,11 +2816,24 @@ ipcMain.handle("flow-save-runner-settings", (_event, flowId: unknown, patch: unk
   if (toolArgs === undefined || cwd === undefined || profile === undefined) {
     return { ok: false, error: "Invalid runner patch fields" };
   }
+  let env: Record<string, string> | null | undefined;
+  if (p.env === null) {
+    env = null;
+  } else if (p.env && typeof p.env === "object" && !Array.isArray(p.env)) {
+    env = {};
+    for (const [key, value] of Object.entries(p.env as Record<string, unknown>)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== "string") {
+        return { ok: false, error: `Invalid env variable: ${key}` };
+      }
+      env[key] = value;
+    }
+  }
   return saveFlowRunner(flowId.trim(), {
     tool: p.tool.trim(),
     toolArgs,
     cwd,
     profile,
+    env,
   });
 });
 

@@ -8,6 +8,8 @@ import {
 import { parseFlowDocument } from "../../shared/flow-parse.js";
 import type { FlowDefinition } from "../../shared/flow-types.js";
 import type { FlowListItem, ProfileInfo } from "../types";
+import { FlowHistoryRetentionPanel } from "./FlowHistoryRetentionPanel";
+import { FlowNotifySettingsEditor } from "./FlowNotifySettingsEditor";
 import { FlowRunnerSettingsEditor } from "./FlowRunnerSettingsEditor";
 import { FlowScheduleEditor } from "./FlowScheduleEditor";
 import { FlowSchedulerPanel } from "./FlowSchedulerPanel";
@@ -125,6 +127,16 @@ export function FlowSettingsDialog({
     };
   }, [flowId]);
 
+  /** Re-read the definition after a save so editors compare against the new baseline. */
+  const refreshDef = () => {
+    void window.api.flowReadFile(flowId).then((file) => {
+      if (!file) return;
+      const fileName = file.path.split(/[/\\]/).pop() ?? `${flowId}.flow.md`;
+      const parsed = parseFlowDocument(file.content, fileName, file.path);
+      if (!("error" in parsed)) setFlowDef(parsed);
+    });
+  };
+
   const title = useMemo(() => t("flow.settings.dialogTitle", { id: flowId }), [flowId, t]);
 
   return (
@@ -153,6 +165,8 @@ export function FlowSettingsDialog({
                 onRemoveTaskScheduler={onRemoveTaskScheduler}
               />
 
+              <FlowHistoryRetentionPanel onPruned={onSaved} />
+
               <section className="border-t border-border pt-6">
                 <h3 className="text-[13px] font-medium text-text-primary">{t("flow.schedule.title")}</h3>
                 <p className="mt-1 text-[12px] leading-relaxed text-text-secondary">{t("flow.schedule.hint")}</p>
@@ -178,9 +192,23 @@ export function FlowSettingsDialog({
                   cursorModels={cursorModels}
                   profiles={profiles}
                   onSaved={() => {
+                    refreshDef();
                     onSaved();
                   }}
                   embedded
+                />
+              </section>
+
+              <section className="border-t border-border pt-6">
+                <h3 className="text-[13px] font-medium text-text-primary">{t("flow.notify.title")}</h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-text-secondary">{t("flow.notify.hint")}</p>
+                <FlowNotifySettingsEditor
+                  flowId={flowId}
+                  flowDef={flowDef}
+                  onSaved={() => {
+                    refreshDef();
+                    onSaved();
+                  }}
                 />
               </section>
             </div>
