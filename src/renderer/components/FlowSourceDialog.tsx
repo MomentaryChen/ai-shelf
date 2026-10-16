@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "../i18n/LocaleProvider";
+import { validateFlowContent } from "../../shared/flow-validate.js";
 
 interface Props {
   flowId: string;
@@ -56,13 +57,21 @@ export function FlowSourceDialog({ flowId, onClose, onSaved }: Props) {
 
   const dirty = content !== original;
 
+  // Live validation: parse errors, unknown branch targets, dependency cycles, loops.
+  const validation = useMemo(() => {
+    if (!dirty) return null;
+    const res = validateFlowContent(content);
+    if (res.ok) return null;
+    return res.issues.length > 0 ? res.issues.map((i) => i.message) : [res.error];
+  }, [content, dirty]);
+
   const save = async () => {
     if (!path) return;
     setSaving(true);
     setSaveError(null);
-    const res = await window.api.writeConfigFile(path, content);
+    const res = await window.api.flowSaveSource(flowId, content);
     setSaving(false);
-    if (res.success) {
+    if (res.ok) {
       setOriginal(content);
       onSaved?.();
       onClose();
@@ -97,7 +106,19 @@ export function FlowSourceDialog({ flowId, onClose, onSaved }: Props) {
               spellCheck={false}
               className="min-h-[360px] flex-1 resize-none rounded-[20px] border-border bg-bg-primary font-mono text-[12px] leading-relaxed text-text-primary"
             />
-            {saveError && <p className="break-all text-[12px] text-fail">{saveError}</p>}
+            {validation && (
+              <div role="alert" className="rounded-[16px] border border-fail/30 bg-fail/10 px-3 py-2 text-[12px] text-fail">
+                <p className="font-medium">{t("flow.validation.title")}</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  {validation.map((issue) => (
+                    <li key={issue} className="break-words">
+                      {issue}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {saveError && <p className="whitespace-pre-wrap break-all text-[12px] text-fail">{saveError}</p>}
             <DialogFooter className="gap-2 sm:justify-between">
               <Button
                 type="button"
@@ -117,7 +138,7 @@ export function FlowSourceDialog({ flowId, onClose, onSaved }: Props) {
                   size="sm"
                   className="rounded-[22px]"
                   onClick={() => void save()}
-                  disabled={saving || !dirty}
+                  disabled={saving || !dirty || validation !== null}
                 >
                   {saving ? t("flow.source.saving") : t("flow.source.save")}
                 </Button>

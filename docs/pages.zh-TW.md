@@ -127,9 +127,9 @@
 
 ### 窗格快捷鍵（Terminal 模式、有開啟窗格時）
 
-在文字輸入框（例如 Profile 重新命名）內不會觸發。
+在文字輸入框（例如 Profile 重新命名）內不會觸發。所有快捷鍵（含命令面板、快捷鍵一覽、模式切換、Profile 切換與終端機複製／貼上／搜尋）都可在 **設定 → 鍵盤快捷鍵** 重新綁定或**停用**；停用後按鍵會直接送到終端機（例如保留 Ctrl+W／Ctrl+K 給 shell 或 TUI），重複的組合鍵會顯示警告。
 
-| 快捷鍵 | 動作 |
+| 快捷鍵（預設） | 動作 |
 |---|---|
 | **Ctrl+Tab** | 回到上一個使用的終端機（跨 Profile／工作區） |
 | **Ctrl+Shift+Tab** | 上一個窗格 |
@@ -316,7 +316,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 常見能力：
 
-- 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定）
+- 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定；OpenCode、Crush、Goose 直接讀取本機工作階段資料，不需金鑰；Aider 沒有可讀取的用量紀錄，顯示為不提供）
 - 每週預算目標；Flow 撰寫／執行可歸因回 Usage
 - 憑證在可用時以 OS `safeStorage` 保存；部分供應商需在 App 內設定 API 金鑰或帳號 cookie
 

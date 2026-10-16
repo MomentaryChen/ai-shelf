@@ -262,6 +262,34 @@ export function parseWslListVerbose(text: string): WslDistro[] {
   return distros;
 }
 
+const WSL_DISTRO_NAME_RE = /^[A-Za-z0-9][\w.-]{0,63}$/u;
+
+/**
+ * WSL distro names are letters, digits, `.`, `-`, `_` (no spaces). Anything
+ * else is rejected before it reaches a `wsl.exe -d <name>` argv.
+ */
+export function isValidWslDistroName(name: string): boolean {
+  return WSL_DISTRO_NAME_RE.test(name.trim());
+}
+
+/**
+ * Parse `wsl -l -q` / `wsl -l --running -q` (names only, often UTF-16LE).
+ * Status messages such as "There are no running distributions." and blank
+ * lines are dropped — only valid distro names survive.
+ */
+export function parseWslListQuiet(output: Buffer | string): string[] {
+  const text = decodeWslListOutput(output);
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const raw of text.split(/\r?\n/u)) {
+    const name = raw.replace(/^\*\s*/u, "").trim();
+    if (!name || !isValidWslDistroName(name) || seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+  }
+  return names;
+}
+
 /** Build everyday WSL helper commands from a path + distro. */
 export function buildWslSnippets(opts: {
   path: string;

@@ -2,6 +2,7 @@ import type { GroupRepositoryPort, WorkspaceRepositoryPort } from "../core/ports
 import type { GroupLayoutRepository } from "../database/repositories/group-layout-repository.js";
 import type { EventBus } from "../runtime/event-bus.js";
 import type { GroupModel } from "../models/group.js";
+import type { WorkspaceModel } from "../models/workspace.js";
 import type { GroupLayoutSnapshot, SavedCommandSnippet } from "../models/group-layout.js";
 import { AppError } from "../core/errors/app-error.js";
 import { homedir } from "node:os";
@@ -64,15 +65,18 @@ export class ProfileService {
   ) {}
 
   ensureDefaultGroup() {
-    let list = this.workspaces.list();
-    if (list.length === 0) {
-      const ws = this.workspaces.create({
-        name: DEFAULT_PROFILE_GROUP_NAME,
-        root_path: homedir(),
-      });
-      list = [ws];
-    }
-    return list[0]!;
+    const first = this.workspaces.list()[0];
+    if (first) return first;
+    return this.workspaces.create({
+      name: DEFAULT_PROFILE_GROUP_NAME,
+      root_path: homedir(),
+    });
+  }
+
+  private requireWorkspace(workspaceId: string): WorkspaceModel {
+    const ws = this.workspaces.findById(workspaceId);
+    if (!ws) throw new AppError("Profile group not found", "PROFILE_GROUP_NOT_FOUND");
+    return ws;
   }
 
   private ensureLegacyWorkspace() {
@@ -152,6 +156,7 @@ export class ProfileService {
   }
 
   /** @deprecated Use getForest() */
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy API kept for existing callers
   getTree(): ProfileTree {
     const forest = this.getForest();
     const defaultGroup =
@@ -229,7 +234,7 @@ export class ProfileService {
     },
   ): ProfileInfo {
     const { workspaceId, group } = this.resolve(profileId);
-    const ws = this.workspaces.findById(workspaceId)!;
+    const ws = this.requireWorkspace(workspaceId);
     const previousName = group.name;
     let updatedGroup = group;
 
@@ -257,7 +262,7 @@ export class ProfileService {
     const snap =
       this.layouts.findByGroupId(profileId) ??
       ({
-        defaultCwd: patch.defaultCwd ?? ws?.root_path ?? homedir(),
+        defaultCwd: patch.defaultCwd ?? ws.root_path ?? homedir(),
         defaultTool: patch.defaultTool ?? DEFAULT_PROFILE_TOOL,
         panes: [],
         layout: null,
@@ -293,9 +298,9 @@ export class ProfileService {
       defaultTool:
         patch.defaultTool !== undefined
           ? patch.defaultTool
-          : (snap.defaultTool ?? DEFAULT_PROFILE_TOOL),
+          : snap.defaultTool,
       broadcastInput:
-        patch.broadcastInput !== undefined ? patch.broadcastInput : (snap.broadcastInput ?? false),
+        patch.broadcastInput !== undefined ? patch.broadcastInput : snap.broadcastInput,
       accentColor: nextAccent,
       savedCommands: patch.savedCommands !== undefined ? patch.savedCommands : snap.savedCommands,
       panes,
@@ -352,11 +357,11 @@ export class ProfileService {
 
   setSavedCommands(profileId: string, savedCommands: SavedCommandSnippet[]): ProfileInfo {
     const { workspaceId, group } = this.resolve(profileId);
-    const ws = this.workspaces.findById(workspaceId)!;
+    const ws = this.requireWorkspace(workspaceId);
     const snap =
       this.layouts.findByGroupId(profileId) ??
       ({
-        defaultCwd: ws?.root_path ?? homedir(),
+        defaultCwd: ws.root_path ?? homedir(),
         defaultTool: DEFAULT_PROFILE_TOOL,
         panes: [],
         layout: null,
@@ -396,7 +401,7 @@ export class ProfileService {
 
   delete(profileId: string): void {
     const { workspaceId, group } = this.resolve(profileId);
-    const ws = this.workspaces.findById(workspaceId)!;
+    const ws = this.requireWorkspace(workspaceId);
 
     const lastKey = this.layouts.getLastActiveGroupKey();
     if (lastKey === `${workspaceId}:${profileId}`) {
@@ -436,8 +441,9 @@ export class ProfileService {
         const g = this.groups.findByName(ws.id, idOrName);
         if (g) matches.push(this.toProfileInfo(g, ws.id));
       }
-      if (matches.length === 1) return matches[0]!;
-      if (matches.length > 1) {
+      const [only, ...rest] = matches;
+      if (only && rest.length === 0) return only;
+      if (rest.length > 0) {
         throw new AppError(
           `Profile "${idOrName}" exists in multiple groups; use --group`,
           "PROFILE_AMBIGUOUS",

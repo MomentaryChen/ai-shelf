@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { MCP_SYNC_TOOL_IDS } from "../tools.js";
 import { backupFile, getMcpConfigPath, tryReadJson, writeJson } from "./config.js";
 import {
@@ -9,6 +10,14 @@ import {
   validateCodexConfig,
   type McpServerEntry,
 } from "./mcp-codex-toml.js";
+import {
+  OPENCODE_MCP_KEY,
+  adaptMcpForOpenCode,
+  adaptMcpFromOpenCode,
+  migrateOpenCodeLegacyMcp,
+  openCodeMcpEntries,
+  readOpenCodeMcpServers,
+} from "./mcp-opencode.js";
 
 export type McpServersMap = Record<string, McpServerEntry>;
 
@@ -16,6 +25,10 @@ export const SYNC_TOOLS = MCP_SYNC_TOOL_IDS;
 
 function isCodexTool(tool: string): boolean {
   return tool === "codex";
+}
+
+function isOpenCodeTool(tool: string): boolean {
+  return tool === "opencode";
 }
 
 /** Validate an MCP config file for a given tool (JSON or Codex TOML). */
@@ -39,6 +52,13 @@ export function readMcpServers(tool: string): McpServersMap {
     );
   }
 
+  if (isOpenCodeTool(tool)) {
+    const servers = readOpenCodeMcpServers(configPath);
+    return Object.fromEntries(
+      Object.entries(servers).map(([name, entry]) => [name, adaptMcpFromOpenCode(entry)]),
+    );
+  }
+
   const data = tryReadJson<Record<string, unknown>>(configPath);
   if (!data) return {};
   const servers = data["mcpServers"];
@@ -51,6 +71,7 @@ export function readMcpServers(tool: string): McpServersMap {
 /** Adapt an MCP entry for a target tool's config format. */
 export function adaptMcpEntry(source: McpServerEntry, tool: string): McpServerEntry {
   if (isCodexTool(tool)) return adaptMcpForCodex(source);
+  if (isOpenCodeTool(tool)) return adaptMcpForOpenCode(source);
 
   const adapted = { ...source };
   if (tool === "cursor" && !adapted["type"]) {
@@ -106,6 +127,30 @@ export function writeMcpServers(
     if (existsSync(configPath)) {
       data = tryReadJson<Record<string, unknown>>(configPath) ?? {};
     }
+
+    if (isOpenCodeTool(tool)) {
+      // Fold any legacy `mcpServers` block (written by older versions) into `mcp`.
+      const migrated = migrateOpenCodeLegacyMcp(data);
+      const existing = openCodeMcpEntries(data);
+      for (const name of serverNames) {
+        if (existing[name]) {
+          skipped.push(name);
+          continue;
+        }
+        const source = allServers[name];
+        if (!source) continue;
+        existing[name] = adaptMcpEntry(source, tool);
+        added.push(name);
+      }
+      if (added.length > 0 || migrated) {
+        backupFile(configPath);
+        data[OPENCODE_MCP_KEY] = existing;
+        mkdirSync(dirname(configPath), { recursive: true });
+        writeJson(configPath, data);
+      }
+      return { added, skipped };
+    }
+
     const existing = (data["mcpServers"] as McpServersMap) ?? {};
 
     for (const name of serverNames) {

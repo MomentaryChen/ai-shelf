@@ -21,11 +21,19 @@ import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
 import { recordImeAnchor } from "../terminal/ime-anchor-log";
 import { attachImeCommitGuard } from "../terminal/ime-commit-guard";
 import { attachImeInputTrace, recordImeInputData } from "../terminal/ime-input-trace";
+import { shouldRespawnLostSession, shouldWakeShellWithEnter } from "../terminal/pty-attach-session";
 import {
-  shouldRespawnLostSession,
-  shouldWakeShellWithEnter,
-} from "../terminal/pty-attach-session";
-import { registerTerminalClear } from "../terminal/terminal-session-actions";
+  getTerminalPasteTarget,
+  pasteToTerminalSession,
+  registerTerminalClear,
+  registerTerminalPasteTarget,
+} from "../terminal/terminal-session-actions";
+import {
+  analyzePaste,
+  getPasteConfirmReasons,
+  toSingleLinePaste,
+  type PasteConfirmSettings,
+} from "../terminal/paste-confirm";
 import {
   copyTerminalOutputForIssue,
   exportTerminalOutput,
@@ -35,6 +43,7 @@ import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
 import { attachTerminalWebgl } from "../terminal/xterm-webgl";
 import { TerminalFindBar } from "./TerminalFindBar";
+import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
 import { useLocale } from "../i18n/LocaleProvider";
 
 interface Props {
@@ -47,6 +56,13 @@ interface Props {
   webglEnabled?: boolean;
   rightClickPaste?: boolean;
   copyOnSelect?: boolean;
+  /** Confirm multi-line / large / broadcast pastes; omitted = never confirm. */
+  pasteConfirm?: PasteConfirmSettings;
+  /**
+   * Sessions a paste from this pane should reach (all panes while broadcast
+   * input is on). Defaults to this session only.
+   */
+  getPasteTargets?: (sessionId: string) => string[];
   active?: boolean;
   focused?: boolean;
   onExit: () => void;
@@ -98,6 +114,8 @@ function EmbeddedTerminalInner({
   webglEnabled = true,
   rightClickPaste = true,
   copyOnSelect = true,
+  pasteConfirm,
+  getPasteTargets,
   active = true,
   focused = true,
   callbacksRef,
@@ -166,32 +184,35 @@ function EmbeddedTerminalInner({
     termRef.current?.focus();
   }, [clearMatchStats]);
 
-  const goToMatchIndex = useCallback((idx: number): boolean => {
-    const term = termRef.current;
-    const session = sessionMatchesRef.current;
-    if (!term || session.length === 0 || idx < 1 || idx > session.length) {
-      return false;
-    }
+  const goToMatchIndex = useCallback(
+    (idx: number): boolean => {
+      const term = termRef.current;
+      const session = sessionMatchesRef.current;
+      if (!term || session.length === 0 || idx < 1 || idx > session.length) {
+        return false;
+      }
 
-    const ok =
-      jumpToSessionMatch(
-        term,
-        session[idx - 1]!,
-        findQueryRef.current,
-        searchFlagsRef.current,
-        searchRef.current,
-        idx,
-      ) === "ok";
+      const ok =
+        jumpToSessionMatch(
+          term,
+          session[idx - 1]!,
+          findQueryRef.current,
+          searchFlagsRef.current,
+          searchRef.current,
+          idx,
+        ) === "ok";
 
-    setMatchIndex(idx);
-    matchIndexRef.current = idx;
-    if (!findOpenRef.current) {
-      term.focus();
-    } else {
-      refocusFindInput();
-    }
-    return ok;
-  }, [refocusFindInput]);
+      setMatchIndex(idx);
+      matchIndexRef.current = idx;
+      if (!findOpenRef.current) {
+        term.focus();
+      } else {
+        refocusFindInput();
+      }
+      return ok;
+    },
+    [refocusFindInput],
+  );
 
   const refreshMatchCount = useCallback(async (): Promise<number> => {
     const q = findQueryRef.current;
@@ -293,6 +314,54 @@ function EmbeddedTerminalInner({
   const copyOnSelectRef = useRef(copyOnSelect);
   copyOnSelectRef.current = copyOnSelect;
 
+  const pasteConfirmRef = useRef(pasteConfirm);
+  pasteConfirmRef.current = pasteConfirm;
+  const getPasteTargetsRef = useRef(getPasteTargets);
+  getPasteTargetsRef.current = getPasteTargets;
+
+  const [pendingPaste, setPendingPaste] = useState<PendingPaste | null>(null);
+  /** Set by the xterm effect: deliver text to this pane only, via term.paste. */
+  const pasteLocalRef = useRef<((text: string) => void) | null>(null);
+
+  /** Deliver to every target; each pane pastes through its own xterm (own bracketed mode). */
+  const deliverPaste = useCallback(
+    (text: string, targets: string[]) => {
+      for (const target of targets) {
+        if (target === sessionId) pasteLocalRef.current?.(text);
+        else pasteToTerminalSession(target, text);
+      }
+    },
+    [sessionId],
+  );
+
+  const requestPaste = useCallback(
+    (text: string) => {
+      const targets = getPasteTargetsRef.current?.(sessionId) ?? [sessionId];
+      const settings = pasteConfirmRef.current;
+      const stats = analyzePaste(text);
+      if (!settings || getPasteConfirmReasons(stats, targets.length, settings).length === 0) {
+        deliverPaste(text, targets);
+        return;
+      }
+      const bracketed = targets.every((target) =>
+        target === sessionId
+          ? (termRef.current?.modes.bracketedPasteMode ?? false)
+          : (getTerminalPasteTarget(target)?.isBracketedPaste() ?? false),
+      );
+      setPendingPaste({ text, stats, targets, bracketed });
+    },
+    [sessionId, deliverPaste],
+  );
+  const requestPasteRef = useRef(requestPaste);
+  requestPasteRef.current = requestPaste;
+
+  const closePasteDialog = (text: string | null) => {
+    const current = pendingPaste;
+    setPendingPaste(null);
+    if (current && text) deliverPaste(text, current.targets);
+    requestAnimationFrame(() => termRef.current?.focus());
+  };
+
   activeRef.current = active;
 
   useEffect(() => {
@@ -368,11 +437,22 @@ function EmbeddedTerminalInner({
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
       getCopyOnSelect: () => copyOnSelectRef.current,
-      onPaste: (text) => {
-        pasteToThisPaneOnly = true;
+      // Paste confirmation (multi-line / large / broadcast) decides the targets.
+      onPaste: (text) => requestPasteRef.current(text),
+    });
+    const pasteLocal = (text: string) => {
+      if (cancelled || exited) return;
+      pasteToThisPaneOnly = true;
+      try {
         term.paste(text);
+      } finally {
         pasteToThisPaneOnly = false;
-      },
+      }
+    };
+    pasteLocalRef.current = pasteLocal;
+    const unregisterPaste = registerTerminalPasteTarget(sessionId, {
+      paste: pasteLocal,
+      isBracketedPaste: () => term.modes.bracketedPasteMode,
     });
     // Pin IME to Ink-style inverse caret (Claude Code / Codex AI prompts).
     const unbindImeAnchor = attachImeAnchor(term, {
@@ -558,7 +638,9 @@ function EmbeddedTerminalInner({
       statusTimer = window.setTimeout(() => {
         if (cancelled || receivedBytes > 0) return;
         const wasAtBottom = isTerminalAtBottom(term);
-        term.writeln("\r\n\x1b[33m[terminal] waiting for shell output — click here and press Enter\x1b[0m");
+        term.writeln(
+          "\r\n\x1b[33m[terminal] waiting for shell output — click here and press Enter\x1b[0m",
+        );
         if (!wasAtBottom) setHasNewOutput(true);
       }, 2500);
     });
@@ -602,6 +684,8 @@ function EmbeddedTerminalInner({
       window.removeEventListener("resize", onWindowResize);
       document.fonts.removeEventListener("loadingdone", onFontsLoadingDone);
       unregisterClear();
+      unregisterPaste();
+      if (pasteLocalRef.current === pasteLocal) pasteLocalRef.current = null;
       unbindClipboard();
       unbindImeAnchor();
       unbindImeCommitGuard();
@@ -723,6 +807,14 @@ function EmbeddedTerminalInner({
           onPrevious={() => void runSearch("prev")}
           onClose={closeFind}
         />
+        <PasteConfirmDialog
+          pending={pendingPaste}
+          onCancel={() => closePasteDialog(null)}
+          onPaste={() => closePasteDialog(pendingPaste?.text ?? null)}
+          onPasteSingleLine={() =>
+            closePasteDialog(pendingPaste ? toSingleLinePaste(pendingPaste.text) : null)
+          }
+        />
         {hasNewOutput && (
           <button
             type="button"
@@ -732,7 +824,6 @@ function EmbeddedTerminalInner({
             }}
             className="pointer-events-auto absolute bottom-3 right-3 flex cursor-pointer items-center gap-1.5 rounded-lg border border-chrome-border-focus bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-pop backdrop-blur-sm transition-colors hover:border-chrome-border-hover hover:bg-chrome-surface-hover-strong"
             title={t("terminal.scrollToBottom")}
-
           >
             <ArrowDown className="h-3 w-3" aria-hidden />
             <span>{t("terminal.newOutput")}</span>

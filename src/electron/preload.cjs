@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld("api", {
   getHealthMonitorState: () => ipcRenderer.invoke("get-health-monitor-state"),
   runHealthCheck: () => ipcRenderer.invoke("run-health-check"),
   setHealthMonitorPrefs: (partial) => ipcRenderer.invoke("set-health-monitor-prefs", partial),
+  getPtyLogRetention: () => ipcRenderer.invoke("get-pty-log-retention"),
+  setPtyLogRetention: (partial) => ipcRenderer.invoke("set-pty-log-retention", partial),
+  runPtyLogGc: () => ipcRenderer.invoke("run-pty-log-gc"),
   onHealthMonitorState: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("health-monitor-state", handler);
@@ -96,8 +99,8 @@ contextBridge.exposeInMainWorld("api", {
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   launchInTerminal: (tool, terminal, cwd, extraArgs) =>
     ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
-  ptySpawn: (tool, cwd, extraArgs, shell) =>
-    ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell),
+  ptySpawn: (tool, cwd, extraArgs, shell, options) =>
+    ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell, options),
   ptyAttach: (sessionId, opts)              => ipcRenderer.invoke("pty-attach", sessionId, opts),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
   ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),
@@ -267,6 +270,10 @@ contextBridge.exposeInMainWorld("api", {
   flowSaveSchedule: (flowId, patch) => ipcRenderer.invoke("flow-save-schedule", flowId, patch),
   flowSaveRunnerSettings: (flowId, patch) =>
     ipcRenderer.invoke("flow-save-runner-settings", flowId, patch),
+  flowSaveNotifySettings: (flowId, patch) =>
+    ipcRenderer.invoke("flow-save-notify-settings", flowId, patch),
+  flowSaveSource: (flowId, content) => ipcRenderer.invoke("flow-save-source", flowId, content),
+  flowPruneHistory: (flowId) => ipcRenderer.invoke("flow-prune-history", flowId),
   flowGenerate: (turns, flowId) => ipcRenderer.invoke("flow-generate", { turns, flowId }),
   flowGetChat: (flowId) => ipcRenderer.invoke("flow-get-chat", flowId),
   flowSaveChat: (flowId, messages) => ipcRenderer.invoke("flow-save-chat", flowId, messages),

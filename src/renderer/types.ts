@@ -10,9 +10,10 @@ import type {
   FlowConsoleChunk,
 } from "../shared/flow-console-types.js";
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
+import type { FlowSchedulePrefs } from "../shared/flow-schedule-pref.js";
 import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
-import type { PortListenerRow } from "../shared/port-listeners.js";
+import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
@@ -24,12 +25,42 @@ export type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 
 export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boolean };
 
+/** OS-level "run when app is closed" job (Task Scheduler / launchd / systemd user timer). */
+export type FlowTaskSchedulerStatus = {
+  supported: boolean;
+  installed: boolean;
+  taskName: string;
+  backend?: "windows-task-scheduler" | "launchd" | "systemd";
+  launcherPath?: string;
+  definitionPath?: string;
+  /** Set when the platform has a backend but it cannot be used (e.g. no systemd --user). */
+  unavailableReason?: string;
+};
+
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
+
+/**
+ * Where an MCP server is defined. Mirrors Claude Code scopes:
+ * `user` (global), `local` (per-project entry in the user config),
+ * `project` (checked-in `.mcp.json` at a project root).
+ */
+export type McpServerScope = "user" | "local" | "project";
+
+export interface McpServerDetail {
+  name: string;
+  scope: McpServerScope;
+  /** Config file the server was read from. */
+  source: string;
+  /** Project root for `local` / `project` scoped servers. */
+  project?: string;
+}
 
 export interface MCPInfo {
   supported: boolean;
   servers: string[];
   configPaths: string[];
+  /** Per-server scope metadata; omitted for tools without scoped MCP configs. */
+  serverDetails?: McpServerDetail[];
 }
 
 export interface Capabilities {
@@ -200,6 +231,23 @@ export interface HealthMonitorPrefs {
   backgroundChecksEnabled: boolean;
   trayBadgeEnabled: boolean;
   weeklyDoctorSummary: boolean;
+  /** Minutes between background checks (main clamps to 15 min – 7 days). */
+  checkIntervalMinutes: number;
+}
+
+export interface PtyLogRetentionPrefs {
+  /** 0 = no age limit. */
+  maxAgeDays: number;
+  /** 0 = no size limit. */
+  maxTotalMb: number;
+  /** 0 = no per-tool count limit. */
+  maxFilesPerTool: number;
+}
+
+export interface PtyLogGcResult {
+  scanned: number;
+  deleted: number;
+  freedBytes: number;
 }
 
 export interface HealthMonitorState {
@@ -489,7 +537,16 @@ export interface PtySearchResult {
   capped: boolean;
 }
 
-export type UsageToolId = "claude" | "codex" | "cursor" | "gemini" | "copilot";
+export type UsageToolId =
+  | "claude"
+  | "codex"
+  | "cursor"
+  | "gemini"
+  | "copilot"
+  | "opencode"
+  | "crush"
+  | "goose"
+  | "aider";
 
 export interface UsageCredentialFieldMeta {
   key: string;
@@ -507,7 +564,9 @@ export interface UsageProviderMeta {
   toolId: UsageToolId;
   label: string;
   supported: boolean;
+  dataSource?: "api" | "local";
   unsupportedReason?: string;
+  unsupportedReasonKey?: string;
   credentialNoteKey?: string;
   docsUrl?: string;
   fields: UsageCredentialFieldMeta[];
@@ -567,6 +626,8 @@ export interface UsageToolSnapshot {
   status: "ok" | "not_configured" | "unsupported" | "error";
   error?: string;
   authSourceKey?: string;
+  messageKey?: string;
+  statusKey?: string;
   quotaHintKey?: string;
   totalCostUsd?: number;
   totalInputTokens?: number;
@@ -733,6 +794,11 @@ export interface ElectronAPI {
     partial: Partial<HealthMonitorPrefs>,
   ) => Promise<{ ok: boolean; prefs: HealthMonitorPrefs }>;
   onHealthMonitorState: (cb: (state: HealthMonitorState) => void) => () => void;
+  getPtyLogRetention: () => Promise<PtyLogRetentionPrefs>;
+  setPtyLogRetention: (
+    partial: Partial<PtyLogRetentionPrefs>,
+  ) => Promise<{ ok: boolean; prefs: PtyLogRetentionPrefs }>;
+  runPtyLogGc: () => Promise<PtyLogGcResult>;
   getSkillsRaw: () => Promise<SkillsRawData>;
   syncSkills: (opts: {
     skillNames: string[];
@@ -773,8 +839,10 @@ export interface ElectronAPI {
     tool: string,
     cwd?: string,
     extraArgs?: string,
-    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | bash | zsh | fish | sh. */
+    /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | wsl | bash | zsh | fish | sh. */
     shell?: string,
+    /** `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro. */
+    options?: { wslDistro?: string },
   ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
   ptyAttach: (
     sessionId: string,
@@ -1038,21 +1106,16 @@ export interface ElectronAPI {
   flowCancelRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
   flowApproveGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowRejectGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
-  flowGetTaskSchedulerStatus: () => Promise<{
-    supported: boolean;
-    installed: boolean;
-    taskName: string;
-    launcherPath?: string;
-  }>;
+  flowGetTaskSchedulerStatus: () => Promise<FlowTaskSchedulerStatus>;
   flowInstallTaskScheduler: () => Promise<{
     ok: boolean;
     error?: string;
-    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+    status?: FlowTaskSchedulerStatus;
   }>;
   flowRemoveTaskScheduler: () => Promise<{
     ok: boolean;
     error?: string;
-    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+    status?: FlowTaskSchedulerStatus;
   }>;
   flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
   flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;
@@ -1070,10 +1133,30 @@ export interface ElectronAPI {
   flowOpenFlowsDir: () => Promise<void>;
   flowDelete: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowOpenFile: (flowId: string) => Promise<{ ok: boolean; error?: string; path?: string }>;
-  flowGetSchedulePrefs: () => Promise<{ schedulerEnabled: boolean }>;
+  flowGetSchedulePrefs: () => Promise<FlowSchedulePrefs>;
   flowSetSchedulePrefs: (partial: {
     schedulerEnabled?: boolean;
-  }) => Promise<{ ok: boolean; prefs?: { schedulerEnabled: boolean }; error?: string }>;
+    historyMaxRuns?: number | null;
+    historyMaxDays?: number | null;
+  }) => Promise<{ ok: boolean; prefs?: FlowSchedulePrefs; error?: string }>;
+  flowPruneHistory: (flowId?: string) => Promise<{
+    ok: boolean;
+    deleted?: number;
+    byFlow?: Record<string, number>;
+    error?: string;
+  }>;
+  flowSaveSource: (flowId: string, content: string) => Promise<{ ok: boolean; error?: string }>;
+  flowSaveNotifySettings: (
+    flowId: string,
+    patch: {
+      notify?: import("../shared/flow-types.js").FlowDesktopNotifyMode;
+      onSuccess?: "slack" | "none";
+      onFail?: "slack" | "none";
+      webhooks?: import("../shared/flow-types.js").FlowWebhookDef[] | null;
+      historyMaxRuns?: number | null;
+      historyMaxDays?: number | null;
+    },
+  ) => Promise<{ ok: boolean; error?: string }>;
   flowRunDue: () => Promise<{
     ok: boolean;
     result?: {
@@ -1094,6 +1177,7 @@ export interface ElectronAPI {
       toolArgs: string | null;
       cwd: string | null;
       profile: string | null;
+      env?: Record<string, string> | null;
     },
   ) => Promise<{ ok: boolean; error?: string }>;
   flowGenerate: (
@@ -1135,7 +1219,14 @@ export interface ElectronAPI {
   onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
   onFlowConsoleChunk: (cb: (chunk: FlowConsoleChunk) => void) => () => void;
   portsList: (port?: number | null) => Promise<
-    { ok: true; listeners: PortListenerRow[]; port: number | null } | { ok: false; error: string }
+    | {
+        ok: true;
+        listeners: PortListenerRow[];
+        port: number | null;
+        /** Running WSL distros that were scanned (Windows only; stopped distros are skipped). */
+        wslDistros?: WslPortScan[];
+      }
+    | { ok: false; error: string }
   >;
   portsKill: (
     pid: number,

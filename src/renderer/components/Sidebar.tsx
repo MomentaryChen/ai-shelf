@@ -28,6 +28,8 @@ import { EmptyState } from "./EmptyState";
 import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { ToolLogo } from "./ToolLogo";
+import { BackgroundAttentionBadge } from "./BackgroundAttentionBadge";
+import type { BackgroundAttentionKind } from "../../shared/background-agent-attention.js";
 import { profileToolLabel } from "../utils/available-tools";
 import {
   profileAccentMarkerStyle,
@@ -51,6 +53,7 @@ export interface SidebarGroup {
   name: string;
   icon?: ReactNode;
   profileCount?: number;
+  agentAttention?: BackgroundAttentionKind | null;
 }
 
 export interface SidebarNavItem {
@@ -74,6 +77,8 @@ export interface SidebarProfileItem {
   accentColor?: string | null;
   savedCommands?: SidebarSavedCommandItem[];
   terminals?: SidebarTerminalItem[];
+  /** Background agent attention summary (non-active profiles only). */
+  agentAttention?: { kind: BackgroundAttentionKind; count: number } | null;
 }
 
 export interface SidebarSavedCommandItem {
@@ -91,6 +96,8 @@ export interface SidebarTerminalItem {
   description?: string;
   live?: boolean;
   minimized?: boolean;
+  /** Background agent attention for this terminal (non-active profiles only). */
+  agentAttention?: BackgroundAttentionKind | null;
 }
 
 interface SidebarProps {
@@ -337,7 +344,15 @@ export function Sidebar({
                       : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                   }`}
                 >
-                  <ToolLogo tool={terminal.tool ?? "shell"} size={14} />
+                  <span className="relative inline-flex">
+                    <ToolLogo tool={terminal.tool ?? "shell"} size={14} />
+                    {terminal.agentAttention && (
+                      <BackgroundAttentionBadge
+                        kind={terminal.agentAttention}
+                        className="absolute -right-1 -top-1 ring-2 ring-chrome-surface"
+                      />
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -542,6 +557,12 @@ export function Sidebar({
                           }
                         />
                         <span className="truncate font-medium">{item.name}</span>
+                        {!active && item.agentAttention && (
+                          <BackgroundAttentionBadge
+                            kind={item.agentAttention.kind}
+                            count={item.agentAttention.count}
+                          />
+                        )}
                       </button>
                       <span
                         className={`inline-flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums text-chrome-text-dim transition-opacity ${
@@ -771,6 +792,9 @@ export function Sidebar({
                                     <span className="truncate text-[11px] leading-tight">
                                       {terminal.label}
                                     </span>
+                                  )}
+                                  {terminal.agentAttention && (
+                                    <BackgroundAttentionBadge kind={terminal.agentAttention} />
                                   )}
                                   {terminal.live && (
                                     <span className="ml-auto inline-flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/term:opacity-100">

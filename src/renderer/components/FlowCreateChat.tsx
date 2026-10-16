@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FLOW_CHAT_DRAFT_ID } from "../../shared/flow-chat-types.js";
 import type { FlowChatMessage } from "../../shared/flow-chat-types.js";
 import { parseFlowDocument } from "../../shared/flow-parse.js";
+import { formatFlowValidationIssues, validateFlowDefinition } from "../../shared/flow-validate.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
 
@@ -171,10 +172,13 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
     setDraft(res.content);
     setPromptLogCount((c) => c + 1);
     const parsed = parseFlowDocument(res.content, "draft.flow.md", "");
+    const issues = "error" in parsed ? [] : validateFlowDefinition(parsed);
     const summary =
       "error" in parsed
         ? t("flow.create.draftReady")
-        : t("flow.create.draftSummary", { id: parsed.id, phases: parsed.phases.length });
+        : issues.length > 0
+          ? t("flow.create.draftInvalid", { issues: formatFlowValidationIssues(issues) })
+          : t("flow.create.draftSummary", { id: parsed.id, phases: parsed.phases.length });
 
     const withAssistant: UiMessage[] = [
       ...nextMessages,
@@ -313,7 +317,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
         </div>
       )}
       {saveError && (
-        <p className="rounded-[20px] border border-fail/30 bg-fail/10 px-4 py-2 text-[13px] text-fail">
+        <p className="whitespace-pre-wrap rounded-[20px] border border-fail/30 bg-fail/10 px-4 py-2 text-[13px] text-fail">
           {saveError}
         </p>
       )}
