@@ -186,6 +186,15 @@ export const zh: Record<MessageKey, string> = {
   "settings.scrollbackHint": "行 — 已開啟窗格會立即套用",
   "settings.ptyBuffer": "輸出緩衝",
   "settings.ptyBufferHint": "字元 — 匯出、搜尋與 pty-logs 尾端",
+  "settings.ptyLogRetention": "PTY 記錄保留",
+  "settings.ptyLogRetentionHint":
+    "啟動時與每小時自動清理舊的 pty-logs；執行中的終端機記錄永不刪除。填 0 表示停用該限制。",
+  "settings.ptyLogMaxAgeDays": "天 — 刪除超過此天數的記錄",
+  "settings.ptyLogMaxTotalMb": "MB — 總容量上限（由最舊開始刪除）",
+  "settings.ptyLogMaxFilesPerTool": "每個工具保留的記錄數",
+  "settings.ptyLogGcNow": "立即清理",
+  "settings.ptyLogGcRunning": "清理中…",
+  "settings.ptyLogGcResult": "已刪除 {count} 個記錄，釋放 {size} MB",
   "settings.rightClickPaste": "右鍵貼上",
   "settings.rightClickPasteHint":
     "啟用後，右鍵會從剪貼簿貼上；若有選取文字則先複製。按住 Shift 再右鍵可開啟內容選單（複製、貼上、尋找…）。",
@@ -215,6 +224,12 @@ export const zh: Record<MessageKey, string> = {
   "healthMonitor.weeklySummary": "每週健康摘要",
   "healthMonitor.weeklySummaryHint":
     "可選：每週一次桌面通知（例如 MCP 失效、Copilot 需重新登入）。",
+  "healthMonitor.checkInterval": "檢查間隔",
+  "healthMonitor.checkIntervalHint": "分鐘（15 – 10080）— 立即生效",
+  "healthMonitor.interval1h": "1 小時",
+  "healthMonitor.interval6h": "6 小時",
+  "healthMonitor.interval12h": "12 小時",
+  "healthMonitor.interval24h": "24 小時",
   "healthMonitor.allClear": "環境狀態良好",
   "healthMonitor.watching": "背景監控運作中",
   "healthMonitor.lastCheck": "上次檢查：{time}",

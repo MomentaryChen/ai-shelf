@@ -230,6 +230,23 @@ export interface HealthMonitorPrefs {
   backgroundChecksEnabled: boolean;
   trayBadgeEnabled: boolean;
   weeklyDoctorSummary: boolean;
+  /** Minutes between background checks (main clamps to 15 min – 7 days). */
+  checkIntervalMinutes: number;
+}
+
+export interface PtyLogRetentionPrefs {
+  /** 0 = no age limit. */
+  maxAgeDays: number;
+  /** 0 = no size limit. */
+  maxTotalMb: number;
+  /** 0 = no per-tool count limit. */
+  maxFilesPerTool: number;
+}
+
+export interface PtyLogGcResult {
+  scanned: number;
+  deleted: number;
+  freedBytes: number;
 }
 
 export interface HealthMonitorState {
@@ -776,6 +793,11 @@ export interface ElectronAPI {
     partial: Partial<HealthMonitorPrefs>,
   ) => Promise<{ ok: boolean; prefs: HealthMonitorPrefs }>;
   onHealthMonitorState: (cb: (state: HealthMonitorState) => void) => () => void;
+  getPtyLogRetention: () => Promise<PtyLogRetentionPrefs>;
+  setPtyLogRetention: (
+    partial: Partial<PtyLogRetentionPrefs>,
+  ) => Promise<{ ok: boolean; prefs: PtyLogRetentionPrefs }>;
+  runPtyLogGc: () => Promise<PtyLogGcResult>;
   getSkillsRaw: () => Promise<SkillsRawData>;
   syncSkills: (opts: {
     skillNames: string[];
