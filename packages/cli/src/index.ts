@@ -15,6 +15,8 @@ export {
   buildUnixPtyCandidates,
   buildUnixPtySpawn,
   buildWindowsPtyCandidates,
+  buildWslPtyArgs,
+  isValidWslDistroName,
   effectiveUnixShellPref,
   effectiveWindowsShellPref,
   normalizePtyShellPreference,
