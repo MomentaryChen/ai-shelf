@@ -13,6 +13,7 @@ export {
   PTY_SHELL_PREFERENCE_VALUES,
   buildPtyEnv,
   buildUnixPtyCandidates,
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- public API kept for compatibility
   buildUnixPtySpawn,
   buildWindowsPtyCandidates,
   buildWslPtyArgs,
@@ -37,11 +38,13 @@ export type { SessionModel } from "./models/session.js";
 export type { GroupLayoutSnapshot, GroupLayoutMeta, SerializedLayoutNode, SavedCommandSnippet } from "./models/group-layout.js";
 export type {
   ProfileInfo,
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- public API kept for compatibility
   ProfileTree,
   ProfileForest,
   ProfileGroupNode,
   CreateProfileInput,
 } from "./services/profile-service.js";
+// eslint-disable-next-line @typescript-eslint/no-deprecated -- public API kept for compatibility
 export { PROFILES_WORKSPACE_NAME, DEFAULT_PROFILE_TOOL } from "./services/profile-service.js";
 export type { ProfileGroupInfo } from "./services/profile-group-service.js";
 export {
