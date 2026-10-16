@@ -57,6 +57,7 @@ function statusLabel(
   snapshot: UsageToolSnapshot,
   t: (key: MessageKey) => string,
 ): string {
+  if (snapshot.statusKey) return t(snapshot.statusKey as MessageKey);
   switch (snapshot.status) {
     case "ok":
       return t("usage.status.ok");
@@ -208,13 +209,17 @@ function ToolCredentialRow({
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <UsageToolHeader toolId={provider.toolId} />
-          {provider.supported ? (
+          {!provider.supported ? (
+            <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[11px] text-text-secondary">
+              {t("usage.badge.unavailable")}
+            </span>
+          ) : provider.dataSource === "local" ? (
             <span className="rounded-full bg-ok/15 px-2 py-0.5 text-[11px] text-ok">
-              {t("usage.badge.api")}
+              {t("usage.badge.local")}
             </span>
           ) : (
-            <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[11px] text-text-secondary">
-              {t("usage.badge.comingSoon")}
+            <span className="rounded-full bg-ok/15 px-2 py-0.5 text-[11px] text-ok">
+              {t("usage.badge.api")}
             </span>
           )}
         </div>
@@ -223,14 +228,34 @@ function ToolCredentialRow({
         )}
       </div>
 
-      {provider.unsupportedReason && (
-        <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">{provider.unsupportedReason}</p>
+      {!provider.supported && (
+        <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">
+          {provider.unsupportedReasonKey
+            ? t(provider.unsupportedReasonKey as MessageKey)
+            : (provider.unsupportedReason ?? t("usage.tool.unsupported"))}
+          {provider.docsUrl && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="cursor-pointer text-[12px] text-accent underline-offset-2 hover:underline"
+                onClick={() => window.api.openExternal(provider.docsUrl!)}
+              >
+                {t("usage.tool.learnMore")}
+              </button>
+            </>
+          )}
+        </p>
       )}
 
       {provider.credentialNoteKey && (
         <p className="mb-4 text-[13px] leading-relaxed text-text-secondary">
           {t(provider.credentialNoteKey as MessageKey)}
         </p>
+      )}
+
+      {provider.supported && provider.dataSource === "local" && (
+        <p className="text-[12px] leading-relaxed text-text-secondary">{t("usage.local.noKey")}</p>
       )}
 
       <div className="flex flex-col gap-4">
@@ -348,6 +373,10 @@ const USAGE_TOOL_BAR_COLORS: Record<UsageToolId, string> = {
   cursor: "var(--color-text-secondary)",
   gemini: "var(--color-accent-hover)",
   copilot: "var(--color-warn)",
+  opencode: "color-mix(in srgb, var(--color-ok) 50%, var(--color-text-primary))",
+  crush: "color-mix(in srgb, var(--color-warn) 50%, var(--color-accent))",
+  goose: "var(--color-text-tertiary)",
+  aider: "var(--color-border)",
 };
 
 function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
@@ -355,12 +384,20 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
 
   if (snapshot.status === "unsupported") {
     return (
-      <p className="text-[13px] text-text-secondary">{snapshot.error ?? t("usage.tool.unsupported")}</p>
+      <p className="text-[13px] text-text-secondary">
+        {snapshot.messageKey
+          ? t(snapshot.messageKey as MessageKey)
+          : (snapshot.error ?? t("usage.tool.unsupported"))}
+      </p>
     );
   }
 
   if (snapshot.status === "not_configured") {
-    return <p className="text-[13px] text-text-secondary">{t("usage.tool.notConfigured")}</p>;
+    return (
+      <p className="text-[13px] text-text-secondary">
+        {t((snapshot.messageKey ?? "usage.tool.notConfigured") as MessageKey)}
+      </p>
+    );
   }
 
   if (snapshot.status === "error") {
@@ -1054,7 +1091,7 @@ export function UsageTab() {
               label={t("usage.summary.totalOutputTokens")}
             />
             <StatCard
-              value={`${dashboard.summary.configuredCount}/${providers.length}`}
+              value={`${dashboard.summary.configuredCount}/${providers.filter((p) => p.fields.length > 0).length}`}
               label={t("usage.summary.configured")}
             />
             <StatCard

@@ -14,8 +14,10 @@ import {
 import { useLocale } from "../i18n/LocaleProvider";
 import {
   COMMON_DEV_PORTS,
+  listenerKey,
   parsePortQuery,
   type PortListenerRow,
+  type WslPortScan,
 } from "../../shared/port-listeners.js";
 import { Card } from "./Card";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -41,6 +43,7 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listeners, setListeners] = useState<PortListenerRow[]>([]);
+  const [wslScans, setWslScans] = useState<WslPortScan[]>([]);
   const [queriedPort, setQueriedPort] = useState<number | null>(3000);
   const [killingPid, setKillingPid] = useState<number | null>(null);
   const [pendingKill, setPendingKill] = useState<PortListenerRow | null>(null);
@@ -82,6 +85,7 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
       }
       setQueriedPort(result.port);
       setListeners(result.listeners);
+      setWslScans(result.wslDistros ?? []);
       setError(null);
     } catch (err) {
       if (id !== requestIdRef.current) return;
@@ -171,6 +175,19 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
       ? t("ports.count.all", { count: listeners.length })
       : t("ports.count.port", { count: listeners.length, port: queriedPort });
 
+  const wslSummary =
+    wslScans.length > 0
+      ? t("ports.wsl.scanned", {
+          list: wslScans
+            .map((scan) =>
+              scan.ok
+                ? `${scan.distro} (${String(scan.count)})`
+                : t("ports.wsl.scanFailed", { distro: scan.distro }),
+            )
+            .join(", "),
+        })
+      : null;
+
   return (
     <>
       <SectionHeading icon={Network}>{t("tools.tab.ports")}</SectionHeading>
@@ -249,6 +266,18 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
 
           <p className="text-[12px] text-text-secondary">{loading ? t("ports.looking") : countLabel}</p>
 
+          {wslSummary && (
+            <p
+              className="text-[12px] text-text-tertiary"
+              title={[
+                t("ports.wsl.stoppedHint"),
+                ...wslScans.filter((s) => !s.ok && s.error).map((s) => `${s.distro}: ${s.error ?? ""}`),
+              ].join("\n")}
+            >
+              {wslSummary}
+            </p>
+          )}
+
           {error && (
             <p className="text-[13px] leading-relaxed text-text-primary" role="alert">
               {error}
@@ -274,14 +303,26 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
               </TableHeader>
               <TableBody>
                 {listeners.map((row) => {
-                  const key = `${row.protocol}-${row.address}-${row.port}-${row.pid}`;
-                  const stopping = killingPid === row.pid;
+                  const key = listenerKey(row);
+                  const stopping = !row.wslDistro && killingPid === row.pid;
+                  const stopTitle = row.wslDistro
+                    ? t("ports.wsl.stopHint", { distro: row.wslDistro })
+                    : row.canKill
+                      ? t("ports.stop")
+                      : t("ports.stopProtected");
                   return (
                     <TableRow key={key}>
-                      <TableCell className="max-w-[12rem] truncate font-medium text-text-primary">
-                        {row.processName}
+                      <TableCell className="max-w-[14rem] font-medium text-text-primary">
+                        <span className="block truncate">{row.processName}</span>
+                        {row.wslDistro && (
+                          <span className="mt-0.5 inline-block rounded border border-border px-1.5 py-px font-mono text-[10px] font-normal text-text-secondary">
+                            {t("ports.wsl.badge", { distro: row.wslDistro })}
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell className="font-mono tabular-nums text-text-primary">{row.pid}</TableCell>
+                      <TableCell className="font-mono tabular-nums text-text-primary">
+                        {row.pid > 0 ? row.pid : "—"}
+                      </TableCell>
                       <TableCell className="text-text-secondary">{row.protocol}</TableCell>
                       <TableCell className="font-mono text-[12px] text-text-primary">
                         {formatAddress(row.address, row.port)}
@@ -293,7 +334,7 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
                           size="sm"
                           disabled={!row.canKill || killingPid != null}
                           className="h-9 px-3 text-[12px] text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          title={row.canKill ? t("ports.stop") : t("ports.stopProtected")}
+                          title={stopTitle}
                           onClick={() => requestStop(row)}
                         >
                           <Unplug className="h-3.5 w-3.5" />

@@ -61,7 +61,10 @@ function playAttentionSound(): void {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.12);
-    void ctx.close();
+    // Close only after the tone finishes; closing right away silences it.
+    osc.onended = () => {
+      void ctx.close();
+    };
   } catch {
     /* Web Audio unavailable */
   }

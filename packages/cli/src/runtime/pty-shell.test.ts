@@ -6,6 +6,8 @@ import {
   effectiveWindowsShellPref,
   orderWindowsPtyCandidates,
   buildWindowsPtyCandidates,
+  buildWslPtyArgs,
+  isValidWslDistroName,
   resolvePtySpawnPlan,
   unixShellArgs,
 } from "./pty-shell.js";
@@ -127,5 +129,60 @@ describe("resolvePtySpawnPlan", () => {
     assert.equal(plan.platform, "win32");
     assert.equal(plan.windowsCandidates[0]?.[0], "pwsh.exe");
     assert.equal(plan.windowsCandidates.at(-1)?.[0], "cmd.exe");
+  });
+
+  it("puts wsl.exe first with distro + cwd and keeps the Windows cascade as fallback", () => {
+    const plan = resolvePtySpawnPlan({
+      command: "",
+      shell: "wsl",
+      platform: "win32",
+      wsl: { distro: "Ubuntu-22.04", cwd: "C:\\work\\repo" },
+    });
+    assert.deepEqual(plan.windowsCandidates[0], [
+      "wsl.exe",
+      ["-d", "Ubuntu-22.04", "--cd", "C:\\work\\repo"],
+    ]);
+    assert.deepEqual(
+      plan.windowsCandidates.slice(1).map(([sh]) => sh),
+      ["pwsh.exe", "powershell.exe", "cmd.exe"],
+    );
+  });
+
+  it("ignores wsl on non-Windows hosts", () => {
+    const plan = resolvePtySpawnPlan({
+      command: "",
+      shell: "wsl",
+      platform: "linux",
+      env: { SHELL: "/bin/bash" },
+    });
+    assert.equal(plan.platform, "unix");
+    assert.equal(plan.unixCandidates[0]?.[0], "/bin/bash");
+  });
+});
+
+describe("buildWslPtyArgs", () => {
+  it("uses the default distro when none (or an invalid name) is given", () => {
+    assert.deepEqual(buildWslPtyArgs({}), []);
+    assert.deepEqual(buildWslPtyArgs({ distro: "  " }), []);
+    assert.deepEqual(buildWslPtyArgs({ distro: "bad name; rm -rf /" }), []);
+  });
+
+  it("runs a tool in a login bash and stays in a shell afterwards", () => {
+    assert.deepEqual(buildWslPtyArgs({ distro: "Debian", command: "claude --model opus" }), [
+      "-d",
+      "Debian",
+      "--exec",
+      "bash",
+      "-lic",
+      "claude --model opus; exec ${SHELL:-bash} -l",
+    ]);
+  });
+
+  it("validates distro names", () => {
+    assert.equal(isValidWslDistroName("Ubuntu"), true);
+    assert.equal(isValidWslDistroName("docker-desktop"), true);
+    assert.equal(isValidWslDistroName("openSUSE-Leap-15.6"), true);
+    assert.equal(isValidWslDistroName("-d"), false);
+    assert.equal(isValidWslDistroName("a b"), false);
   });
 });

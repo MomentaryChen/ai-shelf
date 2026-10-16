@@ -208,17 +208,19 @@ export function useProfileWorkspace(
   }, []);
 
   const discardProfileSessions = useCallback((profileId: string, workspaceId?: string) => {
-    const ws =
-      workspaceId ??
-      activeProfileRef.current?.workspaceId ??
-      Array.from(profileLiveCacheRef.current.keys())
-        .map((k) => k.split(":"))
-        .find((parts) => parts[1] === profileId)?.[0] ??
-      "";
-    const cached = profileLiveCacheRef.current.get(cacheKey(ws, profileId));
-    if (cached) {
+    // Without an explicit workspace, the profile may be stashed under any workspace
+    // (not necessarily the active one) — tear down every matching cache entry.
+    const keys =
+      workspaceId !== undefined
+        ? [cacheKey(workspaceId, profileId)]
+        : Array.from(profileLiveCacheRef.current.keys()).filter(
+            (k) => k.slice(k.indexOf(":") + 1) === profileId,
+          );
+    for (const key of keys) {
+      const cached = profileLiveCacheRef.current.get(key);
+      if (!cached) continue;
       teardownPtys(cached.layout);
-      profileLiveCacheRef.current.delete(cacheKey(ws, profileId));
+      profileLiveCacheRef.current.delete(key);
     }
     if (activeProfileRef.current?.id === profileId) {
       teardownPtys(layoutRef.current);

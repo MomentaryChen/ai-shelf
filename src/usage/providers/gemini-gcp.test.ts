@@ -6,6 +6,7 @@ import {
   buildQuotasFromPublishedLimits,
   isQuotaApiUnavailable,
   maxPoint,
+  pacificQuotaDay,
   peakAlignedSum,
   sumPoints,
   usedPercent,
@@ -118,6 +119,26 @@ describe("buildQuotasFromPublishedLimits", () => {
       new Map([["generativelanguage.googleapis.com/generate_content_requests", 150]]),
     );
     assert.equal(quotas.length, 0);
+  });
+});
+
+describe("pacificQuotaDay", () => {
+  it("resets at midnight Pacific (PDT, UTC-7)", () => {
+    const { start, resetAt } = pacificQuotaDay(new Date("2026-07-15T20:00:00.000Z"));
+    assert.equal(start.toISOString(), "2026-07-15T07:00:00.000Z");
+    assert.equal(resetAt.toISOString(), "2026-07-16T07:00:00.000Z");
+  });
+
+  it("uses the previous Pacific day just before UTC midnight rolls it over (PST, UTC-8)", () => {
+    const { start, resetAt } = pacificQuotaDay(new Date("2026-01-10T05:00:00.000Z"));
+    assert.equal(start.toISOString(), "2026-01-09T08:00:00.000Z");
+    assert.equal(resetAt.toISOString(), "2026-01-10T08:00:00.000Z");
+  });
+
+  it("handles the DST spring-forward day", () => {
+    const { start, resetAt } = pacificQuotaDay(new Date("2026-03-08T12:00:00.000Z"));
+    assert.equal(start.toISOString(), "2026-03-08T08:00:00.000Z");
+    assert.equal(resetAt.toISOString(), "2026-03-09T07:00:00.000Z");
   });
 });
 

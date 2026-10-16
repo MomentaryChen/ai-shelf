@@ -1,6 +1,8 @@
 import type { Terminal } from "@xterm/xterm";
 import { shouldDeferImeKeyToXterm, shouldIgnoreShortcutForIme } from "./ime-keys";
 import { tryConsumePaneShortcut } from "./pane-shortcuts";
+import { getActiveKeybindings } from "../shortcuts/active-keybindings";
+import { matchShortcut, type ShortcutId } from "../shortcuts/keybindings";
 import { getStoredT } from "../i18n/stored-locale.js";
 
 /** Serialize clipboard IPC so copy-then-paste across panes does not read mid-write (Windows). */
@@ -171,34 +173,22 @@ function hasMod(ev: KeyboardEvent): boolean {
   return ev.ctrlKey || ev.metaKey;
 }
 
-function isMacPlatform(): boolean {
-  return /mac/i.test(navigator.platform || navigator.userAgent || "");
-}
-
-function isWindowsPlatform(): boolean {
-  return /win/i.test(navigator.platform || navigator.userAgent || "");
-}
-
 /** xterm's selectAll() only covers the viewport; select the full scrollback buffer. */
 function selectAllTerminalBuffer(term: Terminal): void {
   const lastLine = Math.max(0, term.buffer.active.length - 1);
   term.selectLines(0, lastLine);
 }
 
-/**
- * Windows: Ctrl+A (user expectation). Mac: Cmd+A. Linux: Ctrl+Shift+A (Ctrl+A = shell line-start).
- */
-function isTerminalSelectAllShortcut(ev: KeyboardEvent): boolean {
-  if (ev.key.toLowerCase() !== "a" || ev.altKey || !hasMod(ev)) return false;
-
-  if (isMacPlatform()) {
-    return ev.metaKey && !ev.ctrlKey && !ev.shiftKey;
-  }
-  if (isWindowsPlatform()) {
-    return ev.ctrlKey && !ev.metaKey;
-  }
-  return ev.ctrlKey && !ev.metaKey && ev.shiftKey;
-}
+/** Terminal-input shortcuts handled by the xterm key handler (configurable). */
+const TERMINAL_SHORTCUT_IDS: readonly ShortcutId[] = [
+  "find",
+  "paste",
+  "pasteAlt",
+  "copy",
+  "selectAll",
+  "clearScreen",
+  "restartSession",
+];
 
 /**
  * Bind copy/paste/select-all shortcuts and a minimal context menu.
@@ -299,65 +289,56 @@ export function bindTerminalClipboard(
     if (shouldIgnoreShortcutForIme(ev)) return true;
     if (tryConsumePaneShortcut(ev)) return false;
 
-    const key = ev.key.toLowerCase();
-
-    // Find in terminal: Ctrl+F
-    if (hasMod(ev) && !ev.shiftKey && key === "f") {
-      consumeKey(ev);
-      options?.onOpenFind?.();
-      return false;
+    const match = matchShortcut(ev, getActiveKeybindings(), TERMINAL_SHORTCUT_IDS);
+    switch (match?.id) {
+      case "find":
+        consumeKey(ev);
+        options?.onOpenFind?.();
+        return false;
+      case "paste":
+      case "pasteAlt":
+        consumeKey(ev);
+        void pasteIntoTerminal();
+        return false;
+      case "copy":
+        consumeKey(ev);
+        void copyTerminalSelection();
+        return false;
+      case "selectAll":
+        consumeKey(ev);
+        selectAllTerminalBuffer(term);
+        return false;
+      // Also handled globally via pane-shortcuts when panes are registered.
+      case "clearScreen":
+        consumeKey(ev);
+        options.onClear?.();
+        return false;
+      case "restartSession":
+        consumeKey(ev);
+        options.onRestart?.();
+        return false;
+      default:
+        break;
     }
 
-    // Paste: Ctrl+V, Ctrl+Shift+V, Shift+Insert
-    if (
-      (hasMod(ev) && key === "v") ||
-      (ev.shiftKey && !hasMod(ev) && key === "insert")
-    ) {
+    // Fixed terminal conventions (not rebindable; they do not shadow shell keys):
+    const key = ev.key.toLowerCase();
+    // Shift+Insert: paste
+    if (ev.shiftKey && !hasMod(ev) && !ev.altKey && key === "insert") {
       consumeKey(ev);
       void pasteIntoTerminal();
       return false;
     }
-
-    // Copy: Ctrl+Shift+C, Ctrl+Insert
-    if (hasMod(ev) && ev.shiftKey && key === "c") {
+    // Ctrl+Insert: copy
+    if (hasMod(ev) && !ev.shiftKey && !ev.altKey && key === "insert") {
       consumeKey(ev);
       void copyTerminalSelection();
       return false;
     }
-    if (hasMod(ev) && key === "insert" && !ev.shiftKey) {
+    // Ctrl/Cmd+C copies only when text is selected; otherwise the interrupt reaches the shell.
+    if (hasMod(ev) && !ev.shiftKey && !ev.altKey && key === "c" && term.hasSelection()) {
       consumeKey(ev);
       void copyTerminalSelection();
-      return false;
-    }
-
-    // Ctrl+C — copy when text selected, otherwise send interrupt to shell
-    if (hasMod(ev) && !ev.shiftKey && key === "c") {
-      if (term.hasSelection()) {
-        consumeKey(ev);
-        void copyTerminalSelection();
-        return false;
-      }
-      return true;
-    }
-
-    // Select all: Ctrl+A (Windows), Cmd+A (Mac), Ctrl+Shift+A (Linux)
-    if (isTerminalSelectAllShortcut(ev)) {
-      consumeKey(ev);
-      selectAllTerminalBuffer(term);
-      return false;
-    }
-
-    // Clear screen: Ctrl+L (also handled globally via pane-shortcuts when focused)
-    if (hasMod(ev) && !ev.shiftKey && key === "l") {
-      consumeKey(ev);
-      options.onClear?.();
-      return false;
-    }
-
-    // Restart session: Ctrl+Shift+R
-    if (hasMod(ev) && ev.shiftKey && key === "r") {
-      consumeKey(ev);
-      options.onRestart?.();
       return false;
     }
 

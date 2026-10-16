@@ -1,12 +1,10 @@
 import { shouldIgnoreShortcutForIme } from "./terminal/ime-keys";
+import { getActiveKeybindings } from "./shortcuts/active-keybindings";
+import { matchShortcut, type KeybindingMap, type KeyEventLike } from "./shortcuts/keybindings";
 
 export type ProfileQuickSwitchAction =
   | { type: "by-index"; index: number }
   | { type: "cycle"; direction: "next" | "prev" };
-
-function hasMod(ev: KeyboardEvent): boolean {
-  return ev.ctrlKey || ev.metaKey;
-}
 
 function shouldIgnoreTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -20,25 +18,31 @@ function inXterm(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(target.closest(".xterm"));
 }
 
+/**
+ * Map a key event to a profile switch using the given keybindings (pure; unit tested).
+ * `inXterm`: by-index switching is skipped inside the terminal (panes keep 1–9).
+ */
+export function matchProfileQuickSwitchWithBindings(
+  ev: KeyEventLike,
+  map: KeybindingMap,
+  inXterm: boolean,
+): ProfileQuickSwitchAction | null {
+  const cycle = matchShortcut(ev, map, ["profileCycleNext", "profileCyclePrev"]);
+  if (cycle) {
+    return { type: "cycle", direction: cycle.id === "profileCycleNext" ? "next" : "prev" };
+  }
+  if (inXterm) return null;
+  const byIndex = matchShortcut(ev, map, ["profileByIndex"]);
+  if (byIndex) return { type: "by-index", index: byIndex.index ?? 0 };
+  return null;
+}
+
 /** Returns a profile switch action when the event matches a profile shortcut. */
 export function matchProfileQuickSwitch(ev: KeyboardEvent): ProfileQuickSwitchAction | null {
-  if (ev.type !== "keydown" || !hasMod(ev) || ev.altKey) return null;
+  if (ev.type !== "keydown") return null;
   if (shouldIgnoreShortcutForIme(ev)) return null;
   if (shouldIgnoreTarget(ev.target)) return null;
-
-  // Ctrl+` / Ctrl+Shift+` — cycle recent profiles (anywhere except form fields).
-  if (ev.code === "Backquote") {
-    return { type: "cycle", direction: ev.shiftKey ? "prev" : "next" };
-  }
-
-  // Ctrl+1–9 — switch to profile by sidebar order (outside xterm only; panes keep 1–9).
-  if (inXterm(ev.target) || ev.shiftKey) return null;
-  const key = ev.key;
-  if (key >= "1" && key <= "9") {
-    return { type: "by-index", index: Number(key) - 1 };
-  }
-
-  return null;
+  return matchProfileQuickSwitchWithBindings(ev, getActiveKeybindings(), inXterm(ev.target));
 }
 
 export function pushProfileMru(mru: string[], profileId: string, max = 32): string[] {
@@ -58,24 +62,4 @@ export function cycleProfileMru(
   }
   const delta = direction === "next" ? 1 : -1;
   return mru[(idx + delta + mru.length) % mru.length]!;
-}
-
-export function modLabel(): string {
-  const isMac =
-    typeof navigator !== "undefined" &&
-    /mac/i.test(navigator.platform || navigator.userAgent || "");
-  return isMac ? "Cmd" : "Ctrl";
-}
-
-export function formatProfileQuickSwitchLabels(): {
-  profileByIndex: string;
-  profileCycle: string;
-  profileCyclePrev: string;
-} {
-  const mod = modLabel();
-  return {
-    profileByIndex: `${mod}+1–9`,
-    profileCycle: `${mod}+\``,
-    profileCyclePrev: `${mod}+Shift+\``,
-  };
 }
