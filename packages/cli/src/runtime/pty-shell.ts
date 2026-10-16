@@ -8,6 +8,7 @@ export type PtyShellPreference =
   | "pwsh"
   | "powershell"
   | "cmd"
+  | "wsl"
   | "bash"
   | "zsh"
   | "fish"
@@ -23,6 +24,7 @@ export const PTY_SHELL_PREFERENCE_VALUES = [
   "pwsh",
   "powershell",
   "cmd",
+  "wsl",
   "bash",
   "zsh",
   "fish",
@@ -72,6 +74,7 @@ export function normalizePtyShellPreference(shell?: string): PtyShellPreference 
     case "powershell":
     case "cmd":
     case "pwsh":
+    case "wsl":
     case "bash":
     case "zsh":
     case "fish":
@@ -80,6 +83,38 @@ export function normalizePtyShellPreference(shell?: string): PtyShellPreference 
     default:
       return DEFAULT_PTY_SHELL;
   }
+}
+
+const WSL_DISTRO_NAME_RE = /^[A-Za-z0-9][\w.-]{0,63}$/u;
+
+/** Distro names are letters, digits, `.`, `-`, `_`; anything else never reaches `wsl.exe -d`. */
+export function isValidWslDistroName(name: string): boolean {
+  return WSL_DISTRO_NAME_RE.test(name);
+}
+
+/**
+ * Args for `wsl.exe` hosting an embedded PTY (Windows only).
+ * - `distro` empty / invalid → WSL default distro (`wsl.exe` without `-d`).
+ * - `cwd` → `--cd` (Windows paths are translated by wsl.exe; `/…` is a Linux path).
+ * - `command` → run it in an interactive login bash, then stay in a login shell.
+ *   Without a command the user's default login shell starts.
+ */
+export function buildWslPtyArgs(options: {
+  distro?: string;
+  cwd?: string;
+  command?: string;
+}): string[] {
+  const args: string[] = [];
+  const distro = options.distro?.trim() ?? "";
+  if (distro && isValidWslDistroName(distro)) args.push("-d", distro);
+  const cwd = options.cwd?.trim() ?? "";
+  if (cwd) args.push("--cd", cwd);
+  const command = options.command?.trim() ?? "";
+  if (command) {
+    // `-i` loads ~/.bashrc so nvm / volta / ~/.local/bin are on PATH for npm-installed CLIs.
+    args.push("--exec", "bash", "-lic", `${command}; exec \${SHELL:-bash} -l`);
+  }
+  return args;
 }
 
 /** Windows-relevant preference; Unix ids → auto (pwsh-first cascade). */
@@ -343,6 +378,14 @@ export function resolvePtySpawnPlan(options: {
     pwshCommand?: string;
     bashInitFile?: string;
   };
+  /**
+   * When `shell` is `wsl` on Windows: distro to open (empty = WSL default) and
+   * the start directory passed as `wsl.exe --cd`.
+   */
+  wsl?: {
+    distro?: string;
+    cwd?: string;
+  };
 }): ResolvedPtySpawnPlan {
   const platform = options.platform ?? process.platform;
   const env = buildPtyEnv({
@@ -363,13 +406,25 @@ export function resolvePtySpawnPlan(options: {
     : { file: "/bin/bash", args: [] };
 
   if (platform === "win32") {
+    const windowsCandidates = orderWindowsPtyCandidates(
+      buildWindowsPtyCandidates(options.command, pwshCommand),
+      options.shell,
+      options.command,
+    );
+    // WSL first; the normal pwsh → powershell → cmd cascade stays as fallback when wsl.exe is missing.
+    if (normalizePtyShellPreference(options.shell) === "wsl") {
+      windowsCandidates.unshift([
+        "wsl.exe",
+        buildWslPtyArgs({
+          distro: options.wsl?.distro,
+          cwd: options.wsl?.cwd,
+          command: options.command,
+        }),
+      ]);
+    }
     return {
       platform: "win32",
-      windowsCandidates: orderWindowsPtyCandidates(
-        buildWindowsPtyCandidates(options.command, pwshCommand),
-        options.shell,
-        options.command,
-      ),
+      windowsCandidates,
       unixCandidates,
       unix,
       env,

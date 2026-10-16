@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import { platform } from "node:os";
 import { run } from "../utils/exec.js";
 import { analyzeHostEnv, collectHostResources } from "./host-env-snapshot.js";
-import { listAllListeners } from "./ports-list.js";
+import { listAllListeners, listWslListeners } from "./ports-list.js";
 import { filterListeners, isPortNumber, isProtectedPid, type PortListenerRow } from "../shared/port-listeners.js";
 
 function protectedOpts() {
@@ -58,14 +58,20 @@ export function registerPortsHandlers(): void {
     if (!parsed.ok) return parsed;
     try {
       const opts = protectedOpts();
-      const listeners: PortListenerRow[] = filterListeners(
-        await listAllListeners(parsed.port),
-        parsed.port,
-      ).map((row) => ({
-        ...row,
-        canKill: !isProtectedPid(row.pid, opts),
-      }));
-      return { ok: true as const, listeners, port: parsed.port };
+      // WSL scan runs alongside the host scan; its failures never fail the whole list.
+      const [hostRows, wsl] = await Promise.all([
+        listAllListeners(parsed.port),
+        listWslListeners().catch(() => ({ listeners: [], distros: [] })),
+      ]);
+      const listeners: PortListenerRow[] = [
+        ...filterListeners(hostRows, parsed.port).map((row) => ({
+          ...row,
+          canKill: !isProtectedPid(row.pid, opts),
+        })),
+        // Linux pids live in the distro's namespace — taskkill would hit an unrelated Windows process.
+        ...filterListeners(wsl.listeners, parsed.port).map((row) => ({ ...row, canKill: false })),
+      ];
+      return { ok: true as const, listeners, port: parsed.port, wslDistros: wsl.distros };
     } catch (err) {
       return {
         ok: false as const,

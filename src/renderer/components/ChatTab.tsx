@@ -31,13 +31,11 @@ import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
 import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
-import { formatProfileQuickSwitchLabels, modLabel } from "../profile-quick-switch";
+import { getActiveKeybindings } from "../shortcuts/active-keybindings";
 import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
-import {
-  formatFocusPaneBinding,
-  formatPaneKeyChord,
-} from "../terminal/pane-key-bindings";
+import { matchShortcut, resolveKeybindings } from "../shortcuts/keybindings";
+import { shortcutKeys } from "../shortcuts/shortcut-registry";
 import {
   collectPanes,
   equalizeRunAroundPane,
@@ -207,20 +205,19 @@ function ChatTabInner({
     t,
     windowFocused,
   );
-  const paneShortcutLabels = useMemo(() => {
-    const b = settings.paneShortcuts;
-    const profile = formatProfileQuickSwitchLabels();
-    return {
-      focusNext: formatPaneKeyChord(b.focusNext),
-      focusPrev: formatPaneKeyChord(b.focusPrev),
-      splitRight: formatPaneKeyChord(b.splitHorizontal),
-      splitDown: formatPaneKeyChord(b.splitVertical),
-      focusPane: formatFocusPaneBinding(b.focusPane),
-      profileByIndex: profile.profileByIndex,
-      profileCycle: profile.profileCycle,
-      profileCyclePrev: profile.profileCyclePrev,
-    };
-  }, [settings.paneShortcuts]);
+  const keymap = useMemo(
+    () => resolveKeybindings(settings.keybindings),
+    [settings.keybindings],
+  );
+  const paneShortcutLabels = useMemo(
+    () => ({
+      focusNext: shortcutKeys("focusNext", keymap),
+      splitRight: shortcutKeys("splitHorizontal", keymap),
+      splitDown: shortcutKeys("splitVertical", keymap),
+      commandPalette: shortcutKeys("commandPalette", keymap),
+    }),
+    [keymap],
+  );
   const useAppThemeBg = isAppThemeTerminalBg(settings.terminalBg);
   const bg = useAppThemeBg ? getAppBg() : settings.terminalBg;
   const terminalFontFamily = settings.terminalFontFamily;
@@ -235,7 +232,13 @@ function ChatTabInner({
       settings.externalTerminal,
       tool,
     );
-    const result = await window.api.ptySpawn(tool, cwd || undefined, extraArgs, shell);
+    const result = await window.api.ptySpawn(
+      tool,
+      cwd || undefined,
+      extraArgs,
+      shell,
+      shell === "wsl" ? { wslDistro: settings.wslDistro } : undefined,
+    );
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
@@ -249,7 +252,13 @@ function ChatTabInner({
       sessionId: result.sessionId,
       cwd: result.cwd || cwd || "",
     };
-  }, [settings.externalTerminal, settings.preferredShell, settings.toolLaunchArgs, t]);
+  }, [
+    settings.externalTerminal,
+    settings.preferredShell,
+    settings.toolLaunchArgs,
+    settings.wslDistro,
+    t,
+  ]);
 
   const spawnPaneResilient = useCallback(
     async (tool: string, cwd: string): Promise<PaneInfo | null> => {
@@ -453,9 +462,7 @@ function ChatTabInner({
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
       if (shouldIgnoreShortcutForIme(ev)) return;
-      const hasMod = ev.ctrlKey || ev.metaKey;
-      if (!hasMod || ev.shiftKey || ev.altKey) return;
-      if (ev.key.toLowerCase() !== "s") return;
+      if (!matchShortcut(ev, getActiveKeybindings(), ["toggleSidebar"])) return;
 
       const target = ev.target as HTMLElement | null;
       // xterm uses a hidden textarea; still allow sidebar toggle (same as pane shortcuts).
@@ -1503,8 +1510,8 @@ function ChatTabInner({
       onOpenFolder={() => void openFolderPane()}
       available={data.filter((e) => e.available)}
       splitShortcutLabels={{
-        splitRight: paneShortcutLabels.splitRight,
-        splitDown: paneShortcutLabels.splitDown,
+        splitRight: paneShortcutLabels.splitRight ?? t("keybindings.unbound"),
+        splitDown: paneShortcutLabels.splitDown ?? t("keybindings.unbound"),
       }}
     />
   );
@@ -1665,17 +1672,22 @@ function ChatTabInner({
                 {[
                   { keys: paneShortcutLabels.splitRight, label: t("shortcuts.pane.splitHorizontal") },
                   { keys: paneShortcutLabels.focusNext, label: t("shortcuts.pane.focusNext") },
-                  { keys: `${modLabel()}+K`, label: t("shortcuts.general.commandPalette") },
-                ].map((row) => (
-                  <Fragment key={row.label}>
-                    <dt className="text-right">
-                      <kbd className="rounded border border-chrome-border-subtle bg-chrome-surface-raised px-1.5 py-0.5 font-mono text-[11px] text-chrome-text-secondary">
-                        {row.keys}
-                      </kbd>
-                    </dt>
-                    <dd className="text-left">{row.label}</dd>
-                  </Fragment>
-                ))}
+                  {
+                    keys: paneShortcutLabels.commandPalette,
+                    label: t("shortcuts.general.commandPalette"),
+                  },
+                ]
+                  .filter((row) => row.keys)
+                  .map((row) => (
+                    <Fragment key={row.label}>
+                      <dt className="text-right">
+                        <kbd className="rounded border border-chrome-border-subtle bg-chrome-surface-raised px-1.5 py-0.5 font-mono text-[11px] text-chrome-text-secondary">
+                          {row.keys}
+                        </kbd>
+                      </dt>
+                      <dd className="text-left">{row.label}</dd>
+                    </Fragment>
+                  ))}
               </dl>
               <button
                 type="button"

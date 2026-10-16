@@ -6,6 +6,8 @@ import {
   convertWslPaths,
   decodeWslListOutput,
   detectWslPathKind,
+  isValidWslDistroName,
+  parseWslListQuiet,
   parseWslListVerbose,
 } from "./wsl-paths.js";
 
@@ -117,6 +119,45 @@ describe("decodeWslListOutput / parseWslListVerbose", () => {
     assert.equal(rows[0]?.name, "Ubuntu");
     assert.equal(rows[0]?.isDefault, true);
     void utf16;
+  });
+});
+
+describe("parseWslListQuiet", () => {
+  it("reads UTF-16LE `wsl -l -q` output without BOM", () => {
+    const buf = Buffer.from("Ubuntu-22.04\r\ndocker-desktop\r\n\r\n", "utf16le");
+    assert.deepEqual(parseWslListQuiet(buf), ["Ubuntu-22.04", "docker-desktop"]);
+  });
+
+  it("reads UTF-16LE with BOM and dedupes", () => {
+    const buf = Buffer.concat([
+      Buffer.from([0xff, 0xfe]),
+      Buffer.from("Debian\r\nDebian\r\nkali-linux\r\n", "utf16le"),
+    ]);
+    assert.deepEqual(parseWslListQuiet(buf), ["Debian", "kali-linux"]);
+  });
+
+  it("drops status messages such as 'no running distributions'", () => {
+    const buf = Buffer.from("There are no running distributions.\r\n", "utf16le");
+    assert.deepEqual(parseWslListQuiet(buf), []);
+    assert.deepEqual(parseWslListQuiet("Windows Subsystem for Linux has no installed distributions.\n"), []);
+  });
+
+  it("accepts utf8 strings (WSL_UTF8=1)", () => {
+    assert.deepEqual(parseWslListQuiet("Ubuntu\nopenSUSE-Leap-15.6\n"), [
+      "Ubuntu",
+      "openSUSE-Leap-15.6",
+    ]);
+  });
+});
+
+describe("isValidWslDistroName", () => {
+  it("allows WSL-style names and rejects argv tricks", () => {
+    assert.equal(isValidWslDistroName("Ubuntu"), true);
+    assert.equal(isValidWslDistroName("Ubuntu-24.04"), true);
+    assert.equal(isValidWslDistroName("my_distro"), true);
+    assert.equal(isValidWslDistroName("--exec"), false);
+    assert.equal(isValidWslDistroName("two words"), false);
+    assert.equal(isValidWslDistroName(""), false);
   });
 });
 

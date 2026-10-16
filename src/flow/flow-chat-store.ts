@@ -17,12 +17,14 @@ import {
   type FlowChatState,
   type FlowPromptLogEntry,
 } from "../shared/flow-chat-types.js";
+import { isSafeFlowPathSegment } from "../shared/flow-parse.js";
 
 function flowChatRoot(): string {
   return join(getAppDataDir(), "flow-chat");
 }
 
 export function flowChatDir(flowId: string): string {
+  if (!isSafeFlowPathSegment(flowId)) throw new Error(`Invalid flow id: ${flowId}`);
   return join(flowChatRoot(), flowId);
 }
 

@@ -13,6 +13,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const isPostinstall = process.env.npm_lifecycle_event === "postinstall";
 const rebuildAll = process.argv.includes("--all");
 
+// CI quality gate (lint / typecheck / unit tests) never loads the native modules
+// under Electron, so it skips the slow Electron-ABI rebuild on install.
+if (isPostinstall && process.env.AISHELF_SKIP_NATIVE_REBUILD === "1") {
+  console.log("AISHELF_SKIP_NATIVE_REBUILD=1 — skipping Electron native module rebuild.");
+  process.exit(0);
+}
+
 function findNodePtyRoot() {
   const pnpmDir = join(root, "node_modules", ".pnpm");
   if (!existsSync(pnpmDir)) return null;

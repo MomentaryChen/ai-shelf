@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 import { app } from "electron";
 
 const MIME: Record<string, string> = {
@@ -66,13 +66,13 @@ export async function startRendererServer(rendererRoot: string): Promise<string>
       if (pathname === "/") pathname = "/index.html";
 
       const filePath = normalize(join(root, pathname));
-      if (!filePath.startsWith(root)) {
+      if (filePath !== root && !filePath.startsWith(root.endsWith(sep) ? root : root + sep)) {
         res.writeHead(404);
         res.end();
         return;
       }
-      const relative = filePath.slice(root.length);
-      const isAuthHandler = relative.startsWith("/__/auth/");
+      // Match on the URL pathname — the normalized file path uses backslashes on Windows.
+      const isAuthHandler = pathname.startsWith("/__/auth/");
       const exists = existsSync(filePath);
 
       if (!exists && !isAuthHandler) {

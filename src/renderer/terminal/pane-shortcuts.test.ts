@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   applyPaneShortcutAction,
+  matchPaneShortcutWithBindings,
   shouldConsumePaneShortcut,
   type PaneShortcutHandlers,
 } from "./pane-shortcuts.js";
+import { resolveKeybindings, type KeyEventLike } from "../shortcuts/keybindings.js";
 import type { PaneInfo } from "./split-tree.js";
 
 function pane(id: string): PaneInfo {
@@ -91,6 +93,46 @@ describe("shouldConsumePaneShortcut", () => {
     assert.equal(
       shouldConsumePaneShortcut({ type: "close" }, { panes: [pane("a")] }),
       true,
+    );
+  });
+});
+
+describe("matchPaneShortcutWithBindings", () => {
+  const key = (k: string, mods: Partial<KeyEventLike> = {}): KeyEventLike => ({
+    type: "keydown",
+    key: k,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    ...mods,
+  });
+
+  it("maps default bindings to pane actions", () => {
+    const map = resolveKeybindings({}, "win");
+    assert.deepEqual(matchPaneShortcutWithBindings(key("w", { ctrlKey: true }), map), {
+      type: "close",
+    });
+    assert.deepEqual(
+      matchPaneShortcutWithBindings(key("4", { ctrlKey: true, code: "Digit4" }), map),
+      { type: "focus-index", index: 3 },
+    );
+    assert.deepEqual(
+      matchPaneShortcutWithBindings(key("|", { ctrlKey: true, shiftKey: true }), map),
+      { type: "split", direction: "vertical" },
+    );
+  });
+
+  it("lets Ctrl+W reach the terminal when close is unbound", () => {
+    const map = resolveKeybindings({ closePane: null }, "win");
+    assert.equal(matchPaneShortcutWithBindings(key("w", { ctrlKey: true }), map), null);
+  });
+
+  it("supports Alt-based rebinding", () => {
+    const map = resolveKeybindings({ closePane: { key: "w", alt: true, shift: true } }, "win");
+    assert.deepEqual(
+      matchPaneShortcutWithBindings(key("W", { altKey: true, shiftKey: true, code: "KeyW" }), map),
+      { type: "close" },
     );
   });
 });
