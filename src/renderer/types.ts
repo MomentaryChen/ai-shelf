@@ -25,6 +25,18 @@ export type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 
 export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boolean };
 
+/** OS-level "run when app is closed" job (Task Scheduler / launchd / systemd user timer). */
+export type FlowTaskSchedulerStatus = {
+  supported: boolean;
+  installed: boolean;
+  taskName: string;
+  backend?: "windows-task-scheduler" | "launchd" | "systemd";
+  launcherPath?: string;
+  definitionPath?: string;
+  /** Set when the platform has a backend but it cannot be used (e.g. no systemd --user). */
+  unavailableReason?: string;
+};
+
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
 /**
@@ -219,6 +231,23 @@ export interface HealthMonitorPrefs {
   backgroundChecksEnabled: boolean;
   trayBadgeEnabled: boolean;
   weeklyDoctorSummary: boolean;
+  /** Minutes between background checks (main clamps to 15 min – 7 days). */
+  checkIntervalMinutes: number;
+}
+
+export interface PtyLogRetentionPrefs {
+  /** 0 = no age limit. */
+  maxAgeDays: number;
+  /** 0 = no size limit. */
+  maxTotalMb: number;
+  /** 0 = no per-tool count limit. */
+  maxFilesPerTool: number;
+}
+
+export interface PtyLogGcResult {
+  scanned: number;
+  deleted: number;
+  freedBytes: number;
 }
 
 export interface HealthMonitorState {
@@ -765,6 +794,11 @@ export interface ElectronAPI {
     partial: Partial<HealthMonitorPrefs>,
   ) => Promise<{ ok: boolean; prefs: HealthMonitorPrefs }>;
   onHealthMonitorState: (cb: (state: HealthMonitorState) => void) => () => void;
+  getPtyLogRetention: () => Promise<PtyLogRetentionPrefs>;
+  setPtyLogRetention: (
+    partial: Partial<PtyLogRetentionPrefs>,
+  ) => Promise<{ ok: boolean; prefs: PtyLogRetentionPrefs }>;
+  runPtyLogGc: () => Promise<PtyLogGcResult>;
   getSkillsRaw: () => Promise<SkillsRawData>;
   syncSkills: (opts: {
     skillNames: string[];
@@ -1072,21 +1106,16 @@ export interface ElectronAPI {
   flowCancelRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
   flowApproveGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowRejectGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
-  flowGetTaskSchedulerStatus: () => Promise<{
-    supported: boolean;
-    installed: boolean;
-    taskName: string;
-    launcherPath?: string;
-  }>;
+  flowGetTaskSchedulerStatus: () => Promise<FlowTaskSchedulerStatus>;
   flowInstallTaskScheduler: () => Promise<{
     ok: boolean;
     error?: string;
-    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+    status?: FlowTaskSchedulerStatus;
   }>;
   flowRemoveTaskScheduler: () => Promise<{
     ok: boolean;
     error?: string;
-    status?: { supported: boolean; installed: boolean; taskName: string; launcherPath?: string };
+    status?: FlowTaskSchedulerStatus;
   }>;
   flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
   flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;

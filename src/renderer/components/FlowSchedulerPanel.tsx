@@ -1,17 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { useLocale } from "../i18n/LocaleProvider";
+import type { FlowTaskSchedulerStatus } from "../types";
 
-type TaskSchedulerStatus = {
-  supported: boolean;
-  installed: boolean;
-  taskName: string;
-};
 
 type Props = {
   schedulerEnabled: boolean;
   schedulerSaving: boolean;
   onSchedulerToggle: () => void;
-  taskScheduler: TaskSchedulerStatus | null;
+  taskScheduler: FlowTaskSchedulerStatus | null;
   taskSchedulerBusy: boolean;
   onInstallTaskScheduler: () => void;
   onRemoveTaskScheduler: () => void;
@@ -27,6 +23,7 @@ export function FlowSchedulerPanel({
   onRemoveTaskScheduler,
 }: Props) {
   const { t } = useLocale();
+  const backend = taskScheduler?.backend ?? "windows-task-scheduler";
 
   return (
     <section className="rounded-[20px] border border-border bg-bg-primary px-3 py-2.5">
@@ -48,11 +45,20 @@ export function FlowSchedulerPanel({
         <p className="mt-2 text-[11px] leading-relaxed text-text-secondary">{t("flow.scheduler.paused")}</p>
       )}
 
+      {schedulerEnabled && !taskScheduler?.supported && taskScheduler?.unavailableReason && (
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="text-[12px] font-medium text-text-primary">{t("flow.taskScheduler.title")}</div>
+          <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">
+            {t("flow.taskScheduler.unavailable", { reason: taskScheduler.unavailableReason })}
+          </p>
+        </div>
+      )}
+
       {schedulerEnabled && taskScheduler?.supported && (
         <div className="mt-3 border-t border-border pt-3">
           <div className="text-[12px] font-medium text-text-primary">{t("flow.taskScheduler.title")}</div>
           <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">
-            {t("flow.taskScheduler.hint")}
+            {t(`flow.taskScheduler.hint.${backend}`)}
           </p>
           <p className="mt-2 text-[11px] text-text-secondary">
             {taskScheduler.installed
@@ -69,7 +75,7 @@ export function FlowSchedulerPanel({
                 disabled={taskSchedulerBusy}
                 onClick={onInstallTaskScheduler}
               >
-                {taskSchedulerBusy ? t("flow.taskScheduler.installing") : t("flow.taskScheduler.install")}
+                {taskSchedulerBusy ? t("flow.taskScheduler.installing") : t(`flow.taskScheduler.install.${backend}`)}
               </Button>
             ) : (
               <Button

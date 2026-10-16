@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld("api", {
   getHealthMonitorState: () => ipcRenderer.invoke("get-health-monitor-state"),
   runHealthCheck: () => ipcRenderer.invoke("run-health-check"),
   setHealthMonitorPrefs: (partial) => ipcRenderer.invoke("set-health-monitor-prefs", partial),
+  getPtyLogRetention: () => ipcRenderer.invoke("get-pty-log-retention"),
+  setPtyLogRetention: (partial) => ipcRenderer.invoke("set-pty-log-retention", partial),
+  runPtyLogGc: () => ipcRenderer.invoke("run-pty-log-gc"),
   onHealthMonitorState: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("health-monitor-state", handler);

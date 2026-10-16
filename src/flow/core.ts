@@ -68,6 +68,7 @@ import {
   saveFlowChat,
   listFlowPromptLogs,
 } from "./flow-chat-store.js";
+import { listRunDirNamesForFlow } from "./flow-run-match.js";
 import {
   applyProgressEventToState,
   appendRunEvent,
@@ -1249,13 +1250,7 @@ export function saveFlowRunner(
 
 function listRunIdsForFlow(flowId: string): string[] {
   initFlowDirs();
-  if (!existsSync(runsDir())) return [];
-  const suffix = `-${flowId}`;
-  return readdirSync(runsDir(), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name.endsWith(suffix))
-    .map((d) => d.name)
-    .sort()
-    .reverse();
+  return listRunDirNamesForFlow(runsDir(), flowId).sort().reverse();
 }
 
 /**

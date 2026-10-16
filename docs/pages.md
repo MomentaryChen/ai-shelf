@@ -372,7 +372,7 @@ What you can do:
 - Inspect the **DAG**, runner settings, schedule (cron), and next run time
 - Run flows manually; stream agent console output while a run is in progress
 - Review **run history** (status, duration, progress, events) and open run artifacts
-- Prefer the in-app scheduler while the app is open; on Windows, OS Task Scheduler can call `ai-shelf flow due` when the app is closed (see [ai-flow-phase1.md](ai-flow-phase1.md))
+- Prefer the in-app scheduler while the app is open; **Run when app is closed** registers an OS job (Windows Task Scheduler, macOS launchd, or a Linux systemd user timer) that calls `ai-shelf flow due` every minute (see [ai-flow-phase1.md](ai-flow-phase1.md))
 
 Flows live under the app data `flows/` folder; format details are in [flow-format.md](flow-format.md).
 

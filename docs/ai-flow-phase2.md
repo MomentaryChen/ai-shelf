@@ -49,7 +49,7 @@ Spawned as stdio server (`dist/flow/mcp-server.js`) with env:
 - Phases: `fetch-amplitude` → `fetch-jira` → `write-report`
 - Requires Amplitude + Jira MCP in Claude config
 
-### Headless validation (Task Scheduler)
+### Headless validation (OS scheduler)
 
 Same as Phase 1 — `ai-shelf flow due` or `node dist/flow/cli.js due` runs flows with MCP progress when `claude -p` is available.
 

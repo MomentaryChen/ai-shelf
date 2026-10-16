@@ -172,6 +172,11 @@ import {
   onAppUpdateStateChanged,
   runHealthCheck,
 } from "./health-monitor.js";
+import { runPtyLogGc, type PtyLogGcResult, type PtyLogRetentionPrefs } from "./pty-log-gc.js";
+import {
+  readPtyLogRetentionPrefs,
+  writePtyLogRetentionPrefs,
+} from "./pty-log-retention-pref.js";
 import {
   deleteFlow,
   deleteFlowChatData,
@@ -1149,12 +1154,15 @@ ipcMain.handle("set-health-monitor-prefs", (_event, partial: unknown) => {
     return { ok: false, prefs: getHealthMonitorState().prefs };
   }
   const p = partial as Record<string, unknown>;
-  const patch: Record<string, boolean> = {};
+  const patch: Record<string, boolean | number> = {};
   if (typeof p.backgroundChecksEnabled === "boolean") {
     patch.backgroundChecksEnabled = p.backgroundChecksEnabled;
   }
   if (typeof p.trayBadgeEnabled === "boolean") patch.trayBadgeEnabled = p.trayBadgeEnabled;
   if (typeof p.weeklyDoctorSummary === "boolean") patch.weeklyDoctorSummary = p.weeklyDoctorSummary;
+  if (typeof p.checkIntervalMinutes === "number" && Number.isFinite(p.checkIntervalMinutes)) {
+    patch.checkIntervalMinutes = p.checkIntervalMinutes;
+  }
   const prefs = applyHealthMonitorPrefs(patch);
   return { ok: true, prefs };
 });
@@ -1508,6 +1516,68 @@ async function flushPtyLogNow(sessionId: string): Promise<void> {
     await flushPtyLog(sessionId);
   }
 }
+
+// --- PTY log retention / GC ---
+
+const PTY_LOG_GC_STARTUP_DELAY_MS = 20_000;
+const PTY_LOG_GC_INTERVAL_MS = 60 * 60 * 1000;
+let ptyLogGcTimer: ReturnType<typeof setInterval> | null = null;
+let ptyLogGcInFlight: Promise<PtyLogGcResult> | null = null;
+
+/** Sessions whose log must survive GC: live PTYs plus panes still holding the buffer / pending writes. */
+function protectedPtyLogSessionIds(): Set<string> {
+  return new Set<string>([
+    ...PTY_SESSIONS.keys(),
+    ...PTY_OUTPUT_BUFFERS.keys(),
+    ...PTY_LOG_QUEUES.keys(),
+    ...PTY_LOG_INFLIGHT.keys(),
+  ]);
+}
+
+function runPtyLogGcNow(): Promise<PtyLogGcResult> {
+  if (ptyLogGcInFlight) return ptyLogGcInFlight;
+  ptyLogGcInFlight = (async () => {
+    try {
+      const res = await runPtyLogGc(ptyLogDir(), readPtyLogRetentionPrefs(), {
+        protectedSessionIds: protectedPtyLogSessionIds(),
+      });
+      if (res.deleted > 0) {
+        console.log(`[pty-log-gc] deleted ${res.deleted} log(s), freed ${res.freedBytes} bytes`);
+      }
+      return res;
+    } catch (err: unknown) {
+      console.warn("[pty-log-gc]", err instanceof Error ? err.message : err);
+      return { scanned: 0, deleted: 0, freedBytes: 0 };
+    } finally {
+      ptyLogGcInFlight = null;
+    }
+  })();
+  return ptyLogGcInFlight;
+}
+
+function initPtyLogGc(): void {
+  setTimeout(() => void runPtyLogGcNow(), PTY_LOG_GC_STARTUP_DELAY_MS);
+  if (ptyLogGcTimer) clearInterval(ptyLogGcTimer);
+  ptyLogGcTimer = setInterval(() => void runPtyLogGcNow(), PTY_LOG_GC_INTERVAL_MS);
+}
+
+ipcMain.handle("get-pty-log-retention", () => readPtyLogRetentionPrefs());
+
+ipcMain.handle("set-pty-log-retention", async (_event, partial: unknown) => {
+  if (!partial || typeof partial !== "object") {
+    return { ok: false, prefs: readPtyLogRetentionPrefs() };
+  }
+  const p = partial as Record<string, unknown>;
+  const patch: Partial<PtyLogRetentionPrefs> = {};
+  for (const key of ["maxAgeDays", "maxTotalMb", "maxFilesPerTool"] as const) {
+    if (typeof p[key] === "number" && Number.isFinite(p[key])) patch[key] = p[key];
+  }
+  const prefs = writePtyLogRetentionPrefs(patch);
+  void runPtyLogGcNow();
+  return { ok: true, prefs };
+});
+
+ipcMain.handle("run-pty-log-gc", () => runPtyLogGcNow());
 
 /** Rewrite the mirrored log to match the in-memory PTY tail (queued, async). */
 function mirrorPtyLog(sessionId: string, text: string) {
@@ -3009,6 +3079,7 @@ app.whenReady().then(async () => {
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
+  initPtyLogGc();
   initFlowService();
   initFlowScheduler(() => mainWindow);
   onFlowRunState((state) => {

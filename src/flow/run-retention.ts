@@ -6,14 +6,15 @@ import {
   type FlowRunRecord,
 } from "../shared/flow-retention.js";
 import { readFlowSchedulePrefs } from "../shared/flow-schedule-pref.js";
+import { runDirMatchesFlow } from "../shared/flow-run-id.js";
 import type { FlowRunRetentionPolicy } from "../shared/flow-types.js";
 import { readRunState, runsDir } from "./run-state-store.js";
 
 const RUN_ID_RE = /^\d{8}-\d{6}-/;
 
 /**
- * Run folders that belong to `flowId`. `state.json` is authoritative; the folder-name
- * suffix is only a fallback because `-digest` is also a suffix of `-weekly-digest`.
+ * Run folders that belong to `flowId`. `state.json` is authoritative; without it the
+ * folder name is parsed exactly (`-digest` is also a suffix of `-weekly-digest`).
  */
 export function listRunRecordsForFlow(flowId: string): FlowRunRecord[] {
   const root = runsDir();
@@ -30,6 +31,8 @@ export function listRunRecordsForFlow(flowId: string): FlowRunRecord[] {
       records.push({ runId: entry.name, startedAt: state.startedAt ?? null, status: state.status });
       continue;
     }
+    // No readable state: match the directory name structurally (see flow-run-id.ts).
+    if (!runDirMatchesFlow(entry.name, flowId, null)) continue;
     let startedAt: string | null = null;
     try {
       startedAt = statSync(join(root, entry.name)).mtime.toISOString();
