@@ -316,7 +316,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 常見能力：
 
-- 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定）
+- 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定；OpenCode、Crush、Goose 直接讀取本機工作階段資料，不需金鑰；Aider 沒有可讀取的用量紀錄，顯示為不提供）
 - 每週預算目標；Flow 撰寫／執行可歸因回 Usage
 - 憑證在可用時以 OS `safeStorage` 保存；部分供應商需在 App 內設定 API 金鑰或帳號 cookie
 

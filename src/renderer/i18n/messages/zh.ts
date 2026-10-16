@@ -869,8 +869,10 @@ export const zh: Record<MessageKey, string> = {
   "usage.credential.testFailed": "連線失敗",
   "usage.credential.howToGet": "如何取得金鑰",
   "usage.badge.api": "支援 API",
-  "usage.badge.comingSoon": "API 待支援",
-  "usage.tool.unsupported": "此工具尚無公開用量 API",
+  "usage.badge.local": "本機資料",
+  "usage.badge.unavailable": "不提供",
+  "usage.tool.unsupported": "此工具沒有 AI Shelf 可讀取的用量資料來源",
+  "usage.tool.learnMore": "了解更多",
   "usage.tool.notConfigured": "請在下方填入 API 金鑰以載入用量",
   "usage.metric.inputTokens": "輸入 token",
   "usage.metric.outputTokens": "輸出 token",
@@ -888,7 +890,8 @@ export const zh: Record<MessageKey, string> = {
   "usage.compare.view": "查看",
   "usage.status.ok": "有資料",
   "usage.status.notConfigured": "未設定金鑰",
-  "usage.status.unsupported": "API 待支援",
+  "usage.status.unsupported": "不提供",
+  "usage.status.noLocalData": "無本機資料",
   "usage.status.error": "錯誤",
   "usage.fetchedAt": "上次更新 {time} · {days} 天區間",
   "usage.range.7d": "最近 7 天",
@@ -976,6 +979,17 @@ export const zh: Record<MessageKey, string> = {
   "usage.copilot.auth.enterprise.title": "範圍 · enterprise",
   "usage.copilot.auth.enterprise.note": "若設定，改抓 enterprise 層級的 28 天報表。",
   "usage.copilot.auth.enterprise.field": "Enterprise slug",
+  "usage.local.source": "本機工作階段資料",
+  "usage.local.noKey": "不需要 API 金鑰 — 以唯讀方式直接讀取此電腦上該工具自己的工作階段資料。",
+  "usage.local.notFound": "尚未找到此工具的本機工作階段資料。請先在這台電腦上使用一次，再重新整理。",
+  "usage.opencode.intro":
+    "從 OpenCode 本機資料庫（~/.local/share/opencode/opencode.db，或舊版 storage/message JSON）讀取每則回覆的 token 與費用。費用為 OpenCode 記錄的數值；訂閱或免費模型會顯示 $0。",
+  "usage.crush.intro":
+    "從 Crush projects.json 列出的各專案 .crush/crush.db 讀取工作階段總計。Crush 以工作階段為單位記錄 token 與費用，因此每個工作階段會計入其最後活動的日期。",
+  "usage.goose.intro":
+    "讀取 Goose 本機 sessions.db：有用量帳本（usage ledger）時逐筆讀取，否則使用各工作階段的 token 總計。只有 Goose 為你的供應商記錄費用時才會顯示金額。",
+  "usage.aider.unavailable":
+    "Aider 沒有可供 AI Shelf 讀取的用量紀錄。它只會在對話中（以及各 repo 的 .aider.chat.history.md）顯示 token 與費用，且分析資料需自行選擇加入，並傳送到 Aider 自己的服務。",
 
   "flow.sidebar.title": "流程",
   "flow.loading": "載入流程中…",

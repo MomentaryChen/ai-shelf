@@ -13,12 +13,30 @@ import { scanFlowGenerateCostsForAttribution } from "./flow-generate-scan.js";
 import { scanRecentFlowRunsForAttribution } from "./flow-run-scan.js";
 import { fetchClaudeUsage } from "./providers/claude.js";
 import { fetchCopilotUsage } from "./providers/copilot.js";
+import { fetchCrushUsage } from "./providers/crush.js";
 import { fetchCursorUsage } from "./providers/cursor.js";
 import { fetchGeminiUsage } from "./providers/gemini.js";
+import { fetchGooseUsage } from "./providers/goose.js";
+import type { LocalUsageResult } from "./providers/local-usage.js";
+import { fetchOpencodeUsage } from "./providers/opencode.js";
 import { fetchOpenAiUsage } from "./providers/openai.js";
+import { LocalUsageNotFoundError } from "./local-sqlite.js";
 import { aggregateUsageDashboard } from "./aggregate-daily.js";
 import { USAGE_PROVIDERS } from "./registry.js";
-import type { UsageCostInsights, UsageDashboardResult, UsageFetchOptions, UsageToolSnapshot } from "./types.js";
+import type {
+  UsageCostInsights,
+  UsageDashboardResult,
+  UsageFetchOptions,
+  UsageToolId,
+  UsageToolSnapshot,
+} from "./types.js";
+
+/** Providers that read the tool's own session data on disk — no credentials involved. */
+const LOCAL_USAGE_READERS: Partial<Record<UsageToolId, (days: number) => Promise<LocalUsageResult>>> = {
+  opencode: fetchOpencodeUsage,
+  crush: fetchCrushUsage,
+  goose: fetchGooseUsage,
+};
 
 function buildCostInsights(tools: UsageToolSnapshot[], days: number): UsageCostInsights {
   const budget = readUsageBudgetPrefs();
@@ -76,7 +94,26 @@ async function fetchToolSnapshot(
       ...base,
       status: "unsupported",
       error: provider.unsupportedReason,
+      messageKey: provider.unsupportedReasonKey,
     };
+  }
+
+  const localReader = provider.dataSource === "local" ? LOCAL_USAGE_READERS[provider.toolId] : undefined;
+  if (localReader) {
+    try {
+      const data = await localReader(days);
+      return { ...base, status: "ok", authSourceKey: "usage.local.source", ...data };
+    } catch (err: unknown) {
+      if (err instanceof LocalUsageNotFoundError) {
+        return {
+          ...base,
+          status: "not_configured",
+          messageKey: "usage.local.notFound",
+          statusKey: "usage.status.noLocalData",
+        };
+      }
+      return { ...base, status: "error", error: (err as Error).message };
+    }
   }
 
   if (!isUsageToolConfigured(provider.toolId)) {

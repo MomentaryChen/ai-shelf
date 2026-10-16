@@ -489,7 +489,16 @@ export interface PtySearchResult {
   capped: boolean;
 }
 
-export type UsageToolId = "claude" | "codex" | "cursor" | "gemini" | "copilot";
+export type UsageToolId =
+  | "claude"
+  | "codex"
+  | "cursor"
+  | "gemini"
+  | "copilot"
+  | "opencode"
+  | "crush"
+  | "goose"
+  | "aider";
 
 export interface UsageCredentialFieldMeta {
   key: string;
@@ -507,7 +516,9 @@ export interface UsageProviderMeta {
   toolId: UsageToolId;
   label: string;
   supported: boolean;
+  dataSource?: "api" | "local";
   unsupportedReason?: string;
+  unsupportedReasonKey?: string;
   credentialNoteKey?: string;
   docsUrl?: string;
   fields: UsageCredentialFieldMeta[];
@@ -567,6 +578,8 @@ export interface UsageToolSnapshot {
   status: "ok" | "not_configured" | "unsupported" | "error";
   error?: string;
   authSourceKey?: string;
+  messageKey?: string;
+  statusKey?: string;
   quotaHintKey?: string;
   totalCostUsd?: number;
   totalInputTokens?: number;
