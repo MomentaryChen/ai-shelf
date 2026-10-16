@@ -29,6 +29,12 @@ import {
   type PreferredShell,
 } from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
+import {
+  MAX_PASTE_CONFIRM_MAX_CHARS,
+  MAX_PASTE_CONFIRM_MAX_LINES,
+  MIN_PASTE_CONFIRM_MAX_CHARS,
+  MIN_PASTE_CONFIRM_MAX_LINES,
+} from "../terminal/paste-confirm";
 import { KeybindingsEditor } from "./KeybindingsEditor";
 import { ToolLaunchArgsEditor } from "./ToolLaunchArgsEditor";
 import type { AppColorTheme } from "../app-theme";
@@ -718,6 +724,76 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
               <span className="text-[13px] text-text-primary">{t("settings.copyOnSelect")}</span>
               <span className="text-[11px] leading-snug text-text-tertiary">
                 {t("settings.copyOnSelectHint")}
+              </span>
+            </span>
+          </Label>
+
+          <div className="rounded-lg border border-border px-3.5 py-3">
+            <Label className="flex cursor-pointer items-start gap-3 font-normal">
+              <Checkbox
+                checked={settings.terminalPasteConfirm}
+                onCheckedChange={(v) => updateSettings({ terminalPasteConfirm: v === true })}
+                className="mt-0.5"
+              />
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[13px] text-text-primary">{t("settings.pasteConfirm")}</span>
+                <span className="text-[11px] leading-snug text-text-tertiary">
+                  {t("settings.pasteConfirmHint")}
+                </span>
+              </span>
+            </Label>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 pl-7">
+              <label className="flex items-center gap-2 text-[12px] text-text-secondary">
+                {t("settings.pasteConfirmMaxLines")}
+                <Input
+                  type="number"
+                  min={MIN_PASTE_CONFIRM_MAX_LINES}
+                  max={MAX_PASTE_CONFIRM_MAX_LINES}
+                  step={1}
+                  disabled={!settings.terminalPasteConfirm}
+                  value={settings.terminalPasteConfirmMaxLines}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (Number.isFinite(n) && n > 0) {
+                      updateSettings({ terminalPasteConfirmMaxLines: n });
+                    }
+                  }}
+                  className="w-20 border-border bg-bg-secondary font-mono text-[12px] focus-visible:border-accent/40"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-text-secondary">
+                {t("settings.pasteConfirmMaxChars")}
+                <Input
+                  type="number"
+                  min={MIN_PASTE_CONFIRM_MAX_CHARS}
+                  max={MAX_PASTE_CONFIRM_MAX_CHARS}
+                  step={256}
+                  disabled={!settings.terminalPasteConfirm}
+                  value={settings.terminalPasteConfirmMaxChars}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (Number.isFinite(n) && n > 0) {
+                      updateSettings({ terminalPasteConfirmMaxChars: n });
+                    }
+                  }}
+                  className="w-24 border-border bg-bg-secondary font-mono text-[12px] focus-visible:border-accent/40"
+                />
+              </label>
+            </div>
+          </div>
+
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
+              checked={settings.terminalPasteConfirmBroadcast}
+              onCheckedChange={(v) => updateSettings({ terminalPasteConfirmBroadcast: v === true })}
+              className="mt-0.5"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">
+                {t("settings.pasteConfirmBroadcast")}
+              </span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("settings.pasteConfirmBroadcastHint")}
               </span>
             </span>
           </Label>

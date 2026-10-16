@@ -192,6 +192,14 @@ export const zh: Record<MessageKey, string> = {
   "settings.copyOnSelect": "選取即複製",
   "settings.copyOnSelectHint":
     "啟用後，用滑鼠選取文字會自動複製到剪貼簿——這樣就能直接貼到另一個終端機。",
+  "settings.pasteConfirm": "大量貼上前確認",
+  "settings.pasteConfirmHint":
+    "貼上的文字超過下列門檻時先顯示預覽，避免誤貼多行內容意外執行指令。",
+  "settings.pasteConfirmMaxLines": "超過（行）",
+  "settings.pasteConfirmMaxChars": "超過（字元）",
+  "settings.pasteConfirmBroadcast": "廣播時一律確認",
+  "settings.pasteConfirmBroadcastHint":
+    "開啟「同步輸入至所有 terminal」時，只要貼上會送到多個終端機就先詢問。",
   "settings.webgl": "WebGL 渲染",
   "settings.webglHint":
     "用 GPU 加速繪製——多分屏與大捲動緩衝時較順。WebGL 不可用時會退回 canvas。變更後已開啟的窗格會重新載入。",
@@ -668,6 +676,17 @@ export const zh: Record<MessageKey, string> = {
   "terminal.newOutput": "新輸出",
   "terminal.ctx.copy": "複製",
   "terminal.ctx.paste": "貼上",
+  "terminal.pasteConfirm.title": "要貼上這段文字嗎？",
+  "terminal.pasteConfirm.titleBroadcast": "要貼上到 {count} 個終端機嗎？",
+  "terminal.pasteConfirm.stats": "{lines} 行 · {chars} 個字元",
+  "terminal.pasteConfirm.broadcastNote":
+    "同步輸入已開啟——這次貼上會送到此設定檔的全部 {count} 個終端機。",
+  "terminal.pasteConfirm.unbracketedWarning":
+    "目標終端機未啟用 bracketed paste——每一行貼上後可能立即當成指令執行。",
+  "terminal.pasteConfirm.previewTruncated": "預覽僅顯示開頭部分。",
+  "terminal.pasteConfirm.singleLine": "合併為單行貼上",
+  "terminal.pasteConfirm.paste": "貼上",
+  "terminal.pasteConfirm.pasteBroadcast": "貼上到 {count} 個",
   "terminal.ctx.find": "尋找…",
   "terminal.ctx.selectAll": "全選",
   "terminal.ctx.clear": "清屏",
