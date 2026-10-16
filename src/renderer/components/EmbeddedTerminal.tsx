@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback, useState, memo } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback, useState, memo } from "react";
+import type { MutableRefObject } from "react";
 import { ArrowDown } from "lucide-react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -56,6 +57,17 @@ interface Props {
   onCwdReport?: (sessionId: string, cwd: string) => void;
 }
 
+/** Callback props — routed through a ref so they never force an xterm re-render. */
+type TerminalCallbacks = Pick<
+  Props,
+  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onCwdReport"
+>;
+
+type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
+  /** Stable ref holding the latest callbacks from the parent. */
+  callbacksRef: MutableRefObject<TerminalCallbacks>;
+};
+
 /** True when the viewport is pinned to the latest output (ydisp === ybase). */
 function isTerminalAtBottom(term: Terminal): boolean {
   const buffer = term.buffer.active;
@@ -88,26 +100,17 @@ function EmbeddedTerminalInner({
   copyOnSelect = true,
   active = true,
   focused = true,
-  onExit,
-  onSessionLost,
-  onWrite,
-  onRestart,
-  onCwdReport,
-}: Props) {
+  callbacksRef,
+}: InnerProps) {
   const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
   const activeRef = useRef(active);
-  const onWriteRef = useRef(onWrite);
-  const onSessionLostRef = useRef(onSessionLost);
-  const onRestartRef = useRef(onRestart);
-  const onExitRef = useRef(onExit);
-  const onCwdReportRef = useRef(onCwdReport);
   const fitRef = useRef<(() => void) | null>(null);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const [hasNewOutput, setHasNewOutput] = useState(false);
-  const stableOnExit = useCallback(() => onExitRef.current(), []);
+  const stableOnExit = useCallback(() => callbacksRef.current.onExit(), [callbacksRef]);
 
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
@@ -291,11 +294,6 @@ function EmbeddedTerminalInner({
   copyOnSelectRef.current = copyOnSelect;
 
   activeRef.current = active;
-  onWriteRef.current = onWrite;
-  onSessionLostRef.current = onSessionLost;
-  onRestartRef.current = onRestart;
-  onExitRef.current = onExit;
-  onCwdReportRef.current = onCwdReport;
 
   useEffect(() => {
     setHasNewOutput(false);
@@ -365,7 +363,7 @@ function EmbeddedTerminalInner({
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
-      onRestart: () => onRestartRef.current?.(),
+      onRestart: () => callbacksRef.current.onRestart?.(),
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
@@ -386,7 +384,7 @@ function EmbeddedTerminalInner({
     const unbindImeTrace = attachImeInputTrace(term, sessionId);
     const unbindLinks = bindTerminalLinks(term);
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
-      onCwdReportRef.current?.(sessionId, cwd);
+      callbacksRef.current.onCwdReport?.(sessionId, cwd);
     });
 
     const pending: string[] = [];
@@ -514,7 +512,7 @@ function EmbeddedTerminalInner({
         writePty(data);
         return;
       }
-      const write = onWriteRef.current;
+      const write = callbacksRef.current.onWrite;
       if (write) write(data, sessionId);
       else writePty(data);
     });
@@ -536,7 +534,7 @@ function EmbeddedTerminalInner({
             pid: r.pid,
           })
         ) {
-          onSessionLostRef.current?.(sessionId);
+          callbacksRef.current.onSessionLost?.(sessionId);
         }
         return;
       }
@@ -745,17 +743,31 @@ function EmbeddedTerminalInner({
   );
 }
 
-export const EmbeddedTerminal = memo(
-  EmbeddedTerminalInner,
-  (prev, next) =>
-    prev.sessionId === next.sessionId &&
-    prev.bg === next.bg &&
-    prev.fontFamily === next.fontFamily &&
-    prev.fontSize === next.fontSize &&
-    prev.scrollback === next.scrollback &&
-    prev.webglEnabled === next.webglEnabled &&
-    prev.rightClickPaste === next.rightClickPaste &&
-    prev.copyOnSelect === next.copyOnSelect &&
-    prev.active === next.active &&
-    prev.focused === next.focused,
-);
+/**
+ * Data props are shallow-compared by the default `memo` comparator (every key,
+ * so a newly added prop can never be silently ignored). Callback props are kept
+ * in a ref instead: their identity changes (e.g. `onWrite` rebuilt when broadcast
+ * input toggles) reach the live pane without re-rendering xterm.
+ */
+const EmbeddedTerminalMemo = memo(EmbeddedTerminalInner);
+
+export function EmbeddedTerminal({
+  onExit,
+  onSessionLost,
+  onWrite,
+  onRestart,
+  onCwdReport,
+  ...dataProps
+}: Props) {
+  const callbacksRef = useRef<TerminalCallbacks>({
+    onExit,
+    onSessionLost,
+    onWrite,
+    onRestart,
+    onCwdReport,
+  });
+  useLayoutEffect(() => {
+    callbacksRef.current = { onExit, onSessionLost, onWrite, onRestart, onCwdReport };
+  });
+  return <EmbeddedTerminalMemo {...dataProps} callbacksRef={callbacksRef} />;
+}

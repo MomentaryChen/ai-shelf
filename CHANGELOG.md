@@ -12,6 +12,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 ### Fixed
 
 - **Flow phase loop guard** — Orchestrated flows whose `next:`, `on_fail:` or `on_reject:` cycles back to an earlier phase now fail with a "Phase loop detected" error after `phases × 3` phase executions instead of spawning agent runs forever; configured `retry:` attempts do not count toward the limit.
+- **Terminal broadcast toggle** — Turning broadcast input on or off now takes effect immediately in panes that are already open, instead of only after some unrelated pane setting changed.
 
 ## [4.3.5] - 2026-10-07
 
