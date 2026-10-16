@@ -12,6 +12,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 ### Fixed
 
 - **Flow phase loop guard** — Orchestrated flows whose `next:`, `on_fail:` or `on_reject:` cycles back to an earlier phase now fail with a "Phase loop detected" error after `phases × 3` phase executions instead of spawning agent runs forever; configured `retry:` attempts do not count toward the limit.
+- **Copilot / Cursor config paths on macOS and Linux** — Copilot settings, instruction and MCP files under `~/.copilot` (or `COPILOT_HOME`) and Cursor's per-platform `settings.json` are now found outside Windows instead of being looked up with hard-coded backslashes.
 
 ## [4.3.5] - 2026-10-07
 
