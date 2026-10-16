@@ -29,10 +29,55 @@ interface TimeSeriesRow {
 }
 
 export interface MonitoringUsage {
+  /** Requests since the current daily quota window opened (midnight Pacific). */
   requestCount24h: number;
   peakRpm: number;
   tokenCount24h: number;
   peakTpm: number;
+}
+
+const PACIFIC_TZ = "America/Los_Angeles";
+
+function pacificOffsetMs(instantMs: number): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PACIFIC_TZ,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(instantMs));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const wallAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return wallAsUtc - Math.floor(instantMs / 1000) * 1000;
+}
+
+/**
+ * Gemini per-day quotas reset at midnight Pacific time, not on a rolling 24h window.
+ * Returns the start of the current Pacific day and the next reset instant.
+ */
+export function pacificQuotaDay(now: Date = new Date()): { start: Date; resetAt: Date } {
+  const nowMs = now.getTime();
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: PACIFIC_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(now)
+    .split("-")
+    .map(Number);
+  // DST switches at 02:00 local, so the offset ~1h after UTC midnight+8h is the midnight offset.
+  const midnightUtc = (yy: number, mm: number, dd: number) => {
+    const naive = Date.UTC(yy, mm - 1, dd);
+    return naive - pacificOffsetMs(naive + 8 * 60 * 60 * 1000);
+  };
+  const startMs = midnightUtc(y, m, d);
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  const resetMs = midnightUtc(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+  return { start: new Date(Math.min(startMs, nowMs)), resetAt: new Date(resetMs) };
 }
 
 function humanizeMetric(metric: string): string {
@@ -105,14 +150,17 @@ function quotaWindow(key: string, labelKey: string, used: number, limit: number)
   };
 }
 
-export function buildFreeTierQuotas(usage: MonitoringUsage): UsageQuotaWindow[] {
+export function buildFreeTierQuotas(usage: MonitoringUsage, now: Date = new Date()): UsageQuotaWindow[] {
   const quotas: UsageQuotaWindow[] = [
-    quotaWindow(
-      "gemini-free-rpd",
-      "usage.gemini.quota.rpd",
-      usage.requestCount24h,
-      GEMINI_FREE_TIER_FLASH.rpd,
-    ),
+    {
+      ...quotaWindow(
+        "gemini-free-rpd",
+        "usage.gemini.quota.rpd",
+        usage.requestCount24h,
+        GEMINI_FREE_TIER_FLASH.rpd,
+      ),
+      resetAt: pacificQuotaDay(now).resetAt.toISOString(),
+    },
     quotaWindow(
       "gemini-free-rpm",
       "usage.gemini.quota.rpm",
@@ -203,9 +251,10 @@ async function fetchTimeSeries(
   token: string,
   filter: string,
   extra: Record<string, string> = {},
+  windowStart?: Date,
 ): Promise<TimeSeriesRow[]> {
   const end = new Date();
-  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  const start = windowStart ?? new Date(end.getTime() - 24 * 60 * 60 * 1000);
   const data = (await gcpGet(
     `monitoring.googleapis.com/v3/projects/${encodeURIComponent(projectId)}/timeSeries?${new URLSearchParams({
       filter,
@@ -275,11 +324,12 @@ async function fetchAlignedOrRaw(
   token: string,
   filter: string,
   extra: Record<string, string>,
+  windowStart?: Date,
 ): Promise<TimeSeriesRow[]> {
   try {
-    return await fetchTimeSeries(projectId, token, filter, extra);
+    return await fetchTimeSeries(projectId, token, filter, extra, windowStart);
   } catch {
-    return fetchTimeSeries(projectId, token, filter);
+    return fetchTimeSeries(projectId, token, filter, {}, windowStart);
   }
 }
 
@@ -292,9 +342,13 @@ async function fetchMonitoringUsage(projectId: string, token: string): Promise<M
     'metric.type="aiplatform.googleapis.com/publisher/online_serving/token_count"',
   ];
 
+  // Daily counts follow the Pacific-midnight quota day, not a rolling 24h window.
+  const dayStart = pacificQuotaDay().start;
   const [requestSeries, ...tokenSeriesGroups] = await Promise.all([
-    fetchAlignedOrRaw(projectId, token, REQUEST_COUNT_FILTER, MINUTE_ALIGN),
-    ...tokenFilters.map((filter) => fetchTimeSeries(projectId, token, filter).catch(() => [] as TimeSeriesRow[])),
+    fetchAlignedOrRaw(projectId, token, REQUEST_COUNT_FILTER, MINUTE_ALIGN, dayStart),
+    ...tokenFilters.map((filter) =>
+      fetchTimeSeries(projectId, token, filter, {}, dayStart).catch(() => [] as TimeSeriesRow[]),
+    ),
   ]);
 
   const tokenSeries = tokenSeriesGroups.flat();

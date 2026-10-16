@@ -153,6 +153,11 @@ async function showMcp(opts: Options) {
     console.log(`  ${e.tool}:`);
     if (e.mcp.servers.length === 0) {
       console.log("    (none configured)");
+    } else if (e.mcp.serverDetails?.length) {
+      for (const d of e.mcp.serverDetails) {
+        const where = d.project ? ` ${d.project}` : "";
+        console.log(`    ✓ ${d.name}  [${d.scope}${where}]`);
+      }
     } else {
       for (const s of e.mcp.servers) {
         console.log(`    ✓ ${s}`);

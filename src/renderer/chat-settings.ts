@@ -10,10 +10,10 @@ import {
   type ToolLaunchArgs,
 } from "../tool-launch.js";
 import {
-  DEFAULT_PANE_SHORTCUT_BINDINGS,
-  normalizePaneShortcutBindings,
-  type PaneShortcutBindings,
-} from "./terminal/pane-key-bindings";
+  keybindingOverridesFromStoredSettings,
+  type KeybindingOverrides,
+} from "./shortcuts/keybindings";
+import { SETTINGS_KEY } from "./settings-key";
 import {
   DEFAULT_PASTE_CONFIRM_MAX_CHARS,
   DEFAULT_PASTE_CONFIRM_MAX_LINES,
@@ -31,6 +31,7 @@ export type PreferredShell =
   | "pwsh"
   | "powershell"
   | "cmd"
+  | "wsl"
   | "bash"
   | "zsh"
   | "fish"
@@ -58,6 +59,8 @@ export interface ChatSettings {
   externalTerminal: ExternalTerminal;
   /** Preferred shell for embedded PTY panes (`auto` uses $SHELL on Unix / pwsh-first on Windows). */
   preferredShell: PreferredShell;
+  /** WSL distro for `preferredShell: "wsl"` (Windows only); empty = WSL default distro. */
+  wslDistro: string;
   terminalBg: string;
   terminalFontFamily: string;
   terminalFontSize: number;
@@ -80,8 +83,11 @@ export interface ChatSettings {
   terminalPasteConfirmBroadcast: boolean;
   workingDir: string;
   dirHistory: string[];
-  /** Pane split / focus shortcuts (Ctrl/Cmd combinations). */
-  paneShortcuts: PaneShortcutBindings;
+  /**
+   * Keyboard shortcut overrides (see shortcuts/keybindings.ts). Missing ids use
+   * the default; `null` unbinds a shortcut so the key reaches the terminal.
+   */
+  keybindings: KeybindingOverrides;
   /** Minimize to system tray and keep running when all windows are closed. */
   systemTrayEnabled: boolean;
   /** Show per-pane agent status and completion alerts in multi-pane layouts. */
@@ -100,9 +106,9 @@ export interface ChatSettings {
   toolLaunchArgs: ToolLaunchArgs;
 }
 
-export type { PaneShortcutBindings, ToolLaunchArgs };
+export type { KeybindingOverrides, ToolLaunchArgs };
 
-export const SETTINGS_KEY = "ai-inventory-chat-settings";
+export { SETTINGS_KEY };
 
 /** Same-window notification when saveSettings runs (see subscribeSettingsChanges). */
 export const SETTINGS_CHANGE_EVENT = "ai-shelf-settings-change";
@@ -120,6 +126,7 @@ const PREFERRED_SHELL_SET = new Set<string>([
   "pwsh",
   "powershell",
   "cmd",
+  "wsl",
   "bash",
   "zsh",
   "fish",
@@ -131,6 +138,7 @@ export const WINDOWS_PREFERRED_SHELL_OPTIONS: PreferredShell[] = [
   "pwsh",
   "powershell",
   "cmd",
+  "wsl",
 ];
 
 export const UNIX_PREFERRED_SHELL_OPTIONS: PreferredShell[] = [
@@ -146,6 +154,13 @@ function normalizePreferredShell(raw: unknown): PreferredShell {
     return raw as PreferredShell;
   }
   return "auto";
+}
+
+/** Mirrors `isValidWslDistroName` in the main process; invalid → WSL default distro. */
+function normalizeWslDistro(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const t = raw.trim();
+  return /^[A-Za-z0-9][\w.-]{0,63}$/u.test(t) ? t : "";
 }
 
 /** Stored in settings when terminal background should follow the active app theme. */
@@ -237,6 +252,7 @@ const DEFAULTS: ChatSettings = {
   appTheme: DEFAULT_APP_THEME,
   externalTerminal: "auto",
   preferredShell: "auto",
+  wslDistro: "",
   terminalBg: "#2c2420",
   terminalFontFamily: DEFAULT_TERMINAL_FONT_FAMILY,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
@@ -251,7 +267,7 @@ const DEFAULTS: ChatSettings = {
   terminalPasteConfirmBroadcast: true,
   workingDir: "",
   dirHistory: [],
-  paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
+  keybindings: {},
   systemTrayEnabled: true,
   paneAgentAwarenessEnabled: true,
   paneAgentNotifySystem: true,
@@ -262,15 +278,24 @@ const DEFAULTS: ChatSettings = {
   toolLaunchArgs: {},
 };
 
+/** Legacy settings field replaced by `keybindings` (migrated on load). */
+interface LegacyStoredSettings {
+  paneShortcuts?: unknown;
+}
+
 export function loadSettings(): ChatSettings {
   try {
-    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as Partial<ChatSettings>;
+    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as Partial<ChatSettings> &
+      LegacyStoredSettings;
+    // Drop the legacy field so it is not written back on the next save.
+    const { paneShortcuts: _legacyPaneShortcuts, ...stored } = parsed;
     return {
       ...DEFAULTS,
       ...stored,
       locale: normalizeLocalePreference(stored.locale ?? DEFAULTS.locale),
       appTheme: normalizeAppTheme(stored.appTheme),
       preferredShell: normalizePreferredShell(stored.preferredShell),
+      wslDistro: normalizeWslDistro(stored.wslDistro),
       terminalBg: normalizeTerminalBg(stored.terminalBg),
       terminalFontFamily: normalizeFontFamily(stored.terminalFontFamily),
       terminalFontSize: clampInt(
@@ -298,7 +323,7 @@ export function loadSettings(): ChatSettings {
       terminalPasteConfirmMaxLines: normalizePasteConfirmMaxLines(stored.terminalPasteConfirmMaxLines),
       terminalPasteConfirmMaxChars: normalizePasteConfirmMaxChars(stored.terminalPasteConfirmMaxChars),
       terminalPasteConfirmBroadcast: normalizePaneAgentBool(stored.terminalPasteConfirmBroadcast, true),
-      paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
+      keybindings: keybindingOverridesFromStoredSettings(parsed),
       systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
       paneAgentAwarenessEnabled: normalizePaneAgentBool(stored.paneAgentAwarenessEnabled, true),
       paneAgentNotifySystem: normalizePaneAgentBool(stored.paneAgentNotifySystem, true),

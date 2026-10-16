@@ -169,6 +169,41 @@ export const USAGE_PROVIDERS: UsageProviderMeta[] = [
       },
     ],
   },
+  {
+    toolId: "opencode",
+    label: "OpenCode",
+    supported: true,
+    dataSource: "local",
+    docsUrl: "https://opencode.ai/docs/troubleshooting/#storage",
+    credentialNoteKey: "usage.opencode.intro",
+    fields: [],
+  },
+  {
+    toolId: "crush",
+    label: "Crush",
+    supported: true,
+    dataSource: "local",
+    docsUrl: "https://github.com/charmbracelet/crush",
+    credentialNoteKey: "usage.crush.intro",
+    fields: [],
+  },
+  {
+    toolId: "goose",
+    label: "Goose",
+    supported: true,
+    dataSource: "local",
+    docsUrl: "https://goose-docs.ai/docs/guides/sessions/session-management",
+    credentialNoteKey: "usage.goose.intro",
+    fields: [],
+  },
+  {
+    toolId: "aider",
+    label: "Aider",
+    supported: false,
+    unsupportedReasonKey: "usage.aider.unavailable",
+    docsUrl: "https://aider.chat/docs/more/analytics.html",
+    fields: [],
+  },
 ];
 
 export function getUsageProvider(toolId: string): UsageProviderMeta | undefined {
