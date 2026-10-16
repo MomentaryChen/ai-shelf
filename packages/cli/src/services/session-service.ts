@@ -146,9 +146,8 @@ export class SessionService {
     } catch {
       /* not running */
     }
-    const workspace = this.workspaces.findByName(workspaceName)!;
-    const group = this.groups.findByName(workspace.id, groupName)!;
-    const deleted = this.sessions.deleteByName(workspace.id, group.id, sessionName);
+    // resolveSession() already verified the workspace and group exist.
+    const deleted = this.sessions.deleteByName(session.workspace_id, session.group_id, sessionName);
     if (!deleted) throw new AppError(`Session "${sessionName}" not found`, "SESSION_NOT_FOUND");
   }
 

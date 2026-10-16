@@ -2,9 +2,9 @@ import { z } from "zod";
 import { SESSION_STATUSES } from "../core/entities/session-status.js";
 
 export const SessionModelSchema = z.object({
-  id: z.string().uuid(),
-  workspace_id: z.string().uuid(),
-  group_id: z.string().uuid(),
+  id: z.uuid(),
+  workspace_id: z.uuid(),
+  group_id: z.uuid(),
   name: z.string().min(1).max(128),
   cwd: z.string(),
   shell: z.string(),
@@ -20,8 +20,8 @@ export const SessionModelSchema = z.object({
 export type SessionModel = z.infer<typeof SessionModelSchema>;
 
 export const CreateSessionInputSchema = z.object({
-  workspace_id: z.string().uuid(),
-  group_id: z.string().uuid(),
+  workspace_id: z.uuid(),
+  group_id: z.uuid(),
   name: z.string().min(1).max(128),
   cwd: z.string().optional(),
   shell: z.string().optional(),

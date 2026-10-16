@@ -56,8 +56,10 @@ export function buildFlowMcpConfigJson(
   return JSON.stringify(config);
 }
 
-export function flowMcpConfigTempPath(runId: string): string {
-  return join(tmpdir(), `ai-shelf-flow-mcp-${runId}.json`);
+export function flowMcpConfigTempPath(runId: string, configKey?: string): string {
+  // Parallel DAG phases share a run id; the key keeps their configs apart.
+  const key = configKey?.replace(/[^A-Za-z0-9_-]/g, "_");
+  return join(tmpdir(), `ai-shelf-flow-mcp-${runId}${key ? `-${key}` : ""}.json`);
 }
 
 /** Best-effort delete of a per-run MCP config temp file. */
@@ -83,6 +85,8 @@ export function writeFlowMcpConfigFile(
 export type FlowAgentSpawnOptions = {
   /** When false, args reference the temp path but no file is written (preview only). */
   writeMcpConfig?: boolean;
+  /** Distinguishes temp MCP config files of parallel phases within one run. */
+  configKey?: string;
 };
 
 export function flowMcpAllowedTools(): string[] {
@@ -267,7 +271,7 @@ export function flowAgentMcpSpawnArgs(
   const canonical = canonicalToolId(tool);
   if (canonical === "claude") {
     const extraMcp = scope.extraMcpServers ?? [];
-    const mcpConfigPath = flowMcpConfigTempPath(runId);
+    const mcpConfigPath = flowMcpConfigTempPath(runId, options.configKey);
     if (writeMcpConfig) {
       writeFileSync(
         mcpConfigPath,

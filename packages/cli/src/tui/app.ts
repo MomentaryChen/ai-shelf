@@ -238,52 +238,55 @@ function runTui(ctx: AppContext, onExit: () => void): void {
   }
 
   function promptExec(screenRef: Widgets.Screen, broadcast: boolean) {
-    if (!state.profile) return;
-    blessed.prompt(
-      {
-        parent: screenRef,
-        border: "line",
-        height: 3,
-        width: "70%",
-        top: "center",
-        left: "center",
-        label: broadcast ? " Broadcast Exec " : " Exec ",
-        tags: true,
-        keys: true,
-        vi: true,
-        style: { fg: "white", bg: "blue", border: { fg: "cyan" } },
-      },
-      (err, value) => {
-        if (err || !value?.trim()) {
-          screenRef.render();
-          return;
-        }
-        try {
-          const result = ctx.execService.exec(
-            currentGroupName(),
-            state.profile!.name,
-            value.trim(),
-            broadcast
-              ? { broadcast: true }
-              : state.selectedSession
-                ? { session: state.selectedSession.name }
-                : undefined,
-          );
-          if ("sent" in result) {
-            setStatusMessage(
-              statusBar,
-              `Broadcast → ${result.sent.join(", ")}${result.skipped.length ? ` (${result.skipped.length} skipped)` : ""}`,
-            );
-          } else {
-            setStatusMessage(statusBar, `Exec → ${result.sessionName}`);
-          }
-        } catch (ex) {
-          const msg = ex instanceof AppError ? ex.message : String(ex);
-          setStatusMessage(statusBar, msg);
-        }
+    const profile = state.profile;
+    if (!profile) return;
+    // blessed.prompt() only builds a hidden widget (it ignores a callback argument);
+    // input() shows it and reads the command.
+    const prompt = blessed.prompt({
+      parent: screenRef,
+      border: "line",
+      height: "shrink",
+      width: "70%",
+      top: "center",
+      left: "center",
+      label: broadcast ? " Broadcast Exec " : " Exec ",
+      tags: true,
+      keys: true,
+      vi: true,
+      style: { fg: "white", bg: "blue", border: { fg: "cyan" } },
+    });
+    prompt.input("Command:", "", (err: unknown, value: string | undefined) => {
+      prompt.destroy();
+      const command = value?.trim();
+      if (err || !command) {
         screenRef.render();
-      },
-    );
+        return;
+      }
+      try {
+        const result = ctx.execService.exec(
+          currentGroupName(),
+          profile.name,
+          command,
+          broadcast
+            ? { broadcast: true }
+            : state.selectedSession
+              ? { session: state.selectedSession.name }
+              : undefined,
+        );
+        if ("sent" in result) {
+          const skipped = result.skipped.length
+            ? ` (${String(result.skipped.length)} skipped)`
+            : "";
+          setStatusMessage(statusBar, `Broadcast → ${result.sent.join(", ")}${skipped}`);
+        } else {
+          setStatusMessage(statusBar, `Exec → ${result.sessionName}`);
+        }
+      } catch (ex) {
+        const msg = ex instanceof AppError ? ex.message : String(ex);
+        setStatusMessage(statusBar, msg);
+      }
+      screenRef.render();
+    });
   }
 
   let exiting = false;
@@ -301,14 +304,24 @@ function runTui(ctx: AppContext, onExit: () => void): void {
     }
   });
 
-  screen.key(["r"], () => fullRefresh());
+  screen.key(["r"], () => {
+    fullRefresh();
+  });
   screen.key(["s"], () => {
     void startSelectedSession();
   });
-  screen.key(["x"], () => stopSelectedSession());
-  screen.key(["e"], () => promptExec(screen, false));
-  screen.key(["B"], () => promptExec(screen, true));
-  screen.key(["tab"], () => profileTree.focus());
+  screen.key(["x"], () => {
+    stopSelectedSession();
+  });
+  screen.key(["e"], () => {
+    promptExec(screen, false);
+  });
+  screen.key(["B"], () => {
+    promptExec(screen, true);
+  });
+  screen.key(["tab"], () => {
+    profileTree.focus();
+  });
 
   refreshCoordinator.start(ctx, {
     onTick: () => {
@@ -317,7 +330,9 @@ function runTui(ctx: AppContext, onExit: () => void): void {
         screen.render();
       }
     },
-    onEvent: () => refreshSessions(),
+    onEvent: () => {
+      refreshSessions();
+    },
   });
 
   refreshTree();

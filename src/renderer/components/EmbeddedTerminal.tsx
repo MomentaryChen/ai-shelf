@@ -24,7 +24,18 @@ import {
   shouldRespawnLostSession,
   shouldWakeShellWithEnter,
 } from "../terminal/pty-attach-session";
-import { registerTerminalClear } from "../terminal/terminal-session-actions";
+import {
+  getTerminalPasteTarget,
+  pasteToTerminalSession,
+  registerTerminalClear,
+  registerTerminalPasteTarget,
+} from "../terminal/terminal-session-actions";
+import {
+  analyzePaste,
+  getPasteConfirmReasons,
+  toSingleLinePaste,
+  type PasteConfirmSettings,
+} from "../terminal/paste-confirm";
 import {
   copyTerminalOutputForIssue,
   exportTerminalOutput,
@@ -34,6 +45,7 @@ import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
 import { attachTerminalWebgl } from "../terminal/xterm-webgl";
 import { TerminalFindBar } from "./TerminalFindBar";
+import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
 import { useLocale } from "../i18n/LocaleProvider";
 
 interface Props {
@@ -46,6 +58,13 @@ interface Props {
   webglEnabled?: boolean;
   rightClickPaste?: boolean;
   copyOnSelect?: boolean;
+  /** Confirm multi-line / large / broadcast pastes; omitted = never confirm. */
+  pasteConfirm?: PasteConfirmSettings;
+  /**
+   * Sessions a paste from this pane should reach (all panes while broadcast
+   * input is on). Defaults to this session only.
+   */
+  getPasteTargets?: (sessionId: string) => string[];
   active?: boolean;
   focused?: boolean;
   onExit: () => void;
@@ -86,6 +105,8 @@ function EmbeddedTerminalInner({
   webglEnabled = true,
   rightClickPaste = true,
   copyOnSelect = true,
+  pasteConfirm,
+  getPasteTargets,
   active = true,
   focused = true,
   onExit,
@@ -290,6 +311,54 @@ function EmbeddedTerminalInner({
   const copyOnSelectRef = useRef(copyOnSelect);
   copyOnSelectRef.current = copyOnSelect;
 
+  const pasteConfirmRef = useRef(pasteConfirm);
+  pasteConfirmRef.current = pasteConfirm;
+  const getPasteTargetsRef = useRef(getPasteTargets);
+  getPasteTargetsRef.current = getPasteTargets;
+
+  const [pendingPaste, setPendingPaste] = useState<PendingPaste | null>(null);
+  /** Set by the xterm effect: deliver text to this pane only, via term.paste. */
+  const pasteLocalRef = useRef<((text: string) => void) | null>(null);
+
+  /** Deliver to every target; each pane pastes through its own xterm (own bracketed mode). */
+  const deliverPaste = useCallback(
+    (text: string, targets: string[]) => {
+      for (const target of targets) {
+        if (target === sessionId) pasteLocalRef.current?.(text);
+        else pasteToTerminalSession(target, text);
+      }
+    },
+    [sessionId],
+  );
+
+  const requestPaste = useCallback(
+    (text: string) => {
+      const targets = getPasteTargetsRef.current?.(sessionId) ?? [sessionId];
+      const settings = pasteConfirmRef.current;
+      const stats = analyzePaste(text);
+      if (!settings || getPasteConfirmReasons(stats, targets.length, settings).length === 0) {
+        deliverPaste(text, targets);
+        return;
+      }
+      const bracketed = targets.every((target) =>
+        target === sessionId
+          ? termRef.current?.modes.bracketedPasteMode ?? false
+          : getTerminalPasteTarget(target)?.isBracketedPaste() ?? false,
+      );
+      setPendingPaste({ text, stats, targets, bracketed });
+    },
+    [sessionId, deliverPaste],
+  );
+  const requestPasteRef = useRef(requestPaste);
+  requestPasteRef.current = requestPaste;
+
+  const closePasteDialog = (text: string | null) => {
+    const current = pendingPaste;
+    setPendingPaste(null);
+    if (current && text) deliverPaste(text, current.targets);
+    requestAnimationFrame(() => termRef.current?.focus());
+  };
+
   activeRef.current = active;
   onWriteRef.current = onWrite;
   onSessionLostRef.current = onSessionLost;
@@ -370,11 +439,22 @@ function EmbeddedTerminalInner({
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
       getCopyOnSelect: () => copyOnSelectRef.current,
-      onPaste: (text) => {
-        pasteToThisPaneOnly = true;
+      // Paste confirmation (multi-line / large / broadcast) decides the targets.
+      onPaste: (text) => requestPasteRef.current(text),
+    });
+    const pasteLocal = (text: string) => {
+      if (cancelled || exited) return;
+      pasteToThisPaneOnly = true;
+      try {
         term.paste(text);
+      } finally {
         pasteToThisPaneOnly = false;
-      },
+      }
+    };
+    pasteLocalRef.current = pasteLocal;
+    const unregisterPaste = registerTerminalPasteTarget(sessionId, {
+      paste: pasteLocal,
+      isBracketedPaste: () => term.modes.bracketedPasteMode,
     });
     // Pin IME to Ink-style inverse caret (Claude Code / Codex AI prompts).
     const unbindImeAnchor = attachImeAnchor(term, {
@@ -604,6 +684,8 @@ function EmbeddedTerminalInner({
       window.removeEventListener("resize", onWindowResize);
       document.fonts.removeEventListener("loadingdone", onFontsLoadingDone);
       unregisterClear();
+      unregisterPaste();
+      if (pasteLocalRef.current === pasteLocal) pasteLocalRef.current = null;
       unbindClipboard();
       unbindImeAnchor();
       unbindImeCommitGuard();
@@ -725,6 +807,14 @@ function EmbeddedTerminalInner({
           onPrevious={() => void runSearch("prev")}
           onClose={closeFind}
         />
+        <PasteConfirmDialog
+          pending={pendingPaste}
+          onCancel={() => closePasteDialog(null)}
+          onPaste={() => closePasteDialog(pendingPaste?.text ?? null)}
+          onPasteSingleLine={() =>
+            closePasteDialog(pendingPaste ? toSingleLinePaste(pendingPaste.text) : null)
+          }
+        />
         {hasNewOutput && (
           <button
             type="button"
@@ -756,6 +846,11 @@ export const EmbeddedTerminal = memo(
     prev.webglEnabled === next.webglEnabled &&
     prev.rightClickPaste === next.rightClickPaste &&
     prev.copyOnSelect === next.copyOnSelect &&
+    prev.pasteConfirm?.enabled === next.pasteConfirm?.enabled &&
+    prev.pasteConfirm?.maxLines === next.pasteConfirm?.maxLines &&
+    prev.pasteConfirm?.maxChars === next.pasteConfirm?.maxChars &&
+    prev.pasteConfirm?.alwaysWhenBroadcast === next.pasteConfirm?.alwaysWhenBroadcast &&
+    prev.getPasteTargets === next.getPasteTargets &&
     prev.active === next.active &&
     prev.focused === next.focused,
 );

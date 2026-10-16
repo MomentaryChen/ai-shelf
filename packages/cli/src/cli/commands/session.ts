@@ -24,7 +24,10 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
       "--shell <shell>",
       "Shell preference (auto, pwsh, powershell, cmd, bash, zsh, fish, sh)",
     )
-    .option("--tool <tool>", "AI tool to launch (claude, copilot, cursor, codex, gemini, aider, opencode)")
+    .option(
+      "--tool <tool>",
+      "AI tool to launch (claude, copilot, cursor, codex, gemini, aider, opencode)",
+    )
     .option("--no-start", "Only create metadata, do not spawn PTY")
     .description(
       "Create session and start its PTY attached to this terminal (the session stops when you detach)",
@@ -47,7 +50,9 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
           });
           console.log(chalk.green(`✓ Session created: ${workspaceName}/${groupName}/${s.name}`));
           console.log(
-            chalk.dim(`  cwd: ${s.cwd}  status: ${s.status}${s.pid ? `  pid: ${String(s.pid)}` : ""}`),
+            chalk.dim(
+              `  cwd: ${s.cwd}  status: ${s.status}${s.pid ? `  pid: ${String(s.pid)}` : ""}`,
+            ),
           );
           if (s.status === "running") await attachAndReport(ctx, s);
         } catch (err) {
@@ -69,7 +74,9 @@ export function registerSessionCommands(program: Command, getCtx: () => AppConte
       try {
         const ctx = getCtx();
         const s = await ctx.sessionService.start(workspaceName, groupName, sessionName);
-        console.log(chalk.green(`✓ Session started: ${s.name} (pid ${String(s.pid ?? "—")})`));
+        console.log(
+          chalk.green(`✓ Session started: ${s.name} (pid ${s.pid != null ? String(s.pid) : "—"})`),
+        );
         await attachAndReport(ctx, s);
       } catch (err) {
         handleError(err);

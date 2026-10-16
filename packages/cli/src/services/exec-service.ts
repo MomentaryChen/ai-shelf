@@ -35,11 +35,8 @@ export class ExecService {
     command: string,
     options?: ExecOptions,
   ): ExecResult | BroadcastExecResult {
-    if (options?.broadcast && options?.session) {
-      throw new AppError(
-        "Use either --session or --broadcast, not both",
-        "EXEC_OPTIONS_CONFLICT",
-      );
+    if (options?.broadcast && options.session) {
+      throw new AppError("Use either --session or --broadcast, not both", "EXEC_OPTIONS_CONFLICT");
     }
 
     if (options?.broadcast) {
@@ -47,24 +44,21 @@ export class ExecService {
     }
 
     const sessions = this.sessionService.list(workspaceName, groupName);
-    if (sessions.length === 0) {
+    const first = [...sessions].sort((a, b) => a.name.localeCompare(b.name))[0];
+    if (!first) {
       throw new AppError(`No sessions in group "${groupName}"`, "NO_SESSIONS");
     }
 
     const target = options?.session
       ? this.sessionService.resolveSession(workspaceName, groupName, options.session)
-      : [...sessions].sort((a, b) => a.name.localeCompare(b.name))[0]!;
+      : first;
 
     this.writeToSession(target, command);
     return { sessionName: target.name };
   }
 
   /** Send command to every running session in the group. */
-  execBroadcast(
-    workspaceName: string,
-    groupName: string,
-    command: string,
-  ): BroadcastExecResult {
+  execBroadcast(workspaceName: string, groupName: string, command: string): BroadcastExecResult {
     const sessions = this.sessionService.list(workspaceName, groupName);
     if (sessions.length === 0) {
       throw new AppError(`No sessions in group "${groupName}"`, "NO_SESSIONS");

@@ -23,8 +23,8 @@ export class ProfileGroupService {
   ) {}
 
   ensureDefaultGroup(): WorkspaceModel {
-    const list = this.workspaces.list();
-    if (list.length > 0) return list[0]!;
+    const first = this.workspaces.list()[0];
+    if (first) return first;
     const ws = this.workspaces.create({ name: DEFAULT_PROFILE_GROUP_NAME, root_path: homedir() });
     this.eventBus.publish({ type: "WorkspaceCreated", payload: ws });
     return ws;
@@ -59,7 +59,8 @@ export class ProfileGroupService {
       }
       this.workspaces.rename(ws.id, trimmed);
     }
-    const updated = this.workspaces.findById(ws.id)!;
+    const updated = this.workspaces.findById(ws.id);
+    if (!updated) throw new AppError("Profile group not found", "PROFILE_GROUP_NOT_FOUND");
     return this.toGroupInfo(updated, this.layouts.listMetaByWorkspace());
   }
 
