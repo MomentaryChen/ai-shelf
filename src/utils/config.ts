@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { homedir } from "node:os";
 import { canonicalToolId } from "../tools.js";
 
@@ -9,6 +9,54 @@ export function home(...segments: string[]): string {
 
 export function cwd(...segments: string[]): string {
   return join(process.cwd(), ...segments);
+}
+
+/** True when an env-var value is usable as an absolute directory override. */
+function envDir(name: string): string | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  return isAbsolute(raw) ? raw : undefined;
+}
+
+/**
+ * XDG base config directory: `$XDG_CONFIG_HOME` when set to an absolute path
+ * (per the XDG spec relative values are ignored), else `~/.config`.
+ */
+export function xdgConfigHome(...segments: string[]): string {
+  return join(envDir("XDG_CONFIG_HOME") ?? home(".config"), ...segments);
+}
+
+/** Claude Code config dir: `$CLAUDE_CONFIG_DIR` when set, else `~/.claude`. */
+export function claudeConfigDir(...segments: string[]): string {
+  return join(envDir("CLAUDE_CONFIG_DIR") ?? home(".claude"), ...segments);
+}
+
+/**
+ * Claude Code global state file (user + local-scoped MCP, `projects` map).
+ * Lives inside `$CLAUDE_CONFIG_DIR` when that is set, else `~/.claude.json`.
+ */
+export function claudeJsonPath(): string {
+  const dir = envDir("CLAUDE_CONFIG_DIR");
+  return dir ? join(dir, ".claude.json") : home(".claude.json");
+}
+
+/** Codex home: `$CODEX_HOME` when set, else `~/.codex`. */
+export function codexHome(...segments: string[]): string {
+  return join(envDir("CODEX_HOME") ?? home(".codex"), ...segments);
+}
+
+/** OpenCode global config dir (`$XDG_CONFIG_HOME/opencode`). */
+export function opencodeConfigDir(...segments: string[]): string {
+  return xdgConfigHome("opencode", ...segments);
+}
+
+/**
+ * OpenCode global config file: the first existing of `opencode.json` /
+ * `opencode.jsonc`, defaulting to `opencode.json` when neither exists.
+ */
+export function opencodeConfigPath(): string {
+  const candidates = [opencodeConfigDir("opencode.json"), opencodeConfigDir("opencode.jsonc")];
+  return candidates.find((p) => existsSync(p)) ?? candidates[0]!;
 }
 
 export function findExistingPaths(candidates: string[]): string[] {
@@ -87,7 +135,7 @@ export function envPresent(name: string): boolean {
 export function getMcpConfigPath(tool: string): string {
   switch (canonicalToolId(tool)) {
     case "claude":
-      return home(".claude.json");
+      return claudeJsonPath();
     case "copilot":
       return process.env["COPILOT_HOME"]
         ? join(process.env["COPILOT_HOME"], "mcp-config.json")
@@ -95,11 +143,11 @@ export function getMcpConfigPath(tool: string): string {
     case "cursor":
       return home(".cursor", "mcp.json");
     case "codex":
-      return home(".codex", "config.toml");
+      return codexHome("config.toml");
     case "gemini":
       return home(".gemini", "settings.json");
     case "opencode":
-      return join(home(".config", "opencode"), "opencode.json");
+      return opencodeConfigPath();
     default:
       return "";
   }

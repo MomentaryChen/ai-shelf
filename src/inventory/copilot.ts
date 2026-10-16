@@ -1,4 +1,5 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
+import { copilotSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
 import { home, cwd, findExistingPaths, tryReadJson, envPresent } from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
@@ -115,6 +116,7 @@ export async function detectCopilot(opts: DetectOptions = {}): Promise<ProviderE
   }
 
   const models = cliModels.length > 0 ? cliModels : COPILOT_MODELS;
+  const scanned = withScannedSkills(copilotSkillRoots());
 
   return {
     tool: "copilot",
@@ -124,8 +126,7 @@ export async function detectCopilot(opts: DetectOptions = {}): Promise<ProviderE
     auth,
     model,
     models,
-    skills: [],
-    skillDetails: [],
+    ...scanned,
     mcp: {
       supported: true,
       servers: [...new Set(mcpServers)],

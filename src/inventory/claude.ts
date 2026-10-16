@@ -1,7 +1,14 @@
 import type { DetectOptions, ProviderEntry } from "./types.js";
 import { claudeSkillRoots, withScannedSkills } from "./skills-scan.js";
 import { run } from "../utils/exec.js";
-import { home, cwd, findExistingPaths, tryReadJson } from "../utils/config.js";
+import { scanClaudeMcp } from "./claude-mcp.js";
+import {
+  cwd,
+  findExistingPaths,
+  tryReadJson,
+  claudeConfigDir,
+  claudeJsonPath,
+} from "../utils/config.js";
 import { parseCliVersionLine } from "../utils/version.js";
 
 const CLAUDE_MODELS = [
@@ -69,42 +76,28 @@ export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEn
     if (val) model = val;
   }
   if (!model) {
-    const settings = tryReadJson<Record<string, unknown>>(home(".claude", "settings.json"))
-      ?? tryReadJson<Record<string, unknown>>(home(".claude.json"));
+    const settings = tryReadJson<Record<string, unknown>>(claudeConfigDir("settings.json"))
+      ?? tryReadJson<Record<string, unknown>>(claudeJsonPath());
     const val = settings?.["model"];
     if (typeof val === "string" && val.length > 0) model = val;
   }
 
   // Config paths
   const configCandidates = [
-    home(".claude", "settings.json"),
-    home(".claude.json"),
+    claudeConfigDir("settings.json"),
+    claudeJsonPath(),
   ];
   const instructionCandidates = [
-    home(".claude", "CLAUDE.md"),
+    claudeConfigDir("CLAUDE.md"),
     cwd("CLAUDE.md"),
     cwd(".claude", "CLAUDE.md"),
     cwd("CLAUDE.local.md"),
     cwd(".claude", "settings.json"),
     cwd(".claude", "settings.local.json"),
   ];
-  const mcpCandidates = [
-    home(".claude.json"),
-    cwd(".mcp.json"),
-  ];
-
-  // MCP servers
-  const mcpConfigPaths = findExistingPaths(mcpCandidates);
-  const mcpServers: string[] = [];
-  for (const p of mcpConfigPaths) {
-    const data = tryReadJson<Record<string, unknown>>(p);
-    if (data && typeof data === "object") {
-      const servers = (data as Record<string, unknown>)["mcpServers"];
-      if (servers && typeof servers === "object") {
-        mcpServers.push(...Object.keys(servers as object));
-      }
-    }
-  }
+  // MCP servers: user + local (per-project) scopes from ~/.claude.json, and
+  // project-scoped `.mcp.json` at the cwd and every known project root.
+  const mcp = scanClaudeMcp();
 
   const models = cliModels.length > 0 ? cliModels : CLAUDE_MODELS;
   if (model) model = resolveClaudeModelAlias(model, models);
@@ -120,11 +113,7 @@ export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEn
     models,
     model,
     ...scanned,
-    mcp: {
-      supported: true,
-      servers: [...new Set(mcpServers)],
-      configPaths: mcpConfigPaths,
-    },
+    mcp,
     capabilities: {
       contextTokens: 200_000,
       streaming: true,

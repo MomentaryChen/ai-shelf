@@ -30,7 +30,16 @@ import {
   fetchRemoteLatestVersion,
   resolveToolLatestVersion,
 } from "../utils/latest-version.js";
-import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
+import {
+  getMcpConfigPath,
+  tryReadJson,
+  backupFile,
+  writeJson,
+  parseJsonLoose,
+  claudeConfigDir,
+  codexHome,
+  opencodeConfigPath,
+} from "../utils/config.js";
 import {
   collectAllMcpServers,
   readMcpServers,
@@ -1982,8 +1991,8 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
     let key: string;
 
     if (tool === "claude") {
-      settingsPath = join(homedir(), ".claude", "settings.json");
-      mkdirSync(join(homedir(), ".claude"), { recursive: true });
+      settingsPath = claudeConfigDir("settings.json");
+      mkdirSync(claudeConfigDir(), { recursive: true });
       key = "model";
     } else if (tool === "copilot") {
       const copilotHome = process.env["COPILOT_HOME"] ?? join(homedir(), ".copilot");
@@ -1999,11 +2008,11 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
       mkdirSync(join(homedir(), ".gemini"), { recursive: true });
       key = "model";
     } else if (tool === "codex") {
-      settingsPath = join(homedir(), ".codex", "config.toml");
+      settingsPath = codexHome("config.toml");
       key = "model";
     } else if (tool === "opencode") {
-      settingsPath = join(homedir(), ".config", "opencode", "opencode.json");
-      mkdirSync(join(homedir(), ".config", "opencode"), { recursive: true });
+      settingsPath = opencodeConfigPath();
+      mkdirSync(dirname(settingsPath), { recursive: true });
       key = "model";
     } else {
       return { success: false, error: `Unknown tool: ${tool}` };
