@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { getAppDataDir } from "ai-shelf";
+import { DEFAULT_FLOW_RUN_RETENTION } from "./flow-retention.js";
 
 const PREF_FILE = "flow-schedule-pref.json";
 const SLOT_CLAIMS_DIR = "flow-slot-claims";
@@ -18,6 +19,10 @@ const SLOT_CLAIM_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 export type FlowSchedulePrefs = {
   /** In-app cron tick (every minute while AI Shelf is running). */
   schedulerEnabled: boolean;
+  /** Run history retention: keep at most N runs per flow (`null` = unlimited). */
+  historyMaxRuns: number | null;
+  /** Run history retention: delete runs older than N days (`null` = keep forever). */
+  historyMaxDays: number | null;
 };
 
 export type FlowScheduleStore = FlowSchedulePrefs & {
@@ -27,7 +32,17 @@ export type FlowScheduleStore = FlowSchedulePrefs & {
 
 export const DEFAULT_FLOW_SCHEDULE_PREFS: FlowSchedulePrefs = {
   schedulerEnabled: true,
+  historyMaxRuns: DEFAULT_FLOW_RUN_RETENTION.maxRuns,
+  historyMaxDays: DEFAULT_FLOW_RUN_RETENTION.maxAgeDays,
 };
+
+function readLimit(raw: unknown, fallback: number | null): number | null {
+  if (raw === null) return null;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw > 0 ? Math.floor(raw) : null;
+  }
+  return fallback;
+}
 
 function prefPath(): string {
   return join(getAppDataDir(), PREF_FILE);
@@ -42,6 +57,8 @@ function readStore(): FlowScheduleStore {
     const data = JSON.parse(readFileSync(path, "utf-8")) as Partial<FlowScheduleStore>;
     return {
       schedulerEnabled: data.schedulerEnabled !== false,
+      historyMaxRuns: readLimit(data.historyMaxRuns, DEFAULT_FLOW_SCHEDULE_PREFS.historyMaxRuns),
+      historyMaxDays: readLimit(data.historyMaxDays, DEFAULT_FLOW_SCHEDULE_PREFS.historyMaxDays),
       lastSlots:
         data.lastSlots && typeof data.lastSlots === "object" ? { ...data.lastSlots } : {},
     };
@@ -61,8 +78,8 @@ function writeStore(store: FlowScheduleStore): void {
 }
 
 export function readFlowSchedulePrefs(): FlowSchedulePrefs {
-  const { schedulerEnabled } = readStore();
-  return { schedulerEnabled };
+  const { schedulerEnabled, historyMaxRuns, historyMaxDays } = readStore();
+  return { schedulerEnabled, historyMaxRuns, historyMaxDays };
 }
 
 export function writeFlowSchedulePrefs(partial: Partial<FlowSchedulePrefs>): FlowSchedulePrefs {
@@ -73,9 +90,21 @@ export function writeFlowSchedulePrefs(partial: Partial<FlowSchedulePrefs>): Flo
       partial.schedulerEnabled !== undefined
         ? partial.schedulerEnabled
         : store.schedulerEnabled,
+    historyMaxRuns:
+      partial.historyMaxRuns !== undefined
+        ? readLimit(partial.historyMaxRuns, null)
+        : store.historyMaxRuns,
+    historyMaxDays:
+      partial.historyMaxDays !== undefined
+        ? readLimit(partial.historyMaxDays, null)
+        : store.historyMaxDays,
   };
   writeStore(next);
-  return { schedulerEnabled: next.schedulerEnabled };
+  return {
+    schedulerEnabled: next.schedulerEnabled,
+    historyMaxRuns: next.historyMaxRuns,
+    historyMaxDays: next.historyMaxDays,
+  };
 }
 
 export function readFlowLastSlot(flowId: string): string | null {

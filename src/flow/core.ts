@@ -15,6 +15,7 @@ import { dirname, join } from "node:path";
 import { getAppDataDir } from "ai-shelf";
 import { cronNextRun, shouldRunFlowNow, validateFlowCronMinInterval } from "../shared/flow-cron.js";
 import { isSafeFlowPathSegment, parseFlowDocument } from "../shared/flow-parse.js";
+import { formatFlowValidationIssues, validateFlowDefinition } from "../shared/flow-validate.js";
 import { FLOW_OUTPUT_BEGIN, FLOW_PROGRESS_PREFIX } from "../shared/flow-protocol.js";
 import {
   claimFlowScheduleSlot,
@@ -33,13 +34,20 @@ import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js"
 import type { FlowConsoleChunk } from "../shared/flow-console-types.js";
 import type { ToolLaunchArgs } from "../tool-launch.js";
 import { notifyFlowRunFailed, notifyFlowRunCompleted } from "./flow-notify.js";
+import { pruneFlowRunHistory } from "./run-retention.js";
 import {
   appendFlowConsole,
   beginFlowConsole,
   getFlowConsoleBuffer,
   markFlowConsoleFinished,
 } from "./flow-console-buffer.js";
-import { patchFlowScheduleInContent, patchFlowRunnerInContent, ensureFlowDefaultsInContent } from "../shared/flow-frontmatter-patch.js";
+import {
+  patchFlowScheduleInContent,
+  patchFlowRunnerInContent,
+  patchFlowNotifyInContent,
+  ensureFlowDefaultsInContent,
+  type FlowNotifyPatch,
+} from "../shared/flow-frontmatter-patch.js";
 import {
   getFlowDagNodeCommandDetail,
   type FlowDagNodeCommandDetail,
@@ -90,6 +98,8 @@ type ActiveRunContext = {
   runDir: string;
   state: FlowRunState;
   child?: ChildProcess;
+  /** Parallel DAG phases register every live agent process here. */
+  children?: Set<ChildProcess>;
   abortHttp?: AbortController;
   timeout?: NodeJS.Timeout;
   stopWatching?: () => void;
@@ -255,6 +265,7 @@ function spawnAgentPrompt(
   });
   const env = {
     ...process.env,
+    ...resolved.env,
     AISHELF_RUN_ID: runId,
     AISHELF_APP_DATA_DIR: getAppDataDir(),
     AISHELF_FLOW_OUTPUT_PATH: outputPath,
@@ -341,6 +352,7 @@ export function listFlows(): FlowListItem[] {
     const parsed = parseFlowDocument(content, fileName, filePath);
     if ("error" in parsed) continue;
     const tz = parsed.timezone ?? "Asia/Taipei";
+    const issues = validateFlowDefinition(parsed).map((i) => i.message);
     items.push({
       id: parsed.id,
       fileName,
@@ -348,6 +360,7 @@ export function listFlows(): FlowListItem[] {
       schedule: parsed.schedule,
       phaseCount: parsed.phases.length,
       nextRunAt: parsed.schedule ? cronNextRun(parsed.schedule, tz) : null,
+      ...(issues.length > 0 ? { issues } : {}),
     });
   }
   return items;
@@ -424,6 +437,9 @@ export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; er
   if (ctx.timeout) clearTimeout(ctx.timeout);
   ctx.abortHttp?.abort();
   if (ctx.child) killRunChild(ctx.child);
+  for (const child of ctx.children ?? []) {
+    if (child !== ctx.child) killRunChild(child);
+  }
   cancelFlowGateWait(flowId);
 
   for (const phase of ctx.state.phases) {
@@ -473,6 +489,10 @@ export async function runFlow(
   const flow = getFlowDefinition(flowId);
   if (!flow) return { ok: false, error: `Flow not found: ${flowId}` };
   if (!flow.enabled) return { ok: false, error: "Flow is disabled" };
+  const issues = validateFlowDefinition(flow);
+  if (issues.length > 0) {
+    return { ok: false, error: `Invalid flow: ${formatFlowValidationIssues(issues)}` };
+  }
 
   const stamp = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -499,6 +519,14 @@ export async function runFlow(
       void notifyFlowRunFailed(flow, done);
     } else if (done.status === "completed") {
       void notifyFlowRunCompleted(flow, done);
+    }
+    try {
+      pruneFlowRunHistory(flow.id, {
+        flowOverrides: { maxRuns: flow.historyMaxRuns, maxAgeDays: flow.historyMaxDays },
+        keepRunIds: new Set([runId]),
+      });
+    } catch (err: unknown) {
+      console.warn("[flow] run history GC failed:", err instanceof Error ? err.message : err);
     }
   });
 
@@ -1019,6 +1047,53 @@ export function createFlowFromContent(
   }
 }
 
+/**
+ * Validate and write edited `.flow.md` source for an existing flow (source dialog).
+ * The `id` may not change here — use chat / create to fork a flow.
+ */
+export function saveFlowSource(
+  flowId: string,
+  content: string,
+): { ok: boolean; error?: string } {
+  const flow = getFlowDefinition(flowId);
+  if (!flow) return { ok: false, error: `Flow not found: ${flowId}` };
+  const parsed = parseFlowDocument(content, flow.fileName, flow.filePath);
+  if ("error" in parsed) return { ok: false, error: parsed.error };
+  if (parsed.id !== flowId) {
+    return { ok: false, error: `Flow id cannot change here (expected "${flowId}")` };
+  }
+  const normalized = ensureFlowDefaultsInContent(content);
+  if ("error" in normalized) return { ok: false, error: normalized.error };
+  try {
+    const toWrite = normalized.content.endsWith("\n") ? normalized.content : `${normalized.content}\n`;
+    writeFileSync(flow.filePath, toWrite, "utf8");
+    return { ok: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+export function saveFlowNotifications(
+  flowId: string,
+  patch: FlowNotifyPatch,
+): { ok: boolean; error?: string } {
+  const flow = getFlowDefinition(flowId);
+  if (!flow) return { ok: false, error: `Flow not found: ${flowId}` };
+  const content = readFileSync(flow.filePath, "utf8");
+  const patched = patchFlowNotifyInContent(content, patch);
+  if ("error" in patched) return { ok: false, error: patched.error };
+  const normalized = ensureFlowDefaultsInContent(patched.content);
+  if ("error" in normalized) return { ok: false, error: normalized.error };
+  try {
+    writeFileSync(flow.filePath, normalized.content, "utf8");
+    return { ok: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
 function ensureOutputPathOnState(state: FlowRunState, runDir: string): void {
   if (state.outputPath && existsSync(state.outputPath)) return;
   const fallback = join(runDir, "output.md");
@@ -1149,6 +1224,7 @@ export function saveFlowRunner(
     toolArgs?: string | null;
     cwd?: string | null;
     profile?: string | null;
+    env?: Record<string, string> | null;
   },
 ): { ok: boolean; error?: string } {
   const flow = getFlowDefinition(flowId);
@@ -1175,6 +1251,37 @@ export function saveFlowRunner(
 function listRunIdsForFlow(flowId: string): string[] {
   initFlowDirs();
   return listRunDirNamesForFlow(runsDir(), flowId).sort().reverse();
+}
+
+/**
+ * Apply the run history retention policy to every flow (app start, CLI `prune`, settings).
+ * Runs that are still in flight are never deleted.
+ */
+export function pruneAllFlowRunHistory(
+  options: { flowId?: string; now?: Date } = {},
+): { deleted: number; byFlow: Record<string, number> } {
+  initFlowDirs();
+  const byFlow: Record<string, number> = {};
+  let deleted = 0;
+  const keep = new Set<string>();
+  for (const ctx of activeRunContexts.values()) keep.add(ctx.runId);
+  const files = readdirSync(flowsDir()).filter((f) => f.endsWith(".flow.md"));
+  for (const fileName of files) {
+    const filePath = join(flowsDir(), fileName);
+    const parsed = parseFlowDocument(readFileSync(filePath, "utf8"), fileName, filePath);
+    if ("error" in parsed) continue;
+    if (options.flowId && parsed.id !== options.flowId) continue;
+    const removed = pruneFlowRunHistory(parsed.id, {
+      flowOverrides: { maxRuns: parsed.historyMaxRuns, maxAgeDays: parsed.historyMaxDays },
+      keepRunIds: keep,
+      now: options.now,
+    });
+    if (removed.length > 0) {
+      byFlow[parsed.id] = removed.length;
+      deleted += removed.length;
+    }
+  }
+  return { deleted, byFlow };
 }
 
 export function listRecentRuns(limit = 20): FlowRunState[] {

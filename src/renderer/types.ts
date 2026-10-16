@@ -10,6 +10,7 @@ import type {
   FlowConsoleChunk,
 } from "../shared/flow-console-types.js";
 import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
+import type { FlowSchedulePrefs } from "../shared/flow-schedule-pref.js";
 import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
 import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
@@ -1132,10 +1133,30 @@ export interface ElectronAPI {
   flowOpenFlowsDir: () => Promise<void>;
   flowDelete: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
   flowOpenFile: (flowId: string) => Promise<{ ok: boolean; error?: string; path?: string }>;
-  flowGetSchedulePrefs: () => Promise<{ schedulerEnabled: boolean }>;
+  flowGetSchedulePrefs: () => Promise<FlowSchedulePrefs>;
   flowSetSchedulePrefs: (partial: {
     schedulerEnabled?: boolean;
-  }) => Promise<{ ok: boolean; prefs?: { schedulerEnabled: boolean }; error?: string }>;
+    historyMaxRuns?: number | null;
+    historyMaxDays?: number | null;
+  }) => Promise<{ ok: boolean; prefs?: FlowSchedulePrefs; error?: string }>;
+  flowPruneHistory: (flowId?: string) => Promise<{
+    ok: boolean;
+    deleted?: number;
+    byFlow?: Record<string, number>;
+    error?: string;
+  }>;
+  flowSaveSource: (flowId: string, content: string) => Promise<{ ok: boolean; error?: string }>;
+  flowSaveNotifySettings: (
+    flowId: string,
+    patch: {
+      notify?: import("../shared/flow-types.js").FlowDesktopNotifyMode;
+      onSuccess?: "slack" | "none";
+      onFail?: "slack" | "none";
+      webhooks?: import("../shared/flow-types.js").FlowWebhookDef[] | null;
+      historyMaxRuns?: number | null;
+      historyMaxDays?: number | null;
+    },
+  ) => Promise<{ ok: boolean; error?: string }>;
   flowRunDue: () => Promise<{
     ok: boolean;
     result?: {
@@ -1156,6 +1177,7 @@ export interface ElectronAPI {
       toolArgs: string | null;
       cwd: string | null;
       profile: string | null;
+      env?: Record<string, string> | null;
     },
   ) => Promise<{ ok: boolean; error?: string }>;
   flowGenerate: (

@@ -270,6 +270,10 @@ contextBridge.exposeInMainWorld("api", {
   flowSaveSchedule: (flowId, patch) => ipcRenderer.invoke("flow-save-schedule", flowId, patch),
   flowSaveRunnerSettings: (flowId, patch) =>
     ipcRenderer.invoke("flow-save-runner-settings", flowId, patch),
+  flowSaveNotifySettings: (flowId, patch) =>
+    ipcRenderer.invoke("flow-save-notify-settings", flowId, patch),
+  flowSaveSource: (flowId, content) => ipcRenderer.invoke("flow-save-source", flowId, content),
+  flowPruneHistory: (flowId) => ipcRenderer.invoke("flow-prune-history", flowId),
   flowGenerate: (turns, flowId) => ipcRenderer.invoke("flow-generate", { turns, flowId }),
   flowGetChat: (flowId) => ipcRenderer.invoke("flow-get-chat", flowId),
   flowSaveChat: (flowId, messages) => ipcRenderer.invoke("flow-save-chat", flowId, messages),

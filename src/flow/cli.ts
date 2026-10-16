@@ -5,6 +5,7 @@ import {
   initFlowCore,
   listFlows,
   listRunsForFlow,
+  pruneAllFlowRunHistory,
   runDueFlows,
   runFlow,
 } from "./core.js";
@@ -12,9 +13,10 @@ import {
 const [, , command, ...rest] = process.argv;
 
 function printUsage(): void {
-  console.log("Usage: node dist/flow/cli.js <list|run|due|status> [args]");
+  console.log("Usage: node dist/flow/cli.js <list|run|due|status|prune> [args]");
   console.log("  status <runId>           Completed phase ids for a run");
   console.log("  status --flow <flowId>   Latest run for a flow");
+  console.log("  prune [flowId]           Delete old runs per the history retention policy");
 }
 
 async function main(): Promise<void> {
@@ -35,7 +37,8 @@ async function main(): Promise<void> {
       const schedule = f.schedule ? f.schedule : "manual";
       const next = f.nextRunAt ? ` next=${f.nextRunAt}` : "";
       const enabled = f.enabled ? "on" : "off";
-      console.log(`${f.id}\t${enabled}\t${schedule}\t${f.phaseCount} phases${next}`);
+      const invalid = f.issues?.length ? `\tINVALID: ${f.issues.join("; ")}` : "";
+      console.log(`${f.id}\t${enabled}\t${schedule}\t${f.phaseCount} phases${next}${invalid}`);
     }
     return;
   }
@@ -66,6 +69,13 @@ async function main(): Promise<void> {
     if (result.errors.length > 0) {
       process.exitCode = 1;
     }
+    return;
+  }
+
+  if (command === "prune") {
+    const flowId = rest[0]?.trim() || undefined;
+    const result = pruneAllFlowRunHistory({ flowId });
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
 

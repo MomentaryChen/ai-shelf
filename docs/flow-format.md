@@ -53,6 +53,14 @@ phases:
 | `tool_args` | no | CLI flags for the agent; default `--model haiku` when omitted |
 | `extra_mcp_servers` | no | MCP server names merged from Claude config (strict scope — only these + `ai-shelf-flow`) |
 | `allowed_tools` | no | Extra `--allowedTools` patterns for external MCP |
+| `cwd` | no | Working directory for the agent process |
+| `profile` | no | Terminal profile id/name — fills `cwd` / `tool`, exports `AISHELF_PROFILE_ID` / `AISHELF_PROFILE_NAME` |
+| `env` | no | `KEY: value` map added to the agent environment (`${VAR}` expands) |
+| `on_fail` / `on_success` | no | `slack` posts to `AISHELF_FLOW_SLACK_WEBHOOK` |
+| `notify` | no | Desktop notifications: `all` (default) / `failure` / `success` / `none` |
+| `webhooks` | no | List of `{ url, method, on, payload, content_type, authorization }` — see [ai-flow-phase2.md](./ai-flow-phase2.md) |
+| `max_parallel` | no | Max concurrent phases in DAG mode (default 4, max 16) |
+| `history_max_runs` / `history_max_days` | no | Per-flow run history retention overrides |
 
 ### Per-phase fields (under `phases:`)
 
@@ -67,6 +75,11 @@ phases:
 | `require_approval` | Pause for approve before running the node |
 | `next` | Next phase id after success (omit = next in list; empty = end) |
 | `on_reject` | Branch when a gate is rejected (`fail` / `skip` / phase id) |
+| `depends_on` | DAG dependencies (`[a, b]`, nested list, or `[]` for a root). Any `depends_on` enables parallel DAG scheduling; phases without it depend on the previous phase |
+| `profile` | Terminal profile for this node (overrides the flow `profile`) |
+
+Validation (on save and before each run) rejects unknown `next` / `on_fail` / `on_reject` / `depends_on`
+targets, branch loops, dependency cycles, and jump branches in DAG mode.
 
 ## Multi-node orchestration
 
