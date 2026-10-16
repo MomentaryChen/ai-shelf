@@ -129,18 +129,33 @@ export function validateFlowCronMinInterval(
   }
 }
 
+/** How late a missed fire (app closed / machine asleep) may still be caught up. */
+export const FLOW_CRON_CATCHUP_MAX_MS = 24 * 60 * 60 * 1000;
+
 export function shouldRunFlowNow(
   expression: string,
   timezone: string,
   lastSlot: string | null | undefined,
   now = new Date(),
 ): { due: boolean; slotKey: string | null } {
-  if (!cronMatchesMinute(expression, timezone, now)) {
+  if (cronMatchesMinute(expression, timezone, now)) {
+    const slotKey = cronSlotKey(expression, timezone, now);
+    if (!slotKey || slotKey === lastSlot) {
+      return { due: false, slotKey };
+    }
+    return { due: true, slotKey };
+  }
+
+  // Catch up the most recent missed fire (only that one, not every missed slot).
+  // A flow that has never fired (no lastSlot) waits for its next real fire time,
+  // so creating/enabling a flow doesn't immediately run a past slot.
+  if (!lastSlot) return { due: false, slotKey: null };
+  const prev = cronPrevInMinute(expression, timezone, now);
+  if (!prev || now.getTime() - prev.getTime() > FLOW_CRON_CATCHUP_MAX_MS) {
     return { due: false, slotKey: null };
   }
-  const slotKey = cronSlotKey(expression, timezone, now);
-  if (!slotKey || slotKey === lastSlot) {
-    return { due: false, slotKey };
-  }
+  const slotKey = prev.toISOString().slice(0, 16);
+  // Slot keys are minute-precision ISO strings, so lexical order is time order.
+  if (slotKey <= lastSlot) return { due: false, slotKey };
   return { due: true, slotKey };
 }

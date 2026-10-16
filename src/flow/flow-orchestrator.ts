@@ -1,5 +1,5 @@
 import { type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getAppDataDir } from "ai-shelf";
 import {
@@ -21,6 +21,7 @@ import type {
 } from "../shared/flow-types.js";
 import type { ToolLaunchArgs } from "../tool-launch.js";
 import { spawnAgentPrint } from "./claude-spawn.js";
+import { appendBoundedTail } from "./flow-output.js";
 import { resolvePhaseRunner } from "./flow-runner-resolve.js";
 import { phaseLoopError } from "./flow-loop-guard.js";
 import { formatSystemSkillsSection, loadFlowSystemSkills } from "./flow-system-skills.js";
@@ -370,7 +371,7 @@ async function runAgentPhaseOnce(
     child.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString("utf8");
       hooks.emitConsole?.({ phaseId: phase.id, stream: "stderr", data: text });
-      stderr += text;
+      stderr = appendBoundedTail(stderr, text);
     });
 
     child.on("close", (code) => {
@@ -562,9 +563,11 @@ export async function executeOrchestratedFlowRun(
         writeState(ctx, hooks);
 
         const outPath = phaseOutputPath(ctx.runDir, phase.id);
-        // Clear previous attempt output so success requires a fresh write.
+        // Remove previous attempt output so success requires a fresh write. Truncating
+        // would leave the file present, and the existsSync checks after the agent exits
+        // would then treat an empty file as this attempt's output.
         try {
-          if (existsSync(outPath)) writeFileSync(outPath, "", "utf8");
+          rmSync(outPath, { force: true });
         } catch {
           /* ignore */
         }

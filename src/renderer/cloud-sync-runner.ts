@@ -93,9 +93,25 @@ function notifySyncFailure(message: string): void {
   showSyncToast(body, "error");
 }
 
-export async function runCloudSync(
-  options: RunCloudSyncOptions = {},
-): Promise<{ ok: boolean; error?: string; skipped?: boolean }> {
+type RunCloudSyncResult = { ok: boolean; error?: string; skipped?: boolean };
+
+/**
+ * Only one sync may run at a time — concurrent runs (e.g. sign-in background sync
+ * plus a manual click) would both push `revision + 1` and clobber each other.
+ * Callers arriving mid-run share the in-flight result.
+ */
+let inFlightSync: Promise<RunCloudSyncResult> | null = null;
+
+export function runCloudSync(options: RunCloudSyncOptions = {}): Promise<RunCloudSyncResult> {
+  if (inFlightSync) return inFlightSync;
+  const run = runCloudSyncOnce(options).finally(() => {
+    if (inFlightSync === run) inFlightSync = null;
+  });
+  inFlightSync = run;
+  return run;
+}
+
+async function runCloudSyncOnce(options: RunCloudSyncOptions): Promise<RunCloudSyncResult> {
   if (!isFirebaseConfigured()) {
     return { ok: false, error: "not_configured" };
   }
