@@ -10,10 +10,10 @@ import {
   type ToolLaunchArgs,
 } from "../tool-launch.js";
 import {
-  DEFAULT_PANE_SHORTCUT_BINDINGS,
-  normalizePaneShortcutBindings,
-  type PaneShortcutBindings,
-} from "./terminal/pane-key-bindings";
+  keybindingOverridesFromStoredSettings,
+  type KeybindingOverrides,
+} from "./shortcuts/keybindings";
+import { SETTINGS_KEY } from "./settings-key";
 
 export type { AppColorTheme, AppLocale, LocalePreference };
 
@@ -66,8 +66,11 @@ export interface ChatSettings {
   terminalWebglEnabled: boolean;
   workingDir: string;
   dirHistory: string[];
-  /** Pane split / focus shortcuts (Ctrl/Cmd combinations). */
-  paneShortcuts: PaneShortcutBindings;
+  /**
+   * Keyboard shortcut overrides (see shortcuts/keybindings.ts). Missing ids use
+   * the default; `null` unbinds a shortcut so the key reaches the terminal.
+   */
+  keybindings: KeybindingOverrides;
   /** Minimize to system tray and keep running when all windows are closed. */
   systemTrayEnabled: boolean;
   /** Show per-pane agent status and completion alerts in multi-pane layouts. */
@@ -86,9 +89,9 @@ export interface ChatSettings {
   toolLaunchArgs: ToolLaunchArgs;
 }
 
-export type { PaneShortcutBindings, ToolLaunchArgs };
+export type { KeybindingOverrides, ToolLaunchArgs };
 
-export const SETTINGS_KEY = "ai-inventory-chat-settings";
+export { SETTINGS_KEY };
 
 /** Same-window notification when saveSettings runs (see subscribeSettingsChanges). */
 export const SETTINGS_CHANGE_EVENT = "ai-shelf-settings-change";
@@ -233,7 +236,7 @@ const DEFAULTS: ChatSettings = {
   terminalWebglEnabled: true,
   workingDir: "",
   dirHistory: [],
-  paneShortcuts: { ...DEFAULT_PANE_SHORTCUT_BINDINGS },
+  keybindings: {},
   systemTrayEnabled: true,
   paneAgentAwarenessEnabled: true,
   paneAgentNotifySystem: true,
@@ -244,9 +247,17 @@ const DEFAULTS: ChatSettings = {
   toolLaunchArgs: {},
 };
 
+/** Legacy settings field replaced by `keybindings` (migrated on load). */
+interface LegacyStoredSettings {
+  paneShortcuts?: unknown;
+}
+
 export function loadSettings(): ChatSettings {
   try {
-    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as Partial<ChatSettings>;
+    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as Partial<ChatSettings> &
+      LegacyStoredSettings;
+    // Drop the legacy field so it is not written back on the next save.
+    const { paneShortcuts: _legacyPaneShortcuts, ...stored } = parsed;
     return {
       ...DEFAULTS,
       ...stored,
@@ -276,7 +287,7 @@ export function loadSettings(): ChatSettings {
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       terminalWebglEnabled: normalizeWebglEnabled(stored.terminalWebglEnabled),
-      paneShortcuts: normalizePaneShortcutBindings(stored.paneShortcuts),
+      keybindings: keybindingOverridesFromStoredSettings(parsed),
       systemTrayEnabled: normalizeSystemTrayEnabled(stored.systemTrayEnabled),
       paneAgentAwarenessEnabled: normalizePaneAgentBool(stored.paneAgentAwarenessEnabled, true),
       paneAgentNotifySystem: normalizePaneAgentBool(stored.paneAgentNotifySystem, true),
