@@ -37,6 +37,7 @@ import type { MessageKey } from "../i18n/messages/en";
 import { syncMainProcessFromSettings } from "../system-tray-sync";
 import { useHealthMonitor } from "../hooks/useHealthMonitor";
 import { installPlatform } from "../utils/install-platform";
+import type { PtyLogRetentionPrefs } from "../types";
 
 export const SETTINGS_CATEGORIES = [
   { id: "appearance", labelKey: "settings.category.appearance" },
@@ -45,6 +46,61 @@ export const SETTINGS_CATEGORIES = [
   { id: "alerts", labelKey: "settings.category.alerts" },
   { id: "backup", labelKey: "settings.category.backup" },
 ] as const;
+
+const HEALTH_INTERVAL_PRESETS: { minutes: number; labelKey: MessageKey }[] = [
+  { minutes: 60, labelKey: "healthMonitor.interval1h" },
+  { minutes: 6 * 60, labelKey: "healthMonitor.interval6h" },
+  { minutes: 12 * 60, labelKey: "healthMonitor.interval12h" },
+  { minutes: 24 * 60, labelKey: "healthMonitor.interval24h" },
+];
+const MIN_HEALTH_INTERVAL_MINUTES = 15;
+const MAX_HEALTH_INTERVAL_MINUTES = 7 * 24 * 60;
+
+/** Number input that commits on blur / Enter so clamping does not fight typing. */
+function CommitNumberInput({
+  value,
+  min,
+  max,
+  step,
+  onCommit,
+  disabled,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onCommit: (n: number) => void;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const n = Number(draft);
+    if (!Number.isFinite(n) || draft.trim() === "") {
+      setDraft(String(value));
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, Math.round(n)));
+    setDraft(String(clamped));
+    if (clamped !== value) onCommit(clamped);
+  };
+  return (
+    <Input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={draft}
+      disabled={disabled}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+      }}
+      className="w-28 border-border bg-bg-secondary font-mono text-[12px] focus-visible:border-accent/40"
+    />
+  );
+}
 
 export type SettingsCategoryId = (typeof SETTINGS_CATEGORIES)[number]["id"];
 
@@ -137,6 +193,40 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
     null,
   );
   const [importConfirmOpen, setImportConfirmOpen] = useState(false);
+  const [ptyLogRetention, setPtyLogRetention] = useState<PtyLogRetentionPrefs | null>(null);
+  const [ptyLogGcBusy, setPtyLogGcBusy] = useState(false);
+  const [ptyLogGcMessage, setPtyLogGcMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.api.getPtyLogRetention().then((prefs) => {
+      if (!cancelled) setPtyLogRetention(prefs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const updatePtyLogRetention = useCallback(async (partial: Partial<PtyLogRetentionPrefs>) => {
+    const res = await window.api.setPtyLogRetention(partial);
+    if (res.ok) setPtyLogRetention(res.prefs);
+  }, []);
+
+  async function cleanUpPtyLogs() {
+    setPtyLogGcBusy(true);
+    setPtyLogGcMessage(null);
+    try {
+      const res = await window.api.runPtyLogGc();
+      setPtyLogGcMessage(
+        t("settings.ptyLogGcResult", {
+          count: res.deleted,
+          size: (res.freedBytes / (1024 * 1024)).toFixed(1),
+        }),
+      );
+    } finally {
+      setPtyLogGcBusy(false);
+    }
+  }
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -601,6 +691,67 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
             </div>
           </div>
 
+          <div>
+            <Label className="mb-1.5 block text-[12px] font-normal text-text-secondary">
+              {t("settings.ptyLogRetention")}
+            </Label>
+            <p className="mb-2 text-[11px] leading-snug text-text-tertiary">
+              {t("settings.ptyLogRetentionHint")}
+            </p>
+            {ptyLogRetention && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CommitNumberInput
+                    value={ptyLogRetention.maxAgeDays}
+                    min={0}
+                    max={3650}
+                    onCommit={(n) => void updatePtyLogRetention({ maxAgeDays: n })}
+                  />
+                  <span className="text-[11px] text-text-tertiary">
+                    {t("settings.ptyLogMaxAgeDays")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CommitNumberInput
+                    value={ptyLogRetention.maxTotalMb}
+                    min={0}
+                    max={100 * 1024}
+                    step={50}
+                    onCommit={(n) => void updatePtyLogRetention({ maxTotalMb: n })}
+                  />
+                  <span className="text-[11px] text-text-tertiary">
+                    {t("settings.ptyLogMaxTotalMb")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CommitNumberInput
+                    value={ptyLogRetention.maxFilesPerTool}
+                    min={0}
+                    max={10000}
+                    onCommit={(n) => void updatePtyLogRetention({ maxFilesPerTool: n })}
+                  />
+                  <span className="text-[11px] text-text-tertiary">
+                    {t("settings.ptyLogMaxFilesPerTool")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={ptyLogGcBusy}
+                    onClick={() => void cleanUpPtyLogs()}
+                  >
+                    {ptyLogGcBusy ? t("settings.ptyLogGcRunning") : t("settings.ptyLogGcNow")}
+                  </Button>
+                  {ptyLogGcMessage && (
+                    <span className="text-[11px] text-text-tertiary">{ptyLogGcMessage}</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
             <Checkbox
               checked={settings.terminalRightClickPaste}
@@ -697,6 +848,38 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
               </span>
             </span>
           </Label>
+          <div className="rounded-lg border border-border px-3.5 py-3">
+            <Label className="mb-1.5 block text-[13px] font-normal text-text-primary">
+              {t("healthMonitor.checkInterval")}
+            </Label>
+            <ToggleGroup
+              type="single"
+              value={String(healthState?.prefs.checkIntervalMinutes ?? 360)}
+              disabled={!healthState?.prefs.backgroundChecksEnabled}
+              onValueChange={(value) => {
+                if (value) void setHealthPrefs({ checkIntervalMinutes: Number(value) });
+              }}
+            >
+              {HEALTH_INTERVAL_PRESETS.map((p) => (
+                <ToggleGroupItem key={p.minutes} value={String(p.minutes)} size="sm">
+                  {t(p.labelKey)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <div className="mt-2 flex items-center gap-2">
+              <CommitNumberInput
+                value={healthState?.prefs.checkIntervalMinutes ?? 360}
+                min={MIN_HEALTH_INTERVAL_MINUTES}
+                max={MAX_HEALTH_INTERVAL_MINUTES}
+                step={15}
+                disabled={!healthState?.prefs.backgroundChecksEnabled}
+                onCommit={(n) => void setHealthPrefs({ checkIntervalMinutes: n })}
+              />
+              <span className="text-[11px] text-text-tertiary">
+                {t("healthMonitor.checkIntervalHint")}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

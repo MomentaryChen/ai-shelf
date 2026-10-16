@@ -181,6 +181,15 @@ export const en = {
   "settings.scrollbackHint": "lines of history kept in open panes",
   "settings.ptyBuffer": "Output buffer",
   "settings.ptyBufferHint": "chars — export, search, and pty-logs tail",
+  "settings.ptyLogRetention": "PTY log retention",
+  "settings.ptyLogRetentionHint":
+    "Old pty-logs are cleaned at startup and hourly. Logs of running terminals are never deleted. Use 0 to disable a limit.",
+  "settings.ptyLogMaxAgeDays": "days — delete logs older than this",
+  "settings.ptyLogMaxTotalMb": "MB — total size cap (oldest removed first)",
+  "settings.ptyLogMaxFilesPerTool": "logs kept per tool",
+  "settings.ptyLogGcNow": "Clean up now",
+  "settings.ptyLogGcRunning": "Cleaning…",
+  "settings.ptyLogGcResult": "Removed {count} log(s), freed {size} MB",
   "settings.rightClickPaste": "Right-click to paste",
   "settings.rightClickPasteHint":
     "When enabled, right-click pastes from the clipboard; with a selection, it copies first. Hold Shift and right-click for the context menu (Copy, Paste, Find…).",
@@ -202,6 +211,12 @@ export const en = {
   "healthMonitor.weeklySummary": "Weekly health summary",
   "healthMonitor.weeklySummaryHint":
     "Optional desktop notification once a week when issues are found (e.g. MCP failures, auth expired).",
+  "healthMonitor.checkInterval": "Check interval",
+  "healthMonitor.checkIntervalHint": "minutes (15 – 10080) — applies immediately",
+  "healthMonitor.interval1h": "1 h",
+  "healthMonitor.interval6h": "6 h",
+  "healthMonitor.interval12h": "12 h",
+  "healthMonitor.interval24h": "24 h",
   "healthMonitor.allClear": "Environment looks healthy",
   "healthMonitor.watching": "Background monitor is active",
   "healthMonitor.lastCheck": "Last check: {time}",
