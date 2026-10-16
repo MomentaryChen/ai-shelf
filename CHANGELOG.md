@@ -12,6 +12,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 ### Fixed
 
 - **Flow phase loop guard** — Orchestrated flows whose `next:`, `on_fail:` or `on_reject:` cycles back to an earlier phase now fail with a "Phase loop detected" error after `phases × 3` phase executions instead of spawning agent runs forever; configured `retry:` attempts do not count toward the limit.
+- **Flow runs on quit** — Quitting or relaunching the app now cancels in-flight AI Flow runs and kills their agent process trees, and runs left "running" by a previous session are marked failed on startup.
 
 ## [4.3.5] - 2026-10-07
 

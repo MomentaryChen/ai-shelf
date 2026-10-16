@@ -27,6 +27,8 @@ import {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  cancelAllFlowRuns,
+  reconcileStaleFlowRuns,
   approveFlowGate,
   rejectFlowGate,
   saveFlowSchedule,
@@ -73,6 +75,7 @@ export {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  cancelAllFlowRuns,
   approveFlowGate,
   rejectFlowGate,
   saveFlowChat,
@@ -165,6 +168,11 @@ function wireDesktopNotifyOnFail(): void {
 
 export function initFlowService(): void {
   initFlowCore();
+  try {
+    reconcileStaleFlowRuns();
+  } catch {
+    /* history cleanup must not block startup */
+  }
   mkdirSync(join(getAppDataDir(), "flows"), { recursive: true });
   seedExampleFlows();
   wireDesktopNotifyOnFail();

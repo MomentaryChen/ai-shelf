@@ -1,4 +1,4 @@
-import { type ChildProcess, execFile } from "node:child_process";
+import { type ChildProcess, execFile, execFileSync } from "node:child_process";
 import {
   appendFileSync,
   existsSync,
@@ -74,6 +74,7 @@ import {
   flowUsesNodeOrchestration,
   resolveFlowGate,
 } from "./flow-orchestrator.js";
+import { reconcileStaleRuns } from "./run-reconcile.js";
 
 type RunStateListener = (state: FlowRunState) => void;
 type ConsoleChunkListener = (chunk: FlowConsoleChunk) => void;
@@ -98,7 +99,7 @@ type ActiveRunContext = {
 
 const activeRunContexts = new Map<string, ActiveRunContext>();
 
-function killRunChild(child: ChildProcess): void {
+function killRunChild(child: ChildProcess, options: { sync?: boolean } = {}): void {
   if (!child.pid) {
     try {
       child.kill();
@@ -108,7 +109,17 @@ function killRunChild(child: ChildProcess): void {
     return;
   }
   if (process.platform === "win32") {
-    execFile("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
+    const args = ["/pid", String(child.pid), "/T", "/F"];
+    if (options.sync) {
+      // App quit: block until the whole tree (cmd shim + agent) is gone before we exit.
+      try {
+        execFileSync("taskkill", args, { windowsHide: true, stdio: "ignore", timeout: 5000 });
+      } catch {
+        /* already dead or taskkill failed */
+      }
+      return;
+    }
+    execFile("taskkill", args, { windowsHide: true }, () => {});
     return;
   }
   try {
@@ -411,6 +422,14 @@ export function listActiveFlowRuns(): FlowRunState[] {
 }
 
 export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; error?: string } {
+  return cancelRunContext(flowId, "Cancelled by user");
+}
+
+function cancelRunContext(
+  flowId: string,
+  reason: string,
+  options: { syncKill?: boolean } = {},
+): { ok: boolean; runId?: string; error?: string } {
   const ctx = activeRunContexts.get(flowId);
   if (!ctx) {
     return { ok: false, error: "No run in progress for this flow" };
@@ -422,7 +441,7 @@ export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; er
   ctx.cancelled = true;
   if (ctx.timeout) clearTimeout(ctx.timeout);
   ctx.abortHttp?.abort();
-  if (ctx.child) killRunChild(ctx.child);
+  if (ctx.child) killRunChild(ctx.child, { sync: options.syncKill });
   cancelFlowGateWait(flowId);
 
   for (const phase of ctx.state.phases) {
@@ -435,7 +454,7 @@ export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; er
     }
   }
   ctx.state.status = "cancelled";
-  ctx.state.error = "Cancelled by user";
+  ctx.state.error = reason;
   ctx.state.currentPhaseId = null;
   ctx.state.pendingGatePhaseId = null;
   recomputeRunProgress(ctx.state);
@@ -443,6 +462,43 @@ export function cancelFlowRun(flowId: string): { ok: boolean; runId?: string; er
   writeState(ctx.runDir, ctx.state);
 
   return { ok: true, runId: ctx.runId };
+}
+
+export const APP_QUIT_CANCEL_ERROR = "Cancelled: application quit";
+
+/**
+ * Cancel every in-flight run (app quit / relaunch): kill each agent process tree
+ * synchronously and persist a terminal `cancelled` state so nothing stays "running".
+ */
+export function cancelAllFlowRuns(reason = APP_QUIT_CANCEL_ERROR): string[] {
+  const cancelled: string[] = [];
+  for (const [flowId, ctx] of [...activeRunContexts]) {
+    try {
+      const result = cancelRunContext(flowId, reason, { syncKill: true });
+      if (result.ok && result.runId) cancelled.push(result.runId);
+    } catch {
+      /* keep cancelling the rest */
+    }
+    // The child's close handler may never fire before exit; release resources now.
+    try {
+      ctx.stopWatching?.();
+      releaseRunMcp(ctx);
+    } catch {
+      /* best effort */
+    }
+  }
+  return cancelled;
+}
+
+/**
+ * Startup: runs left non-terminal by a previous app session that died mid-run are
+ * rewritten as failed (see run-reconcile.ts). Runs owned by a live CLI process are kept.
+ */
+export function reconcileStaleFlowRuns(): string[] {
+  initFlowDirs();
+  return reconcileStaleRuns(runsDir(), {
+    isActive: (runId) => activeRuns.has(runId),
+  });
 }
 
 export function approveFlowGate(flowId: string): { ok: boolean; error?: string } {
@@ -484,6 +540,7 @@ export async function runFlow(
 
   const state = initialRunState(flow, runId, runDir);
   state.status = "running";
+  state.ownerPid = process.pid;
   writeState(runDir, state);
   appendEvent(runDir, { type: "run.started", flowId, trigger: options.trigger ?? "manual" });
 
@@ -494,6 +551,8 @@ export async function runFlow(
     activeRunContexts.delete(flowId);
     markFlowConsoleFinished(runId);
     const done = getFlowRunState(runId) ?? state;
+    // Terminal now: drop the in-memory cache so finished runs don't accumulate.
+    activeRuns.delete(runId);
     if (done.status === "failed") {
       void notifyFlowRunFailed(flow, done);
     } else if (done.status === "completed") {
