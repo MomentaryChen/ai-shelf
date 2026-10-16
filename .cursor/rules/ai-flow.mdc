@@ -41,7 +41,30 @@ tool_args: --model haiku  # default for claude runner when omitted
 orchestration: true       # force multi-node mode (also auto when phases set tool/kind/retry/gate)
 extra_mcp_servers:        # optional — external MCP from Claude config
   - atlassian
+profile: work             # optional Terminal profile (cwd / tool / AISHELF_PROFILE_* env)
+env:                      # optional extra env for the agent (${VAR} expands)
+  API_BASE: https://example.com
+notify: failure           # desktop notifications: all | failure | success | none
+on_success: slack         # also on_fail: slack
+webhooks:                 # optional generic webhooks (secrets via ${ENV_VAR})
+  - url: https://hooks.example.com/flow
+    on: both
+    payload: '{"text": "{flow_id} {status} {error}"}'
 ```
+
+## Parallel phases (`depends_on`)
+
+```yaml
+phases:
+  - id: fetch-a
+    depends_on: []        # root
+  - id: fetch-b
+    depends_on: []        # parallel with fetch-a
+  - id: report
+    depends_on: [fetch-a, fetch-b]
+```
+
+Branch targets must exist and must not form loops; `depends_on` must not form cycles (validated on save).
 
 ## Multi-agent orchestration (per-phase nodes)
 

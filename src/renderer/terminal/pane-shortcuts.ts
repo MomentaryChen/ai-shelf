@@ -1,7 +1,12 @@
-import { loadSettings } from "../chat-settings";
 import type { PaneInfo } from "./split-tree";
 import { shouldIgnoreShortcutForIme } from "./ime-keys";
-import { matchPaneFocusSplitShortcut } from "./pane-key-bindings";
+import { getActiveKeybindings } from "../shortcuts/active-keybindings";
+import {
+  matchShortcut,
+  type KeybindingMap,
+  type KeyEventLike,
+  type ShortcutId,
+} from "../shortcuts/keybindings";
 
 export type PaneShortcutAction =
   | { type: "focus-next" }
@@ -11,10 +16,6 @@ export type PaneShortcutAction =
   | { type: "clear-screen" }
   | { type: "restart-session" }
   | { type: "split"; direction: "horizontal" | "vertical" };
-
-function hasMod(ev: KeyboardEvent): boolean {
-  return ev.ctrlKey || ev.metaKey;
-}
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -27,14 +28,14 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
 }
 
 function isXtermTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && Boolean(target.closest(".xterm"));
+  if (!target || typeof target !== "object" || !("closest" in target)) return false;
+  const closest = (target as { closest?: unknown }).closest;
+  if (typeof closest !== "function") return false;
+  return Boolean(closest.call(target, ".xterm"));
 }
 
 /** Apply a matched pane shortcut. Exported for unit tests. */
-export function applyPaneShortcutAction(
-  action: PaneShortcutAction,
-  h: PaneShortcutHandlers,
-): void {
+export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShortcutHandlers): void {
   const {
     panes,
     focusedPaneId,
@@ -109,36 +110,103 @@ export function registerPaneShortcutHandlers(
   getHandlers = source;
 }
 
+const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
+  "focusNext",
+  "focusPrev",
+  "splitHorizontal",
+  "splitVertical",
+  "focusPane",
+  "closePane",
+  "clearScreen",
+  "restartSession",
+];
+
+/** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
+function closeIsDefaultModW(map: KeybindingMap): boolean {
+  const close = map.closePane;
+  return (
+    !!close &&
+    close.key === "w" &&
+    close.mod === true &&
+    !close.shift &&
+    !close.alt &&
+    !close.ctrl &&
+    !close.meta
+  );
+}
+
+function isPlainCtrlW(ev: KeyEventLike): boolean {
+  return (
+    ev.type !== "keyup" &&
+    ev.ctrlKey &&
+    !ev.metaKey &&
+    !ev.shiftKey &&
+    !ev.altKey &&
+    ev.key.toLowerCase() === "w"
+  );
+}
+
+function isCtrlShiftW(ev: KeyEventLike): boolean {
+  return (
+    ev.type !== "keyup" &&
+    ev.ctrlKey &&
+    !ev.metaKey &&
+    ev.shiftKey &&
+    !ev.altKey &&
+    ev.key.toLowerCase() === "w"
+  );
+}
+
+/**
+ * Map a key event to a pane action using the given keybindings (pure; unit tested).
+ *
+ * While close is still the default Ctrl/Cmd+W:
+ * - Ctrl+Shift+W closes the pane (including inside the terminal)
+ * - plain Ctrl+W inside xterm is left for the shell (delete previous word)
+ * - Cmd+W and Ctrl+W outside xterm still close
+ * A rebound or disabled close shortcut is honored as-is, including inside xterm.
+ */
+export function matchPaneShortcutWithBindings(
+  ev: KeyEventLike,
+  map: KeybindingMap,
+  target?: EventTarget | null,
+): PaneShortcutAction | null {
+  if (closeIsDefaultModW(map) && isCtrlShiftW(ev)) {
+    return { type: "close" };
+  }
+  if (closeIsDefaultModW(map) && isPlainCtrlW(ev) && isXtermTarget(target ?? null)) {
+    return null;
+  }
+
+  const m = matchShortcut(ev, map, PANE_SHORTCUT_IDS);
+  if (!m) return null;
+  switch (m.id) {
+    case "focusNext":
+      return { type: "focus-next" };
+    case "focusPrev":
+      return { type: "focus-prev" };
+    case "splitHorizontal":
+      return { type: "split", direction: "horizontal" };
+    case "splitVertical":
+      return { type: "split", direction: "vertical" };
+    case "focusPane":
+      return { type: "focus-index", index: m.index ?? 0 };
+    case "closePane":
+      return { type: "close" };
+    case "clearScreen":
+      return { type: "clear-screen" };
+    case "restartSession":
+      return { type: "restart-session" };
+    default:
+      return null;
+  }
+}
+
 /** Returns a pane action when the event matches a global pane shortcut. */
 export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null {
-  if (ev.type !== "keydown" || !hasMod(ev) || ev.altKey) return null;
+  if (ev.type !== "keydown") return null;
   if (shouldIgnoreShortcutTarget(ev.target)) return null;
-
-  const bindings = loadSettings().paneShortcuts;
-  const focusSplit = matchPaneFocusSplitShortcut(ev, bindings);
-  if (focusSplit) return focusSplit;
-
-  const key = ev.key.toLowerCase();
-
-  // Ctrl+Shift+W closes the pane everywhere, including inside the terminal.
-  if (ev.shiftKey && key === "w") {
-    return { type: "close" };
-  }
-  // Plain Ctrl+W is "delete previous word" in bash/zsh/fish and most AI CLI
-  // prompts — inside xterm let it reach the PTY. Cmd+W (macOS) still closes.
-  if (!ev.shiftKey && key === "w") {
-    if (ev.ctrlKey && !ev.metaKey && isXtermTarget(ev.target)) return null;
-    return { type: "close" };
-  }
-
-  if (!ev.shiftKey && key === "l") {
-    return { type: "clear-screen" };
-  }
-  if (ev.shiftKey && key === "r") {
-    return { type: "restart-session" };
-  }
-
-  return null;
+  return matchPaneShortcutWithBindings(ev, getActiveKeybindings(), ev.target);
 }
 
 /**

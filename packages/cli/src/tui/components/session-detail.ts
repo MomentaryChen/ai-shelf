@@ -33,7 +33,7 @@ export function updateSessionDetail(box: Widgets.BoxElement, session: SessionMod
       `{cyan-fg}CWD:{/}     ${session.cwd}`,
       `{cyan-fg}Shell:{/}   ${session.shell}`,
       `{cyan-fg}Tool:{/}    ${session.tool ?? "—"}`,
-      `{cyan-fg}PID:{/}     ${session.pid ?? "—"}`,
+      `{cyan-fg}PID:{/}     ${session.pid != null ? String(session.pid) : "—"}`,
       "",
       `{gray-fg}Created:{/} ${session.created_at}`,
       `{gray-fg}Updated:{/} ${session.updated_at}`,

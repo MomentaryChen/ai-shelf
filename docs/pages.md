@@ -8,6 +8,7 @@
 ## Table of Contents
 
 - [App navigation](#app-navigation)
+
 1. [Overview](#1-overview)
 2. [Terminal](#2-terminal)
 3. [Models](#3-models)
@@ -26,12 +27,12 @@
 
 The desktop app has **four** top-level modes in the header:
 
-| Mode | Role |
-|---|---|
-| **Terminal** (default) | Profiles sidebar, embedded multi-pane terminals, external launch |
-| **Inventory** | Tabbed dashboard: Overview, Models, Skills, MCP, Config, Doctor, Update, **Usage** |
-| **Tools** | Local utilities (Codec, Crypto, Time, Cron, Regex, JSON, Markdown, Mermaid, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL) |
-| **AI Flow** | Author, schedule, and run multi-agent `.flow.md` workflows |
+| Mode                   | Role                                                                                                                          |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Terminal** (default) | Profiles sidebar, embedded multi-pane terminals, external launch                                                              |
+| **Inventory**          | Tabbed dashboard: Overview, Models, Skills, MCP, Config, Doctor, Update, **Usage**                                            |
+| **Tools**              | Local utilities (Codec, Crypto, Time, Cron, Regex, JSON, Markdown, Mermaid, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL) |
+| **AI Flow**            | Author, schedule, and run multi-agent `.flow.md` workflows                                                                    |
 
 Use the header tabs to switch modes at any time. Command palette (`Cmd/Ctrl+K`) can jump to any mode or Inventory / Tools section.
 
@@ -48,34 +49,38 @@ While **Inventory** mode is open, the window footer shows **🔄 Refresh** to re
 The **Overview** tab is the inventory home screen. It summarizes every AI CLI the app knows about (installed or not). Some labels are localized; column headers stay in English.
 
 ### Summary Bar
+
 Four stat cards run across the top:
 
-| Card | Meaning |
-|---|---|
-| **已安裝 / 偵測總數** | Installed tool count vs. total tools scanned |
-| **未安裝** | Tools detected but not available on `PATH` |
-| **MCP Servers** | Unique MCP servers reported by **installed** tools |
-| **Warnings** | Rows that are not installed or are installed but missing auth |
+| Card                  | Meaning                                                       |
+| --------------------- | ------------------------------------------------------------- |
+| **已安裝 / 偵測總數** | Installed tool count vs. total tools scanned                  |
+| **未安裝**            | Tools detected but not available on `PATH`                    |
+| **MCP Servers**       | Unique MCP servers reported by **installed** tools            |
+| **Warnings**          | Rows that are not installed or are installed but missing auth |
 
 ### Capability Table
+
 The main table lists one row per tool with the following columns:
 
-| Column | Description |
-|---|---|
-| **Tool** | Tool name with official logo |
-| **Version** | Installed version (from `--version`) |
-| **Auth** | Auth status: `ok` · `missing` · `expired` · `unknown` |
-| **MCP** | Whether MCP is configured (`yes` / `no`) |
-| **Model** | Active default model |
-| **Context** | Maximum context window (e.g. `200k`) |
-| **Stream** | Supports streaming output (`yes` / `no`) |
-| **Tools** | Supports tool/function calling (`yes` / `no`) |
-| **Skills** | Comma-separated list of detected skills |
+| Column      | Description                                           |
+| ----------- | ----------------------------------------------------- |
+| **Tool**    | Tool name with official logo                          |
+| **Version** | Installed version (from `--version`)                  |
+| **Auth**    | Auth status: `ok` · `missing` · `expired` · `unknown` |
+| **MCP**     | Whether MCP is configured (`yes` / `no`)              |
+| **Model**   | Active default model                                  |
+| **Context** | Maximum context window (e.g. `200k`)                  |
+| **Stream**  | Supports streaming output (`yes` / `no`)              |
+| **Tools**   | Supports tool/function calling (`yes` / `no`)         |
+| **Skills**  | Comma-separated list of detected skills               |
 
 ### Warnings Panel
-Lists any actionable issues (e.g. *"Copilot binary not found in PATH"*) with tool name and a short description.
+
+Lists any actionable issues (e.g. _"Copilot binary not found in PATH"_) with tool name and a short description.
 
 ### Environment Variables Panel
+
 Shows which AI-related environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN`, etc.) are **present** or **missing** in the current shell environment, without revealing their values.
 
 ---
@@ -96,19 +101,19 @@ Shows which AI-related environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_K
 
 Opened via **Settings** in the profiles sidebar (window title **Terminal Settings**). It hosts the shared `ChatSettingsPanel`:
 
-| Section | What it does |
-|---|---|
-| **Working directory** | Dropdown of `~ (home directory)` plus recent folders; **Browse…** adds a path; up to **10** folders are remembered; **Clear history** resets the list |
-| **External terminal preference** | Same choices as the in-app selector, shown as pill buttons |
-| **Terminal background** | Presets: Windows Terminal black, App theme, Pure black, PowerShell blue, VS Code; optional custom hex color |
+| Section                          | What it does                                                                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Working directory**            | Dropdown of `~ (home directory)` plus recent folders; **Browse…** adds a path; up to **10** folders are remembered; **Clear history** resets the list |
+| **External terminal preference** | Same choices as the in-app selector, shown as pill buttons                                                                                            |
+| **Terminal background**          | Presets: Windows Terminal black, App theme, Pure black, PowerShell blue, VS Code; optional custom hex color                                           |
 
 ### Toolbar (active profile)
 
-| Control | Description |
-|---|---|
-| **+ Pane** | Opens a menu of detected tools; adds another embedded terminal up to the profile limit (`current/max` in the profile chip) |
+| Control                          | Description                                                                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **+ Pane**                       | Opens a menu of detected tools; adds another embedded terminal up to the profile limit (`current/max` in the profile chip)    |
 | **External terminal `<select>`** | Same mapping as **External terminal preference** (Auto detect, Windows Terminal, PowerShell 7+, PowerShell 5, Command Prompt) |
-| **`· sync` badge** | When **broadcast input** is enabled and more than one pane exists, the profile chip shows `· sync` next to the pane counter |
+| **`· sync` badge**               | When **broadcast input** is enabled and more than one pane exists, the profile chip shows `· sync` next to the pane counter   |
 
 ### Agent grid
 
@@ -125,16 +130,16 @@ The **可用的 Agent** section lists installed tools. Each card shows version, 
 
 ### Pane keyboard shortcuts (Terminal mode, when panes are open)
 
-Ignored while typing in inputs (e.g. profile rename).
+Ignored while typing in inputs (e.g. profile rename). Every app shortcut (these, plus command palette, cheatsheet, mode switch, profile switching and terminal copy/paste/find) can be rebound or **disabled** in **Settings → Keyboard shortcuts** — a disabled shortcut passes the key through to the terminal. Duplicate combos are flagged there. Inside a terminal, **Ctrl+W** is delete-previous-word for the shell; **Ctrl+Shift+W** closes the pane (**Cmd+W** still closes on macOS).
 
-| Shortcut | Action |
-|---|---|
-| **Ctrl+Tab** (default) | Return to the previously used terminal (any profile or workspace) — customizable in **Settings → Pane shortcuts** |
-| **Ctrl+Shift+Tab** (default) | Previous pane — customizable in Settings |
-| **Ctrl+1 … Ctrl+9** (default) | Focus pane N (tree order) — modifier customizable in Settings |
-| **Ctrl+Shift+W** | Close focused pane (plain **Ctrl+W** also works outside the terminal; inside the terminal it is passed to the shell as delete-previous-word) |
-| **Ctrl+\\** (default) | Split right (horizontal) — customizable in Settings |
-| **Ctrl+Shift+\\** (default) | Split down (vertical) — customizable in Settings |
+| Shortcut (default)  | Action                                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Ctrl+Tab**        | Return to the previously used terminal (any profile or workspace)                                                             |
+| **Ctrl+Shift+Tab**  | Previous pane                                                                                                                 |
+| **Ctrl+1 … Ctrl+9** | Focus pane N (tree order)                                                                                                     |
+| **Ctrl+Shift+W**    | Close focused pane (plain **Ctrl+W** also closes outside the terminal; inside the terminal **Ctrl+W** is passed to the shell) |
+| **Ctrl+\\**         | Split right (horizontal)                                                                                                      |
+| **Ctrl+Shift+\\**   | Split down (vertical)                                                                                                         |
 
 ---
 
@@ -151,12 +156,12 @@ The **Models** tab is a read-only matrix of detected defaults, optional expanded
 
 ### Model table
 
-| Column | Description |
-|---|---|
-| **Tool** | Tool name and logo |
-| **Available Models** | Chips for the active default plus any extra ids returned during inventory enrichment; falls back to `default` when no list exists |
-| **Context** | Formatter output for configured context/token limits |
-| **Streaming / Tool Calls / Vision** | Capability switches (`Yes` / `No`) from inventory |
+| Column                              | Description                                                                                                                       |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Tool**                            | Tool name and logo                                                                                                                |
+| **Available Models**                | Chips for the active default plus any extra ids returned during inventory enrichment; falls back to `default` when no list exists |
+| **Context**                         | Formatter output for configured context/token limits                                                                              |
+| **Streaming / Tool Calls / Vision** | Capability switches (`Yes` / `No`) from inventory                                                                                 |
 
 ### Long lists
 
@@ -175,6 +180,7 @@ Inventory merges quick detection with optional enrichment (for example **Cursor*
 The **Skills** tab shows which capabilities each tool supports.
 
 ### Team config policy
+
 At the top of the Skills tab you can edit a shared **team policy** (`team-policy.json` under the app data directory):
 
 - **Source of truth** — default MCP / skills tool used when aligning or syncing content
@@ -185,18 +191,23 @@ At the top of the Skills tab you can edit a shared **team policy** (`team-policy
 Forbidden names are blocked from sync writes (shown as `blocked` in the MCP sync preview).
 
 ### Config align from source
+
 Below the policy card, pick MCP and skills source tools, review gaps on other tools, then **Align all missing** (missing-only; never overwrites). Policy defaults seed the source selectors.
 
 ### Skill sync matrix
+
 Copy missing `SKILL.md` folders across tools, with an optional source-of-truth picker for content preference.
 
 ### Per-Tool Skill Cards
+
 Each tool gets a card with:
+
 - Tool logo and name
 - A **count badge** showing how many skills were detected
 - **Skill tags** — e.g. `coding`, `bash`, `file-edit`, `mcp`, `shell`, `repo-edit`
 
 ### Skill Matrix
+
 A cross-tool matrix at the bottom of the page shows every detected skill as a row and each tool as a column. A ✓ badge indicates the tool supports that skill, making it easy to compare capabilities across tools.
 
 ---
@@ -208,22 +219,27 @@ A cross-tool matrix at the bottom of the page shows every detected skill as a ro
 The **MCP** tab gives a complete picture of your Model Context Protocol server setup.
 
 ### Summary Header
+
 When MCP data exists, the summary tile shows **Unique MCP Servers（已安裝工具）** — unique server names aggregated from **installed** tools only.
 
 ### Per-Tool Cards
+
 Each card shows:
 
 - Tool header with **Supported**, **Not Supported**, or an install-state badge depending on detection
-- When a CLI is missing, the UI shows *「未安裝，無法掃描 MCP 設定」*
+- When a CLI is missing, the UI shows _「未安裝，無法掃描 MCP 設定」_
 - Configured MCP server tags (🔌 prefixed) plus monospace paths you can click to reveal in Explorer
 
 ### MCP Server Matrix
+
 A full matrix at the bottom where:
+
 - **Rows** = individual MCP servers
 - **Columns** = tools
 - A green ✓ badge indicates the server is configured for that tool
 
 ### MCP Sync
+
 The matrix card includes tooling to copy entries between JSON MCP configs:
 
 - **Source:** pick which tool’s entry wins when the same server name exists in more than one place (defaults from team policy)
@@ -236,6 +252,7 @@ The matrix card includes tooling to copy entries between JSON MCP configs:
 - Rows with every target already configured are dimmed; the footer counts **servers total**, **need sync**, and **fully synced**
 
 ### Matrix footer strip
+
 Inside the MCP matrix card, a compact line reports **servers total**, how many **need sync**, and how many are **fully synced** (mirrors the sync panel state).
 
 ---
@@ -248,14 +265,16 @@ The **Config** tab lists every configuration file used by each tool, grouped by 
 
 ### File Types
 
-| Type | Description |
-|---|---|
-| **Config** | Main JSON/YAML config files (e.g. `settings.json`, `.claude.json`) |
+| Type             | Description                                                           |
+| ---------------- | --------------------------------------------------------------------- |
+| **Config**       | Main JSON/YAML config files (e.g. `settings.json`, `.claude.json`)    |
 | **Instructions** | Instruction/system-prompt files (e.g. `CLAUDE.md`, `instructions.md`) |
-| **MCP** | MCP-specific config files (e.g. `mcp.json`, `mcp-config.json`) |
+| **MCP**          | MCP-specific config files (e.g. `mcp.json`, `mcp-config.json`)        |
 
 ### File Rows
+
 Each row shows:
+
 - A file-type badge
 - The full resolved path in monospace style
 - A **click-to-open** action that opens the file in the system's default editor
@@ -269,19 +288,22 @@ Each row shows:
 The **Doctor** tab runs health checks to surface problems with your AI CLI setup.
 
 ### Parallel Execution
+
 All tool cards are **rendered immediately** when the tab loads, each showing a spinning loader. Checks for every tool run **concurrently** — results appear card by card as each check completes, rather than waiting for all checks to finish.
 
 ### Checks Performed
+
 Each tool card runs the following checks:
 
-| Check | What it verifies |
-|---|---|
-| **Binary** | Tool binary exists and is executable in `PATH` |
-| **Auth** | Authentication status (`ok` / `missing` / `expired` / `unknown`) |
-| **Config JSON** | Main config file is valid JSON (if present) |
-| **MCP Config JSON** | MCP config file is valid JSON (if present) |
+| Check               | What it verifies                                                 |
+| ------------------- | ---------------------------------------------------------------- |
+| **Binary**          | Tool binary exists and is executable in `PATH`                   |
+| **Auth**            | Authentication status (`ok` / `missing` / `expired` / `unknown`) |
+| **Config JSON**     | Main config file is valid JSON (if present)                      |
+| **MCP Config JSON** | MCP config file is valid JSON (if present)                       |
 
 ### Result Indicators
+
 - ✅ **Pass** — check succeeded
 - ⚠️ **Warning** — present but not ideal (e.g. unknown auth state)
 - ❌ **Fail** — critical issue requiring action
@@ -295,29 +317,33 @@ Each tool card runs the following checks:
 The **Update** tab checks for and applies updates to your AI tools and the inventory tool itself.
 
 ### How Updates Work
+
 The desktop UI ultimately runs `node dist/cli.js update <tool>` (`ai update …`) underneath. The command line printed on each card comes from [`src/tools.ts`](../src/tools.ts) (`TOOL_UPDATE`) plus a package-manager-specific self-update suggestion.
 
-| Target | Printed command (`<cmd> <args…>`) |
-|---|---|
-| Claude Code | `claude update` |
-| GitHub Copilot CLI | `copilot update` |
-| Cursor | `agent update` |
-| OpenAI Codex | `codex upgrade` |
-| Google Gemini CLI | `gemini update` |
-| Aider | `pip install -U aider-chat` |
-| OpenCode | `opencode upgrade` |
+| Target                            | Printed command (`<cmd> <args…>`)                                                                                                                                                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code                       | `claude update`                                                                                                                                                                                                                                    |
+| GitHub Copilot CLI                | `copilot update`                                                                                                                                                                                                                                   |
+| Cursor                            | `agent update`                                                                                                                                                                                                                                     |
+| OpenAI Codex                      | `codex upgrade`                                                                                                                                                                                                                                    |
+| Google Gemini CLI                 | `gemini update`                                                                                                                                                                                                                                    |
+| Aider                             | `pip install -U aider-chat`                                                                                                                                                                                                                        |
+| OpenCode                          | `opencode upgrade`                                                                                                                                                                                                                                 |
 | AI Shelf (**self** / **desktop**) | **Installed NSIS app**: GitHub Release check on startup; in-app download with progress and restart to install (**Download & upgrade desktop** on the Update tab). **From source / dev**: `pnpm` / `yarn` / `npm` global update command as detected |
 
 Packaged CLIs use npm registry metadata (`TOOL_NPM_PACKAGE`). Tools without npm packages (Aider, OpenCode, Crush, Goose) use GitHub Releases (`TOOL_GITHUB_REPO`). The installed desktop app uses `electron-updater` and `latest.yml` on GitHub Releases.
 
 ### Per-Tool Cards
+
 Each card shows:
+
 - Tool logo and name
 - Currently installed version
 - Update status (up-to-date / update available)
 - The exact update command being run
 
 ### Re-check All
+
 The **Re-check All** button at the top re-runs the version scan for all tools without applying any updates, useful for refreshing the status after a manual update.
 
 ---
@@ -328,7 +354,7 @@ The **Re-check All** button at the top re-runs the version scan for all tools wi
 
 Typical capabilities:
 
-- Daily rollups and provider breakdowns (Claude, Codex, Cursor, Gemini, Copilot where credentials allow)
+- Daily rollups and provider breakdowns (Claude, Codex, Cursor, Gemini, Copilot where credentials allow; OpenCode, Crush and Goose read from their local session data with no key; Aider is shown as not available because it keeps no readable usage history)
 - Weekly budget targets and attribution back to Flow authoring / runs when applicable
 - Credentials stored via OS `safeStorage` when available; some providers need API keys or account cookies configured in-app
 
@@ -340,23 +366,23 @@ Open **Inventory → Usage** from the header, or jump via the command palette.
 
 **Tools** is a top-level mode (left rail of utility panels). No dedicated screenshot assets yet; regenerate later via `pnpm gen:docs-assets` when capture coverage expands.
 
-| Panel | Purpose |
-|---|---|
-| **Codec** | Hash / encode / decode / image Base64 |
-| **Crypto** | AES / RSA / ECDSA helpers |
-| **Time** | Timestamp and timezone conversion |
-| **Cron** | Cron expression helpers |
-| **Regex** | Test / replace with presets |
-| **JSON** | Format / minify |
-| **Markdown** | Preview (including Mermaid fences) |
-| **Mermaid** | Diagram editor with templates, live preview, and SVG export |
-| **YAML ↔ JSON** | Convert between YAML and JSON |
-| **JWT** | Decode / inspect tokens |
-| **UUID** | Generate / validate UUID and NanoID |
-| **Diff** | Side-by-side text compare |
-| **System** | Live cpu, memory, network, and gpu |
-| **Ports** | Who is listening on a port, with optional stop |
-| **WSL** | Windows ↔ WSL path convert, distro list / IP, everyday `wsl.exe` commands |
+| Panel           | Purpose                                                                   |
+| --------------- | ------------------------------------------------------------------------- |
+| **Codec**       | Hash / encode / decode / image Base64                                     |
+| **Crypto**      | AES / RSA / ECDSA helpers                                                 |
+| **Time**        | Timestamp and timezone conversion                                         |
+| **Cron**        | Cron expression helpers                                                   |
+| **Regex**       | Test / replace with presets                                               |
+| **JSON**        | Format / minify                                                           |
+| **Markdown**    | Preview (including Mermaid fences)                                        |
+| **Mermaid**     | Diagram editor with templates, live preview, and SVG export               |
+| **YAML ↔ JSON** | Convert between YAML and JSON                                             |
+| **JWT**         | Decode / inspect tokens                                                   |
+| **UUID**        | Generate / validate UUID and NanoID                                       |
+| **Diff**        | Side-by-side text compare                                                 |
+| **System**      | Live cpu, memory, network, and gpu                                        |
+| **Ports**       | Who is listening on a port, with optional stop                            |
+| **WSL**         | Windows ↔ WSL path convert, distro list / IP, everyday `wsl.exe` commands |
 
 Dual-pane Tools layouts adapt with container queries on narrower windows.
 
@@ -372,7 +398,7 @@ What you can do:
 - Inspect the **DAG**, runner settings, schedule (cron), and next run time
 - Run flows manually; stream agent console output while a run is in progress
 - Review **run history** (status, duration, progress, events) and open run artifacts
-- Prefer the in-app scheduler while the app is open; on Windows, OS Task Scheduler can call `ai-shelf flow due` when the app is closed (see [ai-flow-phase1.md](ai-flow-phase1.md))
+- Prefer the in-app scheduler while the app is open; **Run when app is closed** registers an OS job (Windows Task Scheduler, macOS launchd, or a Linux systemd user timer) that calls `ai-shelf flow due` every minute (see [ai-flow-phase1.md](ai-flow-phase1.md))
 
 Flows live under the app data `flows/` folder; format details are in [flow-format.md](flow-format.md).
 

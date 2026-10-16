@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   applyPaneShortcutAction,
-  matchPaneShortcut,
+  matchPaneShortcutWithBindings,
   shouldConsumePaneShortcut,
   type PaneShortcutHandlers,
 } from "./pane-shortcuts.js";
+import { resolveKeybindings, type KeyEventLike } from "../shortcuts/keybindings.js";
 import type { PaneInfo } from "./split-tree.js";
 
 function pane(id: string): PaneInfo {
@@ -89,76 +90,90 @@ describe("shouldConsumePaneShortcut", () => {
   });
 
   it("allows normal pane shortcuts when panes exist", () => {
-    assert.equal(
-      shouldConsumePaneShortcut({ type: "close" }, { panes: [pane("a")] }),
-      true,
-    );
+    assert.equal(shouldConsumePaneShortcut({ type: "close" }, { panes: [pane("a")] }), true);
   });
 });
 
-/** Minimal HTMLElement stand-in: node:test has no DOM. */
-class FakeElement {
-  tagName: string;
-  isContentEditable = false;
-  constructor(
-    tagName: string,
-    private readonly ancestors: string[] = [],
-  ) {
-    this.tagName = tagName;
-  }
-  closest(selector: string): FakeElement | null {
-    return this.ancestors.includes(selector) ? this : null;
-  }
-}
-(globalThis as { HTMLElement?: unknown }).HTMLElement ??= FakeElement;
-
-function keydown(
-  key: string,
-  target: FakeElement,
-  mods: { ctrl?: boolean; meta?: boolean; shift?: boolean } = { ctrl: true },
-): KeyboardEvent {
+/** Minimal element stand-in: node:test has no DOM. `closest` is enough for xterm detection. */
+function fakeTarget(ancestors: string[] = []): EventTarget {
   return {
-    type: "keydown",
-    key,
-    ctrlKey: Boolean(mods.ctrl),
-    metaKey: Boolean(mods.meta),
-    shiftKey: Boolean(mods.shift),
-    altKey: false,
-    target,
-  } as unknown as KeyboardEvent;
+    closest(selector: string) {
+      return ancestors.includes(selector) ? this : null;
+    },
+  } as unknown as EventTarget;
 }
 
-describe("matchPaneShortcut close", () => {
-  const xtermTextarea = () => new FakeElement("TEXTAREA", [".xterm"]);
-  const sidebarButton = () => new FakeElement("BUTTON");
+describe("matchPaneShortcutWithBindings", () => {
+  const key = (k: string, mods: Partial<KeyEventLike> = {}): KeyEventLike => ({
+    type: "keydown",
+    key: k,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    ...mods,
+  });
+  const xterm = () => fakeTarget([".xterm"]);
 
-  it("passes Ctrl+W through to the shell inside xterm", () => {
-    assert.equal(matchPaneShortcut(keydown("w", xtermTextarea())), null);
+  it("maps default bindings to pane actions", () => {
+    const map = resolveKeybindings({}, "win");
+    assert.deepEqual(matchPaneShortcutWithBindings(key("w", { ctrlKey: true }), map), {
+      type: "close",
+    });
+    assert.deepEqual(
+      matchPaneShortcutWithBindings(key("4", { ctrlKey: true, code: "Digit4" }), map),
+      { type: "focus-index", index: 3 },
+    );
+    assert.deepEqual(
+      matchPaneShortcutWithBindings(key("|", { ctrlKey: true, shiftKey: true }), map),
+      { type: "split", direction: "vertical" },
+    );
   });
 
-  it("closes the pane with Ctrl+Shift+W inside xterm", () => {
+  it("lets Ctrl+W reach the terminal when close is unbound", () => {
+    const map = resolveKeybindings({ closePane: null }, "win");
+    assert.equal(matchPaneShortcutWithBindings(key("w", { ctrlKey: true }), map), null);
+    assert.equal(matchPaneShortcutWithBindings(key("w", { ctrlKey: true }), map, xterm()), null);
+  });
+
+  it("supports Alt-based rebinding", () => {
+    const map = resolveKeybindings({ closePane: { key: "w", alt: true, shift: true } }, "win");
     assert.deepEqual(
-      matchPaneShortcut(keydown("W", xtermTextarea(), { ctrl: true, shift: true })),
+      matchPaneShortcutWithBindings(key("W", { altKey: true, shiftKey: true, code: "KeyW" }), map),
+      { type: "close" },
+    );
+    assert.deepEqual(
+      matchPaneShortcutWithBindings(
+        key("W", { altKey: true, shiftKey: true, code: "KeyW" }),
+        map,
+        xterm(),
+      ),
       { type: "close" },
     );
   });
 
-  it("keeps Cmd+W as close inside xterm (macOS)", () => {
-    assert.deepEqual(matchPaneShortcut(keydown("w", xtermTextarea(), { meta: true })), {
+  it("passes plain Ctrl+W through to the shell inside xterm", () => {
+    const map = resolveKeybindings({}, "win");
+    assert.equal(matchPaneShortcutWithBindings(key("w", { ctrlKey: true }), map, xterm()), null);
+  });
+
+  it("closes the pane with Ctrl+Shift+W, including inside xterm", () => {
+    const map = resolveKeybindings({}, "win");
+    const chord = key("W", { ctrlKey: true, shiftKey: true });
+    assert.deepEqual(matchPaneShortcutWithBindings(chord, map), { type: "close" });
+    assert.deepEqual(matchPaneShortcutWithBindings(chord, map, xterm()), { type: "close" });
+  });
+
+  it("keeps Cmd+W as close inside xterm", () => {
+    const map = resolveKeybindings({}, "mac");
+    assert.deepEqual(matchPaneShortcutWithBindings(key("w", { metaKey: true }), map, xterm()), {
       type: "close",
     });
   });
 
-  it("keeps Ctrl+W as close outside xterm", () => {
-    assert.deepEqual(matchPaneShortcut(keydown("w", sidebarButton())), { type: "close" });
-  });
-
-  it("still ignores Ctrl+W in form inputs", () => {
-    assert.equal(matchPaneShortcut(keydown("w", new FakeElement("INPUT"))), null);
-  });
-
   it("keeps Ctrl+L as clear-screen inside xterm", () => {
-    assert.deepEqual(matchPaneShortcut(keydown("l", xtermTextarea())), {
+    const map = resolveKeybindings({}, "win");
+    assert.deepEqual(matchPaneShortcutWithBindings(key("l", { ctrlKey: true }), map, xterm()), {
       type: "clear-screen",
     });
   });

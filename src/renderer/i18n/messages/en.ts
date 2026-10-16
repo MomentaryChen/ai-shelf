@@ -56,10 +56,8 @@ export const en = {
   "onboarding.start.creating": "Setting up…",
   "onboarding.start.modesTitle": "Four ways to work",
   "onboarding.start.modeTerminal": "Terminal — run agents side by side in split panes",
-  "onboarding.start.modeInventory":
-    "Inventory — models, skills, MCP, doctor checks, and usage",
-  "onboarding.start.modeTools":
-    "Tools — codec, JSON, regex, JWT, and other everyday utilities",
+  "onboarding.start.modeInventory": "Inventory — models, skills, MCP, doctor checks, and usage",
+  "onboarding.start.modeTools": "Tools — codec, JSON, regex, JWT, and other everyday utilities",
   "onboarding.start.modeFlow": "AI Flow — automate multi-step AI jobs",
   "onboarding.start.getStarted": "Open terminal",
   "onboarding.next": "Continue",
@@ -122,16 +120,21 @@ export const en = {
   "settings.category.shortcuts": "Shortcuts",
   "settings.category.alerts": "Alerts",
   "settings.category.backup": "Backup",
-  "settings.paneShortcut.title": "Pane shortcuts",
-  "settings.paneShortcut.subtitle":
-    "Split and focus shortcuts while a terminal pane is focused. Requires Ctrl (or Cmd on Mac). Close, clear, and restart shortcuts stay fixed.",
-  "settings.paneShortcut.focusNext": "Return to previous terminal",
-  "settings.paneShortcut.focusPrev": "Focus previous pane",
-  "settings.paneShortcut.splitRight": "Split right",
-  "settings.paneShortcut.splitDown": "Split down",
-  "settings.paneShortcut.focusPane": "Focus pane 1–9",
-  "settings.paneShortcut.hint": "Click a shortcut, press the new key combination, or Esc to cancel.",
   "settings.paneShortcut.pressKeys": "Press keys…",
+  "keybindings.title": "Keyboard shortcuts",
+  "keybindings.subtitle":
+    "Rebind any app shortcut, or disable it so the key reaches the terminal. Inside a terminal, Ctrl+W deletes the previous word; Ctrl+Shift+W closes the pane.",
+  "keybindings.hint":
+    "Click a shortcut and press the new key combination (Esc cancels). Shortcuts need Ctrl/Cmd or Alt, except F1–F24.",
+  "keybindings.unbound": "Disabled",
+  "keybindings.disable": "Disable (pass key to terminal)",
+  "keybindings.resetOne": "Reset to default ({keys})",
+  "keybindings.resetAll": "Reset all shortcuts",
+  "keybindings.recordAria": "Change shortcut for {label}",
+  "keybindings.recordHint": "Press a combination with Ctrl/Cmd or Alt (Esc to cancel).",
+  "keybindings.recordDigitHint":
+    "Press a modifier with any digit 1–9, e.g. Ctrl+1 (Esc to cancel).",
+  "keybindings.conflict": "Same keys as: {names}",
   "settings.language": "Language",
   "settings.theme": "App color theme",
   "settings.theme.system": "Follow system",
@@ -157,6 +160,13 @@ export const en = {
   "shell.zsh": "Zsh",
   "shell.fish": "Fish",
   "shell.sh": "sh",
+  "shell.wsl": "WSL",
+  "settings.wslDistro": "WSL distro",
+  "settings.wslDistro.default": "Default distro (wsl.exe default)",
+  "settings.wslDistro.missing": "not installed",
+  "settings.wslDistro.hint":
+    "New panes open in this distro via wsl.exe, starting in the pane's folder. AI tools run inside the distro with a login bash, so install them there.",
+  "settings.wslDistro.loadFailed": "Could not list WSL distros.",
 
   "settings.toolLaunchArgs.title": "Tool launch arguments",
   "settings.toolLaunchArgs.subtitle":
@@ -181,12 +191,29 @@ export const en = {
   "settings.scrollbackHint": "lines of history kept in open panes",
   "settings.ptyBuffer": "Output buffer",
   "settings.ptyBufferHint": "chars — export, search, and pty-logs tail",
+  "settings.ptyLogRetention": "PTY log retention",
+  "settings.ptyLogRetentionHint":
+    "Old pty-logs are cleaned at startup and hourly. Logs of running terminals are never deleted. Use 0 to disable a limit.",
+  "settings.ptyLogMaxAgeDays": "days — delete logs older than this",
+  "settings.ptyLogMaxTotalMb": "MB — total size cap (oldest removed first)",
+  "settings.ptyLogMaxFilesPerTool": "logs kept per tool",
+  "settings.ptyLogGcNow": "Clean up now",
+  "settings.ptyLogGcRunning": "Cleaning…",
+  "settings.ptyLogGcResult": "Removed {count} log(s), freed {size} MB",
   "settings.rightClickPaste": "Right-click to paste",
   "settings.rightClickPasteHint":
     "When enabled, right-click pastes from the clipboard; with a selection, it copies first. Hold Shift and right-click for the context menu (Copy, Paste, Find…).",
   "settings.copyOnSelect": "Copy on selection",
   "settings.copyOnSelectHint":
     "When enabled, selecting text with the mouse copies it to the clipboard automatically — so you can paste it straight into another terminal.",
+  "settings.pasteConfirm": "Confirm large pastes",
+  "settings.pasteConfirmHint":
+    "Show a preview before pasting text longer than these limits, so a stray multi-line paste can't run commands by accident.",
+  "settings.pasteConfirmMaxLines": "More than (lines)",
+  "settings.pasteConfirmMaxChars": "More than (characters)",
+  "settings.pasteConfirmBroadcast": "Always confirm when broadcasting",
+  "settings.pasteConfirmBroadcastHint":
+    "When “Sync input to all terminals” is on, ask before every paste that would reach more than one terminal.",
   "settings.webgl": "WebGL renderer",
   "settings.webglHint":
     "Faster drawing with the GPU — helps with many panes and large scrollback. Falls back to canvas if WebGL is unavailable. Open panes reload on change.",
@@ -198,10 +225,17 @@ export const en = {
   "healthMonitor.backgroundChecksHint":
     "Every few hours, quietly check for CLI updates and doctor issues. Results appear on Overview and nav badges.",
   "healthMonitor.trayBadge": "Tray alert dot",
-  "healthMonitor.trayBadgeHint": "Show a small red dot on the tray icon when something needs attention.",
+  "healthMonitor.trayBadgeHint":
+    "Show a small red dot on the tray icon when something needs attention.",
   "healthMonitor.weeklySummary": "Weekly health summary",
   "healthMonitor.weeklySummaryHint":
     "Optional desktop notification once a week when issues are found (e.g. MCP failures, auth expired).",
+  "healthMonitor.checkInterval": "Check interval",
+  "healthMonitor.checkIntervalHint": "minutes (15 – 10080) — applies immediately",
+  "healthMonitor.interval1h": "1 h",
+  "healthMonitor.interval6h": "6 h",
+  "healthMonitor.interval12h": "12 h",
+  "healthMonitor.interval24h": "24 h",
   "healthMonitor.allClear": "Environment looks healthy",
   "healthMonitor.watching": "Background monitor is active",
   "healthMonitor.lastCheck": "Last check: {time}",
@@ -216,7 +250,8 @@ export const en = {
     "Preview what will change before writing config files. Existing servers with different settings are never overwritten.",
   "healthMonitor.mcpPreviewBlocked": "{count} blocked by team policy",
   "healthMonitor.mcpPreviewConflicts": "{count} name conflict(s) — will skip",
-  "healthMonitor.mcpPreviewConflictSkip": "Server already exists with different config; sync will not overwrite.",
+  "healthMonitor.mcpPreviewConflictSkip":
+    "Server already exists with different config; sync will not overwrite.",
   "healthMonitor.mcpPreviewShowDiff": "Show diff",
   "healthMonitor.mcpPreviewAdds": "{count} server(s) will be added",
   "healthMonitor.mcpPreviewFrom": "from {tool}",
@@ -253,8 +288,7 @@ export const en = {
     "Too many workspaces to sync ({count}, max {max}). Remove unused workspaces and try again.",
   "settings.accountSyncLimitTooManyProfiles":
     "Too many profiles to sync ({count}, max {max}). Remove unused profiles and try again.",
-  "settings.accountSyncLimitTooManyLayouts":
-    "Too many layouts to sync ({count}, max {max}).",
+  "settings.accountSyncLimitTooManyLayouts": "Too many layouts to sync ({count}, max {max}).",
   "settings.accountSyncLimitTooManyPanes":
     "Profile {profileId} has too many panes to sync ({count}, max {max}).",
   "settings.accountSyncLimitRateLimited": "Please wait {seconds}s before syncing again.",
@@ -267,7 +301,8 @@ export const en = {
   "settings.accountSignInGoogle": "Sign in with Google",
   "settings.accountSigningIn": "Opening Google sign-in…",
   "settings.accountSigningInRedirect": "Continuing sign-in in browser…",
-  "settings.accountSigningInHint": "Complete sign-in in the window that opens. It will close automatically when done.",
+  "settings.accountSigningInHint":
+    "Complete sign-in in the window that opens. It will close automatically when done.",
   "settings.accountSignInSuccess": "Signed in. Returning to settings…",
   "settings.accountSignOut": "Sign out",
   "settings.accountSignInFailed": "Sign-in failed: {error}",
@@ -292,13 +327,16 @@ export const en = {
   "settings.accountSyncCompareChecking": "Checking cloud…",
   "settings.accountSyncCompareInSync": "Matches cloud",
   "settings.accountSyncCompareLocalAhead": "Local changes not backed up yet",
-  "settings.accountSyncCompareRemoteAhead": "Cloud has newer data—choose restore or keep local when backing up",
-  "settings.accountSyncCompareDiverged": "Local and cloud both changed—choose which side to keep when backing up",
+  "settings.accountSyncCompareRemoteAhead":
+    "Cloud has newer data—choose restore or keep local when backing up",
+  "settings.accountSyncCompareDiverged":
+    "Local and cloud both changed—choose which side to keep when backing up",
   "settings.accountSyncPreferTitle": "Choose backup side",
   "settings.accountSyncPreferHint":
     "When local and cloud differ, pick which side to keep. Local is selected by default.",
   "settings.accountSyncPreferLocal": "Prefer local",
-  "settings.accountSyncPreferLocalDesc": "Upload this device’s data and overwrite the cloud backup.",
+  "settings.accountSyncPreferLocalDesc":
+    "Upload this device’s data and overwrite the cloud backup.",
   "settings.accountSyncPreferCloud": "Prefer cloud",
   "settings.accountSyncPreferCloudDesc": "Restore the cloud backup and overwrite this device.",
   "settings.accountSyncPreferConfirm": "Start backup",
@@ -370,8 +408,7 @@ export const en = {
   "profileGroup.creating": "Creating…",
   "profileGroup.namePlaceholder": "Group name",
   "profileGroup.deleteTitle": "Delete this group?",
-  "profileGroup.deleteConfirm":
-    '"{name}" and every profile inside it will be removed.',
+  "profileGroup.deleteConfirm": '"{name}" and every profile inside it will be removed.',
   "profileGroup.deleteAction": "Delete",
   "profileGroup.failedCreate": "Failed to create profile group",
   "profileGroup.failedRename": "Failed to rename profile group",
@@ -420,8 +457,7 @@ export const en = {
   "profile.failedSave": "Failed to save settings",
   "profile.failedDelete": "Failed to delete",
   "profile.deleteTitle": "Delete this profile?",
-  "profile.deleteConfirm":
-    '"{name}" and its saved terminals and layout will be removed.',
+  "profile.deleteConfirm": '"{name}" and its saved terminals and layout will be removed.',
   "profile.deleteAction": "Delete",
   "profile.dialog.settingsTitle": "Profile settings",
   "profile.dialog.createTitle": "New Profile",
@@ -429,7 +465,8 @@ export const en = {
   "profile.dialog.startBlank": "Blank profile",
   "profile.dialog.startCopy": "Copy from existing profile",
   "profile.dialog.copyFromProfile": "Source profile",
-  "profile.dialog.copyHint": "Copies default directory, tool, accent, broadcast, and saved commands.",
+  "profile.dialog.copyHint":
+    "Copies default directory, tool, accent, broadcast, and saved commands.",
   "profile.dialog.copyNameDefault": "{name} copy",
   "profile.dialog.templateHint": "Pre-fills settings; you can still edit before creating.",
   "profile.dialog.templateSolo": "Template: Solo agent",
@@ -497,8 +534,10 @@ export const en = {
   "inventory.install.installing": "Installing…",
   "inventory.install.openWebsite": "Official install",
   "inventory.install.noRecipe": "No install command on file — check the tool docs.",
-  "inventory.install.notInPathHint": "{tool} is not in PATH. Run the command below or use the official installer.",
-  "inventory.install.rescanHint": "Rescanning inventory — the tool should appear once PATH is updated.",
+  "inventory.install.notInPathHint":
+    "{tool} is not in PATH. Run the command below or use the official installer.",
+  "inventory.install.rescanHint":
+    "Rescanning inventory — the tool should appear once PATH is updated.",
   "inventory.install.failedUnexpected": "Install failed unexpectedly",
   "inventory.skillMatrix": "Skill Matrix",
   "inventory.mcpUnique": "Unique MCP servers (installed tools)",
@@ -523,7 +562,8 @@ export const en = {
   "inventory.update.upToDate": "Up to date",
   "inventory.update.updating": "Updating…",
   "inventory.update.runUpdate": "Run update",
-  "inventory.update.desktopHint": "Installed desktop app — updates download from GitHub Releases and install on restart.",
+  "inventory.update.desktopHint":
+    "Installed desktop app — updates download from GitHub Releases and install on restart.",
   "inventory.update.noTools": "No installed tools to check",
   "inventory.update.allUpToDate": "All installed tools are up to date",
   "inventory.update.useCards": "Use the cards below to update",
@@ -671,10 +711,30 @@ export const en = {
   "pane.agent.notify.readyBody": "The agent finished and is waiting for your next message.",
   "pane.agent.notify.stalledTitle": "{pane} may be stuck",
   "pane.agent.notify.stalledBody": "No output for a while. Check this pane when you can.",
+  "pane.agent.notify.exitedTitle": "{pane} exited with an error",
+  "pane.agent.notify.exitedBody": "The process exited with code {code}.",
+  "pane.agent.bg.paneLabel": "{profile} › {pane}",
+  "pane.agent.bg.kind.waiting_input": "Waiting for input",
+  "pane.agent.bg.kind.finished": "Agent finished",
+  "pane.agent.bg.kind.error": "Error or may be stuck",
+  "pane.agent.bg.badgeHint": "{kind} · {count} background terminal(s)",
+  "pane.agent.bg.toastOpen": "Open",
+  "pane.agent.bg.toastDismiss": "Dismiss",
   "terminal.scrollToBottom": "Scroll to bottom",
   "terminal.newOutput": "New output",
   "terminal.ctx.copy": "Copy",
   "terminal.ctx.paste": "Paste",
+  "terminal.pasteConfirm.title": "Paste this text?",
+  "terminal.pasteConfirm.titleBroadcast": "Paste into {count} terminals?",
+  "terminal.pasteConfirm.stats": "{lines} lines · {chars} characters",
+  "terminal.pasteConfirm.broadcastNote":
+    "Sync input is on — this paste goes to all {count} terminals in this profile.",
+  "terminal.pasteConfirm.unbracketedWarning":
+    "Bracketed paste is off in the target terminal — each line may run as a command as soon as it is pasted.",
+  "terminal.pasteConfirm.previewTruncated": "Preview shows the beginning only.",
+  "terminal.pasteConfirm.singleLine": "Paste as single line",
+  "terminal.pasteConfirm.paste": "Paste",
+  "terminal.pasteConfirm.pasteBroadcast": "Paste to {count}",
   "terminal.ctx.find": "Find…",
   "terminal.ctx.selectAll": "Select all",
   "terminal.ctx.clear": "Clear screen",
@@ -682,7 +742,8 @@ export const en = {
   "terminal.ctx.exportOutput": "Export output…",
   "terminal.ctx.copyOutputForIssue": "Copy output for issue",
   "chat.emptyPanes.title": "No terminals open in “{profile}”",
-  "chat.emptyPanes.desc": "The layout is saved automatically and restored when you come back (up to {max} panes).",
+  "chat.emptyPanes.desc":
+    "The layout is saved automatically and restored when you come back (up to {max} panes).",
   "chat.emptyPanes.openShell": "Open terminal",
   "chat.emptyPanes.openTool": "Open {tool}",
   "chat.emptyPanes.pickFolder": "Open in folder…",
@@ -713,7 +774,8 @@ export const en = {
   "chat.syncLabel": "sync",
   "chat.broadcastSyncTitle": "Input syncs to all {count} terminals",
   "chat.allTerminalsMinimized": "All terminals are tucked away in the sidebar",
-  "chat.selectTerminalFromSidebar": "Pick or drag a terminal from the sidebar to bring it back here",
+  "chat.selectTerminalFromSidebar":
+    "Pick or drag a terminal from the sidebar to bring it back here",
   "chat.externalBtn": "External",
   "chat.inAppBtn": "In-App",
   "chat.launchFailed": "Failed to launch terminal",
@@ -832,7 +894,8 @@ export const en = {
     "See which tools, profiles, and flows burn money — set a weekly budget before the bill wakes you up. Keys stay on this device.",
   "usage.decisions.title": "This week",
   "usage.decisions.hottest": "Hottest flow",
-  "usage.decisions.hottestEmpty": "No flow runs this week yet — spend attribution starts after the next run.",
+  "usage.decisions.hottestEmpty":
+    "No flow runs this week yet — spend attribution starts after the next run.",
   "usage.decisions.hottestHint": "{runs} runs · {cost}",
   "usage.decisions.estimated": "Estimated from tool spend × run time",
   "usage.decisions.weekSpend": "Week spend",
@@ -846,7 +909,8 @@ export const en = {
   "usage.attribution.runs": "{count} runs",
   "usage.attribution.estimatedBadge": "Est.",
   "usage.budget.title": "Weekly budget",
-  "usage.budget.hint": "Optional soft cap for the last 7 days. Alerts also fire when a provider quota crosses the same threshold.",
+  "usage.budget.hint":
+    "Optional soft cap for the last 7 days. Alerts also fire when a provider quota crosses the same threshold.",
   "usage.budget.amount": "Budget (USD)",
   "usage.budget.amountPlaceholder": "e.g. 50",
   "usage.budget.alertAt": "Alert at %",
@@ -871,7 +935,8 @@ export const en = {
   "usage.summary.configured": "Tools with API keys",
   "usage.summary.active": "Tools reporting data",
   "usage.unified.title": "Daily rollup",
-  "usage.unified.hint": "Costs and tokens merged across every tool that reported data for this period.",
+  "usage.unified.hint":
+    "Costs and tokens merged across every tool that reported data for this period.",
   "usage.unified.empty": "No daily breakdown yet — configure at least one tool below.",
   "usage.unified.noDaily":
     "Connected tools report subscription quotas or billing-cycle totals without a daily history. See each tool for allowance details.",
@@ -890,8 +955,10 @@ export const en = {
   "usage.credential.testFailed": "Connection failed",
   "usage.credential.howToGet": "How to get a key",
   "usage.badge.api": "API supported",
-  "usage.badge.comingSoon": "API pending",
-  "usage.tool.unsupported": "No public usage API for this tool yet",
+  "usage.badge.local": "Local data",
+  "usage.badge.unavailable": "Not available",
+  "usage.tool.unsupported": "This tool has no usage data source AI Shelf can read",
+  "usage.tool.learnMore": "Learn more",
   "usage.tool.notConfigured": "Add an API key below to load usage",
   "usage.metric.inputTokens": "Input tokens",
   "usage.metric.outputTokens": "Output tokens",
@@ -909,7 +976,8 @@ export const en = {
   "usage.compare.view": "View",
   "usage.status.ok": "Reporting",
   "usage.status.notConfigured": "No API key",
-  "usage.status.unsupported": "API pending",
+  "usage.status.unsupported": "Not available",
+  "usage.status.noLocalData": "No local data",
   "usage.status.error": "Error",
   "usage.fetchedAt": "Last refreshed {time} · {days}-day window",
   "usage.range.7d": "Last 7 days",
@@ -999,16 +1067,31 @@ export const en = {
   "usage.copilot.auth.enterprise.note":
     "If set, fetches enterprise-level 28-day reports instead of organization reports.",
   "usage.copilot.auth.enterprise.field": "Enterprise slug",
+  "usage.local.source": "Local session data",
+  "usage.local.noKey":
+    "No API key needed — read-only, straight from the tool's own session data on this computer.",
+  "usage.local.notFound":
+    "No local session data found for this tool yet. Use it at least once on this computer, then refresh.",
+  "usage.opencode.intro":
+    "Reads per-message tokens and cost from OpenCode's local database (~/.local/share/opencode/opencode.db, or legacy storage/message JSON). Cost is what OpenCode recorded for each reply; subscription or free models show $0.",
+  "usage.crush.intro":
+    "Reads session totals from each project's .crush/crush.db listed in Crush's projects.json. Crush stores tokens and cost per session, so each session is counted on the day it was last active.",
+  "usage.goose.intro":
+    "Reads Goose's local sessions.db: the per-request usage ledger when present, otherwise per-session token totals. Cost appears only when Goose recorded it for your provider.",
+  "usage.aider.unavailable":
+    "Aider keeps no usage history AI Shelf can read. It only prints token and cost totals in the chat (and in each repo's .aider.chat.history.md), and its analytics are opt-in and sent to Aider's own service.",
 
   "flow.sidebar.title": "Flows",
   "flow.loading": "Loading flows…",
   "flow.empty": "No flows yet",
   "flow.emptyTitle": "No automation flows",
-  "flow.emptyDesc": "Start from a template, describe what you want in chat, or add a .flow.md to your flows folder.",
+  "flow.emptyDesc":
+    "Start from a template, describe what you want in chat, or add a .flow.md to your flows folder.",
   "flow.emptyBrowseTemplates": "Browse templates",
   "flow.template.marketplace": "Template gallery",
   "flow.template.marketplaceTitle": "Flow template gallery",
-  "flow.template.marketplaceDesc": "Install ready-made flows into your flows folder. You can edit them after install.",
+  "flow.template.marketplaceDesc":
+    "Install ready-made flows into your flows folder. You can edit them after install.",
   "flow.template.loading": "Loading templates…",
   "flow.template.empty": "No templates available",
   "flow.template.install": "Install",
@@ -1025,7 +1108,8 @@ export const en = {
   "flow.template.dailyStandup.desc": "Gather updates and write concise standup bullets with Haiku.",
   "flow.template.dailyStandup.tag": "Claude · manual",
   "flow.template.weeklyDigest.title": "Weekly digest",
-  "flow.template.weeklyDigest.desc": "Monday report from Amplitude + Jira via MCP. Disabled until MCP is configured.",
+  "flow.template.weeklyDigest.desc":
+    "Monday report from Amplitude + Jira via MCP. Disabled until MCP is configured.",
   "flow.template.weeklyDigest.tag": "Claude · scheduled",
   "flow.openFolder": "Open flows folder",
   "flow.phases": "phases",
@@ -1043,8 +1127,10 @@ export const en = {
   "flow.output.generatedAt": "Generated {date}",
   "flow.output.inProgress": "A new run is in progress — this section will update when it finishes",
   "flow.output.expand": "Open full view",
-  "flow.output.waiting": "Run in progress — the agent will write the Markdown report via flow_output…",
-  "flow.output.noOutput": "No output for this run. Make sure the agent calls the flow_output MCP tool.",
+  "flow.output.waiting":
+    "Run in progress — the agent will write the Markdown report via flow_output…",
+  "flow.output.noOutput":
+    "No output for this run. Make sure the agent calls the flow_output MCP tool.",
   "flow.output.loading": "Loading output…",
   "flow.output.empty": "(empty)",
   "flow.output.loadFailed": "Could not read output file",
@@ -1072,7 +1158,8 @@ export const en = {
   "flow.dag.inspectPreview": "Preview (run once for the exact logged command)",
   "flow.dag.inspectLogged": "From last run",
   "flow.dag.inspectHttp": "HTTP request",
-  "flow.dag.inspectPhaseHint": "In multi-node mode each step has its own agent command; legacy flows report steps via MCP flow_progress.",
+  "flow.dag.inspectPhaseHint":
+    "In multi-node mode each step has its own agent command; legacy flows report steps via MCP flow_progress.",
   "flow.dag.inspectOutputPath": "Output file",
   "flow.dag.inspectNoOutput": "No output file yet.",
   "flow.dag.inspectCopy": "Copy command",
@@ -1118,13 +1205,20 @@ export const en = {
   "flow.scheduler.hint":
     "Turn off to pause all cron runs while the app is open or closed. Each flow still keeps its own cron.",
   "flow.scheduler.enabled": "Enable scheduled runs",
-  "flow.scheduler.paused": "Paused — in-app checks and the Windows due job will not start flows.",
+  "flow.scheduler.paused": "Paused — in-app checks and the OS due job will not start flows.",
   "flow.taskScheduler.title": "Run when app is closed",
-  "flow.taskScheduler.hint":
+  "flow.taskScheduler.hint.windows-task-scheduler":
     "Optional Windows Task Scheduler job that runs flow due every minute. Requires scheduled runs enabled above.",
+  "flow.taskScheduler.hint.launchd":
+    "Optional launchd LaunchAgent (~/Library/LaunchAgents) that runs flow due every minute. Requires scheduled runs enabled above.",
+  "flow.taskScheduler.hint.systemd":
+    "Optional systemd user timer (~/.config/systemd/user) that runs flow due every minute. Requires scheduled runs enabled above.",
+  "flow.taskScheduler.unavailable": "Not available on this system: {reason}",
   "flow.taskScheduler.installed": "Configured: {name}",
   "flow.taskScheduler.notInstalled": "Not configured",
-  "flow.taskScheduler.install": "Set up Task Scheduler",
+  "flow.taskScheduler.install.windows-task-scheduler": "Set up Task Scheduler",
+  "flow.taskScheduler.install.launchd": "Set up launchd job",
+  "flow.taskScheduler.install.systemd": "Set up systemd timer",
   "flow.taskScheduler.installing": "Setting up…",
   "flow.taskScheduler.remove": "Remove schedule",
   "flow.taskScheduler.removing": "Removing…",
@@ -1151,10 +1245,12 @@ export const en = {
   "flow.runner.title": "Runner environment",
   "flow.runner.dialogTitle": "Runner: {id}",
   "flow.runner.open": "Runner settings",
-  "flow.runner.hint": "Choose Claude or Cursor agent to run this flow, with launch args and working directory.",
+  "flow.runner.hint":
+    "Choose Claude or Cursor agent to run this flow, with launch args and working directory.",
   "flow.runner.tool": "Tool",
   "flow.runner.toolArgs": "Launch arguments",
-  "flow.runner.toolArgsHint": "Model and other flags are saved to tool_args; manual runs still merge app-wide defaults from Settings.",
+  "flow.runner.toolArgsHint":
+    "Model and other flags are saved to tool_args; manual runs still merge app-wide defaults from Settings.",
   "flow.runner.toolUnsupported": "Only Claude and Cursor agent support AI Flow MCP mode for now.",
   "flow.runner.profile": "Profile",
   "flow.runner.profileNone": "None",
@@ -1164,25 +1260,61 @@ export const en = {
   "flow.runner.saving": "Saving…",
   "flow.runner.saveFailed": "Could not save runner settings",
   "flow.runner.httpOnly": "HTTP flows do not use an agent runner.",
+  "flow.runner.env": "Environment variables",
+  "flow.runner.envHint":
+    "One KEY=value per line, added to the agent process. ${VAR} expands from the app environment. A bound profile also sets AISHELF_PROFILE_ID / AISHELF_PROFILE_NAME.",
+  "flow.notify.title": "Notifications",
+  "flow.notify.hint":
+    "Choose which outcomes notify you, and post run results to Slack or any webhook.",
+  "flow.notify.desktop": "Desktop notifications",
+  "flow.notify.mode.all": "Success and failure",
+  "flow.notify.mode.failure": "Failures only",
+  "flow.notify.mode.success": "Successes only",
+  "flow.notify.mode.none": "Off",
+  "flow.notify.slack": "Slack (AISHELF_FLOW_SLACK_WEBHOOK)",
+  "flow.notify.onSuccess": "On success",
+  "flow.notify.onFailure": "On failure",
+  "flow.notify.slackHint": "Uses the AISHELF_FLOW_SLACK_WEBHOOK environment variable.",
+  "flow.notify.webhooks": "Webhooks",
+  "flow.notify.addWebhook": "Add webhook",
+  "flow.notify.noWebhooks": "No webhooks configured.",
+  "flow.notify.removeWebhook": "Remove webhook",
+  "flow.notify.authorizationPlaceholder":
+    "Authorization header (optional), e.g. Bearer ${MY_TOKEN}",
+  "flow.notify.webhookHint":
+    "Payload placeholders: {flow_id} {run_id} {status} {error} {output_path} {duration_sec} {started_at} {completed_at}. ${ENV_VAR} expands from the environment, so secrets stay out of the flow file. Empty payload sends a default JSON body.",
+  "flow.notify.webhookUrlRequired": "Every webhook needs a URL.",
+  "flow.notify.save": "Save notifications",
+  "flow.notify.saving": "Saving…",
+  "flow.notify.saveFailed": "Could not save notification settings",
+  "flow.validation.title": "This flow has errors and cannot run",
+  "flow.validation.hint": "Fix them in View source or with AI chat.",
+  "flow.dag.after": "after {ids}",
+  "flow.dag.root": "starts immediately",
   "flow.settings.open": "Flow settings",
   "flow.settings.dialogTitle": "Settings: {id}",
   "flow.nextRun": "Next run {time}",
   "flow.create.title": "Create a flow",
-  "flow.create.subtitle": "Describe the job in plain language — Claude will draft a .flow.md for you.",
+  "flow.create.subtitle":
+    "Describe the job in plain language — Claude will draft a .flow.md for you.",
   "flow.create.welcome":
     "Tell me what to automate — for example: check an API every morning and save a Markdown summary.",
   "flow.create.placeholder": "Describe schedule, data sources, and output…",
   "flow.create.send": "Send",
   "flow.create.cancel": "Back to flows",
   "flow.create.new": "New flow",
-  "flow.create.generateFailed": "Could not generate a flow. Check that Claude CLI is installed and signed in.",
+  "flow.create.generateFailed":
+    "Could not generate a flow. Check that Claude CLI is installed and signed in.",
   "flow.create.draftReady": "Here is a draft flow file. Review it, then save.",
-  "flow.create.draftSummary": "Draft ready: {id} ({phases} phases). Tweak with another message or save.",
+  "flow.create.draftSummary":
+    "Draft ready: {id} ({phases} phases). Tweak with another message or save.",
+  "flow.create.draftInvalid": "The draft has errors and cannot be saved yet:\n{issues}",
   "flow.create.previewHint": "Ready to add to your flows folder",
   "flow.create.save": "Save flow",
   "flow.create.saving": "Saving…",
   "flow.create.saveFailed": "Could not save flow",
-  "flow.create.existsHint": "A flow with this id already exists — use Overwrite or change the id in chat.",
+  "flow.create.existsHint":
+    "A flow with this id already exists — use Overwrite or change the id in chat.",
   "flow.create.overwrite": "Overwrite existing",
   "flow.create.update": "Update flow",
   "flow.create.editTitle": "Edit {id} with chat",
@@ -1209,10 +1341,25 @@ export const en = {
   "flow.history.event.runCancelled": "Run cancelled",
   "flow.history.event.phase": "{type} · {phase}",
   "flow.history.event.flowOutput": "Output written",
+  "flow.history.retentionTitle": "Run history retention",
+  "flow.history.retentionHint":
+    "Old run folders are deleted after each run and at app start. Leave a field empty for no limit. Applies to all flows unless a flow overrides it.",
+  "flow.history.maxRuns": "Max runs per flow",
+  "flow.history.maxDays": "Max age (days)",
+  "flow.history.unlimited": "Unlimited",
+  "flow.history.retentionSave": "Save retention",
+  "flow.history.retentionSaveFailed": "Could not save retention settings",
+  "flow.history.pruneNow": "Clean up now",
+  "flow.history.pruneFailed": "Could not clean up run history",
+  "flow.history.pruned": "Deleted {count} old runs",
+  "flow.history.retentionOverride": "History retention for this flow",
+  "flow.history.retentionOverrideHint":
+    "Optional. Overrides the app-wide retention for this flow only.",
   "cmd.action.flow": "AI Flow mode",
 
   "shortcuts.title": "Keyboard shortcuts",
-  "shortcuts.subtitle": "Command palette works everywhere. Pane and terminal shortcuts apply in Terminal mode.",
+  "shortcuts.subtitle":
+    "Command palette works everywhere. Pane and terminal shortcuts apply in Terminal mode.",
   "shortcuts.openLink": "View all shortcuts",
   "shortcuts.section.general": "General",
   "shortcuts.section.pane": "Terminal panes",
@@ -1220,7 +1367,10 @@ export const en = {
   "shortcuts.section.terminal": "Terminal input",
   "shortcuts.general.commandPalette": "Open command palette",
   "shortcuts.general.cheatsheet": "Show this cheatsheet",
-  "shortcuts.general.switchMode": "Switch mode (Terminal / Inventory / Tools / AI Flow)",
+  "shortcuts.general.modeTerminal": "Switch to Terminal mode",
+  "shortcuts.general.modeInventory": "Switch to Inventory mode",
+  "shortcuts.general.modeTools": "Switch to Tools mode",
+  "shortcuts.general.modeFlow": "Switch to AI Flow mode",
   "shortcuts.terminal.toggleSidebar": "Toggle profile sidebar (Terminal mode)",
   "shortcuts.pane.focusNext": "Previous terminal (cross-profile)",
   "shortcuts.pane.focusPrev": "Previous pane in profile",
@@ -1236,6 +1386,7 @@ export const en = {
   "shortcuts.terminal.find": "Find in terminal",
   "shortcuts.terminal.copy": "Copy selection",
   "shortcuts.terminal.paste": "Paste",
+  "shortcuts.terminal.pasteAlt": "Paste (alternate)",
   "shortcuts.terminal.selectAll": "Select all scrollback",
 
   // Tools mode — Codec
@@ -1607,8 +1758,7 @@ export const en = {
   "diff.empty": "Paste text on both sides to see the difference.",
   "diff.identical": "No differences",
   "diff.stats": "+{added} −{removed}",
-  "diff.error.tooLarge":
-    "Each side can be at most {max} lines — shorten the text and try again.",
+  "diff.error.tooLarge": "Each side can be at most {max} lines — shorten the text and try again.",
 
   // Tools mode — System
   "tools.tab.system": "System",
@@ -1629,8 +1779,7 @@ export const en = {
   "system.analyze.report": "Environment report",
   "system.analyze.copy": "Copy",
   "system.analyze.copied": "Copied",
-  "system.analyze.error.noClaude":
-    "Claude CLI is not available. Install it, then try again.",
+  "system.analyze.error.noClaude": "Claude CLI is not available. Install it, then try again.",
   "system.analyze.error.timeout": "The report took too long — try again in a moment.",
   "system.analyze.error.failed": "Could not write the report. Check that Claude is signed in.",
 
@@ -1657,16 +1806,21 @@ export const en = {
   "ports.stopping": "Stopping",
   "ports.stopProtected": "This process cannot be stopped from here.",
   "ports.killTitle": "Stop this process?",
-  "ports.killConfirm": "{name} (pid {pid}) is listening on port {port}. Stopping it will free the port.",
+  "ports.killConfirm":
+    "{name} (pid {pid}) is listening on port {port}. Stopping it will free the port.",
   "ports.error.invalidPort": "Enter a port between 1 and 65535, or leave the field empty.",
   "ports.error.unavailable": "Port lookup is not available in this window.",
   "ports.error.listFailed": "Could not list listeners — try refresh.",
   "ports.error.killFailed": "Could not stop that process. It may have already exited.",
+  "ports.wsl.badge": "WSL · {distro}",
+  "ports.wsl.stopHint": "Runs inside WSL ({distro}) — stop it from a shell in that distro.",
+  "ports.wsl.scanned": "WSL: {list}",
+  "ports.wsl.scanFailed": "{distro} (not scanned)",
+  "ports.wsl.stoppedHint": "Only running distros are scanned; stopped distros are not started.",
 
   // Tools mode — WSL
   "tools.tab.wsl": "WSL",
-  "wsl.subtitle":
-    "Convert Windows ↔ WSL paths, list distros, and copy everyday wsl.exe commands.",
+  "wsl.subtitle": "Convert Windows ↔ WSL paths, list distros, and copy everyday wsl.exe commands.",
   "wsl.panels": "WSL tools",
   "wsl.panel.paths": "Paths",
   "wsl.panel.distros": "Distros",

@@ -1,15 +1,18 @@
 import type { MessageKey } from "../i18n/messages/en";
-import { loadSettings } from "../chat-settings";
+import { getActiveKeybindings } from "./active-keybindings";
 import {
-  DEFAULT_PANE_SHORTCUT_BINDINGS,
-  formatFocusPaneBinding,
-  formatPaneKeyChord,
-  type PaneShortcutBindings,
-} from "../terminal/pane-key-bindings";
-import { formatProfileQuickSwitchLabels, modLabel } from "../profile-quick-switch";
+  SHORTCUT_DEFS,
+  formatCombo,
+  type KeyBinding,
+  type KeybindingMap,
+  type ShortcutId,
+  type ShortcutSectionId,
+} from "./keybindings";
 
 export interface ShortcutRow {
-  keys: string;
+  id: ShortcutId;
+  /** Formatted combo, or `null` when the shortcut is disabled. */
+  keys: string | null;
   labelKey: MessageKey;
 }
 
@@ -18,88 +21,74 @@ export interface ShortcutSection {
   items: ShortcutRow[];
 }
 
-function mod(): string {
-  return modLabel();
-}
+export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
+  commandPalette: "shortcuts.general.commandPalette",
+  cheatsheet: "shortcuts.general.cheatsheet",
+  modeTerminal: "shortcuts.general.modeTerminal",
+  modeInventory: "shortcuts.general.modeInventory",
+  modeTools: "shortcuts.general.modeTools",
+  modeFlow: "shortcuts.general.modeFlow",
+  toggleSidebar: "shortcuts.terminal.toggleSidebar",
+  focusNext: "shortcuts.pane.focusNext",
+  focusPrev: "shortcuts.pane.focusPrev",
+  focusPane: "shortcuts.pane.focusPane",
+  splitHorizontal: "shortcuts.pane.splitHorizontal",
+  splitVertical: "shortcuts.pane.splitVertical",
+  closePane: "shortcuts.pane.close",
+  clearScreen: "shortcuts.pane.clear",
+  restartSession: "shortcuts.pane.restart",
+  profileByIndex: "shortcuts.profile.byIndex",
+  profileCycleNext: "shortcuts.profile.cycleNext",
+  profileCyclePrev: "shortcuts.profile.cyclePrev",
+  find: "shortcuts.terminal.find",
+  copy: "shortcuts.terminal.copy",
+  paste: "shortcuts.terminal.paste",
+  pasteAlt: "shortcuts.terminal.pasteAlt",
+  selectAll: "shortcuts.terminal.selectAll",
+};
 
-function isMac(): boolean {
-  return (
-    typeof navigator !== "undefined" &&
-    /mac/i.test(navigator.platform || navigator.userAgent || "")
-  );
-}
+export const SHORTCUT_SECTION_TITLE_KEYS: Record<ShortcutSectionId, MessageKey> = {
+  general: "shortcuts.section.general",
+  pane: "shortcuts.section.pane",
+  profile: "shortcuts.section.profile",
+  terminal: "shortcuts.section.terminal",
+};
 
-function buildPaneSections(bindings: PaneShortcutBindings): ShortcutSection {
-  return {
-    titleKey: "shortcuts.section.pane",
-    items: [
-      { keys: formatPaneKeyChord(bindings.focusNext), labelKey: "shortcuts.pane.focusNext" },
-      { keys: formatPaneKeyChord(bindings.focusPrev), labelKey: "shortcuts.pane.focusPrev" },
-      {
-        keys: formatPaneKeyChord(bindings.splitHorizontal),
-        labelKey: "shortcuts.pane.splitHorizontal",
-      },
-      {
-        keys: formatPaneKeyChord(bindings.splitVertical),
-        labelKey: "shortcuts.pane.splitVertical",
-      },
-      { keys: formatFocusPaneBinding(bindings.focusPane), labelKey: "shortcuts.pane.focusPane" },
-      // Plain Ctrl+W inside a terminal is passed to the shell (delete word).
-      { keys: isMac() ? `${mod()}+W` : `${mod()}+Shift+W`, labelKey: "shortcuts.pane.close" },
-      { keys: `${mod()}+L`, labelKey: "shortcuts.pane.clear" },
-      { keys: `${mod()}+Shift+R`, labelKey: "shortcuts.pane.restart" },
-    ],
-  };
-}
+const SECTION_ORDER: ShortcutSectionId[] = ["general", "pane", "profile", "terminal"];
 
 export function buildShortcutSections(
-  bindings: PaneShortcutBindings = loadSettings().paneShortcuts ??
-    DEFAULT_PANE_SHORTCUT_BINDINGS,
+  map: KeybindingMap = getActiveKeybindings(),
 ): ShortcutSection[] {
-  const profile = formatProfileQuickSwitchLabels();
-  const m = mod();
-  const copyKeys = isMac() ? `${m}+C` : `${m}+Shift+C`;
-  const pasteKeys = isMac() ? `${m}+V` : `${m}+Shift+V`;
-  const win =
-    typeof navigator !== "undefined" &&
-    /win/i.test(navigator.platform || navigator.userAgent || "");
-  const selectAllKeys = isMac() || win ? `${m}+A` : `${m}+Shift+A`;
-
-  return [
-    {
-      titleKey: "shortcuts.section.general",
-      items: [
-        { keys: `${m}+K`, labelKey: "shortcuts.general.commandPalette" },
-        { keys: `${m}+/`, labelKey: "shortcuts.general.cheatsheet" },
-        { keys: `${modeSwitchModLabel()}+1–4`, labelKey: "shortcuts.general.switchMode" },
-      ],
-    },
-    buildPaneSections(bindings),
-    {
-      titleKey: "shortcuts.section.profile",
-      items: [
-        { keys: profile.profileByIndex, labelKey: "shortcuts.profile.byIndex" },
-        { keys: profile.profileCycle, labelKey: "shortcuts.profile.cycleNext" },
-        { keys: profile.profileCyclePrev, labelKey: "shortcuts.profile.cyclePrev" },
-      ],
-    },
-    {
-      titleKey: "shortcuts.section.terminal",
-      items: [
-        { keys: `${m}+S`, labelKey: "shortcuts.terminal.toggleSidebar" },
-        { keys: `${m}+F`, labelKey: "shortcuts.terminal.find" },
-        { keys: copyKeys, labelKey: "shortcuts.terminal.copy" },
-        { keys: pasteKeys, labelKey: "shortcuts.terminal.paste" },
-        { keys: selectAllKeys, labelKey: "shortcuts.terminal.selectAll" },
-      ],
-    },
-  ];
+  return SECTION_ORDER.map((section) => ({
+    titleKey: SHORTCUT_SECTION_TITLE_KEYS[section],
+    items: SHORTCUT_DEFS.filter((d) => d.section === section).map((d) => ({
+      id: d.id,
+      keys: map[d.id] ? formatCombo(map[d.id]) : null,
+      labelKey: SHORTCUT_LABEL_KEYS[d.id],
+    })),
+  }));
 }
 
-export function modeSwitchModLabel(): string {
-  return isMac() ? "Option" : "Alt";
+/** Formatted combo for one shortcut, or `undefined` when unbound (for optional hint props). */
+export function shortcutKeys(
+  id: ShortcutId,
+  map: KeybindingMap = getActiveKeybindings(),
+): string | undefined {
+  const binding: KeyBinding = map[id];
+  return binding ? formatCombo(binding) : undefined;
 }
 
-export function cheatsheetToggleKeys(): string {
-  return `${mod()}+/`;
+/** Combo for the n-th item of a digit-family shortcut (`Ctrl+3`), or `undefined` when unbound. */
+export function digitShortcutKeys(
+  id: ShortcutId,
+  index: number,
+  map: KeybindingMap = getActiveKeybindings(),
+): string | undefined {
+  const binding = map[id];
+  if (!binding || index < 0 || index > 8) return undefined;
+  return formatCombo({ ...binding, key: String(index + 1) });
+}
+
+export function cheatsheetToggleKeys(): string | undefined {
+  return shortcutKeys("cheatsheet");
 }

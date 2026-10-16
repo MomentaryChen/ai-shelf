@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { formatEnvLines, parseEnvLines } from "../../shared/flow-env.js";
 import {
   applyFlowClaudeDefaultModel,
   buildToolArgsWithClaudeModel,
@@ -55,6 +57,7 @@ export function FlowRunnerSettingsEditor({
   const [toolArgs, setToolArgs] = useState(flowDef.toolArgs ?? "");
   const [cwd, setCwd] = useState(flowDef.cwd ?? "");
   const [profileId, setProfileId] = useState(flowDef.profileId ?? "");
+  const [envText, setEnvText] = useState(() => formatEnvLines(flowDef.env));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [globalToolLaunchArgs, setGlobalToolLaunchArgs] = useState(() => loadSettings().toolLaunchArgs);
@@ -148,6 +151,7 @@ export function FlowRunnerSettingsEditor({
     setTool(initialTool);
     setCwd(flowDef.cwd ?? "");
     setProfileId(flowDef.profileId ?? "");
+    setEnvText(formatEnvLines(flowDef.env));
     setError(null);
 
     const initialArgs = resolveArgsForTool(initialTool, {});
@@ -164,11 +168,17 @@ export function FlowRunnerSettingsEditor({
       normalizeFlowClaudeToolArgs(canonicalToolId(tool), resolvedToolArgs) !==
         normalizeFlowClaudeToolArgs(canonicalToolId(baseTool), flowDef.toolArgs ?? "") ||
       cwd.trim() !== (flowDef.cwd ?? "").trim() ||
-      profileId.trim() !== (flowDef.profileId ?? "").trim()
+      profileId.trim() !== (flowDef.profileId ?? "").trim() ||
+      envText.trim() !== formatEnvLines(flowDef.env).trim()
     );
-  }, [tool, resolvedToolArgs, cwd, profileId, flowDef]);
+  }, [tool, resolvedToolArgs, cwd, profileId, envText, flowDef]);
 
   const save = async () => {
+    const envParsed = parseEnvLines(envText);
+    if ("error" in envParsed) {
+      setError(envParsed.error);
+      return;
+    }
     setSaving(true);
     setError(null);
     const res = await window.api.flowSaveRunnerSettings(flowId, {
@@ -176,6 +186,7 @@ export function FlowRunnerSettingsEditor({
       toolArgs: resolvedToolArgs.trim() || null,
       cwd: cwd.trim() || null,
       profile: profileId.trim() || null,
+      env: Object.keys(envParsed.env).length > 0 ? envParsed.env : null,
     });
     setSaving(false);
     if (!res.ok) {
@@ -295,6 +306,19 @@ export function FlowRunnerSettingsEditor({
             {t("profile.dialog.browse")}
           </Button>
         </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-1.5">
+        <label className="text-[12px] text-text-secondary">{t("flow.runner.env")}</label>
+        <Textarea
+          value={envText}
+          onChange={(e) => setEnvText(e.target.value)}
+          placeholder={"API_BASE=https://example.com\nPATH=${PATH};C:\\tools"}
+          spellCheck={false}
+          rows={3}
+          className="min-h-[72px] resize-y rounded-[18px] border-border bg-bg-primary font-mono text-[12px]"
+        />
+        <p className="text-[11px] text-text-secondary">{t("flow.runner.envHint")}</p>
       </div>
     </>
   );

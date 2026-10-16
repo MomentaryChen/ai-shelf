@@ -88,7 +88,11 @@ export function previewMcpSync(opts: {
           sourceTool: resolvedSource,
           incomingJson: stableJson(adapted),
         });
-      } else if (entriesMatch(current, adapted)) {
+      } else if (
+        entriesMatch(current, adapted) ||
+        // OpenCode entries are read back in canonical shape; compare in target shape.
+        (targetTool === "opencode" && entriesMatch(adaptMcpEntry(current, targetTool), adapted))
+      ) {
         items.push({ serverName, targetTool, action: "skip", sourceTool: resolvedSource });
       } else {
         items.push({
