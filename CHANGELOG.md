@@ -24,6 +24,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 - **Cross-process `exec` errors** — `session exec` and `profile exec [--broadcast]` explain that a session running in another `ai-shelf` process can only receive commands from that process, instead of reporting "No running session".
 - **Duplicate CLI error output** — Failed commands print one `Error: …` line and exit with code 1; stack traces appear only with `AI_SHELF_DEBUG=1`.
 - **`session create` / `session start` hang and crash** — Both stay attached to the PTY (exit the shell or press `Ctrl+]`), then stop it cleanly without writing to a closed database.
+- **Copilot / Cursor config paths on macOS and Linux** — Copilot settings, instruction and MCP files under `~/.copilot` (or `COPILOT_HOME`) and Cursor's per-platform `settings.json` are now found outside Windows instead of being looked up with hard-coded backslashes.
 
 ## [4.3.5] - 2026-10-07
 
