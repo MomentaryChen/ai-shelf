@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback, useState, memo } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback, useState, memo } from "react";
+import type { MutableRefObject } from "react";
 import { ArrowDown } from "lucide-react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -20,10 +21,7 @@ import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
 import { recordImeAnchor } from "../terminal/ime-anchor-log";
 import { attachImeCommitGuard } from "../terminal/ime-commit-guard";
 import { attachImeInputTrace, recordImeInputData } from "../terminal/ime-input-trace";
-import {
-  shouldRespawnLostSession,
-  shouldWakeShellWithEnter,
-} from "../terminal/pty-attach-session";
+import { shouldRespawnLostSession, shouldWakeShellWithEnter } from "../terminal/pty-attach-session";
 import {
   getTerminalPasteTarget,
   pasteToTerminalSession,
@@ -75,6 +73,17 @@ interface Props {
   onCwdReport?: (sessionId: string, cwd: string) => void;
 }
 
+/** Callback props — routed through a ref so they never force an xterm re-render. */
+type TerminalCallbacks = Pick<
+  Props,
+  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onCwdReport"
+>;
+
+type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
+  /** Stable ref holding the latest callbacks from the parent. */
+  callbacksRef: MutableRefObject<TerminalCallbacks>;
+};
+
 /** True when the viewport is pinned to the latest output (ydisp === ybase). */
 function isTerminalAtBottom(term: Terminal): boolean {
   const buffer = term.buffer.active;
@@ -109,26 +118,17 @@ function EmbeddedTerminalInner({
   getPasteTargets,
   active = true,
   focused = true,
-  onExit,
-  onSessionLost,
-  onWrite,
-  onRestart,
-  onCwdReport,
-}: Props) {
+  callbacksRef,
+}: InnerProps) {
   const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
   const activeRef = useRef(active);
-  const onWriteRef = useRef(onWrite);
-  const onSessionLostRef = useRef(onSessionLost);
-  const onRestartRef = useRef(onRestart);
-  const onExitRef = useRef(onExit);
-  const onCwdReportRef = useRef(onCwdReport);
   const fitRef = useRef<(() => void) | null>(null);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const [hasNewOutput, setHasNewOutput] = useState(false);
-  const stableOnExit = useCallback(() => onExitRef.current(), []);
+  const stableOnExit = useCallback(() => callbacksRef.current.onExit(), [callbacksRef]);
 
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
@@ -184,32 +184,35 @@ function EmbeddedTerminalInner({
     termRef.current?.focus();
   }, [clearMatchStats]);
 
-  const goToMatchIndex = useCallback((idx: number): boolean => {
-    const term = termRef.current;
-    const session = sessionMatchesRef.current;
-    if (!term || session.length === 0 || idx < 1 || idx > session.length) {
-      return false;
-    }
+  const goToMatchIndex = useCallback(
+    (idx: number): boolean => {
+      const term = termRef.current;
+      const session = sessionMatchesRef.current;
+      if (!term || session.length === 0 || idx < 1 || idx > session.length) {
+        return false;
+      }
 
-    const ok =
-      jumpToSessionMatch(
-        term,
-        session[idx - 1]!,
-        findQueryRef.current,
-        searchFlagsRef.current,
-        searchRef.current,
-        idx,
-      ) === "ok";
+      const ok =
+        jumpToSessionMatch(
+          term,
+          session[idx - 1]!,
+          findQueryRef.current,
+          searchFlagsRef.current,
+          searchRef.current,
+          idx,
+        ) === "ok";
 
-    setMatchIndex(idx);
-    matchIndexRef.current = idx;
-    if (!findOpenRef.current) {
-      term.focus();
-    } else {
-      refocusFindInput();
-    }
-    return ok;
-  }, [refocusFindInput]);
+      setMatchIndex(idx);
+      matchIndexRef.current = idx;
+      if (!findOpenRef.current) {
+        term.focus();
+      } else {
+        refocusFindInput();
+      }
+      return ok;
+    },
+    [refocusFindInput],
+  );
 
   const refreshMatchCount = useCallback(async (): Promise<number> => {
     const q = findQueryRef.current;
@@ -342,8 +345,8 @@ function EmbeddedTerminalInner({
       }
       const bracketed = targets.every((target) =>
         target === sessionId
-          ? termRef.current?.modes.bracketedPasteMode ?? false
-          : getTerminalPasteTarget(target)?.isBracketedPaste() ?? false,
+          ? (termRef.current?.modes.bracketedPasteMode ?? false)
+          : (getTerminalPasteTarget(target)?.isBracketedPaste() ?? false),
       );
       setPendingPaste({ text, stats, targets, bracketed });
     },
@@ -360,11 +363,6 @@ function EmbeddedTerminalInner({
   };
 
   activeRef.current = active;
-  onWriteRef.current = onWrite;
-  onSessionLostRef.current = onSessionLost;
-  onRestartRef.current = onRestart;
-  onExitRef.current = onExit;
-  onCwdReportRef.current = onCwdReport;
 
   useEffect(() => {
     setHasNewOutput(false);
@@ -434,7 +432,7 @@ function EmbeddedTerminalInner({
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
-      onRestart: () => onRestartRef.current?.(),
+      onRestart: () => callbacksRef.current.onRestart?.(),
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
@@ -466,7 +464,7 @@ function EmbeddedTerminalInner({
     const unbindImeTrace = attachImeInputTrace(term, sessionId);
     const unbindLinks = bindTerminalLinks(term);
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
-      onCwdReportRef.current?.(sessionId, cwd);
+      callbacksRef.current.onCwdReport?.(sessionId, cwd);
     });
 
     const pending: string[] = [];
@@ -594,7 +592,7 @@ function EmbeddedTerminalInner({
         writePty(data);
         return;
       }
-      const write = onWriteRef.current;
+      const write = callbacksRef.current.onWrite;
       if (write) write(data, sessionId);
       else writePty(data);
     });
@@ -616,7 +614,7 @@ function EmbeddedTerminalInner({
             pid: r.pid,
           })
         ) {
-          onSessionLostRef.current?.(sessionId);
+          callbacksRef.current.onSessionLost?.(sessionId);
         }
         return;
       }
@@ -640,7 +638,9 @@ function EmbeddedTerminalInner({
       statusTimer = window.setTimeout(() => {
         if (cancelled || receivedBytes > 0) return;
         const wasAtBottom = isTerminalAtBottom(term);
-        term.writeln("\r\n\x1b[33m[terminal] waiting for shell output — click here and press Enter\x1b[0m");
+        term.writeln(
+          "\r\n\x1b[33m[terminal] waiting for shell output — click here and press Enter\x1b[0m",
+        );
         if (!wasAtBottom) setHasNewOutput(true);
       }, 2500);
     });
@@ -824,7 +824,6 @@ function EmbeddedTerminalInner({
             }}
             className="pointer-events-auto absolute bottom-3 right-3 flex cursor-pointer items-center gap-1.5 rounded-lg border border-chrome-border-focus bg-chrome-surface-raised/95 px-2.5 py-1.5 text-[11px] font-medium text-chrome-text shadow-pop backdrop-blur-sm transition-colors hover:border-chrome-border-hover hover:bg-chrome-surface-hover-strong"
             title={t("terminal.scrollToBottom")}
-
           >
             <ArrowDown className="h-3 w-3" aria-hidden />
             <span>{t("terminal.newOutput")}</span>
@@ -835,22 +834,31 @@ function EmbeddedTerminalInner({
   );
 }
 
-export const EmbeddedTerminal = memo(
-  EmbeddedTerminalInner,
-  (prev, next) =>
-    prev.sessionId === next.sessionId &&
-    prev.bg === next.bg &&
-    prev.fontFamily === next.fontFamily &&
-    prev.fontSize === next.fontSize &&
-    prev.scrollback === next.scrollback &&
-    prev.webglEnabled === next.webglEnabled &&
-    prev.rightClickPaste === next.rightClickPaste &&
-    prev.copyOnSelect === next.copyOnSelect &&
-    prev.pasteConfirm?.enabled === next.pasteConfirm?.enabled &&
-    prev.pasteConfirm?.maxLines === next.pasteConfirm?.maxLines &&
-    prev.pasteConfirm?.maxChars === next.pasteConfirm?.maxChars &&
-    prev.pasteConfirm?.alwaysWhenBroadcast === next.pasteConfirm?.alwaysWhenBroadcast &&
-    prev.getPasteTargets === next.getPasteTargets &&
-    prev.active === next.active &&
-    prev.focused === next.focused,
-);
+/**
+ * Data props are shallow-compared by the default `memo` comparator (every key,
+ * so a newly added prop can never be silently ignored). Callback props are kept
+ * in a ref instead: their identity changes (e.g. `onWrite` rebuilt when broadcast
+ * input toggles) reach the live pane without re-rendering xterm.
+ */
+const EmbeddedTerminalMemo = memo(EmbeddedTerminalInner);
+
+export function EmbeddedTerminal({
+  onExit,
+  onSessionLost,
+  onWrite,
+  onRestart,
+  onCwdReport,
+  ...dataProps
+}: Props) {
+  const callbacksRef = useRef<TerminalCallbacks>({
+    onExit,
+    onSessionLost,
+    onWrite,
+    onRestart,
+    onCwdReport,
+  });
+  useLayoutEffect(() => {
+    callbacksRef.current = { onExit, onSessionLost, onWrite, onRestart, onCwdReport };
+  });
+  return <EmbeddedTerminalMemo {...dataProps} callbacksRef={callbacksRef} />;
+}
