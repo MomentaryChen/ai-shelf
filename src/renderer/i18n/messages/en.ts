@@ -56,10 +56,8 @@ export const en = {
   "onboarding.start.creating": "Setting up…",
   "onboarding.start.modesTitle": "Four ways to work",
   "onboarding.start.modeTerminal": "Terminal — run agents side by side in split panes",
-  "onboarding.start.modeInventory":
-    "Inventory — models, skills, MCP, doctor checks, and usage",
-  "onboarding.start.modeTools":
-    "Tools — codec, JSON, regex, JWT, and other everyday utilities",
+  "onboarding.start.modeInventory": "Inventory — models, skills, MCP, doctor checks, and usage",
+  "onboarding.start.modeTools": "Tools — codec, JSON, regex, JWT, and other everyday utilities",
   "onboarding.start.modeFlow": "AI Flow — automate multi-step AI jobs",
   "onboarding.start.getStarted": "Open terminal",
   "onboarding.next": "Continue",
@@ -125,7 +123,7 @@ export const en = {
   "settings.paneShortcut.pressKeys": "Press keys…",
   "keybindings.title": "Keyboard shortcuts",
   "keybindings.subtitle":
-    "Rebind any app shortcut, or disable it so the key reaches the terminal (e.g. Ctrl+W / Ctrl+K for shells and TUIs).",
+    "Rebind any app shortcut, or disable it so the key reaches the terminal. Inside a terminal, Ctrl+W deletes the previous word; Ctrl+Shift+W closes the pane.",
   "keybindings.hint":
     "Click a shortcut and press the new key combination (Esc cancels). Shortcuts need Ctrl/Cmd or Alt, except F1–F24.",
   "keybindings.unbound": "Disabled",
@@ -227,7 +225,8 @@ export const en = {
   "healthMonitor.backgroundChecksHint":
     "Every few hours, quietly check for CLI updates and doctor issues. Results appear on Overview and nav badges.",
   "healthMonitor.trayBadge": "Tray alert dot",
-  "healthMonitor.trayBadgeHint": "Show a small red dot on the tray icon when something needs attention.",
+  "healthMonitor.trayBadgeHint":
+    "Show a small red dot on the tray icon when something needs attention.",
   "healthMonitor.weeklySummary": "Weekly health summary",
   "healthMonitor.weeklySummaryHint":
     "Optional desktop notification once a week when issues are found (e.g. MCP failures, auth expired).",
@@ -251,7 +250,8 @@ export const en = {
     "Preview what will change before writing config files. Existing servers with different settings are never overwritten.",
   "healthMonitor.mcpPreviewBlocked": "{count} blocked by team policy",
   "healthMonitor.mcpPreviewConflicts": "{count} name conflict(s) — will skip",
-  "healthMonitor.mcpPreviewConflictSkip": "Server already exists with different config; sync will not overwrite.",
+  "healthMonitor.mcpPreviewConflictSkip":
+    "Server already exists with different config; sync will not overwrite.",
   "healthMonitor.mcpPreviewShowDiff": "Show diff",
   "healthMonitor.mcpPreviewAdds": "{count} server(s) will be added",
   "healthMonitor.mcpPreviewFrom": "from {tool}",
@@ -288,8 +288,7 @@ export const en = {
     "Too many workspaces to sync ({count}, max {max}). Remove unused workspaces and try again.",
   "settings.accountSyncLimitTooManyProfiles":
     "Too many profiles to sync ({count}, max {max}). Remove unused profiles and try again.",
-  "settings.accountSyncLimitTooManyLayouts":
-    "Too many layouts to sync ({count}, max {max}).",
+  "settings.accountSyncLimitTooManyLayouts": "Too many layouts to sync ({count}, max {max}).",
   "settings.accountSyncLimitTooManyPanes":
     "Profile {profileId} has too many panes to sync ({count}, max {max}).",
   "settings.accountSyncLimitRateLimited": "Please wait {seconds}s before syncing again.",
@@ -302,7 +301,8 @@ export const en = {
   "settings.accountSignInGoogle": "Sign in with Google",
   "settings.accountSigningIn": "Opening Google sign-in…",
   "settings.accountSigningInRedirect": "Continuing sign-in in browser…",
-  "settings.accountSigningInHint": "Complete sign-in in the window that opens. It will close automatically when done.",
+  "settings.accountSigningInHint":
+    "Complete sign-in in the window that opens. It will close automatically when done.",
   "settings.accountSignInSuccess": "Signed in. Returning to settings…",
   "settings.accountSignOut": "Sign out",
   "settings.accountSignInFailed": "Sign-in failed: {error}",
@@ -327,13 +327,16 @@ export const en = {
   "settings.accountSyncCompareChecking": "Checking cloud…",
   "settings.accountSyncCompareInSync": "Matches cloud",
   "settings.accountSyncCompareLocalAhead": "Local changes not backed up yet",
-  "settings.accountSyncCompareRemoteAhead": "Cloud has newer data—choose restore or keep local when backing up",
-  "settings.accountSyncCompareDiverged": "Local and cloud both changed—choose which side to keep when backing up",
+  "settings.accountSyncCompareRemoteAhead":
+    "Cloud has newer data—choose restore or keep local when backing up",
+  "settings.accountSyncCompareDiverged":
+    "Local and cloud both changed—choose which side to keep when backing up",
   "settings.accountSyncPreferTitle": "Choose backup side",
   "settings.accountSyncPreferHint":
     "When local and cloud differ, pick which side to keep. Local is selected by default.",
   "settings.accountSyncPreferLocal": "Prefer local",
-  "settings.accountSyncPreferLocalDesc": "Upload this device’s data and overwrite the cloud backup.",
+  "settings.accountSyncPreferLocalDesc":
+    "Upload this device’s data and overwrite the cloud backup.",
   "settings.accountSyncPreferCloud": "Prefer cloud",
   "settings.accountSyncPreferCloudDesc": "Restore the cloud backup and overwrite this device.",
   "settings.accountSyncPreferConfirm": "Start backup",
@@ -405,8 +408,7 @@ export const en = {
   "profileGroup.creating": "Creating…",
   "profileGroup.namePlaceholder": "Group name",
   "profileGroup.deleteTitle": "Delete this group?",
-  "profileGroup.deleteConfirm":
-    '"{name}" and every profile inside it will be removed.',
+  "profileGroup.deleteConfirm": '"{name}" and every profile inside it will be removed.',
   "profileGroup.deleteAction": "Delete",
   "profileGroup.failedCreate": "Failed to create profile group",
   "profileGroup.failedRename": "Failed to rename profile group",
@@ -455,8 +457,7 @@ export const en = {
   "profile.failedSave": "Failed to save settings",
   "profile.failedDelete": "Failed to delete",
   "profile.deleteTitle": "Delete this profile?",
-  "profile.deleteConfirm":
-    '"{name}" and its saved terminals and layout will be removed.',
+  "profile.deleteConfirm": '"{name}" and its saved terminals and layout will be removed.',
   "profile.deleteAction": "Delete",
   "profile.dialog.settingsTitle": "Profile settings",
   "profile.dialog.createTitle": "New Profile",
@@ -464,7 +465,8 @@ export const en = {
   "profile.dialog.startBlank": "Blank profile",
   "profile.dialog.startCopy": "Copy from existing profile",
   "profile.dialog.copyFromProfile": "Source profile",
-  "profile.dialog.copyHint": "Copies default directory, tool, accent, broadcast, and saved commands.",
+  "profile.dialog.copyHint":
+    "Copies default directory, tool, accent, broadcast, and saved commands.",
   "profile.dialog.copyNameDefault": "{name} copy",
   "profile.dialog.templateHint": "Pre-fills settings; you can still edit before creating.",
   "profile.dialog.templateSolo": "Template: Solo agent",
@@ -532,8 +534,10 @@ export const en = {
   "inventory.install.installing": "Installing…",
   "inventory.install.openWebsite": "Official install",
   "inventory.install.noRecipe": "No install command on file — check the tool docs.",
-  "inventory.install.notInPathHint": "{tool} is not in PATH. Run the command below or use the official installer.",
-  "inventory.install.rescanHint": "Rescanning inventory — the tool should appear once PATH is updated.",
+  "inventory.install.notInPathHint":
+    "{tool} is not in PATH. Run the command below or use the official installer.",
+  "inventory.install.rescanHint":
+    "Rescanning inventory — the tool should appear once PATH is updated.",
   "inventory.install.failedUnexpected": "Install failed unexpectedly",
   "inventory.skillMatrix": "Skill Matrix",
   "inventory.mcpUnique": "Unique MCP servers (installed tools)",
@@ -558,7 +562,8 @@ export const en = {
   "inventory.update.upToDate": "Up to date",
   "inventory.update.updating": "Updating…",
   "inventory.update.runUpdate": "Run update",
-  "inventory.update.desktopHint": "Installed desktop app — updates download from GitHub Releases and install on restart.",
+  "inventory.update.desktopHint":
+    "Installed desktop app — updates download from GitHub Releases and install on restart.",
   "inventory.update.noTools": "No installed tools to check",
   "inventory.update.allUpToDate": "All installed tools are up to date",
   "inventory.update.useCards": "Use the cards below to update",
@@ -737,7 +742,8 @@ export const en = {
   "terminal.ctx.exportOutput": "Export output…",
   "terminal.ctx.copyOutputForIssue": "Copy output for issue",
   "chat.emptyPanes.title": "No terminals open in “{profile}”",
-  "chat.emptyPanes.desc": "The layout is saved automatically and restored when you come back (up to {max} panes).",
+  "chat.emptyPanes.desc":
+    "The layout is saved automatically and restored when you come back (up to {max} panes).",
   "chat.emptyPanes.openShell": "Open terminal",
   "chat.emptyPanes.openTool": "Open {tool}",
   "chat.emptyPanes.pickFolder": "Open in folder…",
@@ -768,7 +774,8 @@ export const en = {
   "chat.syncLabel": "sync",
   "chat.broadcastSyncTitle": "Input syncs to all {count} terminals",
   "chat.allTerminalsMinimized": "All terminals are tucked away in the sidebar",
-  "chat.selectTerminalFromSidebar": "Pick or drag a terminal from the sidebar to bring it back here",
+  "chat.selectTerminalFromSidebar":
+    "Pick or drag a terminal from the sidebar to bring it back here",
   "chat.externalBtn": "External",
   "chat.inAppBtn": "In-App",
   "chat.launchFailed": "Failed to launch terminal",
@@ -887,7 +894,8 @@ export const en = {
     "See which tools, profiles, and flows burn money — set a weekly budget before the bill wakes you up. Keys stay on this device.",
   "usage.decisions.title": "This week",
   "usage.decisions.hottest": "Hottest flow",
-  "usage.decisions.hottestEmpty": "No flow runs this week yet — spend attribution starts after the next run.",
+  "usage.decisions.hottestEmpty":
+    "No flow runs this week yet — spend attribution starts after the next run.",
   "usage.decisions.hottestHint": "{runs} runs · {cost}",
   "usage.decisions.estimated": "Estimated from tool spend × run time",
   "usage.decisions.weekSpend": "Week spend",
@@ -901,7 +909,8 @@ export const en = {
   "usage.attribution.runs": "{count} runs",
   "usage.attribution.estimatedBadge": "Est.",
   "usage.budget.title": "Weekly budget",
-  "usage.budget.hint": "Optional soft cap for the last 7 days. Alerts also fire when a provider quota crosses the same threshold.",
+  "usage.budget.hint":
+    "Optional soft cap for the last 7 days. Alerts also fire when a provider quota crosses the same threshold.",
   "usage.budget.amount": "Budget (USD)",
   "usage.budget.amountPlaceholder": "e.g. 50",
   "usage.budget.alertAt": "Alert at %",
@@ -926,7 +935,8 @@ export const en = {
   "usage.summary.configured": "Tools with API keys",
   "usage.summary.active": "Tools reporting data",
   "usage.unified.title": "Daily rollup",
-  "usage.unified.hint": "Costs and tokens merged across every tool that reported data for this period.",
+  "usage.unified.hint":
+    "Costs and tokens merged across every tool that reported data for this period.",
   "usage.unified.empty": "No daily breakdown yet — configure at least one tool below.",
   "usage.unified.noDaily":
     "Connected tools report subscription quotas or billing-cycle totals without a daily history. See each tool for allowance details.",
@@ -1058,7 +1068,8 @@ export const en = {
     "If set, fetches enterprise-level 28-day reports instead of organization reports.",
   "usage.copilot.auth.enterprise.field": "Enterprise slug",
   "usage.local.source": "Local session data",
-  "usage.local.noKey": "No API key needed — read-only, straight from the tool's own session data on this computer.",
+  "usage.local.noKey":
+    "No API key needed — read-only, straight from the tool's own session data on this computer.",
   "usage.local.notFound":
     "No local session data found for this tool yet. Use it at least once on this computer, then refresh.",
   "usage.opencode.intro":
@@ -1074,11 +1085,13 @@ export const en = {
   "flow.loading": "Loading flows…",
   "flow.empty": "No flows yet",
   "flow.emptyTitle": "No automation flows",
-  "flow.emptyDesc": "Start from a template, describe what you want in chat, or add a .flow.md to your flows folder.",
+  "flow.emptyDesc":
+    "Start from a template, describe what you want in chat, or add a .flow.md to your flows folder.",
   "flow.emptyBrowseTemplates": "Browse templates",
   "flow.template.marketplace": "Template gallery",
   "flow.template.marketplaceTitle": "Flow template gallery",
-  "flow.template.marketplaceDesc": "Install ready-made flows into your flows folder. You can edit them after install.",
+  "flow.template.marketplaceDesc":
+    "Install ready-made flows into your flows folder. You can edit them after install.",
   "flow.template.loading": "Loading templates…",
   "flow.template.empty": "No templates available",
   "flow.template.install": "Install",
@@ -1095,7 +1108,8 @@ export const en = {
   "flow.template.dailyStandup.desc": "Gather updates and write concise standup bullets with Haiku.",
   "flow.template.dailyStandup.tag": "Claude · manual",
   "flow.template.weeklyDigest.title": "Weekly digest",
-  "flow.template.weeklyDigest.desc": "Monday report from Amplitude + Jira via MCP. Disabled until MCP is configured.",
+  "flow.template.weeklyDigest.desc":
+    "Monday report from Amplitude + Jira via MCP. Disabled until MCP is configured.",
   "flow.template.weeklyDigest.tag": "Claude · scheduled",
   "flow.openFolder": "Open flows folder",
   "flow.phases": "phases",
@@ -1113,8 +1127,10 @@ export const en = {
   "flow.output.generatedAt": "Generated {date}",
   "flow.output.inProgress": "A new run is in progress — this section will update when it finishes",
   "flow.output.expand": "Open full view",
-  "flow.output.waiting": "Run in progress — the agent will write the Markdown report via flow_output…",
-  "flow.output.noOutput": "No output for this run. Make sure the agent calls the flow_output MCP tool.",
+  "flow.output.waiting":
+    "Run in progress — the agent will write the Markdown report via flow_output…",
+  "flow.output.noOutput":
+    "No output for this run. Make sure the agent calls the flow_output MCP tool.",
   "flow.output.loading": "Loading output…",
   "flow.output.empty": "(empty)",
   "flow.output.loadFailed": "Could not read output file",
@@ -1142,7 +1158,8 @@ export const en = {
   "flow.dag.inspectPreview": "Preview (run once for the exact logged command)",
   "flow.dag.inspectLogged": "From last run",
   "flow.dag.inspectHttp": "HTTP request",
-  "flow.dag.inspectPhaseHint": "In multi-node mode each step has its own agent command; legacy flows report steps via MCP flow_progress.",
+  "flow.dag.inspectPhaseHint":
+    "In multi-node mode each step has its own agent command; legacy flows report steps via MCP flow_progress.",
   "flow.dag.inspectOutputPath": "Output file",
   "flow.dag.inspectNoOutput": "No output file yet.",
   "flow.dag.inspectCopy": "Copy command",
@@ -1228,10 +1245,12 @@ export const en = {
   "flow.runner.title": "Runner environment",
   "flow.runner.dialogTitle": "Runner: {id}",
   "flow.runner.open": "Runner settings",
-  "flow.runner.hint": "Choose Claude or Cursor agent to run this flow, with launch args and working directory.",
+  "flow.runner.hint":
+    "Choose Claude or Cursor agent to run this flow, with launch args and working directory.",
   "flow.runner.tool": "Tool",
   "flow.runner.toolArgs": "Launch arguments",
-  "flow.runner.toolArgsHint": "Model and other flags are saved to tool_args; manual runs still merge app-wide defaults from Settings.",
+  "flow.runner.toolArgsHint":
+    "Model and other flags are saved to tool_args; manual runs still merge app-wide defaults from Settings.",
   "flow.runner.toolUnsupported": "Only Claude and Cursor agent support AI Flow MCP mode for now.",
   "flow.runner.profile": "Profile",
   "flow.runner.profileNone": "None",
@@ -1242,9 +1261,11 @@ export const en = {
   "flow.runner.saveFailed": "Could not save runner settings",
   "flow.runner.httpOnly": "HTTP flows do not use an agent runner.",
   "flow.runner.env": "Environment variables",
-  "flow.runner.envHint": "One KEY=value per line, added to the agent process. ${VAR} expands from the app environment. A bound profile also sets AISHELF_PROFILE_ID / AISHELF_PROFILE_NAME.",
+  "flow.runner.envHint":
+    "One KEY=value per line, added to the agent process. ${VAR} expands from the app environment. A bound profile also sets AISHELF_PROFILE_ID / AISHELF_PROFILE_NAME.",
   "flow.notify.title": "Notifications",
-  "flow.notify.hint": "Choose which outcomes notify you, and post run results to Slack or any webhook.",
+  "flow.notify.hint":
+    "Choose which outcomes notify you, and post run results to Slack or any webhook.",
   "flow.notify.desktop": "Desktop notifications",
   "flow.notify.mode.all": "Success and failure",
   "flow.notify.mode.failure": "Failures only",
@@ -1258,8 +1279,10 @@ export const en = {
   "flow.notify.addWebhook": "Add webhook",
   "flow.notify.noWebhooks": "No webhooks configured.",
   "flow.notify.removeWebhook": "Remove webhook",
-  "flow.notify.authorizationPlaceholder": "Authorization header (optional), e.g. Bearer ${MY_TOKEN}",
-  "flow.notify.webhookHint": "Payload placeholders: {flow_id} {run_id} {status} {error} {output_path} {duration_sec} {started_at} {completed_at}. ${ENV_VAR} expands from the environment, so secrets stay out of the flow file. Empty payload sends a default JSON body.",
+  "flow.notify.authorizationPlaceholder":
+    "Authorization header (optional), e.g. Bearer ${MY_TOKEN}",
+  "flow.notify.webhookHint":
+    "Payload placeholders: {flow_id} {run_id} {status} {error} {output_path} {duration_sec} {started_at} {completed_at}. ${ENV_VAR} expands from the environment, so secrets stay out of the flow file. Empty payload sends a default JSON body.",
   "flow.notify.webhookUrlRequired": "Every webhook needs a URL.",
   "flow.notify.save": "Save notifications",
   "flow.notify.saving": "Saving…",
@@ -1272,22 +1295,26 @@ export const en = {
   "flow.settings.dialogTitle": "Settings: {id}",
   "flow.nextRun": "Next run {time}",
   "flow.create.title": "Create a flow",
-  "flow.create.subtitle": "Describe the job in plain language — Claude will draft a .flow.md for you.",
+  "flow.create.subtitle":
+    "Describe the job in plain language — Claude will draft a .flow.md for you.",
   "flow.create.welcome":
     "Tell me what to automate — for example: check an API every morning and save a Markdown summary.",
   "flow.create.placeholder": "Describe schedule, data sources, and output…",
   "flow.create.send": "Send",
   "flow.create.cancel": "Back to flows",
   "flow.create.new": "New flow",
-  "flow.create.generateFailed": "Could not generate a flow. Check that Claude CLI is installed and signed in.",
+  "flow.create.generateFailed":
+    "Could not generate a flow. Check that Claude CLI is installed and signed in.",
   "flow.create.draftReady": "Here is a draft flow file. Review it, then save.",
-  "flow.create.draftSummary": "Draft ready: {id} ({phases} phases). Tweak with another message or save.",
+  "flow.create.draftSummary":
+    "Draft ready: {id} ({phases} phases). Tweak with another message or save.",
   "flow.create.draftInvalid": "The draft has errors and cannot be saved yet:\n{issues}",
   "flow.create.previewHint": "Ready to add to your flows folder",
   "flow.create.save": "Save flow",
   "flow.create.saving": "Saving…",
   "flow.create.saveFailed": "Could not save flow",
-  "flow.create.existsHint": "A flow with this id already exists — use Overwrite or change the id in chat.",
+  "flow.create.existsHint":
+    "A flow with this id already exists — use Overwrite or change the id in chat.",
   "flow.create.overwrite": "Overwrite existing",
   "flow.create.update": "Update flow",
   "flow.create.editTitle": "Edit {id} with chat",
@@ -1315,7 +1342,8 @@ export const en = {
   "flow.history.event.phase": "{type} · {phase}",
   "flow.history.event.flowOutput": "Output written",
   "flow.history.retentionTitle": "Run history retention",
-  "flow.history.retentionHint": "Old run folders are deleted after each run and at app start. Leave a field empty for no limit. Applies to all flows unless a flow overrides it.",
+  "flow.history.retentionHint":
+    "Old run folders are deleted after each run and at app start. Leave a field empty for no limit. Applies to all flows unless a flow overrides it.",
   "flow.history.maxRuns": "Max runs per flow",
   "flow.history.maxDays": "Max age (days)",
   "flow.history.unlimited": "Unlimited",
@@ -1325,11 +1353,13 @@ export const en = {
   "flow.history.pruneFailed": "Could not clean up run history",
   "flow.history.pruned": "Deleted {count} old runs",
   "flow.history.retentionOverride": "History retention for this flow",
-  "flow.history.retentionOverrideHint": "Optional. Overrides the app-wide retention for this flow only.",
+  "flow.history.retentionOverrideHint":
+    "Optional. Overrides the app-wide retention for this flow only.",
   "cmd.action.flow": "AI Flow mode",
 
   "shortcuts.title": "Keyboard shortcuts",
-  "shortcuts.subtitle": "Command palette works everywhere. Pane and terminal shortcuts apply in Terminal mode.",
+  "shortcuts.subtitle":
+    "Command palette works everywhere. Pane and terminal shortcuts apply in Terminal mode.",
   "shortcuts.openLink": "View all shortcuts",
   "shortcuts.section.general": "General",
   "shortcuts.section.pane": "Terminal panes",
@@ -1728,8 +1758,7 @@ export const en = {
   "diff.empty": "Paste text on both sides to see the difference.",
   "diff.identical": "No differences",
   "diff.stats": "+{added} −{removed}",
-  "diff.error.tooLarge":
-    "Each side can be at most {max} lines — shorten the text and try again.",
+  "diff.error.tooLarge": "Each side can be at most {max} lines — shorten the text and try again.",
 
   // Tools mode — System
   "tools.tab.system": "System",
@@ -1750,8 +1779,7 @@ export const en = {
   "system.analyze.report": "Environment report",
   "system.analyze.copy": "Copy",
   "system.analyze.copied": "Copied",
-  "system.analyze.error.noClaude":
-    "Claude CLI is not available. Install it, then try again.",
+  "system.analyze.error.noClaude": "Claude CLI is not available. Install it, then try again.",
   "system.analyze.error.timeout": "The report took too long — try again in a moment.",
   "system.analyze.error.failed": "Could not write the report. Check that Claude is signed in.",
 
@@ -1778,7 +1806,8 @@ export const en = {
   "ports.stopping": "Stopping",
   "ports.stopProtected": "This process cannot be stopped from here.",
   "ports.killTitle": "Stop this process?",
-  "ports.killConfirm": "{name} (pid {pid}) is listening on port {port}. Stopping it will free the port.",
+  "ports.killConfirm":
+    "{name} (pid {pid}) is listening on port {port}. Stopping it will free the port.",
   "ports.error.invalidPort": "Enter a port between 1 and 65535, or leave the field empty.",
   "ports.error.unavailable": "Port lookup is not available in this window.",
   "ports.error.listFailed": "Could not list listeners — try refresh.",
@@ -1791,8 +1820,7 @@ export const en = {
 
   // Tools mode — WSL
   "tools.tab.wsl": "WSL",
-  "wsl.subtitle":
-    "Convert Windows ↔ WSL paths, list distros, and copy everyday wsl.exe commands.",
+  "wsl.subtitle": "Convert Windows ↔ WSL paths, list distros, and copy everyday wsl.exe commands.",
   "wsl.panels": "WSL tools",
   "wsl.panel.paths": "Paths",
   "wsl.panel.distros": "Distros",

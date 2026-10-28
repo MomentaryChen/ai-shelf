@@ -27,11 +27,15 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest("[contenteditable='true']"));
 }
 
+function isXtermTarget(target: EventTarget | null): boolean {
+  if (!target || typeof target !== "object" || !("closest" in target)) return false;
+  const closest = (target as { closest?: unknown }).closest;
+  if (typeof closest !== "function") return false;
+  return Boolean(closest.call(target, ".xterm"));
+}
+
 /** Apply a matched pane shortcut. Exported for unit tests. */
-export function applyPaneShortcutAction(
-  action: PaneShortcutAction,
-  h: PaneShortcutHandlers,
-): void {
+export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShortcutHandlers): void {
   const {
     panes,
     focusedPaneId,
@@ -117,11 +121,63 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "restartSession",
 ];
 
-/** Map a key event to a pane action using the given keybindings (pure; unit tested). */
+/** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
+function closeIsDefaultModW(map: KeybindingMap): boolean {
+  const close = map.closePane;
+  return (
+    !!close &&
+    close.key === "w" &&
+    close.mod === true &&
+    !close.shift &&
+    !close.alt &&
+    !close.ctrl &&
+    !close.meta
+  );
+}
+
+function isPlainCtrlW(ev: KeyEventLike): boolean {
+  return (
+    ev.type !== "keyup" &&
+    ev.ctrlKey &&
+    !ev.metaKey &&
+    !ev.shiftKey &&
+    !ev.altKey &&
+    ev.key.toLowerCase() === "w"
+  );
+}
+
+function isCtrlShiftW(ev: KeyEventLike): boolean {
+  return (
+    ev.type !== "keyup" &&
+    ev.ctrlKey &&
+    !ev.metaKey &&
+    ev.shiftKey &&
+    !ev.altKey &&
+    ev.key.toLowerCase() === "w"
+  );
+}
+
+/**
+ * Map a key event to a pane action using the given keybindings (pure; unit tested).
+ *
+ * While close is still the default Ctrl/Cmd+W:
+ * - Ctrl+Shift+W closes the pane (including inside the terminal)
+ * - plain Ctrl+W inside xterm is left for the shell (delete previous word)
+ * - Cmd+W and Ctrl+W outside xterm still close
+ * A rebound or disabled close shortcut is honored as-is, including inside xterm.
+ */
 export function matchPaneShortcutWithBindings(
   ev: KeyEventLike,
   map: KeybindingMap,
+  target?: EventTarget | null,
 ): PaneShortcutAction | null {
+  if (closeIsDefaultModW(map) && isCtrlShiftW(ev)) {
+    return { type: "close" };
+  }
+  if (closeIsDefaultModW(map) && isPlainCtrlW(ev) && isXtermTarget(target ?? null)) {
+    return null;
+  }
+
   const m = matchShortcut(ev, map, PANE_SHORTCUT_IDS);
   if (!m) return null;
   switch (m.id) {
@@ -150,7 +206,7 @@ export function matchPaneShortcutWithBindings(
 export function matchPaneShortcut(ev: KeyboardEvent): PaneShortcutAction | null {
   if (ev.type !== "keydown") return null;
   if (shouldIgnoreShortcutTarget(ev.target)) return null;
-  return matchPaneShortcutWithBindings(ev, getActiveKeybindings());
+  return matchPaneShortcutWithBindings(ev, getActiveKeybindings(), ev.target);
 }
 
 /**

@@ -120,7 +120,7 @@ export const zh: Record<MessageKey, string> = {
   "settings.paneShortcut.pressKeys": "請按鍵…",
   "keybindings.title": "鍵盤快捷鍵",
   "keybindings.subtitle":
-    "可重新綁定任何快捷鍵，或停用讓按鍵直接送到終端機（例如 shell / TUI 需要的 Ctrl+W、Ctrl+K）。",
+    "可重新綁定任何快捷鍵，或停用讓按鍵直接送到終端機。終端機內 Ctrl+W 會刪除前一個單字，Ctrl+Shift+W 關閉窗格。",
   "keybindings.hint": "點選快捷鍵後按下新組合鍵（Esc 取消）。需搭配 Ctrl/Cmd 或 Alt，F1–F24 除外。",
   "keybindings.unbound": "已停用",
   "keybindings.disable": "停用（按鍵交給終端機）",
@@ -202,8 +202,7 @@ export const zh: Record<MessageKey, string> = {
   "settings.copyOnSelectHint":
     "啟用後，用滑鼠選取文字會自動複製到剪貼簿——這樣就能直接貼到另一個終端機。",
   "settings.pasteConfirm": "大量貼上前確認",
-  "settings.pasteConfirmHint":
-    "貼上的文字超過下列門檻時先顯示預覽，避免誤貼多行內容意外執行指令。",
+  "settings.pasteConfirmHint": "貼上的文字超過下列門檻時先顯示預覽，避免誤貼多行內容意外執行指令。",
   "settings.pasteConfirmMaxLines": "超過（行）",
   "settings.pasteConfirmMaxChars": "超過（字元）",
   "settings.pasteConfirmBroadcast": "廣播時一律確認",
@@ -240,8 +239,7 @@ export const zh: Record<MessageKey, string> = {
   "healthMonitor.openDoctor": "開啟 Doctor",
   "healthMonitor.openUpdate": "開啟 Update",
   "healthMonitor.mcpPreviewTitle": "檢視 MCP 同步",
-  "healthMonitor.mcpPreviewHint":
-    "寫入設定檔前先預覽變更。同名但內容不同的伺服器絕不會被覆寫。",
+  "healthMonitor.mcpPreviewHint": "寫入設定檔前先預覽變更。同名但內容不同的伺服器絕不會被覆寫。",
   "healthMonitor.mcpPreviewBlocked": "{count} 項被團隊政策封鎖",
   "healthMonitor.mcpPreviewConflicts": "{count} 個名稱衝突——將略過",
   "healthMonitor.mcpPreviewConflictSkip": "此工具已有同名但不同的設定，同步不會覆寫。",
@@ -280,13 +278,11 @@ export const zh: Record<MessageKey, string> = {
     "工作區數量超過同步上限（{count}，上限 {max}）。請刪除未使用的工作區後再試。",
   "settings.accountSyncLimitTooManyProfiles":
     "Profile 數量超過同步上限（{count}，上限 {max}）。請刪除未使用的 Profile 後再試。",
-  "settings.accountSyncLimitTooManyLayouts":
-    "版面配置數量超過同步上限（{count}，上限 {max}）。",
+  "settings.accountSyncLimitTooManyLayouts": "版面配置數量超過同步上限（{count}，上限 {max}）。",
   "settings.accountSyncLimitTooManyPanes":
     "Profile {profileId} 的窗格數超過同步上限（{count}，上限 {max}）。",
   "settings.accountSyncLimitRateLimited": "請等待 {seconds} 秒後再同步。",
-  "settings.accountSyncLimitDailyReached":
-    "已達本裝置每日同步上限（每天 {max} 次）。請明天再試。",
+  "settings.accountSyncLimitDailyReached": "已達本裝置每日同步上限（每天 {max} 次）。請明天再試。",
   "settings.accountSyncLimitUserCapReached":
     "雲端同步名額已滿（{max} 個帳號）。已註冊帳號可繼續同步，新帳號暫時無法加入。",
   "settings.accountNotConfigured":
@@ -436,8 +432,7 @@ export const zh: Record<MessageKey, string> = {
   "profile.middleClickClose": "滑鼠中鍵關閉",
   "profile.showInDisplay": "點擊在右側顯示",
   "profile.dragToDisplay": "點擊或拖曳到右側顯示區",
-  "profile.dragOrShiftAlongside":
-    "拖曳到窗格邊緣可選位置（上/下/左/右），或 Shift+點擊並排顯示",
+  "profile.dragOrShiftAlongside": "拖曳到窗格邊緣可選位置（上/下/左/右），或 Shift+點擊並排顯示",
   "profile.restoreToDisplay": "放回主畫面",
   "profile.failedLoad": "無法載入 profile",
   "profile.failedReorder": "無法重新排序 profile",
@@ -462,7 +457,8 @@ export const zh: Record<MessageKey, string> = {
   "profile.dialog.name": "Profile 名稱",
   "profile.dialog.namePlaceholder": "例如：work、side-project",
   "profile.dialog.defaultDir": "預設目錄",
-  "profile.dialog.defaultDirHint": "套用於新開啟的 terminal；已開啟的 pane 需關閉後重開才會換目錄。",
+  "profile.dialog.defaultDirHint":
+    "套用於新開啟的 terminal；已開啟的 pane 需關閉後重開才會換目錄。",
   "profile.dialog.cwdPlaceholder": "留空則使用使用者目錄",
   "profile.dialog.browse": "瀏覽",
   "profile.dialog.accentLegend": "標記色",
@@ -471,7 +467,8 @@ export const zh: Record<MessageKey, string> = {
   "profile.dialog.detectingMore": "偵測更多工具中…",
   "profile.dialog.delete": "刪除 Profile",
   "profile.savedCommands.legend": "已儲存指令",
-  "profile.savedCommands.hint": "此 profile 可重複使用的指令片段，可從側邊欄或命令面板（Ctrl+K）執行。",
+  "profile.savedCommands.hint":
+    "此 profile 可重複使用的指令片段，可從側邊欄或命令面板（Ctrl+K）執行。",
   "profile.savedCommands.empty": "尚無已儲存指令。",
   "profile.savedCommands.namePlaceholder": "名稱，例如：跑測試",
   "profile.savedCommands.commandPlaceholder": "要送出的指令，例如：pnpm test",
@@ -499,7 +496,8 @@ export const zh: Record<MessageKey, string> = {
   "find.close": "關閉 (Esc)",
   "inventory.installed": "已安裝",
   "inventory.notInstalled": "未安裝",
-  "inventory.emptyHint": "還沒偵測到任何 AI CLI — 從下方「未安裝」清單挑一個裝起來，裝好就會出現在這裡。",
+  "inventory.emptyHint":
+    "還沒偵測到任何 AI CLI — 從下方「未安裝」清單挑一個裝起來，裝好就會出現在這裡。",
   "inventory.installedBadge": "已安裝",
   "inventory.notInstalledBadge": "未安裝",
   "inventory.yes": "是",
@@ -590,7 +588,8 @@ export const zh: Record<MessageKey, string> = {
   "inventory.skillsSync.footerNeedSync": "{count} 個待同步",
   "inventory.skillsSync.footerFullySynced": "{count} 個已全面配置",
   "inventory.diffFix.title": "依來源對齊設定",
-  "inventory.diffFix.subtitle": "以指定工具為 source of truth，檢視差異後僅同步缺少的 MCP Server 與技能。",
+  "inventory.diffFix.subtitle":
+    "以指定工具為 source of truth，檢視差異後僅同步缺少的 MCP Server 與技能。",
   "inventory.diffFix.mcpSource": "MCP 來源",
   "inventory.diffFix.skillsSource": "技能來源",
   "inventory.diffFix.missingOnlyHint": "寫入不會覆寫既有項目。",
@@ -908,8 +907,7 @@ export const zh: Record<MessageKey, string> = {
   "usage.unified.empty": "尚無每日明細 — 請先在下方設定至少一個工具的金鑰。",
   "usage.unified.noDaily":
     "已連線的工具回報的是訂閱額度或帳單週期總計，沒有每日歷史。請切換到各工具查看剩餘額度。",
-  "usage.unified.quotaNote":
-    "期間總成本包含帳單週期或額度型工具，這類資料不會出現在下方每日圖表。",
+  "usage.unified.quotaNote": "期間總成本包含帳單週期或額度型工具，這類資料不會出現在下方每日圖表。",
   "usage.credentials.title": "API 金鑰",
   "usage.credentials.hint": "用量與帳單端點需要 Admin API 金鑰，一般聊天用 API key 通常無法使用。",
   "usage.credential.save": "儲存金鑰",
@@ -1034,7 +1032,8 @@ export const zh: Record<MessageKey, string> = {
   "usage.copilot.auth.enterprise.field": "Enterprise slug",
   "usage.local.source": "本機工作階段資料",
   "usage.local.noKey": "不需要 API 金鑰 — 以唯讀方式直接讀取此電腦上該工具自己的工作階段資料。",
-  "usage.local.notFound": "尚未找到此工具的本機工作階段資料。請先在這台電腦上使用一次，再重新整理。",
+  "usage.local.notFound":
+    "尚未找到此工具的本機工作階段資料。請先在這台電腦上使用一次，再重新整理。",
   "usage.opencode.intro":
     "從 OpenCode 本機資料庫（~/.local/share/opencode/opencode.db，或舊版 storage/message JSON）讀取每則回覆的 token 與費用。費用為 OpenCode 記錄的數值；訂閱或免費模型會顯示 $0。",
   "usage.crush.intro":
@@ -1069,7 +1068,8 @@ export const zh: Record<MessageKey, string> = {
   "flow.template.dailyStandup.desc": "收集進度並用 Haiku 寫出簡短站會條列。",
   "flow.template.dailyStandup.tag": "Claude · 手動",
   "flow.template.weeklyDigest.title": "每週摘要",
-  "flow.template.weeklyDigest.desc": "週一從 Amplitude + Jira（MCP）產出報告；設定 MCP 前預設停用。",
+  "flow.template.weeklyDigest.desc":
+    "週一從 Amplitude + Jira（MCP）產出報告；設定 MCP 前預設停用。",
   "flow.template.weeklyDigest.tag": "Claude · 排程",
   "flow.openFolder": "開啟 flows 資料夾",
   "flow.phases": "個階段",
@@ -1116,7 +1116,8 @@ export const zh: Record<MessageKey, string> = {
   "flow.dag.inspectPreview": "預覽（執行一次後會顯示實際記錄的指令）",
   "flow.dag.inspectLogged": "來自上次執行",
   "flow.dag.inspectHttp": "HTTP 請求",
-  "flow.dag.inspectPhaseHint": "多節點模式時每個步驟有獨立 agent 指令；舊版流程仍由 MCP flow_progress 回報步驟。",
+  "flow.dag.inspectPhaseHint":
+    "多節點模式時每個步驟有獨立 agent 指令；舊版流程仍由 MCP flow_progress 回報步驟。",
   "flow.dag.inspectOutputPath": "產出檔案",
   "flow.dag.inspectNoOutput": "尚無產出檔案。",
   "flow.dag.inspectCopy": "複製指令",
@@ -1159,11 +1160,13 @@ export const zh: Record<MessageKey, string> = {
   "flow.progress.starting": "啟動 agent…",
   "flow.progress.finishing": "寫入產出…",
   "flow.scheduler.title": "排程執行",
-  "flow.scheduler.hint": "關閉後會暫停所有 cron 自動執行（app 開著或關著皆然）；各流程的 cron 設定仍會保留。",
+  "flow.scheduler.hint":
+    "關閉後會暫停所有 cron 自動執行（app 開著或關著皆然）；各流程的 cron 設定仍會保留。",
   "flow.scheduler.enabled": "啟用排程執行",
   "flow.scheduler.paused": "已暫停 — app 內檢查與作業系統 due 排程都不會啟動流程。",
   "flow.taskScheduler.title": "關閉 app 時仍排程執行",
-  "flow.taskScheduler.hint.windows-task-scheduler": "選用的 Windows 工作排程器，每分鐘執行 flow due；需先啟用上方排程執行。",
+  "flow.taskScheduler.hint.windows-task-scheduler":
+    "選用的 Windows 工作排程器，每分鐘執行 flow due；需先啟用上方排程執行。",
   "flow.taskScheduler.hint.launchd":
     "選用的 launchd LaunchAgent（~/Library/LaunchAgents），每分鐘執行 flow due；需先啟用上方排程執行。",
   "flow.taskScheduler.hint.systemd":
@@ -1202,7 +1205,8 @@ export const zh: Record<MessageKey, string> = {
   "flow.runner.hint": "選擇 Claude 或 Cursor agent 執行此流程，並設定啟動參數與工作目錄。",
   "flow.runner.tool": "工具",
   "flow.runner.toolArgs": "啟動參數",
-  "flow.runner.toolArgsHint": "模型與其他參數會寫入 tool_args；手動執行時仍會合併設定中的全域預設。",
+  "flow.runner.toolArgsHint":
+    "模型與其他參數會寫入 tool_args；手動執行時仍會合併設定中的全域預設。",
   "flow.runner.toolUnsupported": "目前僅 Claude 與 Cursor agent 支援 AI Flow 的 MCP 模式。",
   "flow.runner.profile": "Profile",
   "flow.runner.profileNone": "無",
@@ -1213,7 +1217,8 @@ export const zh: Record<MessageKey, string> = {
   "flow.runner.saveFailed": "無法儲存執行環境",
   "flow.runner.httpOnly": "HTTP 流程不使用 agent 執行環境。",
   "flow.runner.env": "環境變數",
-  "flow.runner.envHint": "每行一個 KEY=value，會加到 agent 行程。${VAR} 會以 App 環境展開。綁定設定檔時也會設定 AISHELF_PROFILE_ID / AISHELF_PROFILE_NAME。",
+  "flow.runner.envHint":
+    "每行一個 KEY=value，會加到 agent 行程。${VAR} 會以 App 環境展開。綁定設定檔時也會設定 AISHELF_PROFILE_ID / AISHELF_PROFILE_NAME。",
   "flow.notify.title": "通知",
   "flow.notify.hint": "選擇哪些結果要通知你，並把執行結果送到 Slack 或任意 webhook。",
   "flow.notify.desktop": "桌面通知",
@@ -1230,7 +1235,8 @@ export const zh: Record<MessageKey, string> = {
   "flow.notify.noWebhooks": "尚未設定 webhook。",
   "flow.notify.removeWebhook": "移除 webhook",
   "flow.notify.authorizationPlaceholder": "Authorization 標頭（選填），例如 Bearer ${MY_TOKEN}",
-  "flow.notify.webhookHint": "Payload 佔位符：{flow_id} {run_id} {status} {error} {output_path} {duration_sec} {started_at} {completed_at}。${ENV_VAR} 會從環境變數展開，機密不必寫進流程檔。Payload 留空則送出預設 JSON。",
+  "flow.notify.webhookHint":
+    "Payload 佔位符：{flow_id} {run_id} {status} {error} {output_path} {duration_sec} {started_at} {completed_at}。${ENV_VAR} 會從環境變數展開，機密不必寫進流程檔。Payload 留空則送出預設 JSON。",
   "flow.notify.webhookUrlRequired": "每個 webhook 都需要 URL。",
   "flow.notify.save": "儲存通知設定",
   "flow.notify.saving": "儲存中…",
@@ -1244,7 +1250,8 @@ export const zh: Record<MessageKey, string> = {
   "flow.nextRun": "下次執行 {time}",
   "flow.create.title": "建立流程",
   "flow.create.subtitle": "用自然語言描述工作內容，Claude 會幫你產生 .flow.md。",
-  "flow.create.welcome": "告訴我想自動化什麼，例如：每天檢查 API 健康狀態並把結果寫成 Markdown 報告。",
+  "flow.create.welcome":
+    "告訴我想自動化什麼，例如：每天檢查 API 健康狀態並把結果寫成 Markdown 報告。",
   "flow.create.placeholder": "描述排程、資料來源與產出格式…",
   "flow.create.send": "傳送",
   "flow.create.cancel": "返回流程列表",
@@ -1285,7 +1292,8 @@ export const zh: Record<MessageKey, string> = {
   "flow.history.event.phase": "{type} · {phase}",
   "flow.history.event.flowOutput": "已寫入產出",
   "flow.history.retentionTitle": "執行紀錄保留",
-  "flow.history.retentionHint": "每次執行結束與 App 啟動時會刪除舊的執行資料夾。欄位留空代表不限制。套用到所有流程，除非流程另行覆寫。",
+  "flow.history.retentionHint":
+    "每次執行結束與 App 啟動時會刪除舊的執行資料夾。欄位留空代表不限制。套用到所有流程，除非流程另行覆寫。",
   "flow.history.maxRuns": "每個流程最多保留筆數",
   "flow.history.maxDays": "最長保留天數",
   "flow.history.unlimited": "不限制",
@@ -1787,8 +1795,7 @@ export const zh: Record<MessageKey, string> = {
   "wsl.default": "預設",
   "wsl.useDistro": "使用",
   "wsl.distros.empty": "找不到 WSL 發行版。",
-  "wsl.hint.distros":
-    "列出這台 Windows 主機上 `wsl -l -v` 的結果。路徑轉換不依賴 WSL 也能用。",
+  "wsl.hint.distros": "列出這台 Windows 主機上 `wsl -l -v` 的結果。路徑轉換不依賴 WSL 也能用。",
   "wsl.snippetPath": "路徑",
   "wsl.snippets.empty": "輸入路徑後即可產生指令。",
   "wsl.snippet.shell": "在此開啟 shell",
@@ -1797,15 +1804,13 @@ export const zh: Record<MessageKey, string> = {
   "wsl.snippet.wslpath": "wslpath -w",
   "wsl.snippet.code": "用 VS Code 開啟",
   "wsl.snippet.ip": "主機 IP",
-  "wsl.hint.snippets":
-    "可貼到 PowerShell、CMD 或終端 Profile。需要時再改發行版名稱。",
+  "wsl.hint.snippets": "可貼到 PowerShell、CMD 或終端 Profile。需要時再改發行版名稱。",
   "wsl.error.needsDistro": "從 Linux 路徑組成 \\\\wsl$\\… 時請填發行版名稱。",
   "wsl.error.unknownPath": "這不像 Windows 或 WSL 路徑。",
   "wsl.error.unsupported": "無法轉換這條路徑。",
   "wsl.error.lineCount": "行需要注意",
   "wsl.error.unavailable": "這個視窗無法使用 WSL 工具。",
-  "wsl.error.unsupportedPlatform":
-    "發行版列表需要安裝了 WSL 的 Windows。路徑轉換在這裡仍可用。",
+  "wsl.error.unsupportedPlatform": "發行版列表需要安裝了 WSL 的 Windows。路徑轉換在這裡仍可用。",
   "wsl.error.missing": "找不到 wsl.exe。安裝 WSL 後再試。",
   "wsl.error.listFailed": "無法列出發行版 — 請再整理一次。",
   "wsl.error.ipFailed": "無法讀取發行版 IP。",
