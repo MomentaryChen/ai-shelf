@@ -206,6 +206,7 @@ import {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  cancelAllFlowRuns,
   approveFlowGate,
   rejectFlowGate,
   saveFlowSchedule,
@@ -3148,6 +3149,12 @@ function flushProfileLayoutsFromRenderer(): Promise<void> {
 
 function tearDownOnQuit(): void {
   setAppQuitting(true);
+  stopFlowScheduler();
+  try {
+    cancelAllFlowRuns();
+  } catch {
+    /* never block quit */
+  }
   for (const [, proc] of PTY_SESSIONS) {
     try { proc.kill(); } catch { /* already dead */ }
   }
