@@ -33,7 +33,13 @@ export interface AppContext {
   profileService: ProfileService;
   profileGroupService: ProfileGroupService;
   execService: ExecService;
+  /** Close the database only; PTYs started by this process keep running. */
   close: () => void;
+  /**
+   * Kill PTYs started by this process, mark their sessions stopped, then close the
+   * database. Idempotent; used by the CLI/TUI when the process is about to exit.
+   */
+  shutdown: () => void;
 }
 
 export function bootstrap(): AppContext {
@@ -75,6 +81,21 @@ export function bootstrap(): AppContext {
 
   logger.info("ai-shelf runtime initialized");
 
+  let closed = false;
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    db.close();
+  };
+  const shutdown = (): void => {
+    if (closed) return;
+    try {
+      sessionRuntime.stopAllOwned();
+    } finally {
+      close();
+    }
+  };
+
   return {
     config,
     logger,
@@ -88,6 +109,7 @@ export function bootstrap(): AppContext {
     profileService,
     profileGroupService,
     execService,
-    close: () => db.close(),
+    close,
+    shutdown,
   };
 }
