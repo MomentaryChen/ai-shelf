@@ -25,6 +25,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 - **Duplicate CLI error output** — Failed commands print one `Error: …` line and exit with code 1; stack traces appear only with `AI_SHELF_DEBUG=1`.
 - **`session create` / `session start` hang and crash** — Both stay attached to the PTY (exit the shell or press `Ctrl+]`), then stop it cleanly without writing to a closed database.
 - **Copilot / Cursor config paths on macOS and Linux** — Copilot settings, instruction and MCP files under `~/.copilot` (or `COPILOT_HOME`) and Cursor's per-platform `settings.json` are now found outside Windows instead of being looked up with hard-coded backslashes.
+- **Ctrl+W in terminal** — Ctrl+W inside a terminal pane now reaches the shell (delete previous word) instead of closing the pane; use Ctrl+Shift+W to close a pane from the terminal.
 - **Flow runs on quit** — Quitting or relaunching the app now cancels in-flight AI Flow runs and kills their agent process trees, and runs left "running" by a previous session are marked failed on startup.
 
 ## [4.3.5] - 2026-10-07
