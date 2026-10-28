@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
-import { AppError } from "../../core/errors/app-error.js";
+import { handleError } from "../errors.js";
 import { warnLegacyWorkspaceModel } from "../deprecation.js";
 
 export function registerGroupCommands(program: Command, getCtx: () => AppContext): void {
@@ -60,13 +60,4 @@ export function registerGroupCommands(program: Command, getCtx: () => AppContext
         handleError(err);
       }
     });
-}
-
-function handleError(err: unknown): never {
-  if (err instanceof AppError) {
-    console.error(chalk.red(`Error: ${err.message}`));
-    process.exitCode = 1;
-    throw err;
-  }
-  throw err;
 }

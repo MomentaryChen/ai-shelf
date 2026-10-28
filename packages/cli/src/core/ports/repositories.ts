@@ -31,7 +31,7 @@ export interface SessionRepositoryPort {
   findByName(workspaceId: string, groupId: string, name: string): SessionModel | null;
   updateRuntime(
     id: string,
-    patch: { pid?: number | null; status: SessionModel["status"] },
+    patch: { pid?: number | null; owner_pid?: number | null; status: SessionModel["status"] },
   ): SessionModel;
   deleteByName(workspaceId: string, groupId: string, name: string): boolean;
 }
