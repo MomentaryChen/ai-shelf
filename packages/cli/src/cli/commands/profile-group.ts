@@ -1,17 +1,8 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
-import { AppError } from "../../core/errors/app-error.js";
+import { handleError } from "../errors.js";
 import type { ProfileGroupInfo } from "../../services/profile-group-service.js";
-
-function handleError(err: unknown): never {
-  if (err instanceof AppError) {
-    console.error(chalk.red(`Error: ${err.message}`));
-    process.exitCode = 1;
-    throw err;
-  }
-  throw err;
-}
 
 function formatGroup(g: ProfileGroupInfo): string {
   const count =
