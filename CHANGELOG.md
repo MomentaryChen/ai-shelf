@@ -19,6 +19,11 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 - **Flow run matching** — Run history and flow deletion match run directories to the exact flow id (from `state.json`, else the parsed run name), so deleting `review` no longer removes or lists runs of `multi-agent-review`.
 - **`ai update` timeouts** — Tool updates now stream package-manager output live, allow up to 10 minutes instead of being killed after 10 seconds, report a timeout separately from a failed exit, and `ai update self` uses the package manager that actually installed ai-shelf.
 - **Terminal broadcast toggle** — Turning broadcast input on or off now takes effect immediately in panes that are already open, instead of only after some unrelated pane setting changed.
+- **`ai-shelf tui` database closed under the TUI** — The command now waits for the TUI to exit before closing the database, and quitting stops the PTYs it started instead of calling `process.exit` mid-session.
+- **Phantom `running` CLI sessions** — Sessions record their PTY pid and owning process; exiting the CLI/TUI (including `Ctrl+C` and `SIGTERM`) stops its PTYs, `session list` clears rows whose process is gone, and `session stop` can stop a session started by another `ai-shelf` process.
+- **Cross-process `exec` errors** — `session exec` and `profile exec [--broadcast]` explain that a session running in another `ai-shelf` process can only receive commands from that process, instead of reporting "No running session".
+- **Duplicate CLI error output** — Failed commands print one `Error: …` line and exit with code 1; stack traces appear only with `AI_SHELF_DEBUG=1`.
+- **`session create` / `session start` hang and crash** — Both stay attached to the PTY (exit the shell or press `Ctrl+]`), then stop it cleanly without writing to a closed database.
 - **Find in terminal clipboard** — Stepping through Ctrl+F matches no longer overwrites the clipboard with the matched text when copy-on-select is on.
 
 ## [4.3.5] - 2026-10-07
