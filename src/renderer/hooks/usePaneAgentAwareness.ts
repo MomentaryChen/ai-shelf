@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PaneInfo } from "../terminal/split-tree";
 import type { ChatSettings } from "../chat-settings";
 import {
@@ -12,10 +12,40 @@ import {
   type PaneAgentState,
   type PaneAgentStatus,
 } from "../../shared/pane-agent-state.js";
+import {
+  reduceBackgroundAttention,
+  summarizeBackgroundAttention,
+  type BackgroundAttentionEvent,
+  type BackgroundAttentionKind,
+  type BackgroundAttentionMap,
+} from "../../shared/background-agent-attention.js";
 import { paneDisplayLabel } from "../utils/pane-label";
 import type { MessageKey } from "../i18n/messages/en";
 
 export type PaneAgentStateMap = Record<string, PaneAgentStatus>;
+
+/** A pane living in a non-active profile whose agent output is still tracked. */
+export interface BackgroundAgentPane {
+  pane: PaneInfo;
+  profileId: string;
+  profileName: string;
+}
+
+/** Emitted when a background agent needs attention (for in-app toasts). */
+export interface BackgroundAgentNotice {
+  paneId: string;
+  profileId: string;
+  kind: BackgroundAttentionKind;
+  title: string;
+  body: string;
+}
+
+export interface BackgroundAgentOptions {
+  panes: BackgroundAgentPane[];
+  onNotice?: (notice: BackgroundAgentNotice) => void;
+}
+
+const NO_BACKGROUND: BackgroundAgentOptions = { panes: [] };
 
 const NOTIFY_COOLDOWN_MS = 30_000;
 
@@ -31,7 +61,10 @@ function playAttentionSound(): void {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.12);
-    void ctx.close();
+    // Close only after the tone finishes; closing right away silences it.
+    osc.onended = () => {
+      void ctx.close();
+    };
   } catch {
     /* Web Audio unavailable */
   }
@@ -61,6 +94,7 @@ export function usePaneAgentAwareness(
   settings: ChatSettings,
   t: (key: MessageKey, params?: Record<string, string | number>) => string,
   windowFocused: boolean,
+  background: BackgroundAgentOptions = NO_BACKGROUND,
 ) {
   const [states, setStates] = useState<Record<string, PaneAgentState>>({});
   const statesRef = useRef(states);
@@ -77,12 +111,48 @@ export function usePaneAgentAwareness(
   const readyNotifiedRef = useRef<Record<string, boolean>>({});
   const readyPendingRef = useRef<Record<string, number>>({});
 
+  const backgroundPanes = background.panes;
+  const onNoticeRef = useRef(background.onNotice);
+  onNoticeRef.current = background.onNotice;
+  const windowFocusedRef = useRef(windowFocused);
+  windowFocusedRef.current = windowFocused;
+  const backgroundByPane = useMemo(() => {
+    const map = new Map<string, BackgroundAgentPane>();
+    for (const b of backgroundPanes) map.set(b.pane.id, b);
+    return map;
+  }, [backgroundPanes]);
+  const backgroundByPaneRef = useRef(backgroundByPane);
+  backgroundByPaneRef.current = backgroundByPane;
+
+  /** Active layout panes + live panes of background profiles. */
+  const trackedPanes = useMemo(() => {
+    if (backgroundPanes.length === 0) return panes;
+    const seen = new Set(panes.map((p) => p.id));
+    const out = [...panes];
+    for (const b of backgroundPanes) {
+      if (seen.has(b.pane.id)) continue;
+      seen.add(b.pane.id);
+      out.push(b.pane);
+    }
+    return out;
+  }, [panes, backgroundPanes]);
+
+  const [attention, setAttention] = useState<BackgroundAttentionMap>({});
+  const dispatchAttention = useCallback((event: BackgroundAttentionEvent) => {
+    setAttention((prev) => reduceBackgroundAttention(prev, event));
+  }, []);
+
+  useEffect(() => {
+    const paneIds = new Set(backgroundByPane.keys());
+    dispatchAttention({ type: "retain", paneIds });
+  }, [backgroundByPane, dispatchAttention]);
+
   const paneBySession = useRef(new Map<string, PaneInfo>());
   useEffect(() => {
     const map = new Map<string, PaneInfo>();
-    for (const p of panes) map.set(p.sessionId, p);
+    for (const p of trackedPanes) map.set(p.sessionId, p);
     paneBySession.current = map;
-  }, [panes]);
+  }, [trackedPanes]);
 
   const clearReadyPending = useCallback((paneId: string) => {
     const timer = readyPendingRef.current[paneId];
@@ -106,6 +176,8 @@ export function usePaneAgentAwareness(
   const shouldNotifyPane = useCallback(
     (pane: PaneInfo) => {
       if (!settings.paneAgentAwarenessEnabled) return false;
+      // Background profile panes are never on screen.
+      if (backgroundByPaneRef.current.has(pane.id)) return true;
       return (
         !settings.paneAgentNotifyUnfocusedOnly ||
         focusedPaneId !== pane.id ||
@@ -121,11 +193,26 @@ export function usePaneAgentAwareness(
       titleKey: MessageKey,
       bodyKey: MessageKey,
       silent: boolean,
+      kind?: BackgroundAttentionKind,
+      params?: Record<string, string | number>,
     ) => {
       if (!settings.paneAgentAwarenessEnabled) return;
-      const title = t(titleKey, { pane: paneDisplayLabel(pane) });
-      const body = t(bodyKey, { pane: paneDisplayLabel(pane) });
+      const bg = backgroundByPaneRef.current.get(pane.id);
+      const label = bg
+        ? t("pane.agent.bg.paneLabel", { profile: bg.profileName, pane: paneDisplayLabel(pane) })
+        : paneDisplayLabel(pane);
+      const title = t(titleKey, { ...params, pane: label });
+      const body = t(bodyKey, { ...params, pane: label });
       const playSound = settings.paneAgentNotifySound && !silent;
+      // Background profile + app in front: an in-app toast replaces the OS notification.
+      const onNotice = onNoticeRef.current;
+      if (bg && kind && onNotice && windowFocusedRef.current) {
+        if (settings.paneAgentNotifySystem) {
+          onNotice({ paneId: pane.id, profileId: bg.profileId, kind, title, body });
+        }
+        if (playSound) playAttentionSound();
+        return;
+      }
       if (settings.paneAgentNotifySystem) {
         await window.api.showPaneAgentNotification({
           title,
@@ -154,15 +241,25 @@ export function usePaneAgentAwareness(
         if (!shouldNotifyPane(pane)) return;
 
         readyNotifiedRef.current[pane.id] = true;
+        const bg = backgroundByPaneRef.current.get(pane.id);
+        if (bg) {
+          dispatchAttention({
+            type: "finished",
+            paneId: pane.id,
+            profileId: bg.profileId,
+            at: Date.now(),
+          });
+        }
         void notify(
           pane,
           "pane.agent.notify.readyTitle",
           "pane.agent.notify.readyBody",
           false,
+          "finished",
         );
       }, PANE_AGENT_READY_IDLE_STABLE_MS);
     },
-    [clearReadyPending, notify, shouldNotifyPane],
+    [clearReadyPending, dispatchAttention, notify, shouldNotifyPane],
   );
 
   const handleTransition = useCallback(
@@ -178,6 +275,17 @@ export function usePaneAgentAwareness(
         clearReadyPending(pane.id);
       }
 
+      const bg = backgroundByPaneRef.current.get(pane.id);
+      if (bg) {
+        dispatchAttention({
+          type: "status",
+          paneId: pane.id,
+          profileId: bg.profileId,
+          next,
+          at: Date.now(),
+        });
+      }
+
       if (!shouldNotifyPane(pane)) return;
 
       const cooldownKey = `${pane.id}:${next}`;
@@ -187,21 +295,40 @@ export function usePaneAgentAwareness(
 
       let fired = false;
       if (next === "waiting_input" && prev === "running") {
-        void notify(pane, "pane.agent.notify.waitingTitle", "pane.agent.notify.waitingBody", false);
+        void notify(
+          pane,
+          "pane.agent.notify.waitingTitle",
+          "pane.agent.notify.waitingBody",
+          false,
+          "waiting_input",
+        );
         fired = true;
       } else if (next === "idle" && prev === "running") {
         scheduleReadyNotify(pane, paneState?.lastRunningSpellMs ?? 0);
       } else if (next === "stalled" && prev !== "stalled") {
-        void notify(pane, "pane.agent.notify.stalledTitle", "pane.agent.notify.stalledBody", false);
+        void notify(
+          pane,
+          "pane.agent.notify.stalledTitle",
+          "pane.agent.notify.stalledBody",
+          false,
+          "error",
+        );
         fired = true;
       }
       if (fired) notifyCooldownRef.current[cooldownKey] = now;
     },
-    [clearReadyPending, notify, scheduleReadyNotify, settings, shouldNotifyPane],
+    [
+      clearReadyPending,
+      dispatchAttention,
+      notify,
+      scheduleReadyNotify,
+      settings,
+      shouldNotifyPane,
+    ],
   );
 
   useEffect(() => {
-    for (const pane of panes) {
+    for (const pane of trackedPanes) {
       const paneState = states[pane.id];
       const status = paneState?.status;
       if (!status) continue;
@@ -212,13 +339,13 @@ export function usePaneAgentAwareness(
       prevStatusRef.current[pane.id] = status;
     }
     for (const id of Object.keys(prevStatusRef.current)) {
-      if (!panes.some((p) => p.id === id)) {
+      if (!trackedPanes.some((p) => p.id === id)) {
         delete prevStatusRef.current[id];
         delete readyNotifiedRef.current[id];
         clearReadyPending(id);
       }
     }
-  }, [clearReadyPending, handleTransition, panes, states]);
+  }, [clearReadyPending, handleTransition, trackedPanes, states]);
 
   useEffect(() => {
     return () => {
@@ -297,6 +424,7 @@ export function usePaneAgentAwareness(
       pendingOutputRef.current.clear();
       draftRef.current = {};
       setStates({});
+      setAttention({});
       prevStatusRef.current = {};
       readyNotifiedRef.current = {};
       for (const id of Object.keys(readyPendingRef.current)) {
@@ -313,7 +441,7 @@ export function usePaneAgentAwareness(
       scheduleOutputFlush();
     });
 
-    const offExit = window.api.onPtyExit(({ sessionId }) => {
+    const offExit = window.api.onPtyExit(({ sessionId, exitCode }) => {
       const pane = paneBySession.current.get(sessionId);
       // Apply coalesced bytes before reset so the final chunk is not dropped.
       const pending = pendingOutputRef.current.get(sessionId);
@@ -331,6 +459,24 @@ export function usePaneAgentAwareness(
       if (pane) {
         readyNotifiedRef.current[pane.id] = false;
         clearReadyPending(pane.id);
+        const bg = backgroundByPaneRef.current.get(pane.id);
+        if (bg && exitCode !== 0) {
+          dispatchAttention({
+            type: "exited",
+            paneId: pane.id,
+            profileId: bg.profileId,
+            exitCode,
+            at: Date.now(),
+          });
+          void notify(
+            pane,
+            "pane.agent.notify.exitedTitle",
+            "pane.agent.notify.exitedBody",
+            false,
+            "error",
+            { code: exitCode },
+          );
+        }
       }
       // Process is gone -- do not treat as busy for close-confirm / status dots.
       updateSession(sessionId, () => createPaneAgentState());
@@ -345,13 +491,15 @@ export function usePaneAgentAwareness(
     cancelOutputCoalesce,
     clearReadyPending,
     commitPaneState,
+    dispatchAttention,
+    notify,
     scheduleOutputFlush,
     settings,
     updateSession,
   ]);
 
   useEffect(() => {
-    const paneIds = new Set(panes.map((p) => p.id));
+    const paneIds = new Set(trackedPanes.map((p) => p.id));
     for (const id of Object.keys(draftRef.current)) {
       if (!paneIds.has(id)) delete draftRef.current[id];
     }
@@ -364,7 +512,7 @@ export function usePaneAgentAwareness(
       }
       return changed ? next : prev;
     });
-  }, [panes]);
+  }, [trackedPanes]);
 
   const recordUserInput = useCallback(
     (sessionId: string) => {
@@ -387,7 +535,7 @@ export function usePaneAgentAwareness(
     const id = window.setInterval(() => {
       const now = Date.now();
       const opts = stateOptions(settings);
-      for (const pane of panes) {
+      for (const pane of trackedPanes) {
         const current = draftRef.current[pane.id] ?? statesRef.current[pane.id];
         if (!current) continue;
         const ticked = tickPaneAgentState(current, now, opts);
@@ -399,7 +547,7 @@ export function usePaneAgentAwareness(
       }
     }, 4_000);
     return () => window.clearInterval(id);
-  }, [commitPaneState, panes, settings]);
+  }, [commitPaneState, trackedPanes, settings]);
 
   useEffect(() => {
     if (!settings.paneAgentAwarenessEnabled || !settings.paneAgentNotifyTrayBadge) {
@@ -407,7 +555,7 @@ export function usePaneAgentAwareness(
       return;
     }
     let count = 0;
-    for (const pane of panes) {
+    for (const pane of trackedPanes) {
       const status = states[pane.id]?.status;
       if (status && paneNeedsAttention(status)) {
         if (settings.paneAgentNotifyUnfocusedOnly && focusedPaneId === pane.id && windowFocused) {
@@ -417,14 +565,23 @@ export function usePaneAgentAwareness(
       }
     }
     void window.api.setTrayPaneAttention(count);
-  }, [focusedPaneId, panes, settings, states, windowFocused]);
+  }, [focusedPaneId, trackedPanes, settings, states, windowFocused]);
 
   const statusMap: PaneAgentStateMap = {};
   if (settings.paneAgentAwarenessEnabled) {
-    for (const pane of panes) {
+    for (const pane of trackedPanes) {
       statusMap[pane.id] = states[pane.id]?.status ?? "idle";
     }
   }
 
-  return { paneAgentStates: statusMap, recordPaneAgentInput: recordUserInput };
+  const backgroundAttention = useMemo(() => summarizeBackgroundAttention(attention), [attention]);
+
+  return {
+    paneAgentStates: statusMap,
+    recordPaneAgentInput: recordUserInput,
+    /** Per-profile badge summary for background profiles needing attention. */
+    backgroundAttention,
+    /** Per-pane background attention (keyed by pane id). */
+    backgroundPaneAttention: attention,
+  };
 }

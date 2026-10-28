@@ -7,6 +7,7 @@ import {
   isValidSearchRegex,
   type PtyTextMatch,
 } from "../../shared/pty-output-search";
+import { withProgrammaticSelection } from "./selection-copy";
 
 /** Internal 3rd arg on findNext/findPrevious (not in public .d.ts). */
 interface InternalSearchOptions {
@@ -188,6 +189,18 @@ export function collectAllMatchesViaAddon(
     return { matches: [], capped: false };
   }
 
+  // Walks matches by moving the selection; keep copy-on-select out of it.
+  return withProgrammaticSelection(term, () =>
+    collectMatchesBySelection(addon, term, query, flags),
+  );
+}
+
+function collectMatchesBySelection(
+  addon: SearchAddon,
+  term: Terminal,
+  query: string,
+  flags: TerminalSearchFlags,
+): { matches: TerminalMatch[]; capped: boolean } {
   const opts = searchOptions(flags);
   addon.clearDecorations();
   term.clearSelection();
@@ -259,22 +272,24 @@ export function jumpToMatchViaAddon(
   if (!query || index < 1) return false;
   if (flags.regex && !isValidSearchRegex(query)) return false;
 
-  const opts = searchOptions(flags);
-  addon.clearDecorations();
-  term.clearSelection();
-
-  for (let i = 0; i < index - 1; i++) {
-    if (!findNextInternal(addon, query, opts, { noScroll: true })) {
-      term.clearSelection();
-      return false;
-    }
-  }
-
-  const found = addon.findNext(query, opts);
-  if (!found) {
+  return withProgrammaticSelection(term, () => {
+    const opts = searchOptions(flags);
+    addon.clearDecorations();
     term.clearSelection();
-  }
-  return found;
+
+    for (let i = 0; i < index - 1; i++) {
+      if (!findNextInternal(addon, query, opts, { noScroll: true })) {
+        term.clearSelection();
+        return false;
+      }
+    }
+
+    const found = addon.findNext(query, opts);
+    if (!found) {
+      term.clearSelection();
+    }
+    return found;
+  });
 }
 
 async function countPtyMatches(
@@ -351,6 +366,20 @@ export function jumpToSessionMatch(
   addon: SearchAddon | null,
   matchIndex: number,
 ): MatchScrollStatus {
+  // Selecting the match is navigation, not a copy — keep copy-on-select out.
+  return withProgrammaticSelection(term, () =>
+    jumpToSessionMatchUnguarded(term, entry, query, flags, addon, matchIndex),
+  );
+}
+
+function jumpToSessionMatchUnguarded(
+  term: Terminal,
+  entry: ResolvedSessionMatch,
+  query: string,
+  flags: TerminalSearchFlags,
+  addon: SearchAddon | null,
+  matchIndex: number,
+): MatchScrollStatus {
   if (!query || !addon) {
     term.clearSelection();
     return "out-of-scrollback";
@@ -382,10 +411,23 @@ export function jumpToSessionMatch(
 
 export function runTerminalSearch(
   addon: SearchAddon,
+  term: Terminal,
   direction: "next" | "prev",
   query: string,
   flags: TerminalSearchFlags,
   incremental = false,
+): boolean {
+  return withProgrammaticSelection(term, () =>
+    runTerminalSearchUnguarded(addon, direction, query, flags, incremental),
+  );
+}
+
+function runTerminalSearchUnguarded(
+  addon: SearchAddon,
+  direction: "next" | "prev",
+  query: string,
+  flags: TerminalSearchFlags,
+  incremental: boolean,
 ): boolean {
   if (!query) {
     clearTerminalSearch(addon);

@@ -27,10 +27,15 @@ import {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  cancelAllFlowRuns,
+  reconcileStaleFlowRuns,
   approveFlowGate,
   rejectFlowGate,
   saveFlowSchedule,
   saveFlowRunner,
+  saveFlowSource,
+  saveFlowNotifications,
+  pruneAllFlowRunHistory,
 } from "../flow/core.js";
 import { setFlowNotifyHooks } from "../flow/flow-notify.js";
 import {
@@ -73,11 +78,15 @@ export {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  cancelAllFlowRuns,
   approveFlowGate,
   rejectFlowGate,
   saveFlowChat,
   saveFlowSchedule,
   saveFlowRunner,
+  saveFlowSource,
+  saveFlowNotifications,
+  pruneAllFlowRunHistory,
 };
 
 function bundledFlowPath(fileName: string): string {
@@ -165,7 +174,20 @@ function wireDesktopNotifyOnFail(): void {
 
 export function initFlowService(): void {
   initFlowCore();
+  try {
+    reconcileStaleFlowRuns();
+  } catch {
+    /* history cleanup must not block startup */
+  }
   mkdirSync(join(getAppDataDir(), "flows"), { recursive: true });
   seedExampleFlows();
   wireDesktopNotifyOnFail();
+  // Retention GC off the startup path; per-run GC also runs after every finished run.
+  setTimeout(() => {
+    try {
+      pruneAllFlowRunHistory();
+    } catch (err: unknown) {
+      console.warn("[flow] run history GC failed:", err instanceof Error ? err.message : err);
+    }
+  }, 30_000).unref?.();
 }

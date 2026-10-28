@@ -30,7 +30,16 @@ import {
   fetchRemoteLatestVersion,
   resolveToolLatestVersion,
 } from "../utils/latest-version.js";
-import { getMcpConfigPath, tryReadJson, backupFile, writeJson, parseJsonLoose } from "../utils/config.js";
+import {
+  getMcpConfigPath,
+  tryReadJson,
+  backupFile,
+  writeJson,
+  parseJsonLoose,
+  claudeConfigDir,
+  codexHome,
+  opencodeConfigPath,
+} from "../utils/config.js";
 import {
   collectAllMcpServers,
   readMcpServers,
@@ -76,6 +85,7 @@ import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import {
   NO_SUITABLE_UNIX_SHELL_ERROR,
   NO_SUITABLE_WINDOWS_SHELL_ERROR,
+  isValidWslDistroName,
   resolvePtySpawnPlan,
   type GroupLayoutSnapshot,
 } from "ai-shelf";
@@ -162,6 +172,11 @@ import {
   onAppUpdateStateChanged,
   runHealthCheck,
 } from "./health-monitor.js";
+import { runPtyLogGc, type PtyLogGcResult, type PtyLogRetentionPrefs } from "./pty-log-gc.js";
+import {
+  readPtyLogRetentionPrefs,
+  writePtyLogRetentionPrefs,
+} from "./pty-log-retention-pref.js";
 import {
   deleteFlow,
   deleteFlowChatData,
@@ -191,11 +206,15 @@ import {
   runDueFlows,
   runFlow,
   cancelFlowRun,
+  cancelAllFlowRuns,
   approveFlowGate,
   rejectFlowGate,
   saveFlowSchedule,
   saveFlowRunner,
   saveFlowChat,
+  saveFlowSource,
+  saveFlowNotifications,
+  pruneAllFlowRunHistory,
 } from "./flow-service.js";
 import {
   getFlowTaskSchedulerStatus,
@@ -1136,12 +1155,15 @@ ipcMain.handle("set-health-monitor-prefs", (_event, partial: unknown) => {
     return { ok: false, prefs: getHealthMonitorState().prefs };
   }
   const p = partial as Record<string, unknown>;
-  const patch: Record<string, boolean> = {};
+  const patch: Record<string, boolean | number> = {};
   if (typeof p.backgroundChecksEnabled === "boolean") {
     patch.backgroundChecksEnabled = p.backgroundChecksEnabled;
   }
   if (typeof p.trayBadgeEnabled === "boolean") patch.trayBadgeEnabled = p.trayBadgeEnabled;
   if (typeof p.weeklyDoctorSummary === "boolean") patch.weeklyDoctorSummary = p.weeklyDoctorSummary;
+  if (typeof p.checkIntervalMinutes === "number" && Number.isFinite(p.checkIntervalMinutes)) {
+    patch.checkIntervalMinutes = p.checkIntervalMinutes;
+  }
   const prefs = applyHealthMonitorPrefs(patch);
   return { ok: true, prefs };
 });
@@ -1496,6 +1518,68 @@ async function flushPtyLogNow(sessionId: string): Promise<void> {
   }
 }
 
+// --- PTY log retention / GC ---
+
+const PTY_LOG_GC_STARTUP_DELAY_MS = 20_000;
+const PTY_LOG_GC_INTERVAL_MS = 60 * 60 * 1000;
+let ptyLogGcTimer: ReturnType<typeof setInterval> | null = null;
+let ptyLogGcInFlight: Promise<PtyLogGcResult> | null = null;
+
+/** Sessions whose log must survive GC: live PTYs plus panes still holding the buffer / pending writes. */
+function protectedPtyLogSessionIds(): Set<string> {
+  return new Set<string>([
+    ...PTY_SESSIONS.keys(),
+    ...PTY_OUTPUT_BUFFERS.keys(),
+    ...PTY_LOG_QUEUES.keys(),
+    ...PTY_LOG_INFLIGHT.keys(),
+  ]);
+}
+
+function runPtyLogGcNow(): Promise<PtyLogGcResult> {
+  if (ptyLogGcInFlight) return ptyLogGcInFlight;
+  ptyLogGcInFlight = (async () => {
+    try {
+      const res = await runPtyLogGc(ptyLogDir(), readPtyLogRetentionPrefs(), {
+        protectedSessionIds: protectedPtyLogSessionIds(),
+      });
+      if (res.deleted > 0) {
+        console.log(`[pty-log-gc] deleted ${res.deleted} log(s), freed ${res.freedBytes} bytes`);
+      }
+      return res;
+    } catch (err: unknown) {
+      console.warn("[pty-log-gc]", err instanceof Error ? err.message : err);
+      return { scanned: 0, deleted: 0, freedBytes: 0 };
+    } finally {
+      ptyLogGcInFlight = null;
+    }
+  })();
+  return ptyLogGcInFlight;
+}
+
+function initPtyLogGc(): void {
+  setTimeout(() => void runPtyLogGcNow(), PTY_LOG_GC_STARTUP_DELAY_MS);
+  if (ptyLogGcTimer) clearInterval(ptyLogGcTimer);
+  ptyLogGcTimer = setInterval(() => void runPtyLogGcNow(), PTY_LOG_GC_INTERVAL_MS);
+}
+
+ipcMain.handle("get-pty-log-retention", () => readPtyLogRetentionPrefs());
+
+ipcMain.handle("set-pty-log-retention", async (_event, partial: unknown) => {
+  if (!partial || typeof partial !== "object") {
+    return { ok: false, prefs: readPtyLogRetentionPrefs() };
+  }
+  const p = partial as Record<string, unknown>;
+  const patch: Partial<PtyLogRetentionPrefs> = {};
+  for (const key of ["maxAgeDays", "maxTotalMb", "maxFilesPerTool"] as const) {
+    if (typeof p[key] === "number" && Number.isFinite(p[key])) patch[key] = p[key];
+  }
+  const prefs = writePtyLogRetentionPrefs(patch);
+  void runPtyLogGcNow();
+  return { ok: true, prefs };
+});
+
+ipcMain.handle("run-pty-log-gc", () => runPtyLogGcNow());
+
 /** Rewrite the mirrored log to match the in-memory PTY tail (queued, async). */
 function mirrorPtyLog(sessionId: string, text: string) {
   enqueuePtyLog(sessionId, { kind: "rewrite", text });
@@ -1644,7 +1728,14 @@ ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
 
 ipcMain.handle(
   "pty-spawn",
-  async (_event, tool: string, cwd?: string, extraArgs?: string, shell?: string) => {
+  async (
+    _event,
+    tool: string,
+    cwd?: string,
+    extraArgs?: string,
+    shell?: string,
+    spawnOptions?: { wslDistro?: unknown },
+  ) => {
     let pty: PtyModule;
     try {
       pty = await getPty();
@@ -1676,7 +1767,15 @@ ipcMain.handle(
       console.warn("[pty-spawn] shell integration unavailable:", err);
     }
 
-    const plan = resolvePtySpawnPlan({ command: cmd, shell, shellIntegration });
+    const rawDistro =
+      typeof spawnOptions?.wslDistro === "string" ? spawnOptions.wslDistro.trim() : "";
+    const wslDistro = rawDistro && isValidWslDistroName(rawDistro) ? rawDistro : "";
+    const plan = resolvePtySpawnPlan({
+      command: cmd,
+      shell,
+      shellIntegration,
+      wsl: { distro: wslDistro, cwd: workDir },
+    });
 
     const ptyOpts = {
       name: "xterm-256color",
@@ -1712,7 +1811,10 @@ ipcMain.handle(
       PTY_SESSIONS.set(sessionId, proc);
       PTY_META.set(sessionId, {
         pid: typeof proc.pid === "number" ? proc.pid : null,
-        shell: basename(shellPath) || shellPath,
+        shell:
+          shellPath === "wsl.exe" && wslDistro
+            ? `wsl:${wslDistro}`
+            : basename(shellPath) || shellPath,
         cols: ptyOpts.cols,
         rows: ptyOpts.rows,
         exitCode: null,
@@ -1982,8 +2084,8 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
     let key: string;
 
     if (tool === "claude") {
-      settingsPath = join(homedir(), ".claude", "settings.json");
-      mkdirSync(join(homedir(), ".claude"), { recursive: true });
+      settingsPath = claudeConfigDir("settings.json");
+      mkdirSync(claudeConfigDir(), { recursive: true });
       key = "model";
     } else if (tool === "copilot") {
       const copilotHome = process.env["COPILOT_HOME"] ?? join(homedir(), ".copilot");
@@ -1999,11 +2101,11 @@ ipcMain.handle("set-default-model", async (_event, tool: string, model: string) 
       mkdirSync(join(homedir(), ".gemini"), { recursive: true });
       key = "model";
     } else if (tool === "codex") {
-      settingsPath = join(homedir(), ".codex", "config.toml");
+      settingsPath = codexHome("config.toml");
       key = "model";
     } else if (tool === "opencode") {
-      settingsPath = join(homedir(), ".config", "opencode", "opencode.json");
-      mkdirSync(join(homedir(), ".config", "opencode"), { recursive: true });
+      settingsPath = opencodeConfigPath();
+      mkdirSync(dirname(settingsPath), { recursive: true });
       key = "model";
     } else {
       return { success: false, error: `Unknown tool: ${tool}` };
@@ -2444,7 +2546,9 @@ ipcMain.handle("config-snapshot-import", async (_event, label?: string) => {
 
 ipcMain.handle("relaunch-app", () => {
   app.relaunch();
-  app.exit(0);
+  // Go through the normal quit flow (layout flush, PTY teardown, scheduler/server
+  // shutdown) — app.exit() would skip before-quit / will-quit entirely.
+  app.quit();
   return { ok: true };
 });
 
@@ -2661,12 +2765,100 @@ ipcMain.handle("flow-set-schedule-prefs", (_event, partial: unknown) => {
   if (!partial || typeof partial !== "object") {
     return { ok: false, error: "Invalid prefs" };
   }
-  const p = partial as { schedulerEnabled?: unknown };
+  const p = partial as {
+    schedulerEnabled?: unknown;
+    historyMaxRuns?: unknown;
+    historyMaxDays?: unknown;
+  };
+  const limit = (v: unknown): number | null | undefined => {
+    if (v === null) return null;
+    if (typeof v === "number" && Number.isFinite(v)) return v > 0 ? Math.floor(v) : null;
+    return undefined;
+  };
   const next = writeFlowSchedulePrefs({
     schedulerEnabled:
       typeof p.schedulerEnabled === "boolean" ? p.schedulerEnabled : undefined,
+    historyMaxRuns: limit(p.historyMaxRuns),
+    historyMaxDays: limit(p.historyMaxDays),
   });
   return { ok: true, prefs: next };
+});
+
+ipcMain.handle("flow-prune-history", (_event, flowId: unknown) => {
+  const id = typeof flowId === "string" && flowId.trim() ? flowId.trim() : undefined;
+  try {
+    return { ok: true, ...pruneAllFlowRunHistory({ flowId: id }) };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle("flow-save-source", (_event, flowId: unknown, content: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  if (typeof content !== "string" || !content.trim()) {
+    return { ok: false, error: "Invalid flow content" };
+  }
+  return saveFlowSource(flowId.trim(), content);
+});
+
+ipcMain.handle("flow-save-notify-settings", (_event, flowId: unknown, patch: unknown) => {
+  if (typeof flowId !== "string" || !flowId.trim()) {
+    return { ok: false, error: "Invalid flow id" };
+  }
+  if (!patch || typeof patch !== "object") {
+    return { ok: false, error: "Invalid notification patch" };
+  }
+  const p = patch as Record<string, unknown>;
+  const notify =
+    p.notify === "all" || p.notify === "success" || p.notify === "failure" || p.notify === "none"
+      ? p.notify
+      : undefined;
+  const slack = (v: unknown) => (v === "slack" ? "slack" : v === "none" ? "none" : undefined);
+  const limit = (v: unknown): number | null | undefined => {
+    if (v === null) return null;
+    if (typeof v === "number" && Number.isFinite(v)) return v > 0 ? Math.floor(v) : null;
+    return undefined;
+  };
+  let webhooks: import("../shared/flow-types.js").FlowWebhookDef[] | null | undefined;
+  if (p.webhooks === null) {
+    webhooks = null;
+  } else if (Array.isArray(p.webhooks)) {
+    webhooks = [];
+    for (const raw of p.webhooks) {
+      if (!raw || typeof raw !== "object") continue;
+      const h = raw as Record<string, unknown>;
+      if (typeof h.url !== "string" || !h.url.trim()) {
+        return { ok: false, error: "Each webhook needs a url" };
+      }
+      const method =
+        h.method === "PUT" || h.method === "PATCH" || h.method === "GET" ? h.method : "POST";
+      const on = Array.isArray(h.on)
+        ? h.on.filter((v): v is "success" | "failure" => v === "success" || v === "failure")
+        : [];
+      webhooks.push({
+        url: h.url.trim(),
+        method,
+        on: on.length > 0 ? on : ["success", "failure"],
+        payload: typeof h.payload === "string" && h.payload.trim() ? h.payload : undefined,
+        contentType:
+          typeof h.contentType === "string" && h.contentType.trim() ? h.contentType.trim() : undefined,
+        authorization:
+          typeof h.authorization === "string" && h.authorization.trim()
+            ? h.authorization.trim()
+            : undefined,
+      });
+    }
+  }
+  return saveFlowNotifications(flowId.trim(), {
+    notify,
+    onSuccess: slack(p.onSuccess),
+    onFail: slack(p.onFail),
+    webhooks,
+    historyMaxRuns: limit(p.historyMaxRuns),
+    historyMaxDays: limit(p.historyMaxDays),
+  });
 });
 
 ipcMain.handle("flow-save-schedule", (_event, flowId: unknown, patch: unknown) => {
@@ -2709,6 +2901,7 @@ ipcMain.handle("flow-save-runner-settings", (_event, flowId: unknown, patch: unk
     toolArgs?: unknown;
     cwd?: unknown;
     profile?: unknown;
+    env?: unknown;
   };
   if (typeof p.tool !== "string" || !p.tool.trim()) {
     return { ok: false, error: "tool is required" };
@@ -2724,11 +2917,24 @@ ipcMain.handle("flow-save-runner-settings", (_event, flowId: unknown, patch: unk
   if (toolArgs === undefined || cwd === undefined || profile === undefined) {
     return { ok: false, error: "Invalid runner patch fields" };
   }
+  let env: Record<string, string> | null | undefined;
+  if (p.env === null) {
+    env = null;
+  } else if (p.env && typeof p.env === "object" && !Array.isArray(p.env)) {
+    env = {};
+    for (const [key, value] of Object.entries(p.env as Record<string, unknown>)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== "string") {
+        return { ok: false, error: `Invalid env variable: ${key}` };
+      }
+      env[key] = value;
+    }
+  }
   return saveFlowRunner(flowId.trim(), {
     tool: p.tool.trim(),
     toolArgs,
     cwd,
     profile,
+    env,
   });
 });
 
@@ -2874,6 +3080,7 @@ app.whenReady().then(async () => {
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
+  initPtyLogGc();
   initFlowService();
   initFlowScheduler(() => mainWindow);
   onFlowRunState((state) => {
@@ -2942,6 +3149,12 @@ function flushProfileLayoutsFromRenderer(): Promise<void> {
 
 function tearDownOnQuit(): void {
   setAppQuitting(true);
+  stopFlowScheduler();
+  try {
+    cancelAllFlowRuns();
+  } catch {
+    /* never block quit */
+  }
   for (const [, proc] of PTY_SESSIONS) {
     try { proc.kill(); } catch { /* already dead */ }
   }

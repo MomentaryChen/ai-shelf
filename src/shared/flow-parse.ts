@@ -1,12 +1,31 @@
 import {
   FLOW_DEFINITION_SCHEMA,
   type FlowDefinition,
+  type FlowDesktopNotifyMode,
+  type FlowNotifyEvent,
   type FlowPhaseBranch,
   type FlowPhaseDef,
   type FlowPhaseKind,
+  type FlowWebhookDef,
+  type FlowWebhookMethod,
 } from "./flow-types.js";
 
 const PHASE_TAG_RE = /【([a-z0-9][a-z0-9_-]*)】/gi;
+
+/**
+ * Flow / run ids become file and directory names under app data, so they must be a
+ * single safe path segment: no separators, no `.`/`..`, no Windows-reserved or
+ * control characters (otherwise `id: ../x` writes outside the flows directory).
+ */
+export function isSafeFlowPathSegment(id: string): boolean {
+  if (!id || id.length > 200) return false;
+  if (id === "." || id === "..") return false;
+  if (id.includes("..")) return false;
+  // eslint-disable-next-line no-control-regex
+  if (/[<>:"/\\|?*\x00-\x1f]/.test(id)) return false;
+  if (/^[\s.]|[\s.]$/.test(id)) return false;
+  return true;
+}
 
 function slugLabel(id: string): string {
   return id
@@ -62,7 +81,25 @@ function parsePhaseFields(rec: Record<string, unknown>, id: string, label: strin
   if (typeof rec.next === "string") phase.next = rec.next.trim();
   const onReject = parsePhaseBranch(rec.on_reject);
   if (onReject) phase.onReject = onReject;
+  const dependsOn = parseIdListField(rec.depends_on);
+  if (dependsOn) phase.dependsOn = dependsOn;
+  if (typeof rec.profile === "string" && rec.profile.trim()) phase.profileId = rec.profile.trim();
   return phase;
+}
+
+/** `depends_on: [a, b]`, `depends_on: a, b`, or a nested `- a` list. `[]` = explicit root. */
+function parseIdListField(raw: unknown): string[] | undefined {
+  if (Array.isArray(raw)) {
+    return raw.map((v) => (typeof v === "string" ? v.trim() : "")).filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    const items = raw
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    return items.length > 0 ? items : undefined;
+  }
+  return undefined;
 }
 
 function parsePhasesFromFrontmatter(raw: unknown): FlowPhaseDef[] {
@@ -104,6 +141,189 @@ function parseYamlStringList(lines: string[], startIndex: number): { items: stri
     i += 1;
   }
   return { items, nextIndex: i };
+}
+
+const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export function isValidFlowEnvKey(key: string): boolean {
+  return ENV_KEY_RE.test(key);
+}
+
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
+/** Scalar value inside a nested block: bool / int / inline `[a, b]` list / (un)quoted string. */
+function parseNestedScalar(rest: string): unknown {
+  if (rest === "true" || rest === "false") return rest === "true";
+  if (/^-?\d+$/.test(rest)) return Number(rest);
+  if (rest.startsWith("[") && rest.endsWith("]")) {
+    return rest
+      .slice(1, -1)
+      .split(",")
+      .map((v) => unquoteYamlScalar(v.trim()))
+      .filter(Boolean);
+  }
+  return unquoteYamlScalar(rest);
+}
+
+/**
+ * Parse an indented list of mappings (`phases:` / `webhooks:`):
+ *
+ * ```yaml
+ *   - id: a
+ *     depends_on:
+ *       - b
+ * ```
+ */
+function parseYamlObjectList(
+  lines: string[],
+  startIndex: number,
+): { items: Record<string, unknown>[]; nextIndex: number } {
+  const items: Record<string, unknown>[] = [];
+  let current: Record<string, unknown> | null = null;
+  let itemIndent = -1;
+  let pendingListKey: string | null = null;
+  let i = startIndex;
+
+  const closePendingList = () => {
+    if (current && pendingListKey) {
+      const v = current[pendingListKey];
+      if (Array.isArray(v) && v.length === 0) delete current[pendingListKey];
+    }
+    pendingListKey = null;
+  };
+
+  const setField = (key: string, rest: string) => {
+    if (!current) return;
+    if (rest === "") {
+      current[key] = [];
+      pendingListKey = key;
+      return;
+    }
+    current[key] = parseNestedScalar(rest);
+  };
+
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (!line.trim()) {
+      i += 1;
+      continue;
+    }
+    if (!/^\s/.test(line)) break;
+    const indent = indentOf(line);
+
+    const itemMatch = /^\s*-\s+([a-zA-Z0-9_]+):\s*(.*)$/.exec(line);
+    if (itemMatch && (itemIndent < 0 || indent === itemIndent)) {
+      closePendingList();
+      if (current) items.push(current);
+      current = {};
+      itemIndent = indent;
+      setField(itemMatch[1]!, itemMatch[2]!.trim());
+      i += 1;
+      continue;
+    }
+
+    if (current && indent > itemIndent) {
+      const listItem = /^\s*-\s+(.+)$/.exec(line);
+      if (listItem && pendingListKey) {
+        (current[pendingListKey] as unknown[]).push(unquoteYamlScalar(listItem[1]!.trim()));
+        i += 1;
+        continue;
+      }
+      const fieldMatch = /^\s*([a-zA-Z0-9_]+):\s*(.*)$/.exec(line);
+      if (fieldMatch) {
+        closePendingList();
+        setField(fieldMatch[1]!, fieldMatch[2]!.trim());
+      }
+    }
+    i += 1;
+  }
+  closePendingList();
+  if (current) items.push(current);
+  return { items, nextIndex: i };
+}
+
+/** Parse an indented `KEY: value` map (`env:`). */
+function parseYamlStringMap(
+  lines: string[],
+  startIndex: number,
+): { map: Record<string, string>; nextIndex: number } {
+  const map: Record<string, string> = {};
+  let i = startIndex;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (!line.trim()) {
+      i += 1;
+      continue;
+    }
+    if (!/^\s/.test(line)) break;
+    const m = /^\s+([^:\s]+):\s*(.*)$/.exec(line);
+    if (m) map[m[1]!] = unquoteYamlScalar(m[2]!.trim());
+    i += 1;
+  }
+  return { map, nextIndex: i };
+}
+
+const WEBHOOK_METHODS = new Set<FlowWebhookMethod>(["POST", "PUT", "PATCH", "GET"]);
+
+function parseNotifyEvents(raw: unknown): FlowNotifyEvent[] {
+  const values = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
+  const out = new Set<FlowNotifyEvent>();
+  for (const v of values) {
+    if (typeof v !== "string") continue;
+    const key = v.trim().toLowerCase();
+    if (key === "success" || key === "completed") out.add("success");
+    else if (key === "failure" || key === "failed" || key === "fail") out.add("failure");
+    else if (key === "both" || key === "all" || key === "always") {
+      out.add("success");
+      out.add("failure");
+    }
+  }
+  return out.size > 0 ? [...out] : ["success", "failure"];
+}
+
+function parseWebhooks(raw: unknown): FlowWebhookDef[] | { error: string } | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const hooks: FlowWebhookDef[] = [];
+  for (const [index, item] of raw.entries()) {
+    if (!item || typeof item !== "object") continue;
+    const rec = item as Record<string, unknown>;
+    const url = typeof rec.url === "string" ? rec.url.trim() : "";
+    if (!url) return { error: `webhooks[${index}]: 'url' is required` };
+    const methodRaw = typeof rec.method === "string" ? rec.method.trim().toUpperCase() : "POST";
+    if (!WEBHOOK_METHODS.has(methodRaw as FlowWebhookMethod)) {
+      return { error: `webhooks[${index}]: 'method' must be POST, PUT, PATCH or GET` };
+    }
+    const hook: FlowWebhookDef = {
+      url,
+      method: methodRaw as FlowWebhookMethod,
+      on: parseNotifyEvents(rec.on),
+    };
+    if (typeof rec.payload === "string" && rec.payload.trim()) hook.payload = rec.payload;
+    if (typeof rec.content_type === "string" && rec.content_type.trim()) {
+      hook.contentType = rec.content_type.trim();
+    }
+    if (typeof rec.authorization === "string" && rec.authorization.trim()) {
+      hook.authorization = rec.authorization.trim();
+    }
+    hooks.push(hook);
+  }
+  return hooks.length > 0 ? hooks : undefined;
+}
+
+function parseDesktopNotify(raw: unknown): FlowDesktopNotifyMode {
+  if (typeof raw !== "string") return "all";
+  const v = raw.trim().toLowerCase();
+  if (v === "success" || v === "failure" || v === "none") return v;
+  if (v === "failed" || v === "fail") return "failure";
+  if (v === "never" || v === "off") return "none";
+  return "all";
+}
+
+function parsePositiveInt(raw: unknown, max: number): number | undefined {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return undefined;
+  return Math.min(Math.floor(raw), max);
 }
 
 function parseStringListField(raw: unknown): string[] | undefined {
@@ -150,38 +370,17 @@ function parseSimpleFrontmatter(yaml: string): Record<string, unknown> {
     const key = keyMatch[1]!;
     const rest = keyMatch[2]!.trim();
 
-    if (key === "phases" && rest === "") {
-      const phases: Record<string, unknown>[] = [];
-      i += 1;
-      let current: Record<string, unknown> | null = null;
-      while (i < lines.length) {
-        const phaseLine = lines[i]!;
-        if (!phaseLine.startsWith("  ")) break;
-        const idMatch = /^\s+-\s+id:\s*(.+)$/.exec(phaseLine);
-        if (idMatch) {
-          if (current) phases.push(current);
-          current = { id: unquoteYamlScalar(idMatch[1]!.trim()) };
-          i += 1;
-          continue;
-        }
-        if (current) {
-          const fieldMatch = /^\s+([a-zA-Z0-9_]+):\s*(.*)$/.exec(phaseLine);
-          if (fieldMatch) {
-            const fieldKey = fieldMatch[1]!;
-            const fieldRest = fieldMatch[2]!.trim();
-            if (fieldRest === "true" || fieldRest === "false") {
-              current[fieldKey] = fieldRest === "true";
-            } else if (/^-?\d+$/.test(fieldRest)) {
-              current[fieldKey] = Number(fieldRest);
-            } else if (fieldRest !== "") {
-              current[fieldKey] = unquoteYamlScalar(fieldRest);
-            }
-          }
-        }
-        i += 1;
-      }
-      if (current) phases.push(current);
-      result.phases = phases;
+    if ((key === "phases" || key === "webhooks") && rest === "") {
+      const { items, nextIndex } = parseYamlObjectList(lines, i + 1);
+      result[key] = items;
+      i = nextIndex;
+      continue;
+    }
+
+    if (key === "env" && rest === "") {
+      const { map, nextIndex } = parseYamlStringMap(lines, i + 1);
+      result[key] = map;
+      i = nextIndex;
       continue;
     }
 
@@ -229,6 +428,9 @@ export function parseFlowDocument(
   if (!id) {
     return { error: "Frontmatter field 'id' is required" };
   }
+  if (!isSafeFlowPathSegment(id)) {
+    return { error: `Invalid flow id '${id}': must not contain path separators, '..', or reserved characters` };
+  }
 
   let phases = parsePhasesFromFrontmatter(fm.phases);
   if (phases.length === 0) {
@@ -242,6 +444,20 @@ export function parseFlowDocument(
   const timeoutSec =
     typeof fm.timeout_sec === "number" && fm.timeout_sec > 0 ? fm.timeout_sec : 600;
   const onFail = fm.on_fail === "slack" ? "slack" : "none";
+  const onSuccess = fm.on_success === "slack" ? "slack" : "none";
+  const notify = parseDesktopNotify(fm.notify);
+  const webhooks = parseWebhooks(fm.webhooks);
+  if (webhooks && "error" in webhooks) return webhooks;
+  let env: Record<string, string> | undefined;
+  if (fm.env && typeof fm.env === "object" && !Array.isArray(fm.env)) {
+    const entries = Object.entries(fm.env as Record<string, string>);
+    for (const [key] of entries) {
+      if (!isValidFlowEnvKey(key)) {
+        return { error: `Frontmatter 'env' has an invalid variable name: ${key}` };
+      }
+    }
+    if (entries.length > 0) env = Object.fromEntries(entries);
+  }
   const runner = fm.runner === "http" ? "http" : "claude";
   const orchestration = fm.orchestration === true ? true : undefined;
   const agentTool =
@@ -287,11 +503,18 @@ export function parseFlowDocument(
     timeoutSec,
     outputTemplate: typeof fm.output === "string" ? fm.output : undefined,
     onFail,
+    onSuccess,
+    notify,
+    webhooks,
+    historyMaxRuns: parsePositiveInt(fm.history_max_runs, 100_000),
+    historyMaxDays: parsePositiveInt(fm.history_max_days, 36_500),
+    maxParallel: parsePositiveInt(fm.max_parallel, 16),
     agentTool,
     profileInheritsTool,
     toolArgs,
     cwd,
     profileId,
+    env,
     extraMcpServers,
     agentAllowedTools,
     phases,

@@ -29,6 +29,10 @@ import {
   minimizedSet,
   unminimizePaneIds,
 } from "../terminal/profile-pane-display";
+import {
+  collectBackgroundProfilePanes,
+  LayoutChangeNotifyingMap,
+} from "../terminal/background-profile-panes";
 
 interface ProfileLiveState {
   layout: LayoutNode;
@@ -107,8 +111,13 @@ export function useProfileWorkspace(
   const activeProfileRef = useRef(activeProfile);
   const workingDirRef = useRef(workingDir);
   const broadcastRef = useRef(broadcastInput);
+  /** Bumps when a cached profile layout is added / removed / replaced (background pane list). */
+  const [liveCacheVersion, setLiveCacheVersion] = useState(0);
   /** Live PTY + layout per profile — survives sidebar profile switches. */
-  const profileLiveCacheRef = useRef(new Map<string, ProfileLiveState>());
+  const [profileLiveCache] = useState(
+    () => new LayoutChangeNotifyingMap<ProfileLiveState>(() => setLiveCacheVersion((v) => v + 1)),
+  );
+  const profileLiveCacheRef = useRef(profileLiveCache);
   const cacheKey = useCallback((workspaceId: string, profileId: string) => `${workspaceId}:${profileId}`, []);
   /** True while activateProfile clears layout between profiles (avoids wiping stashed cache). */
   const profileSwitchInProgressRef = useRef(false);
@@ -199,17 +208,19 @@ export function useProfileWorkspace(
   }, []);
 
   const discardProfileSessions = useCallback((profileId: string, workspaceId?: string) => {
-    const ws =
-      workspaceId ??
-      activeProfileRef.current?.workspaceId ??
-      Array.from(profileLiveCacheRef.current.keys())
-        .map((k) => k.split(":"))
-        .find((parts) => parts[1] === profileId)?.[0] ??
-      "";
-    const cached = profileLiveCacheRef.current.get(cacheKey(ws, profileId));
-    if (cached) {
+    // Without an explicit workspace, the profile may be stashed under any workspace
+    // (not necessarily the active one) — tear down every matching cache entry.
+    const keys =
+      workspaceId !== undefined
+        ? [cacheKey(workspaceId, profileId)]
+        : Array.from(profileLiveCacheRef.current.keys()).filter(
+            (k) => k.slice(k.indexOf(":") + 1) === profileId,
+          );
+    for (const key of keys) {
+      const cached = profileLiveCacheRef.current.get(key);
+      if (!cached) continue;
       teardownPtys(cached.layout);
-      profileLiveCacheRef.current.delete(cacheKey(ws, profileId));
+      profileLiveCacheRef.current.delete(key);
     }
     if (activeProfileRef.current?.id === profileId) {
       teardownPtys(layoutRef.current);
@@ -750,8 +761,21 @@ export function useProfileWorkspace(
     [layout, minimizedPaneIds, focusedPaneId],
   );
 
+  /** Live panes of stashed (non-active) profiles — tracked for background agent attention. */
+  const backgroundProfilePanes = useMemo(
+    () =>
+      collectBackgroundProfilePanes(
+        profileLiveCache.entries(),
+        activeProfile ? cacheKey(activeProfile.workspaceId, activeProfile.id) : null,
+      ),
+    // liveCacheVersion: the cache is a mutable map; the version is the change signal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profileLiveCache, liveCacheVersion, activeProfile, cacheKey],
+  );
+
   return {
     activeProfile,
+    backgroundProfilePanes,
     restoring,
     isRestoring,
     migrationDone,

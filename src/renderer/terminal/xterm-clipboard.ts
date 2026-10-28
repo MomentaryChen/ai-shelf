@@ -1,7 +1,10 @@
 import type { Terminal } from "@xterm/xterm";
 import { shouldDeferImeKeyToXterm, shouldIgnoreShortcutForIme } from "./ime-keys";
 import { tryConsumePaneShortcut } from "./pane-shortcuts";
+import { getActiveKeybindings } from "../shortcuts/active-keybindings";
+import { matchShortcut, type ShortcutId } from "../shortcuts/keybindings";
 import { getStoredT } from "../i18n/stored-locale.js";
+import { createSelectionAutoCopy, isProgrammaticSelection } from "./selection-copy";
 
 /** Serialize clipboard IPC so copy-then-paste across panes does not read mid-write (Windows). */
 let clipboardOp: Promise<void> = Promise.resolve();
@@ -152,7 +155,8 @@ export interface TerminalClipboardOptions {
   getCopyOnSelect?: () => boolean;
   /**
    * Paste into this terminal. When omitted, uses term.paste (may fan out via onData broadcast).
-   * Prefer term.paste via a single-pane bypass in EmbeddedTerminal.
+   * EmbeddedTerminal routes it through paste confirmation and per-pane term.paste.
+   * When set, native DOM paste events are routed here too.
    */
   onPaste?: (text: string, term: Terminal) => void;
 }
@@ -171,34 +175,22 @@ function hasMod(ev: KeyboardEvent): boolean {
   return ev.ctrlKey || ev.metaKey;
 }
 
-function isMacPlatform(): boolean {
-  return /mac/i.test(navigator.platform || navigator.userAgent || "");
-}
-
-function isWindowsPlatform(): boolean {
-  return /win/i.test(navigator.platform || navigator.userAgent || "");
-}
-
 /** xterm's selectAll() only covers the viewport; select the full scrollback buffer. */
 function selectAllTerminalBuffer(term: Terminal): void {
   const lastLine = Math.max(0, term.buffer.active.length - 1);
   term.selectLines(0, lastLine);
 }
 
-/**
- * Windows: Ctrl+A (user expectation). Mac: Cmd+A. Linux: Ctrl+Shift+A (Ctrl+A = shell line-start).
- */
-function isTerminalSelectAllShortcut(ev: KeyboardEvent): boolean {
-  if (ev.key.toLowerCase() !== "a" || ev.altKey || !hasMod(ev)) return false;
-
-  if (isMacPlatform()) {
-    return ev.metaKey && !ev.ctrlKey && !ev.shiftKey;
-  }
-  if (isWindowsPlatform()) {
-    return ev.ctrlKey && !ev.metaKey;
-  }
-  return ev.ctrlKey && !ev.metaKey && ev.shiftKey;
-}
+/** Terminal-input shortcuts handled by the xterm key handler (configurable). */
+const TERMINAL_SHORTCUT_IDS: readonly ShortcutId[] = [
+  "find",
+  "paste",
+  "pasteAlt",
+  "copy",
+  "selectAll",
+  "clearScreen",
+  "restartSession",
+];
 
 /**
  * Bind copy/paste/select-all shortcuts and a minimal context menu.
@@ -228,17 +220,11 @@ export function bindTerminalClipboard(
   const POINTER_PASTE_DEDUPE_MS = 100;
   let lastPointerPasteAt = 0;
   let lastAutoCopied = { text: "", at: 0 };
-  let selCopyTimer = 0;
-  let selCopyGeneration = 0;
-  let pendingCopyText = "";
 
   const isRecentAutoCopy = (text: string) =>
-    text === lastAutoCopied.text &&
-    Date.now() - lastAutoCopied.at < AUTO_COPY_DEDUPE_MS;
+    text === lastAutoCopied.text && Date.now() - lastAutoCopied.at < AUTO_COPY_DEDUPE_MS;
 
   const runAutoCopy = (text: string) => {
-    selCopyTimer = 0;
-    pendingCopyText = "";
     if (!(options.getCopyOnSelect?.() ?? false)) return;
     if (isRecentAutoCopy(text)) {
       clearPendingSelectionCopy(text);
@@ -249,12 +235,30 @@ export function bindTerminalClipboard(
     });
   };
 
+  // Capture the text at selection time and write that exact value; re-reading
+  // on the timer could see an already-cleared selection after the pane lost
+  // focus. Search-driven selection changes never queue a copy.
+  const autoCopy = createSelectionAutoCopy({
+    delayMs: 50,
+    setTimer: (fn, ms) => window.setTimeout(fn, ms),
+    clearTimer: (handle) => window.clearTimeout(handle),
+    copy: runAutoCopy,
+    shouldSkip: isRecentAutoCopy,
+    // Publish immediately so a paste in another pane can flush before the
+    // debounce timer queues the OS write.
+    onQueued: notePendingSelectionCopy,
+    onDropped: clearPendingSelectionCopy,
+  });
+
   const cancelPendingAutoCopy = (clearPending = false) => {
-    pendingCopyText = "";
-    selCopyGeneration += 1;
-    window.clearTimeout(selCopyTimer);
-    selCopyTimer = 0;
+    autoCopy.cancel();
     if (clearPending) clearPendingSelectionCopy();
+  };
+
+  /** User-initiated select-all: a new selection of the user's own. */
+  const userSelectAll = () => {
+    autoCopy.userGesture();
+    selectAllTerminalBuffer(term);
   };
 
   const copyTerminalSelection = async (): Promise<boolean> => {
@@ -299,65 +303,56 @@ export function bindTerminalClipboard(
     if (shouldIgnoreShortcutForIme(ev)) return true;
     if (tryConsumePaneShortcut(ev)) return false;
 
-    const key = ev.key.toLowerCase();
-
-    // Find in terminal: Ctrl+F
-    if (hasMod(ev) && !ev.shiftKey && key === "f") {
-      consumeKey(ev);
-      options?.onOpenFind?.();
-      return false;
+    const match = matchShortcut(ev, getActiveKeybindings(), TERMINAL_SHORTCUT_IDS);
+    switch (match?.id) {
+      case "find":
+        consumeKey(ev);
+        options?.onOpenFind?.();
+        return false;
+      case "paste":
+      case "pasteAlt":
+        consumeKey(ev);
+        void pasteIntoTerminal();
+        return false;
+      case "copy":
+        consumeKey(ev);
+        void copyTerminalSelection();
+        return false;
+      case "selectAll":
+        consumeKey(ev);
+        userSelectAll();
+        return false;
+      // Also handled globally via pane-shortcuts when panes are registered.
+      case "clearScreen":
+        consumeKey(ev);
+        options.onClear?.();
+        return false;
+      case "restartSession":
+        consumeKey(ev);
+        options.onRestart?.();
+        return false;
+      default:
+        break;
     }
 
-    // Paste: Ctrl+V, Ctrl+Shift+V, Shift+Insert
-    if (
-      (hasMod(ev) && key === "v") ||
-      (ev.shiftKey && !hasMod(ev) && key === "insert")
-    ) {
+    // Fixed terminal conventions (not rebindable; they do not shadow shell keys):
+    const key = ev.key.toLowerCase();
+    // Shift+Insert: paste
+    if (ev.shiftKey && !hasMod(ev) && !ev.altKey && key === "insert") {
       consumeKey(ev);
       void pasteIntoTerminal();
       return false;
     }
-
-    // Copy: Ctrl+Shift+C, Ctrl+Insert
-    if (hasMod(ev) && ev.shiftKey && key === "c") {
+    // Ctrl+Insert: copy
+    if (hasMod(ev) && !ev.shiftKey && !ev.altKey && key === "insert") {
       consumeKey(ev);
       void copyTerminalSelection();
       return false;
     }
-    if (hasMod(ev) && key === "insert" && !ev.shiftKey) {
+    // Ctrl/Cmd+C copies only when text is selected; otherwise the interrupt reaches the shell.
+    if (hasMod(ev) && !ev.shiftKey && !ev.altKey && key === "c" && term.hasSelection()) {
       consumeKey(ev);
       void copyTerminalSelection();
-      return false;
-    }
-
-    // Ctrl+C — copy when text selected, otherwise send interrupt to shell
-    if (hasMod(ev) && !ev.shiftKey && key === "c") {
-      if (term.hasSelection()) {
-        consumeKey(ev);
-        void copyTerminalSelection();
-        return false;
-      }
-      return true;
-    }
-
-    // Select all: Ctrl+A (Windows), Cmd+A (Mac), Ctrl+Shift+A (Linux)
-    if (isTerminalSelectAllShortcut(ev)) {
-      consumeKey(ev);
-      selectAllTerminalBuffer(term);
-      return false;
-    }
-
-    // Clear screen: Ctrl+L (also handled globally via pane-shortcuts when focused)
-    if (hasMod(ev) && !ev.shiftKey && key === "l") {
-      consumeKey(ev);
-      options.onClear?.();
-      return false;
-    }
-
-    // Restart session: Ctrl+Shift+R
-    if (hasMod(ev) && ev.shiftKey && key === "r") {
-      consumeKey(ev);
-      options.onRestart?.();
       return false;
     }
 
@@ -394,18 +389,19 @@ export function bindTerminalClipboard(
       btn.disabled = !enabled;
       btn.className =
         "block w-full cursor-pointer px-3 py-1.5 text-left text-[12px] text-chrome-text hover:bg-chrome-surface-hover disabled:cursor-default disabled:text-chrome-text-dim";
-      if (enabled) btn.addEventListener("click", () => {
-        removeMenu();
-        action();
-        term.focus();
-      });
+      if (enabled)
+        btn.addEventListener("click", () => {
+          removeMenu();
+          action();
+          term.focus();
+        });
       menuEl!.appendChild(btn);
     };
 
     addItem(getStoredT("terminal.ctx.copy"), hasSelection, () => void copyTerminalSelection());
     addItem(getStoredT("terminal.ctx.paste"), true, () => void pasteIntoTerminal());
     addItem(getStoredT("terminal.ctx.find"), true, () => options?.onOpenFind?.());
-    addItem(getStoredT("terminal.ctx.selectAll"), true, () => selectAllTerminalBuffer(term));
+    addItem(getStoredT("terminal.ctx.selectAll"), true, userSelectAll);
     if (options.onExportOutput) {
       addItem(getStoredT("terminal.ctx.exportOutput"), true, options.onExportOutput);
     }
@@ -466,6 +462,24 @@ export function bindTerminalClipboard(
   container.addEventListener("contextmenu", onContextMenu, { capture: true });
 
   /**
+   * Native paste events (Edit menu, middle-click, OS paste) would reach xterm's
+   * own handler and go out through onData — skipping paste confirmation and
+   * fanning one pane's bracketed bytes out to every broadcast pane. Route them
+   * through the same path as Ctrl+V. Capture phase runs before xterm's listener.
+   */
+  const onNativePaste = (ev: ClipboardEvent) => {
+    if (!options.onPaste) return;
+    const text = ev.clipboardData?.getData("text/plain") ?? "";
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    const now = Date.now();
+    if (!text || now < guards.pasteUntil) return;
+    guards.pasteUntil = now + GUARD_MS;
+    deliverPaste(text);
+  };
+  container.addEventListener("paste", onNativePaste, { capture: true });
+
+  /**
    * Copy-on-select via xterm's own selection event (more reliable than a DOM
    * mouseup, whose listener xterm's document-level drag handling can bypass).
    * Debounced so a drag copies once when it settles, and written directly so the
@@ -476,24 +490,7 @@ export function bindTerminalClipboard(
       cancelPendingAutoCopy(true);
       return;
     }
-    const text = term.getSelection();
-    // Selection cleared (e.g. focus moved to another pane). Leave any pending
-    // copy of the previous selection alone — cancelling it here is what made a
-    // quick copy-then-switch lose the text before it reached the clipboard.
-    if (!text || isRecentAutoCopy(text)) return;
-    // Publish immediately so a paste in another pane can flush before the
-    // debounce timer queues the OS write.
-    notePendingSelectionCopy(text);
-    // Capture `text` now and write that exact value; re-reading on the timer
-    // could see an already-cleared selection after the pane lost focus. Also
-    // tracked in `pendingCopyText` so mouseup can flush it immediately below.
-    const gen = ++selCopyGeneration;
-    pendingCopyText = text;
-    window.clearTimeout(selCopyTimer);
-    selCopyTimer = window.setTimeout(() => {
-      if (gen !== selCopyGeneration) return;
-      runAutoCopy(text);
-    }, 50);
+    autoCopy.selectionChanged(term.getSelection(), isProgrammaticSelection(term));
   };
   const selectionDisposable = term.onSelectionChange(onSelectionChange);
 
@@ -501,6 +498,8 @@ export function bindTerminalClipboard(
 
   const onMouseDown = (ev: MouseEvent) => {
     if (ev.button === 0) {
+      // A fresh drag / click: whatever search selected no longer owns it.
+      autoCopy.userGesture();
       term.focus();
       return;
     }
@@ -515,13 +514,8 @@ export function bindTerminalClipboard(
    * select-then-paste into another pane can read a stale clipboard value.
    */
   const onMouseUp = (ev: MouseEvent) => {
-    if (ev.button !== 0 || !selCopyTimer || !pendingCopyText) return;
-    const text = pendingCopyText;
-    const gen = selCopyGeneration;
-    window.clearTimeout(selCopyTimer);
-    selCopyTimer = 0;
-    if (gen !== selCopyGeneration) return;
-    runAutoCopy(text);
+    if (ev.button !== 0) return;
+    autoCopy.flush();
   };
 
   container.addEventListener("mousedown", onMouseDown, { capture: true });
@@ -532,6 +526,7 @@ export function bindTerminalClipboard(
     cancelPendingAutoCopy();
     selectionDisposable.dispose();
     container.removeEventListener("contextmenu", onContextMenu, { capture: true });
+    container.removeEventListener("paste", onNativePaste, { capture: true });
     container.removeEventListener("mousedown", onMouseDown, { capture: true });
     container.removeEventListener("mouseup", onMouseUp, { capture: true });
     term.attachCustomKeyEventHandler(() => true);

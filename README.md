@@ -8,7 +8,7 @@
 
 [中文說明](README.zh-TW.md) · [Changelog](CHANGELOG.md)
 
-**v4.3.5** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
+**v4.3.6** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
 
 ---
 
@@ -45,6 +45,8 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 - **Broadcast exec** — `profile exec <name> … --broadcast` sends a command to all running CLI sessions in a profile
 - **TUI** — profile list + session management (`ai-shelf tui`)
 - **Legacy** — `workspace` / `group` / `session` commands remain but are deprecated
+
+**Session lifetime and limits:** a CLI session's PTY lives only as long as the `ai-shelf` process that started it. `session create` / `session start` stay attached to your terminal (exit the shell or press `Ctrl+]` to stop); quitting `ai-shelf tui`, `Ctrl+C` or closing the terminal stops every PTY that process started. Other `ai-shelf` processes can **see** (`session list`) and **stop** (`session stop`) those sessions, but `session exec` / `profile exec [--broadcast]` only work from the process that started the session — there is no cross-process input channel, so start and drive sessions from one `ai-shelf tui` when you need exec. Set `AI_SHELF_DEBUG=1` to print stack traces when a command fails.
 
 ### Desktop app (Electron)
 

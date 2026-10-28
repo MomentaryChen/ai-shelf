@@ -9,6 +9,55 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.3.6] - 2026-10-28
+
+AI Flow phase 2b, background agent status, rebindable shortcuts, and sturdier terminal, usage, and inventory behavior.
+
+### Added
+
+- **AI Flow phase 2b** — A flow or phase can bind a terminal profile (working folder and tool) and an `env:` map. Phases can run together via `depends_on` and `max_parallel` (default 4). Saving or running checks that branches, dependencies, and webhook URLs are valid; an invalid flow shows an error and cannot be run. Notifications and webhooks (`notify:`, Slack, or any URL) report the outcome and never fail the run. Run history keeps 200 runs per flow by default (`history_max_runs` / `history_max_days`); Settings can clean them up now. A flow with more than 200 runs drops the oldest after its next run.
+- **Run when the app is closed** — AI Flow can register the every-minute `flow due` job with macOS launchd and Linux systemd user timers, as well as Windows Task Scheduler. Linux explains when `systemctl --user` is unavailable.
+- **Background agent status** — Panes in profiles you are not viewing are tracked for waiting, finished, and error. Coloured badges appear on the sidebar and the workspace switcher, and clear when you open that profile. Notifications are titled with the profile and pane; a click switches there and focuses the pane. The tray count includes those panes.
+- **Paste confirmation** — A paste longer than 5 lines or 2048 characters, or a broadcast paste, asks first. The dialog shows a preview, counts, and a warning when a pane has bracketed paste off. You can paste as typed, paste as one line, or cancel. The Edit menu and middle-click use the same check. With broadcast on, a confirmed paste reaches every target pane.
+- **Rebindable shortcuts** — Every app shortcut can be changed or turned off under Settings. A disabled shortcut is passed through to the shell. The cheatsheet, tooltips, and empty-pane hints show the bindings you set.
+- **WSL shell and ports** — On Windows, Settings can open terminal panes in a chosen WSL distro. The Ports list includes listeners from running distros, tagged with the distro name. Stop stays disabled for those rows.
+- **Usage from local session files** — OpenCode, Crush, and Goose usage is read from their local databases, without an API key. Aider is listed as not available, with the reason.
+- **Richer inventory scan** — Claude MCP servers are reported by user, local, and project scope. Copilot, Codex, and OpenCode skills are scanned. Gemini sign-in is detected from the presence of credentials, without reading them. Config lookup honors `CLAUDE_CONFIG_DIR`, `XDG_CONFIG_HOME`, and `CODEX_HOME`. OpenCode MCP sync writes OpenCode's own `mcp` key.
+- **Terminal log cleanup** — PTY logs are trimmed by age (14 days), total size (200 MB), and count per tool (50). Logs for a running PTY, or an exited PTY whose pane is still open, are kept. The agent health-check interval is a setting (default 6 hours) and applies without a restart.
+
+### Changed
+
+- **Documentation visuals** — Refreshed README/docs screenshots and terminal demo GIFs for the current UI.
+
+### Fixed
+
+- **Flow phase loop guard** — A `next:`, `on_fail:`, or `on_reject:` that jumps back to an earlier phase is rejected when the flow is saved or run. The sequential runner still stops with "Phase loop detected" after `phases × 3` phase executions. Configured `retry:` attempts do not count toward that limit.
+- **Flow run matching** — Run history and flow deletion match run directories to the exact flow id (from `state.json`, else the parsed run name), so deleting `review` no longer removes or lists runs of `multi-agent-review`.
+- **`ai update` timeouts** — Tool updates now stream package-manager output live, allow up to 10 minutes instead of being killed after 10 seconds, report a timeout separately from a failed exit, and `ai update self` uses the package manager that actually installed ai-shelf.
+- **Terminal broadcast toggle** — Turning broadcast input on or off now takes effect immediately in panes that are already open, instead of only after some unrelated pane setting changed.
+- **`ai-shelf tui` database closed under the TUI** — The command now waits for the TUI to exit before closing the database, and quitting stops the PTYs it started instead of calling `process.exit` mid-session.
+- **Phantom `running` CLI sessions** — Sessions record their PTY pid and owning process; exiting the CLI/TUI (including `Ctrl+C` and `SIGTERM`) stops its PTYs, `session list` clears rows whose process is gone, and `session stop` can stop a session started by another `ai-shelf` process.
+- **Cross-process `exec` errors** — `session exec` and `profile exec [--broadcast]` explain that a session running in another `ai-shelf` process can only receive commands from that process, instead of reporting "No running session".
+- **Duplicate CLI error output** — Failed commands print one `Error: …` line and exit with code 1; stack traces appear only with `AI_SHELF_DEBUG=1`.
+- **`session create` / `session start` hang and crash** — Both stay attached to the PTY (exit the shell or press `Ctrl+]`), then stop it cleanly without writing to a closed database.
+- **Copilot / Cursor config paths on macOS and Linux** — Copilot settings, instruction and MCP files under `~/.copilot` (or `COPILOT_HOME`) and Cursor's per-platform `settings.json` are now found outside Windows instead of being looked up with hard-coded backslashes.
+- **Ctrl+W in terminal** — Ctrl+W inside a terminal pane now reaches the shell (delete previous word) instead of closing the pane; use Ctrl+Shift+W to close a pane from the terminal.
+- **Find in terminal clipboard** — Stepping through Ctrl+F matches no longer overwrites the clipboard with the matched text when copy-on-select is on.
+- **Flow runs on quit** — Quitting or relaunching the app now cancels in-flight AI Flow runs and kills their agent process trees, and runs left "running" by a previous session are marked failed on startup.
+- **Attention beep** — The pane attention sound plays through to the end.
+- **Cloud sync** — Only one cloud sync runs at a time, so a background sync and a manual sync cannot both push the next revision.
+- **Profile delete** — Deleting a profile stops its terminal sessions in every workspace, not only the one on screen.
+- **Missed flow schedules** — A flow that has run before catches up its most recent missed slot within 24 hours. A flow that has never fired does not catch up.
+- **Flow retry** — A retried phase deletes the previous output file, so a truncated file is not treated as success.
+- **Flow memory and ids** — Finished runs are released from memory, captured stderr is capped at 256 KB, and flow ids with path separators, `..`, or reserved characters are rejected.
+- **Relaunch** — Restarting from the app quits normally, so layout is saved and terminals are stopped.
+- **Weekly usage alerts** — Weekly spend is not replaced by the whole-period total when a week has no daily data.
+- **Gemini quota day** — The free-tier daily count uses the Pacific-midnight quota day and reports when it resets.
+- **Inventory false servers** — Codex env sections and Gemini's MCP allow/exclude block are no longer counted as MCP servers.
+- **Linux port list** — `ss` output that includes a protocol column or an interface suffix is parsed, so Ports can list listeners on Linux.
+
+[4.3.6]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.3.6
+
 ## [4.3.5] - 2026-10-07
 
 Emoji navigation glyphs and a tighter guard against duplicate CJK input.

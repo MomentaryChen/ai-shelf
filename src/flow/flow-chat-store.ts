@@ -3,7 +3,6 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -17,12 +16,15 @@ import {
   type FlowChatState,
   type FlowPromptLogEntry,
 } from "../shared/flow-chat-types.js";
+import { isSafeFlowPathSegment } from "../shared/flow-parse.js";
+import { listRunDirNamesForFlow } from "./flow-run-match.js";
 
 function flowChatRoot(): string {
   return join(getAppDataDir(), "flow-chat");
 }
 
 export function flowChatDir(flowId: string): string {
+  if (!isSafeFlowPathSegment(flowId)) throw new Error(`Invalid flow id: ${flowId}`);
   return join(flowChatRoot(), flowId);
 }
 
@@ -219,11 +221,8 @@ export function deleteFlowChatData(flowId: string): void {
 
 export function deleteRunsForFlow(flowId: string): void {
   const runsRoot = join(getAppDataDir(), "runs");
-  if (!existsSync(runsRoot)) return;
-  const suffix = `-${flowId}`;
-  for (const entry of readdirSync(runsRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !entry.name.endsWith(suffix)) continue;
-    rmSync(join(runsRoot, entry.name), { recursive: true, force: true });
+  for (const name of listRunDirNamesForFlow(runsRoot, flowId)) {
+    rmSync(join(runsRoot, name), { recursive: true, force: true });
   }
 }
 

@@ -8,6 +8,7 @@
 ## 目次
 
 - [應用程式導覽](#應用程式導覽)
+
 1. [總覽](#1-總覽)
 2. [Terminal 模式](#2-terminal-模式)
 3. [模型](#3-模型)
@@ -26,12 +27,12 @@
 
 桌面應用標題列有 **四種** 頂層模式：
 
-| 模式 | 用途 |
-|---|---|
-| **Terminal**（預設） | Profile 側欄、內嵌多窗格終端機、外部啟動 |
-| **Inventory** | 儀表板：Overview、Models、Skills、MCP、Config、Doctor、Update、**Usage** |
-| **Tools** | 本機工具（Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL） |
-| **AI Flow** | 撰寫、排程與執行多代理 `.flow.md` 工作流 |
+| 模式                 | 用途                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Terminal**（預設） | Profile 側欄、內嵌多窗格終端機、外部啟動                                                                                |
+| **Inventory**        | 儀表板：Overview、Models、Skills、MCP、Config、Doctor、Update、**Usage**                                                |
+| **Tools**            | 本機工具（Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL） |
+| **AI Flow**          | 撰寫、排程與執行多代理 `.flow.md` 工作流                                                                                |
 
 隨時可用標題列切換模式。命令面板（`Cmd/Ctrl+K`）也可跳到任一模式或 Inventory／Tools 分頁。
 
@@ -49,28 +50,28 @@
 
 ### 統計列（Summary）
 
-| 區塊 | 意義 |
-|---|---|
-| **已安裝 / 偵測總數** | 已出現在 `PATH` 的工具數量 / 掃描到的工具總數 |
-| **未安裝** | 有列在清單中但二進位不在 `PATH` 的工具數量 |
-| **MCP Servers** | 由**已安裝**工具回報的 MCP 伺服器之**不重複**數量 |
-| **Warnings** | 未安裝，或已安裝但認證為 `missing` 的筆數 |
+| 區塊                  | 意義                                              |
+| --------------------- | ------------------------------------------------- |
+| **已安裝 / 偵測總數** | 已出現在 `PATH` 的工具數量 / 掃描到的工具總數     |
+| **未安裝**            | 有列在清單中但二進位不在 `PATH` 的工具數量        |
+| **MCP Servers**       | 由**已安裝**工具回報的 MCP 伺服器之**不重複**數量 |
+| **Warnings**          | 未安裝，或已安裝但認證為 `missing` 的筆數         |
 
 ### 能力表格
 
 主表每列一個工具，欄位：
 
-| 欄位 | 說明 |
-|---|---|
-| **Tool** | 工具名稱與官方圖示 |
-| **Version** | CLI `--version`（未安裝顯示 —） |
-| **Auth** | `ok` · `missing` · `expired` · `unknown` |
-| **MCP** | 是否偵測到 MCP 設定（`Yes` / `No`） |
-| **Model** | 目前預設模型 |
-| **Context** | 推斷的上下文長度 |
-| **Stream** | 是否支援串流輸出 |
-| **Tools** | 是否支援工具／函式呼叫 |
-| **Skills** | 已偵測的技能標籤 |
+| 欄位        | 說明                                     |
+| ----------- | ---------------------------------------- |
+| **Tool**    | 工具名稱與官方圖示                       |
+| **Version** | CLI `--version`（未安裝顯示 —）          |
+| **Auth**    | `ok` · `missing` · `expired` · `unknown` |
+| **MCP**     | 是否偵測到 MCP 設定（`Yes` / `No`）      |
+| **Model**   | 目前預設模型                             |
+| **Context** | 推斷的上下文長度                         |
+| **Stream**  | 是否支援串流輸出                         |
+| **Tools**   | 是否支援工具／函式呼叫                   |
+| **Skills**  | 已偵測的技能標籤                         |
 
 ### Warnings 區塊
 
@@ -98,19 +99,19 @@
 
 由側欄 **Settings** 開啟（視窗標題 **Terminal Settings**），內容對應 `ChatSettingsPanel`：
 
-| 區塊 | 說明 |
-|---|---|
-| **Working directory** | 下拉選單含 `~ (home directory)` 與最近路徑；**Browse…** 挑選資料夾；最多記住 **10** 筆；**Clear history** 清空列表 |
-| **External terminal preference** | 與主畫面上外部終端機選項相同，以按鈕群組呈現 |
-| **Terminal background** | 背景預設組（Windows Terminal、App theme、Pure black、PowerShell blue、VS Code）與自訂色碼 |
+| 區塊                             | 說明                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Working directory**            | 下拉選單含 `~ (home directory)` 與最近路徑；**Browse…** 挑選資料夾；最多記住 **10** 筆；**Clear history** 清空列表 |
+| **External terminal preference** | 與主畫面上外部終端機選項相同，以按鈕群組呈現                                                                       |
+| **Terminal background**          | 背景預設組（Windows Terminal、App theme、Pure black、PowerShell blue、VS Code）與自訂色碼                          |
 
 ### 工具列（已選擇 Profile 時）
 
-| 控制項 | 說明 |
-|---|---|
-| **+ Pane** | 選單中挑選工具，新增內嵌窗格（達上限時會停用，Profile 徽章顯示 `目前/上限`） |
+| 控制項                 | 說明                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **+ Pane**             | 選單中挑選工具，新增內嵌窗格（達上限時會停用，Profile 徽章顯示 `目前/上限`）                                 |
 | **外部終端機下拉選單** | 選項等同 **External terminal preference**（Auto detect、Windows Terminal、PowerShell 7+、PowerShell 5、CMD） |
-| **`· sync` 字樣** | 開啟廣播且窗格數 > 1 時，Profile 徽章會在計數旁顯示 **`· sync`** |
+| **`· sync` 字樣**      | 開啟廣播且窗格數 > 1 時，Profile 徽章會在計數旁顯示 **`· sync`**                                             |
 
 ### 「可用的 Agent」卡片格
 
@@ -127,16 +128,16 @@
 
 ### 窗格快捷鍵（Terminal 模式、有開啟窗格時）
 
-在文字輸入框（例如 Profile 重新命名）內不會觸發。
+在文字輸入框（例如 Profile 重新命名）內不會觸發。所有快捷鍵（含命令面板、快捷鍵一覽、模式切換、Profile 切換與終端機複製／貼上／搜尋）都可在 **設定 → 鍵盤快捷鍵** 重新綁定或**停用**；停用後按鍵會直接送到終端機，重複的組合鍵會顯示警告。終端機內 **Ctrl+W** 會傳給 shell 作為刪除前一個單字，**Ctrl+Shift+W** 關閉窗格（macOS 上 **Cmd+W** 仍會關閉）。
 
-| 快捷鍵 | 動作 |
-|---|---|
-| **Ctrl+Tab** | 回到上一個使用的終端機（跨 Profile／工作區） |
-| **Ctrl+Shift+Tab** | 上一個窗格 |
-| **Ctrl+1 … Ctrl+9** | 跳到第 N 個窗格（依版面樹順序） |
-| **Ctrl+W** | 關閉目前焦點窗格 |
-| **Ctrl+\\** | 向右分割（水平） |
-| **Ctrl+Shift+\\** | 向下分割（垂直） |
+| 快捷鍵（預設）      | 動作                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| **Ctrl+Tab**        | 回到上一個使用的終端機（跨 Profile／工作區）                                                       |
+| **Ctrl+Shift+Tab**  | 上一個窗格                                                                                         |
+| **Ctrl+1 … Ctrl+9** | 跳到第 N 個窗格（依版面樹順序）                                                                    |
+| **Ctrl+Shift+W**    | 關閉目前焦點窗格（終端機外也可用 **Ctrl+W**；終端機內 **Ctrl+W** 會傳給 shell 作為刪除前一個單字） |
+| **Ctrl+\\**         | 向右分割（水平）                                                                                   |
+| **Ctrl+Shift+\\**   | 向下分割（垂直）                                                                                   |
 
 ---
 
@@ -153,12 +154,12 @@
 
 ### 模型表
 
-| 欄位 | 說明 |
-|---|---|
-| **Tool** | 工具名稱與圖示 |
-| **Available Models** | 以晶片顯示預設模型與擴充名單；若無清單則常顯示 `default` |
-| **Context** | 由清單邏輯格式化的上下文／權杖資訊 |
-| **Streaming / Tool Calls / Vision** | 能力開關（`Yes` / `No`） |
+| 欄位                                | 說明                                                     |
+| ----------------------------------- | -------------------------------------------------------- |
+| **Tool**                            | 工具名稱與圖示                                           |
+| **Available Models**                | 以晶片顯示預設模型與擴充名單；若無清單則常顯示 `default` |
+| **Context**                         | 由清單邏輯格式化的上下文／權杖資訊                       |
+| **Streaming / Tool Calls / Vision** | 能力開關（`Yes` / `No`）                                 |
 
 ### 長列表
 
@@ -248,11 +249,11 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ### 類型徽章
 
-| 類型 | 說明 |
-|---|---|
-| **Config** | 主要 JSON/YAML 組態檔 |
-| **Instructions** | 指令／系統提示相關檔案 |
-| **MCP** | MCP / mcp-servers 類組態 |
+| 類型             | 說明                     |
+| ---------------- | ------------------------ |
+| **Config**       | 主要 JSON/YAML 組態檔    |
+| **Instructions** | 指令／系統提示相關檔案   |
+| **MCP**          | MCP / mcp-servers 類組態 |
 
 ### 每列資訊
 
@@ -272,12 +273,12 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ### 檢查項目
 
-| 檢查 | 內容 |
-|---|---|
-| **Binary** | 是否在 `PATH` 中找到可執行的 CLI |
-| **Auth** | 認證狀態 |
-| **Config JSON** | 主要設定檔為 JSON 時是否可解析 |
-| **MCP Config JSON** | MCP 設定檔為 JSON 時是否可解析 |
+| 檢查                | 內容                             |
+| ------------------- | -------------------------------- |
+| **Binary**          | 是否在 `PATH` 中找到可執行的 CLI |
+| **Auth**            | 認證狀態                         |
+| **Config JSON**     | 主要設定檔為 JSON 時是否可解析   |
+| **MCP Config JSON** | MCP 設定檔為 JSON 時是否可解析   |
 
 ### 結果標示
 
@@ -295,15 +296,15 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 桌面程式透過 Electron 呼叫與 CLI 相同的 `update` 邏輯（底層即 `node dist/cli.js update <目標>`，等同 `ai update …`）。卡片上印的指令列來自程式碼 [`src/tools.ts`](../src/tools.ts)（`TOOL_UPDATE`）以及對 **AI Shelf 本身**自動偵測的套件管理程式。
 
-| 目標 | 顯示的指令（`<cmd>` + 參數） |
-|---|---|
-| Claude Code | `claude update` |
-| GitHub Copilot CLI | `copilot update` |
-| Cursor | `agent update` |
-| OpenAI Codex | `codex upgrade` |
-| Google Gemini CLI | `gemini update` |
-| Aider | `pip install -U aider-chat` |
-| OpenCode | `opencode upgrade` |
+| 目標                       | 顯示的指令（`<cmd>` + 參數）                                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code                | `claude update`                                                                                                                                                                       |
+| GitHub Copilot CLI         | `copilot update`                                                                                                                                                                      |
+| Cursor                     | `agent update`                                                                                                                                                                        |
+| OpenAI Codex               | `codex upgrade`                                                                                                                                                                       |
+| Google Gemini CLI          | `gemini update`                                                                                                                                                                       |
+| Aider                      | `pip install -U aider-chat`                                                                                                                                                           |
+| OpenCode                   | `opencode upgrade`                                                                                                                                                                    |
 | AI Shelf（self / desktop） | **安裝版**：啟動後檢查 GitHub Release，確認後在 App 內下載並重啟安裝（Update 分頁 **Download & upgrade desktop**）。**開發／原始碼**：依環境顯示 `pnpm` / `yarn` / `npm` 全域更新指令 |
 
 對列在 `TOOL_NPM_PACKAGE` 的 CLI，程式會請 npm registry 協助決定是否有較新版本；沒有 npm 套件的工具（Aider、OpenCode、Crush、Goose）則查 GitHub Releases（`TOOL_GITHUB_REPO`）；桌面安裝版改以 `electron-updater` 比對 GitHub 上的 `latest.yml`。
@@ -316,7 +317,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 常見能力：
 
-- 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定）
+- 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定；OpenCode、Crush、Goose 直接讀取本機工作階段資料，不需金鑰；Aider 沒有可讀取的用量紀錄，顯示為不提供）
 - 每週預算目標；Flow 撰寫／執行可歸因回 Usage
 - 憑證在可用時以 OS `safeStorage` 保存；部分供應商需在 App 內設定 API 金鑰或帳號 cookie
 
@@ -328,23 +329,23 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 **Tools** 是頂層模式（左側為工具面板列表）。目前尚無專用截圖；日後擴大截圖涵蓋範圍後可用 `pnpm gen:docs-assets` 補齊。
 
-| 面板 | 用途 |
-|---|---|
-| **Codec** | 雜湊／編碼／解碼／圖片 Base64 |
-| **Crypto** | AES／RSA／ECDSA 輔助 |
-| **Time** | 時間戳與時區轉換 |
-| **Cron** | Cron 表達式輔助 |
-| **Regex** | 測試／取代（含預設） |
-| **JSON** | 格式化／壓縮 |
-| **Markdown** | 預覽（含 Mermaid 程式碼區塊） |
-| **Mermaid** | 圖表編輯器：範本、即時預覽、SVG 匯出 |
-| **YAML ↔ JSON** | YAML 與 JSON 互轉 |
-| **JWT** | 解碼／檢視 token |
-| **UUID** | 產生／驗證 UUID 與 NanoID |
-| **Diff** | 並排文字比對 |
-| **System** | 即時 cpu、記憶體、網路與 gpu |
-| **Ports** | 查誰佔用埠，必要時可停止該行程 |
-| **WSL** | Windows ↔ WSL 路徑轉換、發行版列表／IP、常用 `wsl.exe` 指令 |
+| 面板            | 用途                                                        |
+| --------------- | ----------------------------------------------------------- |
+| **Codec**       | 雜湊／編碼／解碼／圖片 Base64                               |
+| **Crypto**      | AES／RSA／ECDSA 輔助                                        |
+| **Time**        | 時間戳與時區轉換                                            |
+| **Cron**        | Cron 表達式輔助                                             |
+| **Regex**       | 測試／取代（含預設）                                        |
+| **JSON**        | 格式化／壓縮                                                |
+| **Markdown**    | 預覽（含 Mermaid 程式碼區塊）                               |
+| **Mermaid**     | 圖表編輯器：範本、即時預覽、SVG 匯出                        |
+| **YAML ↔ JSON** | YAML 與 JSON 互轉                                           |
+| **JWT**         | 解碼／檢視 token                                            |
+| **UUID**        | 產生／驗證 UUID 與 NanoID                                   |
+| **Diff**        | 並排文字比對                                                |
+| **System**      | 即時 cpu、記憶體、網路與 gpu                                |
+| **Ports**       | 查誰佔用埠，必要時可停止該行程                              |
+| **WSL**         | Windows ↔ WSL 路徑轉換、發行版列表／IP、常用 `wsl.exe` 指令 |
 
 雙欄 Tools 版面會依容器查詢在較窄視窗自動調整。
 

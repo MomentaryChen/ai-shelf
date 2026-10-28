@@ -1,17 +1,8 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import type { AppContext } from "../../infra/bootstrap.js";
-import { AppError } from "../../core/errors/app-error.js";
+import { handleError } from "../errors.js";
 import type { ProfileInfo } from "../../services/profile-service.js";
-
-function handleError(err: unknown): never {
-  if (err instanceof AppError) {
-    console.error(chalk.red(`Error: ${err.message}`));
-    process.exitCode = 1;
-    throw err;
-  }
-  throw err;
-}
 
 function resolveProfile(ctx: AppContext, idOrName: string, group?: string): ProfileInfo {
   return ctx.profileService.findProfile(idOrName, group);

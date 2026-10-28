@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
+import { AppError } from "../../core/errors/app-error.js";
 
 type FlowCore = typeof import("../../../../../dist/flow/core.js");
 
@@ -15,13 +16,11 @@ async function loadFlowCore(): Promise<FlowCore> {
 function handleFlowCliError(err: unknown): never {
   const message = err instanceof Error ? err.message : String(err);
   if (message.includes("Cannot find module") || message.includes("ERR_MODULE_NOT_FOUND")) {
-    console.error(
-      chalk.red(
-        "Flow module not built. Run `pnpm build` from the ai-shelf repo root, then retry.",
-      ),
+    throw new AppError(
+      "Flow module not built. Run `pnpm build` from the ai-shelf repo root, then retry.",
+      "FLOW_MODULE_NOT_BUILT",
+      err,
     );
-    process.exitCode = 1;
-    throw err;
   }
   throw err;
 }
@@ -45,7 +44,7 @@ export function registerFlowCommands(program: Command): void {
           const schedule = f.schedule ?? "manual";
           const next = f.nextRunAt ? chalk.dim(` next=${f.nextRunAt}`) : "";
           const enabled = f.enabled ? chalk.green("on") : chalk.dim("off");
-          console.log(`${chalk.cyan(f.id)}\t${enabled}\t${schedule}\t${f.phaseCount} phases${next}`);
+          console.log(`${chalk.cyan(f.id)}\t${enabled}\t${schedule}\t${String(f.phaseCount)} phases${next}`);
         }
       } catch (err) {
         handleFlowCliError(err);
@@ -66,7 +65,7 @@ export function registerFlowCommands(program: Command): void {
           process.exitCode = 1;
           return;
         }
-        console.log(`runId=${res.runId} status=${res.state?.status ?? "unknown"}`);
+        console.log(`runId=${res.runId ?? "unknown"} status=${res.state?.status ?? "unknown"}`);
         if (res.state?.status === "failed") {
           process.exitCode = 1;
         }
@@ -77,7 +76,7 @@ export function registerFlowCommands(program: Command): void {
 
   flow
     .command("due")
-    .description("Run flows whose cron schedule is due this minute (for Task Scheduler)")
+    .description("Run flows whose cron schedule is due this minute (for Task Scheduler / launchd / systemd timers)")
     .action(async () => {
       try {
         const core = await loadFlowCore();
