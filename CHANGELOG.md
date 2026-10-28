@@ -26,6 +26,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 - **`session create` / `session start` hang and crash** — Both stay attached to the PTY (exit the shell or press `Ctrl+]`), then stop it cleanly without writing to a closed database.
 - **Copilot / Cursor config paths on macOS and Linux** — Copilot settings, instruction and MCP files under `~/.copilot` (or `COPILOT_HOME`) and Cursor's per-platform `settings.json` are now found outside Windows instead of being looked up with hard-coded backslashes.
 - **Ctrl+W in terminal** — Ctrl+W inside a terminal pane now reaches the shell (delete previous word) instead of closing the pane; use Ctrl+Shift+W to close a pane from the terminal.
+- **Find in terminal clipboard** — Stepping through Ctrl+F matches no longer overwrites the clipboard with the matched text when copy-on-select is on.
 
 ## [4.3.5] - 2026-10-07
 
