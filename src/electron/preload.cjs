@@ -127,6 +127,11 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("pty-meta", handler);
     return () => ipcRenderer.off("pty-meta", handler);
   },
+  onOsResume: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("os-resume", handler);
+    return () => ipcRenderer.off("os-resume", handler);
+  },
   setDefaultModel: (tool, model) => ipcRenderer.invoke("set-default-model", tool, model),
   getEnvVars: () => ipcRenderer.invoke("get-env-vars"),
   wsGetTree: () => ipcRenderer.invoke("ws-get-tree"),

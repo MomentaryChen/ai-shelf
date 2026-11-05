@@ -10,10 +10,18 @@ import {
   createPtyDataPendingState,
   dropPtyDataPending,
   ptyDataEndSeq,
+  PTY_DATA_IPC_MAX_CHARS,
+  pumpPtyDataPending,
   queuePtyDataPending,
   shouldDropPendingOnBufferAttach,
-  takePtyDataPending,
 } from "../shared/pty-data-pending.js";
+import {
+  appendPtyChunk,
+  createPtyChunkBuffer,
+  materializePtyChunk,
+  trimPtyChunkBuffer,
+  type PtyChunkBuffer,
+} from "../shared/pty-chunk-buffer.js";
 import {
   detectAll,
   detectTool,
@@ -159,12 +167,21 @@ import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 import { registerPortsHandlers } from "./ports-handlers.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
+import { initSystemResume } from "./system-resume.js";
+import { ptyWakeResizeSteps } from "../shared/system-resume.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
 app.commandLine.appendSwitch(
   "disable-features",
   "BlockThirdPartyCookies,ThirdPartyStoragePartitioning,PartitionedCookies",
 );
+/**
+ * Chromium freezes renderer timers after the machine sleeps, and again while
+ * the window is occluded. The terminal then ignores input until something
+ * marks the page foreground. These switches keep paints and timers running.
+ */
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-background-timer-throttling");
 import { runChecksForEntry } from "./doctor-checks.js";
 import {
   applyHealthMonitorPrefs,
@@ -280,6 +297,11 @@ const sharedWebPreferences = {
   partition: RENDERER_SESSION_PARTITION,
   /** Required for Firebase Google sign-in popup windows. */
   nativeWindowOpen: true,
+  /**
+   * Default throttling stalls the renderer after sleep and while the window
+   * is in the background, which shows up as a stretch of "not responding".
+   */
+  backgroundThrottling: false,
 } as const;
 
 /** Window title: app name + version (+ dev git label). Version lives here only — not duplicated in the in-app header. */
@@ -1376,7 +1398,7 @@ ipcMain.handle("open-external", async (_event, url: string) => {
 const PLAIN_SHELL_TOOL_ID = "shell";
 
 const PTY_SESSIONS = new Map<string, import("node-pty").IPty>();
-const PTY_OUTPUT_BUFFERS = new Map<string, string>();
+const PTY_OUTPUT_BUFFERS = new Map<string, PtyChunkBuffer>();
 
 /** Session metadata kept after exit so the status bar can show pid / shell / size / exit. */
 type PtySessionMeta = {
@@ -1403,12 +1425,14 @@ function clampPtyBufferMaxChars(n: unknown): number {
 function setPtyBufferMaxChars(chars: number) {
   ptyBufferMaxChars = clampPtyBufferMaxChars(chars);
   for (const [sessionId, buf] of PTY_OUTPUT_BUFFERS) {
-    if (buf.length > ptyBufferMaxChars) {
-      const trimmed = buf.slice(-ptyBufferMaxChars);
-      PTY_OUTPUT_BUFFERS.set(sessionId, trimmed);
-      mirrorPtyLog(sessionId, trimmed);
-    }
+    const trimmed = trimPtyChunkBuffer(buf, ptyBufferMaxChars);
+    if (trimmed != null) mirrorPtyLog(sessionId, trimmed);
   }
+}
+
+function readPtyOutput(sessionId: string): string {
+  const buf = PTY_OUTPUT_BUFFERS.get(sessionId);
+  return buf ? materializePtyChunk(buf) : "";
 }
 
 function ptyLogDir(): string {
@@ -1416,7 +1440,7 @@ function ptyLogDir(): string {
 }
 
 type PtyLogOp =
-  | { kind: "append"; chunk: string }
+  | { kind: "append"; chunks: string[] }
   | { kind: "rewrite"; text: string }
   | { kind: "clear" };
 
@@ -1440,9 +1464,10 @@ function enqueuePtyLog(sessionId: string, op: PtyLogOp) {
   } else {
     const last = q.at(-1);
     if (last && last.kind === "append") {
-      last.chunk += op.chunk;
+      // Keep pieces. Joining here copies the whole backlog on every read.
+      for (const chunk of op.chunks) last.chunks.push(chunk);
     } else {
-      q.push(op);
+      q.push({ kind: "append", chunks: [...op.chunks] });
     }
   }
   schedulePtyLogFlush(sessionId);
@@ -1481,8 +1506,9 @@ async function flushPtyLog(sessionId: string): Promise<void> {
           }
         } else if (op.kind === "rewrite") {
           await writeFile(file, op.text, "utf8");
-        } else if (op.chunk) {
-          await appendFile(file, op.chunk, "utf8");
+        } else {
+          const text = op.chunks.join("");
+          if (text) await appendFile(file, text, "utf8");
         }
       }
     } catch {
@@ -1588,20 +1614,19 @@ function mirrorPtyLog(sessionId: string, text: string) {
 
 function mirrorPtyLogAppend(sessionId: string, chunk: string) {
   if (!chunk) return;
-  enqueuePtyLog(sessionId, { kind: "append", chunk });
+  enqueuePtyLog(sessionId, { kind: "append", chunks: [chunk] });
 }
 
 function appendPtyBuffer(sessionId: string, data: string) {
-  const prev = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
-  let next = prev + data;
-  if (next.length > ptyBufferMaxChars) {
-    next = next.slice(-ptyBufferMaxChars);
-    PTY_OUTPUT_BUFFERS.set(sessionId, next);
-    mirrorPtyLog(sessionId, next);
-    return;
+  if (!data) return;
+  let buf = PTY_OUTPUT_BUFFERS.get(sessionId);
+  if (!buf) {
+    buf = createPtyChunkBuffer();
+    PTY_OUTPUT_BUFFERS.set(sessionId, buf);
   }
-  PTY_OUTPUT_BUFFERS.set(sessionId, next);
-  mirrorPtyLogAppend(sessionId, data);
+  const trimmed = appendPtyChunk(buf, data, ptyBufferMaxChars);
+  if (trimmed != null) mirrorPtyLog(sessionId, trimmed);
+  else mirrorPtyLogAppend(sessionId, data);
 }
 
 function sendPtyData(sessionId: string, data: string, endSeq: number) {
@@ -1613,9 +1638,36 @@ function sendPtyData(sessionId: string, data: string, endSeq: number) {
   }
 }
 
-function flushPtyDataBroadcast(sessionId: string) {
-  const pending = takePtyDataPending(PTY_DATA_STATE, sessionId);
-  if (pending.data) sendPtyData(sessionId, pending.data, pending.endSeq);
+/** Exit/meta broadcasts waiting until the pending tail has been sliced out. */
+const PTY_DATA_AFTER = new Map<string, Array<() => void>>();
+
+function runPtyDataAfter(sessionId: string) {
+  const fns = PTY_DATA_AFTER.get(sessionId);
+  PTY_DATA_AFTER.delete(sessionId);
+  if (!fns) return;
+  for (const fn of fns) fn();
+}
+
+function flushPtyDataBroadcast(sessionId: string, after?: () => void) {
+  if (after) {
+    const list = PTY_DATA_AFTER.get(sessionId) ?? [];
+    list.push(after);
+    PTY_DATA_AFTER.set(sessionId, list);
+  }
+  // A coalesce or drain timer already owns the next pump.
+  if (PTY_DATA_STATE.timers.has(sessionId)) return;
+  pumpPtyDataPending(
+    PTY_DATA_STATE,
+    sessionId,
+    PTY_DATA_IPC_MAX_CHARS,
+    (data, endSeq) => {
+      sendPtyData(sessionId, data, endSeq);
+    },
+    (run) => setTimeout(run, 0),
+    () => {
+      runPtyDataAfter(sessionId);
+    },
+  );
 }
 
 /** Keep the in-memory / mirrored log after exit so Find and export still work. */
@@ -1624,8 +1676,10 @@ function retainPtyBufferOnExit(sessionId: string) {
 }
 
 function clearPtyBuffer(sessionId: string) {
-  // Deliver any coalesced chunks before dropping the in-memory buffer.
-  flushPtyDataBroadcast(sessionId);
+  // Drop the coalesced tail. Killing the pane should not dump a backlog
+  // through the main process; earlier slices were already delivered.
+  dropPtyDataPending(PTY_DATA_STATE, sessionId);
+  runPtyDataAfter(sessionId);
   PTY_OUTPUT_BUFFERS.delete(sessionId);
   const logTimer = PTY_LOG_FLUSH_TIMERS.get(sessionId);
   if (logTimer) {
@@ -1641,12 +1695,14 @@ function broadcastPtyData(sessionId: string, data: string) {
 }
 
 function broadcastPtyExit(sessionId: string, exitCode: number) {
-  flushPtyDataBroadcast(sessionId);
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send("pty-exit", { sessionId, exitCode });
+  // Finish the output slices before the exit event so the banner stays at the tail.
+  flushPtyDataBroadcast(sessionId, () => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("pty-exit", { sessionId, exitCode });
+      }
     }
-  }
+  });
 }
 
 function ptyMetaPayload(sessionId: string) {
@@ -1661,6 +1717,19 @@ function ptyMetaPayload(sessionId: string) {
     rows: meta.rows,
     exitCode: meta.exitCode,
   };
+}
+
+/** Kick ConPTY after sleep or a GPU reset. A same-size resize is a no-op. */
+function wakePtySessions(): void {
+  for (const [sessionId, proc] of PTY_SESSIONS) {
+    const meta = PTY_META.get(sessionId);
+    const steps = ptyWakeResizeSteps(meta?.cols ?? 0, meta?.rows ?? 0);
+    try {
+      for (const step of steps) proc.resize(step.cols, step.rows);
+    } catch (err) {
+      console.warn("[pty-wake]", sessionId, err instanceof Error ? err.message : err);
+    }
+  }
 }
 
 function broadcastPtyMeta(sessionId: string) {
@@ -1808,7 +1877,7 @@ ipcMain.handle(
         );
       }
 
-      PTY_OUTPUT_BUFFERS.set(sessionId, "");
+      PTY_OUTPUT_BUFFERS.set(sessionId, createPtyChunkBuffer());
       PTY_SESSIONS.set(sessionId, proc);
       PTY_META.set(sessionId, {
         pid: typeof proc.pid === "number" ? proc.pid : null,
@@ -1862,12 +1931,15 @@ ipcMain.handle(
     const endSeq = ptyDataEndSeq(PTY_DATA_STATE, sessionId);
     if (shouldDropPendingOnBufferAttach(includeBuffer)) {
       dropPtyDataPending(PTY_DATA_STATE, sessionId);
+      // The attach payload already contains this tail. If an exit broadcast
+      // was waiting on the drain, release it now.
+      runPtyDataAfter(sessionId);
     }
     return {
       success: true,
       alive,
       endSeq,
-      buffer: includeBuffer ? (PTY_OUTPUT_BUFFERS.get(sessionId) ?? "") : "",
+      buffer: includeBuffer ? readPtyOutput(sessionId) : "",
       pid: meta?.pid ?? null,
       shell: meta?.shell ?? null,
       cols: meta?.cols ?? null,
@@ -1878,7 +1950,7 @@ ipcMain.handle(
 );
 
 ipcMain.handle("pty-get-output-buffer", (_event, sessionId: string) => ({
-  buffer: PTY_OUTPUT_BUFFERS.get(sessionId) ?? "",
+  buffer: readPtyOutput(sessionId),
 }));
 
 function sanitizeExportBasename(raw: string): string {
@@ -1890,7 +1962,7 @@ ipcMain.handle(
   "pty-export-output",
   async (_event, sessionId: string, defaultName?: string) => {
     try {
-      const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
+      const buffer = readPtyOutput(sessionId);
       const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const base = sanitizeExportBasename(defaultName ?? sessionId);
       const { canceled, filePath } = await dialog.showSaveDialog({
@@ -1924,7 +1996,7 @@ ipcMain.handle(
       contextChars?: number;
     },
   ) => {
-    const buffer = PTY_OUTPUT_BUFFERS.get(sessionId) ?? "";
+    const buffer = readPtyOutput(sessionId);
     return searchPtyOutput(buffer, query ?? "", opts ?? {});
   },
 );
@@ -3073,6 +3145,7 @@ app.whenReady().then(async () => {
 
   setupAppMenu();
   createWindow();
+  initSystemResume({ wakePtys: wakePtySessions });
 
   if (trayEnabled) {
     applySystemTrayEnabled(true, getTrayDeps(), { skipForestMenu: true });

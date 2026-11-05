@@ -8,6 +8,7 @@ import { LocaleProvider } from "./i18n/LocaleProvider";
 import { isFirebaseConfigured } from "./firebase/config";
 import { completeGoogleRedirectSignIn, shouldHandleAuthRedirectOnLoad } from "./firebase/auth.js";
 import { ensureAuthSessionSync } from "./auth-session-sync.js";
+import { installOsResumeBridge } from "./os-resume";
 import "./index.css";
 
 const AuthBridge = lazy(() => import("./AuthBridge").then((m) => ({ default: m.AuthBridge })));
@@ -43,6 +44,8 @@ function Root() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  useEffect(() => installOsResumeBridge(), []);
 
   if (route === "chat") {
     return (
