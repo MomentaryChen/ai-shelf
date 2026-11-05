@@ -6,7 +6,7 @@ import type { Terminal } from "@xterm/xterm";
  * it stays out of the main xterm chunk. On context loss or activation failure,
  * dispose the addon so xterm falls back to the default canvas path.
  */
-export function attachTerminalWebgl(term: Terminal): () => void {
+export function attachTerminalWebgl(term: Terminal, onRendererChange?: () => void): () => void {
   let addon: WebglAddon | null = null;
   let cancelled = false;
 
@@ -23,6 +23,8 @@ export function attachTerminalWebgl(term: Terminal): () => void {
             /* already torn down */
           }
           if (addon === instance) addon = null;
+          // Canvas metrics differ from WebGL; the pane must fit again or rows smear.
+          onRendererChange?.();
         });
         if (cancelled) {
           instance.dispose();
@@ -34,6 +36,7 @@ export function attachTerminalWebgl(term: Terminal): () => void {
           return;
         }
         addon = instance;
+        onRendererChange?.();
       } catch (err) {
         console.warn("[xterm-webgl] falling back to canvas renderer", err);
         try {
@@ -42,10 +45,12 @@ export function attachTerminalWebgl(term: Terminal): () => void {
           /* ignore */
         }
         if (addon === instance) addon = null;
+        onRendererChange?.();
       }
     })
     .catch((err) => {
       console.warn("[xterm-webgl] falling back to canvas renderer", err);
+      onRendererChange?.();
     });
 
   return () => {

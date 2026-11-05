@@ -7,13 +7,25 @@
  * double-paints the same chunk. `dropPtyDataPending` cancels that flush.
  */
 
+export type PtyPendingChunk = {
+  data: string;
+  /** Total string units appended for this session after `data`. */
+  endSeq: number;
+};
+
 export type PtyDataPendingState = {
-  pending: Map<string, string>;
+  pending: Map<string, PtyPendingChunk>;
   timers: Map<string, ReturnType<typeof setTimeout>>;
+  /** Monotonic units appended per session. Not cleared when the pending tail is dropped. */
+  seq: Map<string, number>;
 };
 
 export function createPtyDataPendingState(): PtyDataPendingState {
-  return { pending: new Map(), timers: new Map() };
+  return { pending: new Map(), timers: new Map(), seq: new Map() };
+}
+
+export function ptyDataEndSeq(state: PtyDataPendingState, sessionId: string): number {
+  return state.seq.get(sessionId) ?? 0;
 }
 
 export function queuePtyDataPending(
@@ -24,8 +36,13 @@ export function queuePtyDataPending(
   flush: (sessionId: string) => void,
 ): void {
   if (!data) return;
-  const prev = state.pending.get(sessionId) ?? "";
-  state.pending.set(sessionId, prev + data);
+  const endSeq = (state.seq.get(sessionId) ?? 0) + data.length;
+  state.seq.set(sessionId, endSeq);
+  const prev = state.pending.get(sessionId);
+  state.pending.set(sessionId, {
+    data: (prev?.data ?? "") + data,
+    endSeq,
+  });
   if (state.timers.has(sessionId)) return;
   const timer = setTimeout(() => {
     state.timers.delete(sessionId);
@@ -45,15 +62,16 @@ export function dropPtyDataPending(state: PtyDataPendingState, sessionId: string
 }
 
 /** Cancel the timer and take pending bytes for broadcast. */
-export function takePtyDataPending(state: PtyDataPendingState, sessionId: string): string {
+export function takePtyDataPending(state: PtyDataPendingState, sessionId: string): PtyPendingChunk {
   const timer = state.timers.get(sessionId);
   if (timer) {
     clearTimeout(timer);
     state.timers.delete(sessionId);
   }
-  const data = state.pending.get(sessionId) ?? "";
+  const entry = state.pending.get(sessionId);
   state.pending.delete(sessionId);
-  return data;
+  if (entry) return entry;
+  return { data: "", endSeq: state.seq.get(sessionId) ?? 0 };
 }
 
 /**

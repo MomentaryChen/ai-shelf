@@ -22,6 +22,12 @@ import { recordImeAnchor } from "../terminal/ime-anchor-log";
 import { attachImeCommitGuard } from "../terminal/ime-commit-guard";
 import { attachImeInputTrace, recordImeInputData } from "../terminal/ime-input-trace";
 import { shouldRespawnLostSession, shouldWakeShellWithEnter } from "../terminal/pty-attach-session";
+import { paintTerminalGrid, terminalFitAction } from "../terminal/terminal-fit";
+import {
+  completePtyReplay,
+  createPtyReplayGate,
+  pushPtyChunk,
+} from "../../shared/pty-attach-replay.js";
 import {
   getTerminalPasteTarget,
   pasteToTerminalSession,
@@ -125,7 +131,7 @@ function EmbeddedTerminalInner({
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
   const activeRef = useRef(active);
-  const fitRef = useRef<(() => void) | null>(null);
+  const fitRef = useRef<((forceMetrics?: boolean) => void) | null>(null);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const [hasNewOutput, setHasNewOutput] = useState(false);
   const stableOnExit = useCallback(() => callbacksRef.current.onExit(), [callbacksRef]);
@@ -392,7 +398,11 @@ function EmbeddedTerminalInner({
     term.loadAddon(fitAddon);
     term.open(el);
     termRef.current = term;
-    const detachWebgl = webglEnabled ? attachTerminalWebgl(term) : () => {};
+    // Assigned once fit() exists. WebGL loads async, so the callback runs later.
+    let scheduleFit = (_forceMetrics = false) => {};
+    const detachWebgl = webglEnabled
+      ? attachTerminalWebgl(term, () => scheduleFit(true))
+      : () => {};
     const searchAddon = attachTerminalSearch(term);
     searchRef.current = searchAddon;
 
@@ -467,40 +477,31 @@ function EmbeddedTerminalInner({
       callbacksRef.current.onCwdReport?.(sessionId, cwd);
     });
 
-    const pending: string[] = [];
     let opened = true;
-    let rafId = 0;
     let wakeTimer = 0;
     let statusTimer = 0;
+    let ptySizeTimer = 0;
     let receivedBytes = 0;
+    let replayed = false;
+    let didFit = false;
+    let allowPtyResize = true;
+    let fitTimer = 0;
+    let sentCols = -1;
+    let sentRows = -1;
+    const replayGate = createPtyReplayGate();
 
     const syncNewOutputHint = () => {
       if (isTerminalAtBottom(term)) setHasNewOutput(false);
     };
 
     const writeSafe = (data: string) => {
-      if (!opened) {
-        pending.push(data);
-        return;
-      }
+      if (!opened || !data) return;
+      receivedBytes += data.length;
       const wasAtBottom = isTerminalAtBottom(term);
       try {
         term.write(data);
       } catch (err) {
         console.error("[xterm-write]", sessionId, err);
-        return;
-      }
-      if (!wasAtBottom) setHasNewOutput(true);
-    };
-
-    const flushPending = () => {
-      if (!opened || pending.length === 0) return;
-      const chunk = pending.splice(0, pending.length).join("");
-      const wasAtBottom = isTerminalAtBottom(term);
-      try {
-        term.write(chunk);
-      } catch (err) {
-        console.error("[xterm-flush]", sessionId, err);
         return;
       }
       if (!wasAtBottom) setHasNewOutput(true);
@@ -513,44 +514,81 @@ function EmbeddedTerminalInner({
     };
     scrollToBottomRef.current = scrollToBottom;
 
-    const syncPtySize = () => {
+    const flushPtySize = () => {
+      ptySizeTimer = 0;
       if (cancelled || exited) return;
       const cols = Math.max(term.cols, 2);
       const rows = Math.max(term.rows, 2);
+      if (cols === sentCols && rows === sentRows) return;
+      sentCols = cols;
+      sentRows = rows;
       void window.api.ptyResize(sessionId, cols, rows).then((r) => {
         if (cancelled || r.success) return;
         markExited();
       });
     };
 
-    const fit = () => {
-      const target = containerRef.current;
-      if (!target || target.clientWidth === 0 || target.clientHeight === 0) return;
-      try {
-        // Always resize from proposeDimensions — FitAddon.fit() skips when cols/rows
-        // are unchanged, which leaves stale canvas metrics after font load or flex settle.
-        const dims = fitAddon.proposeDimensions();
-        if (dims) term.resize(dims.cols, dims.rows);
-        else fitAddon.fit();
-      } catch {
-        /* mid-layout */
+    const schedulePtySize = (immediate: boolean) => {
+      if (immediate) {
+        if (ptySizeTimer) {
+          window.clearTimeout(ptySizeTimer);
+          ptySizeTimer = 0;
+        }
+        flushPtySize();
+        return;
       }
-      syncPtySize();
+      if (ptySizeTimer) return;
+      ptySizeTimer = window.setTimeout(flushPtySize, 50);
     };
 
-    fitRef.current = fit;
-
-    let rafId2 = 0;
-    const scheduleFit = () => {
-      cancelAnimationFrame(rafId);
-      cancelAnimationFrame(rafId2);
-      rafId = requestAnimationFrame(() => {
-        rafId2 = requestAnimationFrame(fit);
+    // Hold the grid until the backlog is parsed at the PTY's own size.
+    // Fitting first (often the default 80x24, or a not-yet-laid-out pane)
+    // wraps Claude's cursor-addressed frame so one row paints as many.
+    const fit = (forceMetrics = false) => {
+      if (cancelled || !replayed) return;
+      const target = containerRef.current;
+      if (!target) return;
+      let proposal: { cols: number; rows: number } | undefined;
+      try {
+        proposal = fitAddon.proposeDimensions();
+      } catch {
+        return;
+      }
+      const action = terminalFitAction({
+        proposal,
+        containerWidth: target.clientWidth,
+        containerHeight: target.clientHeight,
+        currentCols: term.cols,
+        currentRows: term.rows,
+        forceMetrics,
       });
+      if (action === "skip" || !proposal) return;
+      paintTerminalGrid(term, action, proposal.cols, proposal.rows);
+      if (action === "resize" && allowPtyResize) {
+        const immediate = !didFit;
+        didFit = true;
+        schedulePtySize(immediate);
+      } else {
+        didFit = true;
+      }
     };
 
-    scheduleFit();
-    flushPending();
+    // Trailing debounce: opening Claude fires font load, WebGL swap, and flex
+    // settle back to back. Resizing on each one reflows the frame mid-paint.
+    let fitForce = false;
+    scheduleFit = (forceMetrics = false) => {
+      if (cancelled) return;
+      fitForce = fitForce || forceMetrics;
+      if (fitTimer) window.clearTimeout(fitTimer);
+      fitTimer = window.setTimeout(() => {
+        fitTimer = 0;
+        if (cancelled) return;
+        const forceNow = fitForce;
+        fitForce = false;
+        fit(forceNow);
+      }, 50);
+    };
+    fitRef.current = scheduleFit;
 
     const offScroll = term.onScroll(syncNewOutputHint);
 
@@ -574,10 +612,10 @@ function EmbeddedTerminalInner({
     };
     el.addEventListener("wheel", onWheel, { passive: false, capture: true });
 
-    const offData = window.api.onPtyData(({ sessionId: sid, data }) => {
+    const offData = window.api.onPtyData(({ sessionId: sid, data, endSeq }) => {
       if (sid !== sessionId) return;
-      receivedBytes += data.length;
-      writeSafe(data);
+      const text = pushPtyChunk(replayGate, { data, endSeq });
+      if (text) writeSafe(text);
     });
 
     const offExit = window.api.onPtyExit(({ sessionId: sid }) => {
@@ -597,15 +635,37 @@ function EmbeddedTerminalInner({
       else writePty(data);
     });
 
+    const replayAtPtySize = (r: {
+      buffer?: string;
+      endSeq?: number;
+      cols: number | null;
+      rows: number | null;
+    }) => {
+      // Parse the backlog on the grid that produced it. The default 80×24
+      // wraps a Claude frame into a stack of repeated rows, and a later fit
+      // cannot unwrap cursor-addressed output.
+      if (r.cols && r.rows && r.cols >= 2 && r.rows >= 1) {
+        paintTerminalGrid(term, "resize", r.cols, r.rows);
+        sentCols = r.cols;
+        sentRows = r.rows;
+      }
+      const writes = completePtyReplay(
+        replayGate,
+        r.buffer ?? "",
+        typeof r.endSeq === "number" ? r.endSeq : (r.buffer?.length ?? 0),
+      );
+      for (const chunk of writes) writeSafe(chunk);
+      replayed = true;
+      scheduleFit(true);
+    };
+
     void window.api.ptyAttach(sessionId).then((r) => {
       if (cancelled) return;
       if (!r.alive) {
         // Replay history for a known-dead session (Find / "press any key") and
         // only ask the parent to respawn when meta vanished entirely.
-        if (r.buffer) {
-          receivedBytes += r.buffer.length;
-          writeSafe(r.buffer);
-        }
+        allowPtyResize = false;
+        replayAtPtySize(r);
         markExited();
         if (
           shouldRespawnLostSession({
@@ -618,12 +678,7 @@ function EmbeddedTerminalInner({
         }
         return;
       }
-      if (r.buffer) {
-        receivedBytes += r.buffer.length;
-        writeSafe(r.buffer);
-      }
-      flushPending();
-      scheduleFit();
+      replayAtPtySize(r);
 
       // Auto-Enter is only safe for plain shells — AI CLIs can treat a
       // premature CR as submit before the first prompt paints.
@@ -645,18 +700,18 @@ function EmbeddedTerminalInner({
       }, 2500);
     });
 
-    const ro = new ResizeObserver(scheduleFit);
+    const ro = new ResizeObserver(() => scheduleFit());
     ro.observe(el);
 
     const onWindowResize = () => scheduleFit();
     window.addEventListener("resize", onWindowResize);
 
     void document.fonts.ready.then(() => {
-      if (!cancelled) scheduleFit();
+      if (!cancelled) scheduleFit(true);
     });
     const onFontsLoadingDone = () => {
       if (cancelled) return;
-      scheduleFit();
+      scheduleFit(true);
     };
     document.fonts.addEventListener("loadingdone", onFontsLoadingDone);
 
@@ -670,8 +725,8 @@ function EmbeddedTerminalInner({
       opened = false;
       window.clearTimeout(wakeTimer);
       window.clearTimeout(statusTimer);
-      cancelAnimationFrame(rafId);
-      cancelAnimationFrame(rafId2);
+      window.clearTimeout(ptySizeTimer);
+      window.clearTimeout(fitTimer);
       fitRef.current = null;
       scrollToBottomRef.current = null;
       termRef.current = null;
@@ -722,7 +777,7 @@ function EmbeddedTerminalInner({
     // Remeasure cell size after font metrics change (or trim buffer after scrollback).
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => fitRef.current?.());
+      raf2 = requestAnimationFrame(() => fitRef.current?.(true));
     });
     return () => {
       cancelAnimationFrame(raf1);
