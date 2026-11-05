@@ -9,6 +9,21 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.3.7] - 2026-11-05
+
+Neighboring profile and workspace switches slide into place, and the desktop stays responsive through output bursts, sleep, and Claude's first frame.
+
+### Added
+
+- **Profile and workspace motion** — Moving to the next or previous profile slides the sidebar highlight, the profile badge, and the terminal stage. A jump that skips profiles, or that crosses groups, fades instead. The workspace switcher uses the same direction, including when the wheel wraps from one end of the list to the other.
+
+### Fixed
+
+- **Output bursts and wake from sleep** — Terminal output stays in pieces and is sent in small slices, so a large burst no longer copies into one growing string and blocks the main process until Windows marks the window not responding. The same backlog arrives when ConPTY wakes from sleep. On resume the app wakes the console host, repaints the window, and rebuilds a lost WebGL context.
+- **Claude's first frame** — Opening Claude no longer parses its full-screen redraw on the default grid and then fits the pane, which wrapped one row into a stack. The attach snapshot is replayed once at the PTY's own size, a duplicate tail that also arrives on pty-data is dropped, and the pane fits after the backlog is in. Switching between the WebGL and canvas renderers fits the pane again so rows do not smear.
+
+[4.3.7]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.3.7
+
 ## [4.3.6] - 2026-10-28
 
 AI Flow phase 2b, background agent status, rebindable shortcuts, and sturdier terminal, usage, and inventory behavior.
