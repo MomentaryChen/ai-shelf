@@ -17,6 +17,8 @@ export function BusyPaneCloseDialog({
       title={t("pane.closeBusyTitle")}
       description={t("pane.closeBusyConfirm")}
       confirmLabel={t("pane.closeBusyAction")}
+      confirmVariant="destructive"
+      defaultFocus="cancel"
       onCancel={onCancel}
       onConfirm={onConfirm}
     />
