@@ -31,6 +31,7 @@ import {
 } from "../../shared/wsl-paths.js";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 type PanelId = "paths" | "distros" | "snippets";
 
@@ -227,7 +228,8 @@ export function WslToolsTab({ active = true }: { active?: boolean }) {
   return (
     <>
       <SectionHeading icon={Terminal}>{t("tools.tab.wsl")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("wsl.subtitle")}
       </p>
 
@@ -572,6 +574,7 @@ export function WslToolsTab({ active = true }: { active?: boolean }) {
           )}
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

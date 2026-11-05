@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { Monitor, Terminal, FolderOpen, Loader2, Hand, SquareTerminal } from "lucide-react";
+import { Monitor, Terminal, FolderOpen, Hand, SquareTerminal } from "lucide-react";
+import { WarmTypingDots } from "./WarmTypingDots";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -2105,11 +2106,11 @@ function ToolCard({
       ) : (
         <div className="mt-auto grid grid-cols-2 gap-3">
           <Button variant="chromeOutline" className="w-full" disabled={extBusy} onClick={handleExternal}>
-            {extBusy ? <Loader2 className="animate-spin" /> : <Monitor />}
+            {extBusy ? <WarmTypingDots tone="chrome" size="sm" /> : <Monitor />}
             {t("chat.externalBtn")}
           </Button>
           <Button variant="chromeSolid" className="w-full" disabled={inAppBusy} onClick={handleInApp}>
-            {inAppBusy ? <Loader2 className="animate-spin" /> : <Terminal />}
+            {inAppBusy ? <WarmTypingDots tone="chrome" size="sm" /> : <Terminal />}
             {t("chat.inAppBtn")}
           </Button>
         </div>

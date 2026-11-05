@@ -14,6 +14,7 @@ import {
 } from "../utils/json-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 const fieldClass =
   "h-[260px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
@@ -83,7 +84,8 @@ export function JsonToolsTab() {
   return (
     <>
       <SectionHeading icon={Braces}>{t("tools.tab.json")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("json.subtitle")}
       </p>
 
@@ -229,6 +231,7 @@ export function JsonToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

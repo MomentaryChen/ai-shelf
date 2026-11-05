@@ -24,7 +24,8 @@ import { FlowRunHistoryPanel } from "./FlowRunHistoryPanel";
 import { FlowSettingsDialog } from "./FlowSettingsDialog";
 import { FlowSourceDialog } from "./FlowSourceDialog";
 import { FlowTemplateMarketplace } from "./FlowTemplateMarketplace";
-import { Spinner } from "./Spinner";
+import { LoadingRow } from "./WarmTypingDots";
+import { StaggerStack } from "./StaggerStack";
 import { useLocale } from "../i18n/LocaleProvider";
 import { loadSettings } from "../chat-settings";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
@@ -487,7 +488,11 @@ export function FlowTab() {
           <BookOpen className="mr-1.5 h-3.5 w-3.5" aria-hidden />
           {t("flow.template.marketplace")}
         </Button>
-        {loading && <Spinner label={t("flow.loading")} />}
+        {loading && (
+          <div className="px-2 py-3">
+            <LoadingRow label={t("flow.loading")} className="text-[12px]" />
+          </div>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         {!loading && flows.length === 0 && (
           <EmptyState
@@ -567,7 +572,7 @@ export function FlowTab() {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto p-4">
-        <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
+        <StaggerStack className="mx-auto h-full w-full max-w-5xl gap-3">
           {showCreate && (
             <FlowCreateChat
               key={chatFlowId ?? `draft-${draftChatEpoch}`}
@@ -783,7 +788,7 @@ export function FlowTab() {
               />
             </>
           )}
-        </div>
+        </StaggerStack>
       </main>
 
       {sourceOpen && selectedId && (

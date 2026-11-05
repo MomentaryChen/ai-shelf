@@ -19,6 +19,7 @@ import {
 } from "../utils/cron-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 const PRESET_LABEL_KEYS: Record<CronPresetId, MessageKey> = {
   every15min: "cron.preset.every15min",
@@ -101,7 +102,8 @@ export function CronToolsTab() {
   return (
     <>
       <SectionHeading icon={CalendarClock}>{t("tools.tab.cron")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("cron.subtitle")}
       </p>
 
@@ -262,6 +264,7 @@ export function CronToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

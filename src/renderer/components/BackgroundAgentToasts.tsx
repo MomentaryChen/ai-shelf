@@ -28,7 +28,7 @@ function ToastItem({
 
   return (
     <div
-      className="pointer-events-auto flex items-start gap-2 rounded-lg border border-chrome-border bg-chrome-surface-raised/95 px-3 py-2.5 text-[11px] text-chrome-text shadow-lg backdrop-blur-sm"
+      className="ui-toast-enter pointer-events-auto flex items-start gap-2 rounded-lg border border-chrome-border bg-chrome-surface-raised/95 px-3 py-2.5 text-[11px] text-chrome-text shadow-lg backdrop-blur-sm"
       role="status"
     >
       <BackgroundAttentionBadge kind={toast.kind} className="mt-1" />
