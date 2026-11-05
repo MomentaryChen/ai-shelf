@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
   FolderOpen,
@@ -23,6 +23,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLocale } from "../i18n/LocaleProvider";
+import { useSlideDirection } from "../hooks/useSlideDirection";
+import { slideClassName } from "../utils/workspace-slide";
 import { AccountSidebar } from "./AccountSidebar";
 import { EmptyState } from "./EmptyState";
 import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
@@ -238,6 +240,51 @@ export function Sidebar({
     if (active) return (active.terminals ?? []).slice(0, 24);
     return profiles.flatMap((p) => p.terminals ?? []).slice(0, 24);
   }, [collapsed, profiles, activeProfileId]);
+
+  const groupMotion = useSlideDirection(currentGroup?.id ?? null, groups);
+  const groupEnterClass = slideClassName(groupMotion.direction, "profile-slide", groupMotion.epoch);
+  const profileListRef = useRef<HTMLDivElement>(null);
+  const activeListedProfile = filteredProfiles.find((p) => p.id === activeProfileId) ?? null;
+  const [activeIndicator, setActiveIndicator] = useState<{
+    groupId: string;
+    top: number;
+    height: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const root = profileListRef.current;
+    const groupId = currentGroup?.id ?? "";
+    if (!root || !activeListedProfile) {
+      setActiveIndicator(null);
+      return;
+    }
+    const row = root.querySelector<HTMLElement>(
+      `[data-profile-header="${CSS.escape(activeListedProfile.id)}"]`,
+    );
+    if (!row) {
+      setActiveIndicator(null);
+      return;
+    }
+    const measure = () => {
+      const top = Math.round((row.getBoundingClientRect().top - root.getBoundingClientRect().top) * 10) / 10;
+      const height = Math.round(row.getBoundingClientRect().height * 10) / 10;
+      setActiveIndicator((prev) =>
+        prev && prev.groupId === groupId && prev.top === top && prev.height === height
+          ? prev
+          : { groupId, top, height },
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [activeListedProfile, currentGroup?.id, expandedProfiles, filteredProfiles, query]);
+
+  const shownIndicator =
+    activeListedProfile && activeIndicator && activeIndicator.groupId === (currentGroup?.id ?? "")
+      ? activeIndicator
+      : null;
 
   return (
     <aside
@@ -468,7 +515,23 @@ export function Sidebar({
                 </div>
               </div>
             )}
-            <div className="mt-0.5 space-y-0.5">
+            <div
+              key={currentGroup?.id ?? "profiles"}
+              ref={profileListRef}
+              className={`relative mt-0.5 ${groupEnterClass}`}
+            >
+              {shownIndicator && (
+                <div
+                  aria-hidden
+                  className="profile-active-indicator pointer-events-none absolute inset-x-0 z-0 rounded-md"
+                  style={{
+                    top: shownIndicator.top,
+                    height: shownIndicator.height,
+                    ...profileSidebarProfileActiveStyle(activeListedProfile?.accentColor),
+                  }}
+                />
+              )}
+              <div className="relative z-[1] space-y-0.5">
               {filteredProfiles.length === 0 && (
                 <EmptyState
                   tone="chrome"
@@ -526,12 +589,12 @@ export function Sidebar({
                     }}
                   >
                     <div
-                      className={`group/profile relative flex h-7 items-center gap-1 rounded-md pl-1.5 pr-0.5 ${
+                      data-profile-header={item.id}
+                      className={`group/profile relative flex h-7 items-center gap-1 rounded-md pl-1.5 pr-0.5 transition-colors duration-200 ${
                         active
                           ? "text-chrome-text"
                           : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                       }`}
-                      style={active ? profileSidebarProfileActiveStyle(accent) : undefined}
                     >
                       <button
                         type="button"
@@ -744,7 +807,7 @@ export function Sidebar({
                                 setDraggingTerminal(null);
                                 setDragOverTerminal(null);
                               }}
-                              className={`group/term relative flex w-full items-start gap-1.5 rounded-md px-1.5 py-1 text-left transition-colors ${
+                              className={`group/term relative flex w-full items-start gap-1.5 rounded-md px-1.5 py-1 text-left transition-[background-color,box-shadow,color] duration-200 ${
                                 terminalActive
                                   ? "text-chrome-text"
                                   : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
@@ -872,6 +935,7 @@ export function Sidebar({
                   </div>
                 );
               })}
+              </div>
             </div>
           </>
         )}

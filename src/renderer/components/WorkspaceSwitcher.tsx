@@ -9,7 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLocale } from "../i18n/LocaleProvider";
-import { groupIndexById, stepIndex } from "../utils/workspace-slide";
+import { useSlideDirection } from "../hooks/useSlideDirection";
+import {
+  groupIndexById,
+  slideClassName,
+  stepIndex,
+  type SlideDirection,
+} from "../utils/workspace-slide";
 import { BackgroundAttentionBadge } from "./BackgroundAttentionBadge";
 import {
   strongestAttention,
@@ -77,6 +83,7 @@ export function WorkspaceSwitcher({
 }: WorkspaceSwitcherProps) {
   const { t } = useLocale();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const wheelDir = useRef<SlideDirection | null>(null);
   const wheelLock = useRef(false);
   const wheelTimer = useRef(0);
   const [open, setOpen] = useState(false);
@@ -97,7 +104,10 @@ export function WorkspaceSwitcher({
     (delta: number) => {
       if (groups.length < 2) return;
       const id = groups[stepIndex(groups.length, index, delta)]?.id;
-      if (id && id !== currentGroupId) onGroupChange?.(id);
+      if (id && id !== currentGroupId) {
+        wheelDir.current = delta > 0 ? "next" : "prev";
+        onGroupChange?.(id);
+      }
     },
     [currentGroupId, groups, index, onGroupChange],
   );
@@ -134,6 +144,8 @@ export function WorkspaceSwitcher({
     }
   };
 
+  const groupMotion = useSlideDirection(current?.id ?? null, groups, wheelDir);
+  const groupEnterClass = slideClassName(groupMotion.direction, "profile-slide", groupMotion.epoch);
   const name = current?.name ?? t("workspace.empty");
   const countLabel = profileCountLabel(current?.profileCount);
   const position = canCycle
@@ -165,19 +177,28 @@ export function WorkspaceSwitcher({
                 }`
           }
         >
-          <WorkspaceAvatar group={current} active />
+          <span className={`flex min-w-0 items-center overflow-hidden ${collapsed ? "" : "flex-1"}`}>
+            <span
+              key={current?.id ?? "empty"}
+              className={`flex min-w-0 items-center gap-2.5 ${collapsed ? "" : "flex-1"} ${groupEnterClass}`}
+            >
+              <WorkspaceAvatar group={current} active />
+              {!collapsed && (
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[13px] leading-tight font-medium text-chrome-text">
+                    {name}
+                  </span>
+                  {subtitle && (
+                    <span className="truncate text-[11px] leading-tight tabular-nums text-chrome-text-muted">
+                      {subtitle}
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+          </span>
           {!collapsed && (
             <>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[13px] leading-tight font-medium text-chrome-text">
-                  {name}
-                </span>
-                {subtitle && (
-                  <span className="truncate text-[11px] leading-tight tabular-nums text-chrome-text-muted">
-                    {subtitle}
-                  </span>
-                )}
-              </span>
               {otherGroupAttention && <BackgroundAttentionBadge kind={otherGroupAttention} />}
               <ChevronsUpDown aria-hidden className="h-3.5 w-3.5 shrink-0 text-chrome-text-muted" />
             </>

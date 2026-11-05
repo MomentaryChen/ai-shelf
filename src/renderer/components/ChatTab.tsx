@@ -39,6 +39,7 @@ import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAg
 import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
+import { useSlideDirection } from "../hooks/useSlideDirection";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
 import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
 import { getActiveKeybindings } from "../shortcuts/active-keybindings";
@@ -66,6 +67,7 @@ import {
   paneToolLabel,
 } from "../utils/pane-label";
 import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
+import { slideClassName } from "../utils/workspace-slide";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -1148,6 +1150,9 @@ function ChatTabInner({
     "";
   const currentGroup =
     sidebarForest?.groups.find((g) => g.id === currentGroupId) ?? sidebarForest?.groups[0] ?? null;
+  const profileMotion = useSlideDirection(activeProfile?.id ?? null, currentGroup?.profiles ?? NO_SLIDE_ITEMS);
+  const profileStageClass = slideClassName(profileMotion.direction, "profile-stage", profileMotion.epoch);
+  const profileBadgeClass = slideClassName(profileMotion.direction, "profile-slide", profileMotion.epoch);
   const allProfiles = useMemo(
     () => sidebarForest?.groups.flatMap((g) => g.profiles) ?? [],
     [sidebarForest],
@@ -1593,6 +1598,8 @@ function ChatTabInner({
 
   const topBar = (
     <WarpTopBar
+      profileKey={activeProfile?.id ?? null}
+      profileEnterClass={profileBadgeClass}
       profileLabel={profileLabel}
       profileAccentColor={activeProfile?.accentColor ?? null}
       paneCount={panes.length}
@@ -1611,7 +1618,9 @@ function ChatTabInner({
   );
 
   const emptyStateTool = resolveInstalledLaunchTool(activeProfile?.defaultTool, data);
-  const terminalArea = layout ? (
+  const terminalArea = (
+    <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${profileStageClass}`}>
+      {layout ? (
     <div
       className={`relative flex min-h-0 flex-1 flex-col overflow-hidden p-1.5 ${
         displayDropActive ? "ring-2 ring-inset ring-chrome-ui-accent/40" : ""
@@ -1828,6 +1837,20 @@ function ChatTabInner({
         )}
       </div>
     </div>
+    )}
+    {profileStageClass ? (
+      <div
+        key={profileMotion.epoch}
+        aria-hidden
+        className="profile-switch-wash pointer-events-none absolute inset-0 z-30"
+        style={{
+          background: activeProfile?.accentColor
+            ? `linear-gradient(100deg, ${activeProfile.accentColor}38, transparent 62%)`
+            : "linear-gradient(100deg, color-mix(in srgb, var(--color-chrome-ui-accent) 22%, transparent), transparent 62%)",
+        }}
+      />
+    ) : null}
+    </div>
   );
 
   return (
@@ -1877,8 +1900,11 @@ export const ChatTab = memo(ChatTabInner, (prev, next) => {
 });
 
 const PANES_LEFT_HINT_THRESHOLD = 2;
+const NO_SLIDE_ITEMS: readonly { id: string }[] = [];
 
 function WarpTopBar({
+  profileKey = null,
+  profileEnterClass = "",
   profileLabel,
   profileAccentColor = null,
   paneCount,
@@ -1891,6 +1917,8 @@ function WarpTopBar({
   available,
   splitShortcutLabels,
 }: {
+  profileKey?: string | null;
+  profileEnterClass?: string;
   profileLabel: string | null;
   profileAccentColor?: string | null;
   paneCount: number;
@@ -1913,7 +1941,8 @@ function WarpTopBar({
     <div className="relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
       {profileLabel && (
         <div
-          className="flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1"
+          key={profileKey ?? profileLabel}
+          className={`flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1 ${profileEnterClass}`}
           style={profileTopBarBadgeStyle(accent)}
           title={profileLabel}
         >
