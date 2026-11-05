@@ -16,6 +16,7 @@ import {
   type HealthMonitorPrefs,
 } from "./health-monitor-pref.js";
 import { setTrayHealthAlert } from "./tray.js";
+import { inPostResumeQuiet } from "../shared/system-resume.js";
 
 const STARTUP_DELAY_MS = 45_000;
 const WEEKLY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -208,6 +209,9 @@ function maybeShowWeeklySummary(): void {
 
 export async function runHealthCheck(): Promise<HealthMonitorState> {
   if (checkInFlight) return getHealthMonitorState();
+  // Probes and update fetches stall while Windows brings the network back,
+  // and a pile of them is what makes the window feel dead after sleep.
+  if (inPostResumeQuiet()) return getHealthMonitorState();
   checkInFlight = true;
   state.checking = true;
   broadcastState();

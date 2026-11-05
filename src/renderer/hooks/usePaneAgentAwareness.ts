@@ -102,7 +102,7 @@ export function usePaneAgentAwareness(
 
   /** Authoritative per-pane state including tail; React state only commits status-visible fields. */
   const draftRef = useRef<Record<string, PaneAgentState>>({});
-  const pendingOutputRef = useRef(new Map<string, string>());
+  const pendingOutputRef = useRef(new Map<string, string[]>());
   const coalesceRafRef = useRef(0);
   const coalesceTimerRef = useRef(0);
 
@@ -390,8 +390,9 @@ export function usePaneAgentAwareness(
     pendingOutputRef.current = new Map();
     const now = Date.now();
     const opts = stateOptions(settings);
-    for (const [sessionId, data] of pending) {
-      if (!data) continue;
+    for (const [sessionId, parts] of pending) {
+      if (parts.length === 0) continue;
+      const data = parts.length === 1 ? parts[0]! : parts.join("");
       const pane = paneBySession.current.get(sessionId);
       if (!pane || !settings.paneAgentAwarenessEnabled) continue;
       const current =
@@ -436,17 +437,22 @@ export function usePaneAgentAwareness(
     }
 
     const offData = window.api.onPtyData(({ sessionId, data }) => {
-      const prev = pendingOutputRef.current.get(sessionId) ?? "";
-      pendingOutputRef.current.set(sessionId, prev + data);
+      let parts = pendingOutputRef.current.get(sessionId);
+      if (!parts) {
+        parts = [];
+        pendingOutputRef.current.set(sessionId, parts);
+      }
+      parts.push(data);
       scheduleOutputFlush();
     });
 
     const offExit = window.api.onPtyExit(({ sessionId, exitCode }) => {
       const pane = paneBySession.current.get(sessionId);
       // Apply coalesced bytes before reset so the final chunk is not dropped.
-      const pending = pendingOutputRef.current.get(sessionId);
-      if (pending) {
+      const parts = pendingOutputRef.current.get(sessionId);
+      if (parts && parts.length > 0) {
         pendingOutputRef.current.delete(sessionId);
+        const pending = parts.length === 1 ? parts[0]! : parts.join("");
         if (pane && settings.paneAgentAwarenessEnabled) {
           const current =
             draftRef.current[pane.id] ?? statesRef.current[pane.id] ?? createPaneAgentState();
