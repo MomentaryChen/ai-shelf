@@ -17,6 +17,7 @@ import {
 import { Card } from "./Card";
 import { MermaidBlock } from "./MermaidBlock";
 import { SectionHeading } from "./SectionHeading";
+import { ToolsPreviewPane } from "./ToolsPreviewPane";
 
 const TEMPLATE_LABEL_KEYS: Record<MermaidTemplateId, MessageKey> = {
   flowchart: "mermaid.template.flowchart",
@@ -31,9 +32,6 @@ const TEMPLATE_LABEL_KEYS: Record<MermaidTemplateId, MessageKey> = {
 
 const fieldClass =
   "h-[min(60vh,520px)] min-h-[320px] resize-y overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
-
-const previewClass =
-  "h-[min(60vh,520px)] min-h-[320px] overflow-auto rounded-[22px] border border-border bg-bg-primary px-4 py-3";
 
 type CopyKind = "source" | "fence" | "svg" | null;
 
@@ -158,24 +156,20 @@ export function MermaidToolsTab() {
               />
             </div>
 
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex h-8 min-w-0 items-center">
-                <Label className="text-[12px] font-medium text-text-secondary">
-                  {t("mermaid.preview")}
-                </Label>
-              </div>
-              <div className={previewClass}>
-                {hasInput ? (
-                  <MermaidBlock
-                    chart={input}
-                    className="mb-0 border-0 bg-transparent p-0"
-                    onSvgChange={setSvg}
-                  />
-                ) : (
-                  <p className="text-[13px] text-text-tertiary">{t("mermaid.empty")}</p>
-                )}
-              </div>
-            </div>
+            <ToolsPreviewPane
+              label={t("mermaid.preview")}
+              fullscreenTitle={t("mermaid.preview")}
+              empty={!hasInput}
+              emptyFallback={
+                <p className="text-[13px] text-text-tertiary">{t("mermaid.empty")}</p>
+              }
+            >
+              <MermaidBlock
+                chart={input}
+                className="mb-0 border-0 bg-transparent p-0"
+                onSvgChange={setSvg}
+              />
+            </ToolsPreviewPane>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
