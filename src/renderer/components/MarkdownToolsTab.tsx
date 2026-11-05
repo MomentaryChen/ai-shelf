@@ -8,6 +8,7 @@ import { Card } from "./Card";
 import { FlowMarkdownContent } from "./FlowMarkdownContent";
 import { SectionHeading } from "./SectionHeading";
 import { StaggerStack } from "./StaggerStack";
+import { ToolsPreviewPane } from "./ToolsPreviewPane";
 
 const SAMPLE_MARKDOWN = `# Markdown preview
 
@@ -32,9 +33,6 @@ flowchart TD
 
 const fieldClass =
   "h-[min(60vh,520px)] min-h-[320px] resize-y overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
-
-const previewClass =
-  "h-[min(60vh,520px)] min-h-[320px] overflow-auto rounded-[22px] border border-border bg-bg-primary px-4 py-3";
 
 export function MarkdownToolsTab() {
   const { t } = useLocale();
@@ -77,20 +75,16 @@ export function MarkdownToolsTab() {
               />
             </div>
 
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex h-8 min-w-0 items-center">
-                <Label className="text-[12px] font-medium text-text-secondary">
-                  {t("markdown.preview")}
-                </Label>
-              </div>
-              <div className={previewClass}>
-                {input.trim() ? (
-                  <FlowMarkdownContent content={input} />
-                ) : (
-                  <p className="text-[13px] text-text-tertiary">{t("markdown.empty")}</p>
-                )}
-              </div>
-            </div>
+            <ToolsPreviewPane
+              label={t("markdown.preview")}
+              fullscreenTitle={t("markdown.preview")}
+              empty={!input.trim()}
+              emptyFallback={
+                <p className="text-[13px] text-text-tertiary">{t("markdown.empty")}</p>
+              }
+            >
+              <FlowMarkdownContent content={input} />
+            </ToolsPreviewPane>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
