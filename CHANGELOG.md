@@ -12,6 +12,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 ### Fixed
 
 - **Profiles workspace on the terminal sidebar** — The default Profiles workspace is left out of the terminal sidebar when it only duplicates profiles that already live in other workspaces. Opening the terminal no longer lands on that full list. Profiles you created in that workspace, and a Profiles workspace that is still the only one, stay where they are.
+- **Cursor in Cost decisions** — Week spend, tool totals, and the remaining-allowance line include Cursor again. Included usage no longer collapses to $0 when the dashboard zeroes per-request cents, and a balance under $5 is no longer shown as whole dollars.
 
 ## [4.3.7] - 2026-11-05
 

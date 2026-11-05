@@ -103,6 +103,11 @@ export interface UsageToolSnapshot {
   totalCostUsd?: number;
   totalInputTokens?: number;
   totalOutputTokens?: number;
+  /**
+   * Provider-measured spend for the last 7 UTC days.
+   * Used when daily rows have tokens but no dollars (Cursor included usage).
+   */
+  weekCostUsd?: number;
   daily: UsageDayBucket[];
   byModel?: UsageModelBreakdown[];
   quotas?: UsageQuotaWindow[];
@@ -133,7 +138,11 @@ export interface UsageBudgetAlert {
   weeklyBudgetUsd: number | null;
   alertAtPercent: number;
   usedPercent: number;
-  messageKey: "usage.budget.ok" | "usage.budget.warn" | "usage.budget.over" | "usage.budget.quotaWarn";
+  messageKey:
+    | "usage.budget.ok"
+    | "usage.budget.warn"
+    | "usage.budget.over"
+    | "usage.budget.quotaWarn";
   quotaAlerts: Array<{
     toolId: UsageToolId;
     labelKey: string;
