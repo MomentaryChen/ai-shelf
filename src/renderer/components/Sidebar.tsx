@@ -3,8 +3,6 @@ import {
   ArrowUpRight,
   FolderOpen,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   MoreHorizontal,
   Search,
   Plus,
@@ -110,8 +108,8 @@ interface SidebarProps {
   activeTerminalId?: string | null;
   navItems?: SidebarNavItem[];
   activeNavId?: string;
+  /** When true, render the icon rail. The shell may already be mid-animation. */
   collapsed?: boolean;
-  onCollapsedChange?: (collapsed: boolean) => void;
   onGroupChange?: (groupId: string) => void;
   onCreateGroup?: () => void;
   onRenameGroup?: (groupId: string) => void;
@@ -158,8 +156,7 @@ export function Sidebar({
   activeTerminalId = null,
   navItems = defaultNavItems,
   activeNavId = navItems[0]?.id,
-  collapsed: controlledCollapsed,
-  onCollapsedChange,
+  collapsed = false,
   onGroupChange,
   onCreateGroup,
   onRenameGroup,
@@ -183,7 +180,6 @@ export function Sidebar({
   onNavChange,
 }: SidebarProps) {
   const { t } = useLocale();
-  const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [draggingProfileId, setDraggingProfileId] = useState<string | null>(null);
   const [dragOverProfileId, setDragOverProfileId] = useState<string | null>(null);
@@ -195,8 +191,6 @@ export function Sidebar({
   const [profileMenuOpenId, setProfileMenuOpenId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const collapsed = controlledCollapsed ?? internalCollapsed;
-
   useEffect(() => {
     if (!searchOpen) return;
     searchInputRef.current?.focus();
@@ -205,10 +199,6 @@ export function Sidebar({
   const closeSearch = () => {
     setSearchOpen(false);
     setQuery("");
-  };
-  const setCollapsed = (next: boolean) => {
-    if (controlledCollapsed === undefined) setInternalCollapsed(next);
-    onCollapsedChange?.(next);
   };
 
   const currentGroup = useMemo(
@@ -279,7 +269,7 @@ export function Sidebar({
     observer.observe(root);
     observer.observe(row);
     return () => observer.disconnect();
-  }, [activeListedProfile, currentGroup?.id, expandedProfiles, filteredProfiles, query]);
+  }, [activeListedProfile, currentGroup?.id, expandedProfiles, filteredProfiles, collapsed, query]);
 
   const shownIndicator =
     activeListedProfile && activeIndicator && activeIndicator.groupId === (currentGroup?.id ?? "")
@@ -290,16 +280,12 @@ export function Sidebar({
     <aside
       className="flex h-full w-full flex-col border-r border-chrome-border bg-chrome-bg transition-all duration-200"
     >
-      <div className="flex items-center justify-between border-b border-chrome-border/80 p-2">
+      <div className="flex h-12 items-center border-b border-chrome-border/80 pl-2 pr-12">
         {!collapsed && (
-          <span className="px-1 text-xs font-medium text-chrome-text-muted">{t("workspace.title")}</span>
+          <span className="min-w-0 flex-1 truncate px-1 text-xs font-medium text-chrome-text-muted">
+            {t("workspace.title")}
+          </span>
         )}
-        <IconTooltipButton
-          icon={collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          collapsed={collapsed}
-          onClick={() => setCollapsed(!collapsed)}
-        />
       </div>
 
       <div className="p-2">
@@ -983,30 +969,3 @@ function IconAction({
   );
 }
 
-function IconTooltipButton({
-  icon,
-  label,
-  collapsed,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  collapsed: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="group relative flex h-8 w-8 items-center justify-center rounded-lg text-chrome-text-muted transition-all duration-200 hover:bg-chrome-hover hover:text-chrome-text"
-      onClick={onClick}
-      title={label}
-    >
-      {icon}
-      {collapsed && (
-        <span className="pointer-events-none absolute left-10 top-1/2 hidden -translate-y-1/2 rounded-md bg-chrome-surface px-2 py-1 text-xs text-chrome-text shadow-pop group-hover:block">
-          {label}
-        </span>
-      )}
-    </button>
-  );
-}
