@@ -5,10 +5,16 @@ import {
   evaluateBudgetAlert,
   rangeWindowMs,
   sumAttributedCost,
+  weekSpendUsdFromTools,
   weekWindowMs,
 } from "./attribution.js";
 import { readUsageBudgetPrefs } from "./budget-store.js";
-import { getUsageCredential, isUsageEncryptionAvailable, isUsageToolConfigured, listUsageCredentialStatus } from "./credential-store.js";
+import {
+  getUsageCredential,
+  isUsageEncryptionAvailable,
+  isUsageToolConfigured,
+  listUsageCredentialStatus,
+} from "./credential-store.js";
 import { scanFlowGenerateCostsForAttribution } from "./flow-generate-scan.js";
 import { scanRecentFlowRunsForAttribution } from "./flow-run-scan.js";
 import { fetchClaudeUsage } from "./providers/claude.js";
@@ -32,7 +38,9 @@ import type {
 } from "./types.js";
 
 /** Providers that read the tool's own session data on disk — no credentials involved. */
-const LOCAL_USAGE_READERS: Partial<Record<UsageToolId, (days: number) => Promise<LocalUsageResult>>> = {
+const LOCAL_USAGE_READERS: Partial<
+  Record<UsageToolId, (days: number) => Promise<LocalUsageResult>>
+> = {
   opencode: fetchOpencodeUsage,
   crush: fetchCrushUsage,
   goose: fetchGooseUsage,
@@ -53,20 +61,10 @@ function buildCostInsights(tools: UsageToolSnapshot[], days: number): UsageCostI
   const weekInsights = buildAttributionInsights(weekAttr, tools);
 
   // Week spend prefers provider rollups for the 7-day window when daily data exists.
-  const weekFromDaily = tools
-    .filter((t) => t.status === "ok")
-    .reduce((sum, t) => {
-      const inWeek = t.daily
-        .filter((d) => {
-          const ms = Date.parse(`${d.date}T12:00:00.000Z`);
-          return Number.isFinite(ms) && ms >= week.startMs && ms <= week.endMs;
-        })
-        .reduce((s, d) => s + d.costUsd, 0);
-      return sum + inWeek;
-    }, 0);
   // Never fall back to the whole-period total — that inflates "this week" by up to
   // the full range (e.g. 30 days) and trips false budget alerts.
-  const weekSpendUsd = weekFromDaily > 0 ? weekFromDaily : sumAttributedCost(weekAttr);
+  const weekFromTools = weekSpendUsdFromTools(tools, week);
+  const weekSpendUsd = weekFromTools > 0 ? weekFromTools : sumAttributedCost(weekAttr);
 
   const alert = evaluateBudgetAlert(weekSpendUsd, budget, collectProviderQuotaAlerts(tools));
 
@@ -99,7 +97,8 @@ async function fetchToolSnapshot(
     };
   }
 
-  const localReader = provider.dataSource === "local" ? LOCAL_USAGE_READERS[provider.toolId] : undefined;
+  const localReader =
+    provider.dataSource === "local" ? LOCAL_USAGE_READERS[provider.toolId] : undefined;
   if (localReader) {
     try {
       const data = await localReader(days);
@@ -186,7 +185,9 @@ async function fetchToolSnapshot(
   }
 }
 
-export async function fetchUsageDashboard(opts: UsageFetchOptions = {}): Promise<UsageDashboardResult> {
+export async function fetchUsageDashboard(
+  opts: UsageFetchOptions = {},
+): Promise<UsageDashboardResult> {
   const days = Math.min(Math.max(opts.days ?? 30, 1), 90);
   const statuses = listUsageCredentialStatus();
 

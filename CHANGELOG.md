@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cursor in Cost decisions** — Week spend, tool totals, and the remaining-allowance line include Cursor again. Included usage no longer collapses to $0 when the dashboard zeroes per-request cents, and a balance under $5 is no longer shown as whole dollars.
+
 ## [4.3.7] - 2026-11-05
 
 Neighboring profile and workspace switches slide into place, and the desktop stays responsive through output bursts, sleep, and Claude's first frame.

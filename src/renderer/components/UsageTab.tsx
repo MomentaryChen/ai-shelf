@@ -446,10 +446,12 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
                     style={{ width: `${Math.min(100, q.usedPercent)}%` }}
                   />
                 </div>
-                {q.remainingUsd != null && q.limitUsd != null && (
+                {q.limitUsd != null && (q.remainingUsd != null || q.usedUsd != null) && (
                   <p className="mt-1.5 text-[11px] text-text-secondary">
                     {t("usage.cursor.quota.remaining", {
-                      remaining: formatUsd(q.remainingUsd),
+                      remaining: formatUsd(
+                        q.remainingUsd ?? Math.max(0, q.limitUsd - (q.usedUsd ?? 0)),
+                      ),
                       limit: formatUsd(q.limitUsd),
                     })}
                   </p>

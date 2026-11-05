@@ -65,21 +65,29 @@ function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-/** Cursor plan counters are usually cents; fall back to raw values when already dollar-sized. */
-function planAmountsToUsd(used?: number, limit?: number, remaining?: number): {
+/**
+ * `usage-summary` plan `used` / `limit` / `remaining` are cents
+ * (1207 = $12.07). Dividing only values ≥ 500 mixed units on the same row
+ * ("$450 remaining of $20") whenever a small balance sat under that cutoff.
+ */
+function centsToUsd(value: number | undefined): number | undefined {
+  if (value == null || !Number.isFinite(value)) return undefined;
+  return value / 100;
+}
+
+function planAmountsToUsd(
+  used?: number,
+  limit?: number,
+  remaining?: number,
+): {
   usedUsd?: number;
   limitUsd?: number;
   remainingUsd?: number;
 } {
-  const toUsd = (value: number | undefined): number | undefined => {
-    if (value == null) return undefined;
-    if (value > 0 && value < 500) return value;
-    return value / 100;
-  };
   return {
-    usedUsd: toUsd(used),
-    limitUsd: toUsd(limit),
-    remainingUsd: toUsd(remaining),
+    usedUsd: centsToUsd(used),
+    limitUsd: centsToUsd(limit),
+    remainingUsd: centsToUsd(remaining),
   };
 }
 
@@ -129,7 +137,6 @@ export function quotasFromUsageSummary(summary: CursorUsageSummaryResponse): Usa
       "usage.cursor.quota.api",
       asNumber(plan.apiPercentUsed),
       resetAt,
-      amounts,
     );
     pushPercentQuota(
       quotas,
@@ -201,6 +208,132 @@ export function quotasFromUsageSummary(summary: CursorUsageSummaryResponse): Usa
   }
 
   return quotas.sort((a, b) => b.usedPercent - a.usedPercent);
+}
+
+export interface CursorCurrentPeriodUsage {
+  billingCycleStart?: string | number;
+  billingCycleEnd?: string | number;
+  planUsage?: {
+    totalSpend?: number;
+    includedSpend?: number;
+    bonusSpend?: number;
+    limit?: number;
+    autoPercentUsed?: number;
+    apiPercentUsed?: number;
+    totalPercentUsed?: number;
+  };
+  spendLimitUsage?: {
+    individualLimit?: number | null;
+    individualRemaining?: number | null;
+    individualUsed?: number | null;
+    pooledLimit?: number | null;
+    pooledUsed?: number | null;
+    pooledRemaining?: number | null;
+  };
+}
+
+/** Billing-cycle timestamps arrive as ISO strings or epoch milliseconds (sometimes seconds). */
+export function cursorCycleTimestampToIso(value: string | number | undefined): string | undefined {
+  if (value == null || value === "") return undefined;
+  if (typeof value === "string" && value.includes("T")) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : undefined;
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  const ms = n < 1e12 ? n * 1000 : n;
+  return new Date(ms).toISOString();
+}
+
+/**
+ * Dollars and percents from `POST /api/dashboard/get-current-period-usage`.
+ * Spend fields are cents. Percent fields are already 0–100 and are not the same ratio as spend/limit,
+ * so dollar amounts stay on the spend row instead of being copied onto every percent bar.
+ */
+export function quotasFromCurrentPeriodUsage(
+  data: CursorCurrentPeriodUsage | null | undefined,
+): UsageQuotaWindow[] {
+  if (!data) return [];
+  const quotas: UsageQuotaWindow[] = [];
+  const resetAt = cursorCycleTimestampToIso(data.billingCycleEnd);
+  const plan = data.planUsage;
+
+  if (plan) {
+    const usedCents = asNumber(plan.totalSpend);
+    const limitCents = asNumber(plan.limit);
+    const usedUsd = centsToUsd(usedCents);
+    const limitUsd = centsToUsd(limitCents);
+    // A missing cap is not "100% used". Percent bars below cover that case.
+    if (limitUsd != null && limitUsd > 0) {
+      const used = usedUsd ?? 0;
+      quotas.push({
+        key: "cursor-plan-spend",
+        labelKey: "usage.cursor.quota.included",
+        usedPercent: clampPercent((used / limitUsd) * 100),
+        resetAt,
+        usedUsd: used,
+        limitUsd,
+        remainingUsd: Math.max(0, limitUsd - used),
+      });
+    }
+
+    pushPercentQuota(
+      quotas,
+      "cursor-period-total",
+      "usage.cursor.quota.total",
+      asNumber(plan.totalPercentUsed),
+      resetAt,
+    );
+    pushPercentQuota(
+      quotas,
+      "cursor-period-api",
+      "usage.cursor.quota.api",
+      asNumber(plan.apiPercentUsed),
+      resetAt,
+    );
+    pushPercentQuota(
+      quotas,
+      "cursor-period-auto",
+      "usage.cursor.quota.auto",
+      asNumber(plan.autoPercentUsed),
+      resetAt,
+    );
+  }
+
+  const spend = data.spendLimitUsage;
+  if (spend) {
+    const limitCents = asNumber(spend.individualLimit ?? undefined);
+    const remainingCents = asNumber(spend.individualRemaining ?? undefined);
+    const usedCents =
+      asNumber(spend.individualUsed ?? undefined) ??
+      (limitCents != null && remainingCents != null
+        ? Math.max(0, limitCents - remainingCents)
+        : undefined);
+    const pooledUsed = asNumber(spend.pooledUsed ?? undefined);
+    const used = usedCents ?? pooledUsed;
+    const limit = limitCents ?? asNumber(spend.pooledLimit ?? undefined);
+    const remaining = remainingCents ?? asNumber(spend.pooledRemaining ?? undefined);
+    if ((used != null && used > 0) || (limit != null && limit > 0)) {
+      const usedUsd = centsToUsd(used) ?? 0;
+      const limitUsd = centsToUsd(limit);
+      const remainingUsd = centsToUsd(remaining);
+      const usedPercent =
+        limitUsd != null && limitUsd > 0 ? (usedUsd / limitUsd) * 100 : usedUsd > 0 ? 100 : 0;
+      quotas.push({
+        key: "cursor-on-demand",
+        labelKey: "usage.cursor.quota.onDemand",
+        usedPercent: clampPercent(usedPercent),
+        resetAt,
+        usedUsd,
+        limitUsd,
+        remainingUsd,
+      });
+    }
+  }
+
+  return quotas
+    .filter((q) => q.usedPercent > 0 || (q.usedUsd ?? 0) > 0 || (q.limitUsd ?? 0) > 0)
+    .sort((a, b) => b.usedPercent - a.usedPercent);
 }
 
 function cycleEndFromStart(startMs: number): string {
@@ -275,7 +408,10 @@ export function quotasFromTeamSpend(data: CursorTeamSpendResponse): UsageQuotaWi
   }
 
   if (quotas.length === 0) {
-    const totalSpendCents = members.reduce((sum, m) => sum + (asNumber(m.overallSpendCents) ?? 0), 0);
+    const totalSpendCents = members.reduce(
+      (sum, m) => sum + (asNumber(m.overallSpendCents) ?? 0),
+      0,
+    );
     const totalOnDemandCents = members.reduce((sum, m) => sum + (asNumber(m.spendCents) ?? 0), 0);
     if (totalSpendCents > 0) {
       quotas.push({
