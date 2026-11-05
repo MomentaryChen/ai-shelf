@@ -24,6 +24,7 @@ import {
   mcpSyncPayloadFromGaps,
 } from "../utils/onboarding-analysis";
 import { notifyProfilesChanged } from "../utils/profile-events";
+import { LoadingRow } from "./WarmTypingDots";
 
 type Step = 1 | 2 | 3;
 
@@ -166,7 +167,7 @@ export function OnboardingModal({
               return (
                 <div key={key} className="flex items-center gap-2">
                   <span
-                    className={`flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[12px] font-medium transition-colors ${
+                    className={`flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[12px] font-medium transition-[color,background-color,transform] duration-300 ${
                       active
                         ? "bg-[var(--clay)] text-white"
                         : done
@@ -188,9 +189,9 @@ export function OnboardingModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div key={step} className="min-h-0 flex-1 overflow-y-auto px-6 py-5 warm-rise">
           {step === 1 && (
-            <div className="flex flex-col gap-4 warm-rise">
+            <div className="flex flex-col gap-4">
               <p className="text-center text-[15px] leading-normal text-[var(--ink)]">
                 {installed.length > 0
                   ? t("onboarding.welcome.subtitle", { count: installed.length })
@@ -255,9 +256,9 @@ export function OnboardingModal({
               )}
 
               {mcpLoading ? (
-                <p className="text-center text-[13px] text-[var(--muted)]">
-                  {t("onboarding.connect.mcpLoading")}
-                </p>
+                <div className="flex justify-center py-2">
+                  <LoadingRow label={t("onboarding.connect.mcpLoading")} />
+                </div>
               ) : mcpGaps.length > 0 ? (
                 <section className="rounded-[22px] bg-[var(--surface)] p-4 warm-shadow-card">
                   <h3 className="mb-2 text-[13px] font-medium text-[var(--ink)]">
@@ -302,7 +303,7 @@ export function OnboardingModal({
           )}
 
           {step === 3 && (
-            <div className="flex flex-col gap-4 warm-rise">
+            <div className="flex flex-col gap-4">
               <p className="text-[15px] leading-normal text-[var(--ink)]">
                 {t("onboarding.start.subtitle")}
               </p>

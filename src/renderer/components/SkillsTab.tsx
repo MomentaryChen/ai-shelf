@@ -13,6 +13,7 @@ import { InventorySectionHeader } from "./InventorySection";
 import { toolIcon, toolLabel } from "../utils";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
+import { StaggerStack } from "./StaggerStack";
 
 function SkillsCards({ entries }: { entries: ProviderEntry[] }) {
   const { t } = useLocale();
@@ -59,14 +60,14 @@ export function SkillsTab({
       <SkillsSyncPanel />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <SkillsCards entries={installed} />
-      </div>
+      </StaggerStack>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <SkillsCards entries={notInstalled} />
-      </div>
+      </StaggerStack>
 
       {/* Skill matrix */}
       {allSkills.length > 0 && (

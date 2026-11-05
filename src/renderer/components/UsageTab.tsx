@@ -17,6 +17,7 @@ import { StatCard } from "./StatCard";
 import { DataTable, Td } from "./DataTable";
 import { EmptyState } from "./EmptyState";
 import { Spinner } from "./Spinner";
+import { StaggerStack } from "./StaggerStack";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 import { toolIcon, toolLabel } from "../utils";
@@ -445,10 +446,12 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
                     style={{ width: `${Math.min(100, q.usedPercent)}%` }}
                   />
                 </div>
-                {q.remainingUsd != null && q.limitUsd != null && (
+                {q.limitUsd != null && (q.remainingUsd != null || q.usedUsd != null) && (
                   <p className="mt-1.5 text-[11px] text-text-secondary">
                     {t("usage.cursor.quota.remaining", {
-                      remaining: formatUsd(q.remainingUsd),
+                      remaining: formatUsd(
+                        q.remainingUsd ?? Math.max(0, q.limitUsd - (q.usedUsd ?? 0)),
+                      ),
                       limit: formatUsd(q.limitUsd),
                     })}
                   </p>
@@ -1057,8 +1060,9 @@ export function UsageTab() {
         </div>
       </div>
 
+      <StaggerStack className="gap-5">
       {!encryptionAvailable && (
-        <div className="mb-4 rounded-[22px] border border-accent/30 bg-secondary px-4 py-3 text-[13px] text-text-primary">
+        <div className="rounded-[22px] border border-accent/30 bg-secondary px-4 py-3 text-[13px] text-text-primary">
           {t("usage.encryptionUnavailable")}
         </div>
       )}
@@ -1076,7 +1080,7 @@ export function UsageTab() {
             />
           )}
 
-          <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+          <div className="ui-stagger-children grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
             <StatCard
               value={formatUsd(dashboard.summary.totalCostUsd)}
               label={t("usage.summary.totalCost")}
@@ -1168,6 +1172,7 @@ export function UsageTab() {
       )}
 
       {error && <EmptyState title={t("usage.fetchFailed")} description={error} />}
+      </StaggerStack>
 
       {dashboard && (
         <p className="mt-4 text-[11px] text-text-secondary">

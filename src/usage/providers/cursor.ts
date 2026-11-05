@@ -1,9 +1,5 @@
 import { fetchCursorDashboardUsage } from "./cursor-dashboard.js";
-import {
-  aggregateCursorEvents,
-  chunkDateRanges,
-  type CursorUsageEvent,
-} from "./cursor-shared.js";
+import { aggregateCursorEvents, chunkDateRanges, type CursorUsageEvent } from "./cursor-shared.js";
 import { quotasFromTeamSpend, type CursorTeamSpendResponse } from "./cursor-spending.js";
 import type { UsageQuotaWindow } from "../types.js";
 
@@ -78,7 +74,13 @@ export async function fetchCursorAdminUsage(
 ): Promise<
   Pick<
     import("../types.js").UsageToolSnapshot,
-    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens" | "quotas"
+    | "daily"
+    | "byModel"
+    | "totalCostUsd"
+    | "totalInputTokens"
+    | "totalOutputTokens"
+    | "quotas"
+    | "weekCostUsd"
   >
 > {
   const ranges = chunkDateRanges(days);
@@ -103,7 +105,9 @@ export async function fetchCursorAdminUsage(
   return { ...usage, quotas: quotas.length > 0 ? quotas : undefined };
 }
 
-export type CursorUsageAuthSource = "usage.cursor.auth.team.title" | "usage.cursor.auth.personal.title";
+export type CursorUsageAuthSource =
+  | "usage.cursor.auth.team.title"
+  | "usage.cursor.auth.personal.title";
 
 export async function fetchCursorUsage(
   creds: { adminApiKey?: string | null; sessionToken?: string | null },
@@ -111,7 +115,13 @@ export async function fetchCursorUsage(
 ): Promise<
   Pick<
     import("../types.js").UsageToolSnapshot,
-    "daily" | "byModel" | "totalCostUsd" | "totalInputTokens" | "totalOutputTokens" | "quotas"
+    | "daily"
+    | "byModel"
+    | "totalCostUsd"
+    | "totalInputTokens"
+    | "totalOutputTokens"
+    | "quotas"
+    | "weekCostUsd"
   > & { authSourceKey: CursorUsageAuthSource }
 > {
   const adminKey = creds.adminApiKey?.trim();

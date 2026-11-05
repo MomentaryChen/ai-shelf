@@ -18,6 +18,7 @@ import {
 } from "../utils/time-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 type UnitMode = "auto" | TimeUnit;
 
@@ -169,7 +170,8 @@ export function TimeToolsTab() {
   return (
     <>
       <SectionHeading icon={Clock3}>{t("tools.tab.time")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("time.subtitle")}
       </p>
 
@@ -318,6 +320,7 @@ export function TimeToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

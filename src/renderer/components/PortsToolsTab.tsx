@@ -22,6 +22,7 @@ import {
 import { Card } from "./Card";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 const PORTS_POLL_MS = 5_000;
 
@@ -191,7 +192,8 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
   return (
     <>
       <SectionHeading icon={Network}>{t("tools.tab.ports")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("ports.subtitle")}
       </p>
 
@@ -368,6 +370,7 @@ export function PortsToolsTab({ active = true }: { active?: boolean }) {
           if (row) void stopProcess(row);
         }}
       />
+      </StaggerStack>
     </>
   );
 }

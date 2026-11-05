@@ -632,6 +632,8 @@ export interface UsageToolSnapshot {
   totalCostUsd?: number;
   totalInputTokens?: number;
   totalOutputTokens?: number;
+  /** Provider-measured spend for the last 7 UTC days, when daily rows have no dollars. */
+  weekCostUsd?: number;
   daily: UsageDayBucket[];
   byModel?: UsageModelBreakdown[];
   quotas?: UsageQuotaWindow[];

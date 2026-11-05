@@ -22,6 +22,7 @@ import {
 } from "../utils/jwt-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 type ToolId = "decode" | "verify" | "encode";
 
@@ -245,7 +246,8 @@ export function JwtToolsTab() {
   return (
     <>
       <SectionHeading icon={BadgeCheck}>{t("tools.tab.jwt")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("jwt.subtitle")}
       </p>
 
@@ -554,6 +556,7 @@ export function JwtToolsTab() {
           </div>
         </Card>
       ) : null}
+      </StaggerStack>
     </>
   );
 }

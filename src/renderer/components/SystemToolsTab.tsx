@@ -12,22 +12,10 @@ import {
 import { Card } from "./Card";
 import { FlowMarkdownContent } from "./FlowMarkdownContent";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
+import { WarmTypingDots } from "./WarmTypingDots";
 
 const HOST_STATS_POLL_MS = 5_000;
-
-function TypingDots() {
-  return (
-    <span className="inline-flex items-center gap-1 px-1" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="inline-block h-1.5 w-1.5 rounded-full bg-text-tertiary motion-safe:animate-[warm-dot-blink_1.2s_ease-in-out_infinite]"
-          style={{ animationDelay: `${String(i * 0.2)}s` }}
-        />
-      ))}
-    </span>
-  );
-}
 
 function formatPercent(value: number | null, fallback: string): string {
   if (value == null || !Number.isFinite(value)) return fallback;
@@ -62,14 +50,14 @@ function ResourceMeters({ stats }: { stats: HostResourceSnapshot | null }) {
       <div className="rounded-[22px] bg-sand px-3.5 py-3">
         <div className="text-[12px] font-medium text-text-secondary">{t("system.meter.cpu")}</div>
         <div className="mt-1 text-[18px] font-medium tabular-nums text-ink">
-          {stats ? formatPercent(cpu, dash) : <TypingDots />}
+          {stats ? formatPercent(cpu, dash) : <WarmTypingDots className="px-1" />}
         </div>
         <MeterBar percent={cpu} />
       </div>
       <div className="rounded-[22px] bg-sand px-3.5 py-3">
         <div className="text-[12px] font-medium text-text-secondary">{t("system.meter.memory")}</div>
         <div className="mt-1 text-[18px] font-medium tabular-nums text-ink">
-          {stats ? formatMemoryPair(stats.memory.usedBytes, stats.memory.totalBytes) : <TypingDots />}
+          {stats ? formatMemoryPair(stats.memory.usedBytes, stats.memory.totalBytes) : <WarmTypingDots className="px-1" />}
         </div>
         <MeterBar percent={memPct} />
       </div>
@@ -86,14 +74,14 @@ function ResourceMeters({ stats }: { stats: HostResourceSnapshot | null }) {
               </span>
             </>
           ) : (
-            <TypingDots />
+            <WarmTypingDots className="px-1" />
           )}
         </div>
       </div>
       <div className="rounded-[22px] bg-sand px-3.5 py-3" title={stats?.gpu?.name ?? undefined}>
         <div className="text-[12px] font-medium text-text-secondary">{t("system.meter.gpu")}</div>
         <div className="mt-1 text-[18px] font-medium tabular-nums text-ink">
-          {stats ? formatPercent(gpuPct, dash) : <TypingDots />}
+          {stats ? formatPercent(gpuPct, dash) : <WarmTypingDots className="px-1" />}
         </div>
         {gpuMem ? (
           <div className="mt-0.5 truncate text-[11px] tabular-nums text-text-secondary">{gpuMem}</div>
@@ -196,7 +184,8 @@ export function SystemToolsTab({ active = true }: { active?: boolean }) {
   return (
     <>
       <SectionHeading icon={Cpu}>{t("tools.tab.system")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("system.subtitle")}
       </p>
       {stats ? (
@@ -220,7 +209,7 @@ export function SystemToolsTab({ active = true }: { active?: boolean }) {
               <Sparkles className="h-3.5 w-3.5" />
               {analyzing ? t("system.analyze.working") : t("system.analyze")}
             </Button>
-            {analyzing && <TypingDots />}
+            {analyzing && <WarmTypingDots className="px-1" />}
           </div>
           <p className="max-w-2xl text-[12px] leading-relaxed text-text-secondary">
             {t("system.analyze.hint")}
@@ -255,7 +244,7 @@ export function SystemToolsTab({ active = true }: { active?: boolean }) {
             </div>
             {analyzing && !report ? (
               <p className="flex items-center gap-2 text-[13px] text-text-secondary">
-                <TypingDots />
+                <WarmTypingDots className="px-1" />
                 {t("system.analyze.workingHint")}
               </p>
             ) : report ? (
@@ -264,6 +253,7 @@ export function SystemToolsTab({ active = true }: { active?: boolean }) {
           </div>
         </Card>
       )}
+      </StaggerStack>
     </>
   );
 }

@@ -9,6 +9,27 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [4.3.8] - 2026-11-05
+
+AI Flow chat is easier to author, tool previews can be enlarged, and Cursor cost decisions show real spend.
+
+### Added
+
+- **Profile sidebar collapse** — Collapsing the profile sidebar slides the column and its gutter down to the icon rail. The list keeps its open width while the column clips, so labels do not wrap mid-transition.
+- **Live preview zoom** — Markdown and Mermaid previews share a pane with vertical resize, zoom controls, Ctrl+wheel scaling, and a full-screen dialog.
+- **Motion across the app** — Loading states use a shared typing-dot indicator. Dialogs rise in and out, toasts slide, the mode switch and inventory nav show a sliding active highlight, and list pages stagger in.
+
+### Changed
+
+- **AI Flow chat** — The conversation sits beside a scrollable flow preview. Example prompts, clear, and copy are available, and the composer stays pinned while a draft is generating.
+
+### Fixed
+
+- **Profiles workspace on the terminal sidebar** — The default Profiles workspace is left out of the terminal sidebar when it only duplicates profiles that already live in other workspaces. Opening the terminal no longer lands on that full list. Profiles you created in that workspace, and a Profiles workspace that is still the only one, stay where they are.
+- **Cursor in Cost decisions** — Week spend, tool totals, and the remaining-allowance line include Cursor again. Included usage no longer collapses to $0 when the dashboard zeroes per-request cents, and a balance under $5 is no longer shown as whole dollars.
+
+[4.3.8]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v4.3.8
+
 ## [4.3.7] - 2026-11-05
 
 Neighboring profile and workspace switches slide into place, and the desktop stays responsive through output bursts, sleep, and Claude's first frame.
