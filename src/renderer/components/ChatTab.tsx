@@ -1,5 +1,5 @@
-import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { Monitor, Terminal, FolderOpen, Hand, SquareTerminal } from "lucide-react";
+import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo, type CSSProperties } from "react";
+import { ChevronLeft, Monitor, Terminal, FolderOpen, Hand, SquareTerminal } from "lucide-react";
 import { WarmTypingDots } from "./WarmTypingDots";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,6 +106,12 @@ import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { Command } from "./CommandPalette";
 import { useTerminalCommands } from "../hooks/useTerminalCommands";
+import {
+  SIDEBAR_EASE,
+  SIDEBAR_GUTTER_WIDTH,
+  SIDEBAR_MOTION_MS,
+  SIDEBAR_RAIL_WIDTH,
+} from "../sidebar-collapse";
 
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
 const SIDEBAR_COLLAPSED_KEY = "ai-inventory-sidebar-collapsed";
@@ -172,6 +178,10 @@ function ChatTabInner({
   const [addingTerminal, setAddingTerminal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
+  const [sidebarContentCollapsed, setSidebarContentCollapsed] = useState(loadSidebarCollapsed);
+  const sidebarCollapsedRef = useRef(sidebarCollapsed);
+  sidebarCollapsedRef.current = sidebarCollapsed;
+  const [sidebarMotionEpoch, setSidebarMotionEpoch] = useState(0);
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
@@ -463,6 +473,33 @@ function ChatTabInner({
     }
   }, [sidebarCollapsed]);
 
+  const sidebarAnimating = sidebarMotionEpoch > 0;
+
+  const commitSidebarCollapsed = useCallback((next: boolean) => {
+    if (sidebarCollapsedRef.current === next) return;
+    sidebarCollapsedRef.current = next;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setSidebarMotionEpoch(0);
+      setSidebarContentCollapsed(next);
+    } else {
+      setSidebarMotionEpoch((n) => n + 1);
+      // Open the full list immediately so the growing column reveals it.
+      // Closing keeps the wide list until the column has finished clipping shut.
+      if (!next) setSidebarContentCollapsed(false);
+    }
+    setSidebarCollapsed(next);
+  }, []);
+
+  useEffect(() => {
+    if (sidebarMotionEpoch === 0) return;
+    const id = window.setTimeout(() => {
+      setSidebarMotionEpoch(0);
+      setSidebarContentCollapsed(sidebarCollapsedRef.current);
+    }, SIDEBAR_MOTION_MS);
+    return () => window.clearTimeout(id);
+  }, [sidebarMotionEpoch]);
+
   const refreshSidebarForest = useCallback(async (preferredGroupId?: string | null) => {
     const r = await window.api.profileGroupGetForest();
     if (!r.success || !r.forest) return;
@@ -553,12 +590,12 @@ function ChatTabInner({
 
       ev.preventDefault();
       ev.stopImmediatePropagation();
-      setSidebarCollapsed((prev) => !prev);
+      commitSidebarCollapsed(!sidebarCollapsedRef.current);
     };
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, []);
+  }, [commitSidebarCollapsed]);
 
   useEffect(() => {
     if (!migrationDone || initialRestoreDoneRef.current || restoreInFlightRef.current) return;
@@ -1273,16 +1310,29 @@ function ChatTabInner({
     onSplitPane: (id, dir) => void splitPane(id, dir),
   });
 
+  const sidebarColumnStyle: CSSProperties = {
+    width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidth,
+    transition: sidebarAnimating ? `width ${SIDEBAR_MOTION_MS}ms ${SIDEBAR_EASE}` : undefined,
+  };
+  const sidebarGutterStyle: CSSProperties = {
+    width: sidebarCollapsed ? 0 : SIDEBAR_GUTTER_WIDTH,
+    transition: sidebarAnimating ? `width ${SIDEBAR_MOTION_MS}ms ${SIDEBAR_EASE}` : undefined,
+  };
+
   const sidebar = (
-    <div style={{ width: sidebarCollapsed ? 64 : sidebarWidth }}>
+    <div
+      data-sidebar-column
+      className={`relative h-full min-w-0 shrink-0 ${sidebarAnimating ? "overflow-hidden" : "overflow-visible"}`}
+      style={sidebarColumnStyle}
+    >
+      <div className="h-full" style={{ width: sidebarAnimating ? sidebarWidth : "100%" }}>
       <Sidebar
         groups={sidebarGroups}
         currentGroupId={currentGroupId}
         profiles={sidebarProfiles}
         activeProfileId={activeProfile?.id ?? null}
         activeTerminalId={focusedPaneId}
-        collapsed={sidebarCollapsed}
-        onCollapsedChange={setSidebarCollapsed}
+        collapsed={sidebarContentCollapsed}
         onGroupChange={(groupId) => {
           setSelectedGroupId(groupId);
           const group = sidebarForest?.groups.find((g) => g.id === groupId);
@@ -1439,6 +1489,22 @@ function ChatTabInner({
           void handleActivateProfile(profile);
         }}
       />
+      </div>
+      <button
+        type="button"
+        title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        aria-expanded={!sidebarCollapsed}
+        onClick={() => commitSidebarCollapsed(!sidebarCollapsed)}
+        className="absolute right-2 top-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg text-chrome-text-muted transition-colors duration-200 hover:bg-chrome-hover hover:text-chrome-text"
+      >
+        <ChevronLeft
+          className="h-4 w-4"
+          style={{
+            transform: sidebarCollapsed ? "rotate(180deg)" : undefined,
+            transition: `transform ${SIDEBAR_MOTION_MS}ms ${SIDEBAR_EASE}`,
+          }}
+        />
+      </button>
     </div>
   );
 
@@ -1864,17 +1930,23 @@ function ChatTabInner({
           onOpen={openBackgroundToast}
           onDismiss={dismissBackgroundToast}
         />
-        {!sidebarCollapsed && (
-          <div className="w-2.5 shrink-0 self-stretch" style={{ width: 10 }}>
-            <ResizeDivider
-              mode="delta"
-              orientation="horizontal"
-              onResize={(delta) =>
-                setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
-              }
-            />
-          </div>
-        )}
+        <div
+          className={`shrink-0 self-stretch overflow-hidden ${
+            sidebarCollapsed || sidebarAnimating ? "pointer-events-none" : ""
+          }`}
+          style={sidebarGutterStyle}
+          inert={sidebarCollapsed || sidebarAnimating}
+        >
+          <ResizeDivider
+            mode="delta"
+            orientation="horizontal"
+            onResize={(delta) => {
+              setSidebarMotionEpoch(0);
+              setSidebarContentCollapsed(sidebarCollapsedRef.current);
+              setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)));
+            }}
+          />
+        </div>
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
           {topBar}
           {terminalError && (
