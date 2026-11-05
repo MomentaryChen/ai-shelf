@@ -33,6 +33,7 @@ import {
   collectBackgroundProfilePanes,
   LayoutChangeNotifyingMap,
 } from "../terminal/background-profile-panes";
+import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
 
 interface ProfileLiveState {
   layout: LayoutNode;
@@ -467,11 +468,12 @@ export function useProfileWorkspace(
   const restoreLastProfile = useCallback(
     async (forest: ProfileForest) => {
       if (!migrationDone) return;
+      const visible = forestWithoutDefaultProfilesMirror(forest);
       const group =
-        forest.groups.find((g) => g.id === forest.lastActiveGroupId) ?? forest.groups[0];
+        visible.groups.find((g) => g.id === visible.lastActiveGroupId) ?? visible.groups[0];
       if (!group || group.profiles.length === 0) return;
       const profile =
-        group.profiles.find((p) => p.id === forest.lastActiveProfileId) ?? group.profiles[0]!;
+        group.profiles.find((p) => p.id === visible.lastActiveProfileId) ?? group.profiles[0]!;
       const r = await activateProfile(profile);
       return { profile, ...r };
     },
