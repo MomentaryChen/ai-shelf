@@ -20,8 +20,14 @@ export type TerminalWebglHandle = {
  * Attach the WebGL renderer when available. The addon is loaded on demand so
  * it stays out of the main xterm chunk. On context loss or activation failure,
  * dispose the addon so xterm falls back to the default canvas path.
+ *
+ * `onRendererChange` runs when the active renderer swaps. Cell size differs
+ * between WebGL and canvas, so the pane has to fit again or rows smear.
  */
-export function attachTerminalWebgl(term: Terminal): TerminalWebglHandle {
+export function attachTerminalWebgl(
+  term: Terminal,
+  onRendererChange?: () => void,
+): TerminalWebglHandle {
   let addon: WebglAddon | null = null;
   let cancelled = false;
   let generation = 0;
@@ -53,6 +59,7 @@ export function attachTerminalWebgl(term: Terminal): TerminalWebglHandle {
               /* already torn down */
             }
             if (addon === instance) addon = null;
+            onRendererChange?.();
           });
           if (cancelled || gen !== generation) {
             instance.dispose();
@@ -64,6 +71,7 @@ export function attachTerminalWebgl(term: Terminal): TerminalWebglHandle {
             return;
           }
           addon = instance;
+          onRendererChange?.();
         } catch (err) {
           console.warn("[xterm-webgl] falling back to canvas renderer", err);
           try {
@@ -72,10 +80,12 @@ export function attachTerminalWebgl(term: Terminal): TerminalWebglHandle {
             /* ignore */
           }
           if (addon === instance) addon = null;
+          onRendererChange?.();
         }
       })
       .catch((err) => {
         console.warn("[xterm-webgl] falling back to canvas renderer", err);
+        onRendererChange?.();
       });
   };
 
@@ -86,6 +96,7 @@ export function attachTerminalWebgl(term: Terminal): TerminalWebglHandle {
       if (cancelled) return;
       generation += 1;
       detachCurrent();
+      onRendererChange?.();
       window.clearTimeout(recoverTimer);
       recoverTimer = window.setTimeout(() => {
         if (!cancelled) mount();

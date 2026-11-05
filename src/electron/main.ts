@@ -9,6 +9,7 @@ import { execSync, spawn } from "node:child_process";
 import {
   createPtyDataPendingState,
   dropPtyDataPending,
+  ptyDataEndSeq,
   PTY_DATA_IPC_MAX_CHARS,
   pumpPtyDataPending,
   queuePtyDataPending,
@@ -1628,11 +1629,11 @@ function appendPtyBuffer(sessionId: string, data: string) {
   else mirrorPtyLogAppend(sessionId, data);
 }
 
-function sendPtyData(sessionId: string, data: string) {
+function sendPtyData(sessionId: string, data: string, endSeq: number) {
   if (!data) return;
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
-      win.webContents.send("pty-data", { sessionId, data });
+      win.webContents.send("pty-data", { sessionId, data, endSeq });
     }
   }
 }
@@ -1659,8 +1660,8 @@ function flushPtyDataBroadcast(sessionId: string, after?: () => void) {
     PTY_DATA_STATE,
     sessionId,
     PTY_DATA_IPC_MAX_CHARS,
-    (data) => {
-      sendPtyData(sessionId, data);
+    (data, endSeq) => {
+      sendPtyData(sessionId, data, endSeq);
     },
     (run) => setTimeout(run, 0),
     () => {
@@ -1926,6 +1927,8 @@ ipcMain.handle(
     const includeBuffer = opts?.includeBuffer !== false;
     // Full-buffer attach already contains any coalesced pending tail — drop it
     // so the coalesce timer cannot re-deliver the same chunk to onPtyData.
+    // endSeq still covers that tail so the renderer can skip an in-flight copy.
+    const endSeq = ptyDataEndSeq(PTY_DATA_STATE, sessionId);
     if (shouldDropPendingOnBufferAttach(includeBuffer)) {
       dropPtyDataPending(PTY_DATA_STATE, sessionId);
       // The attach payload already contains this tail. If an exit broadcast
@@ -1935,6 +1938,7 @@ ipcMain.handle(
     return {
       success: true,
       alive,
+      endSeq,
       buffer: includeBuffer ? readPtyOutput(sessionId) : "",
       pid: meta?.pid ?? null,
       shell: meta?.shell ?? null,

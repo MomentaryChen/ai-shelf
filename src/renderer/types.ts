@@ -850,6 +850,8 @@ export interface ElectronAPI {
   ) => Promise<{
     success: boolean;
     alive: boolean;
+    /** Units appended for this session. The included `buffer` is the tail of this cursor. */
+    endSeq: number;
     buffer: string;
     pid: number | null;
     shell: string | null;
@@ -883,7 +885,9 @@ export interface ElectronAPI {
   ptyWrite:  (sessionId: string, data: string)             => void;
   ptyResize: (sessionId: string, cols: number, rows: number) => Promise<{ success: boolean; error?: string }>;
   ptyKill:   (sessionId: string)                           => void;
-  onPtyData: (cb: (p: { sessionId: string; data: string })     => void) => (() => void);
+  onPtyData: (
+    cb: (p: { sessionId: string; data: string; endSeq?: number }) => void,
+  ) => () => void;
   onPtyExit: (cb: (p: { sessionId: string; exitCode: number }) => void) => (() => void);
   onPtyMeta: (
     cb: (p: {
