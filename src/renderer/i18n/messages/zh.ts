@@ -1260,6 +1260,22 @@ export const zh: Record<MessageKey, string> = {
   "flow.create.welcome":
     "告訴我想自動化什麼，例如：每天檢查 API 健康狀態並把結果寫成 Markdown 報告。",
   "flow.create.placeholder": "描述排程、資料來源與產出格式…",
+  "flow.create.inputHint": "Enter 傳送 · Shift+Enter 換行",
+  "flow.create.generating": "正在產生流程草稿…",
+  "flow.create.suggestionsTitle": "試試這些範例",
+  "flow.create.suggestion.dailyReport":
+    "每個工作日上午 9 點，抓取狀態 API 並把 Markdown 摘要存到桌面。",
+  "flow.create.suggestion.prReview":
+    "手動執行時，檢視 repo 的 open PR 並把簡短摘要送到 Slack。",
+  "flow.create.suggestion.syncFolder":
+    "每天凌晨 2 點，同步專案資料夾到備份路徑；失敗時通知我。",
+  "flow.create.previewTitle": "流程預覽",
+  "flow.create.previewEmpty": "第一次回覆後，.flow.md 會顯示在這裡。",
+  "flow.create.previewPlaceholder": "在左側描述工作內容，草稿會出現在這裡。",
+  "flow.create.previewGenerating": "產生中…",
+  "flow.create.previewValid": "{id} · {phases} 個階段 · 可儲存",
+  "flow.create.copy": "複製",
+  "flow.create.copied": "已複製",
   "flow.create.send": "傳送",
   "flow.create.cancel": "返回流程列表",
   "flow.create.new": "新建流程",
@@ -1277,6 +1293,7 @@ export const zh: Record<MessageKey, string> = {
   "flow.create.editTitle": "用對話編輯 {id}",
   "flow.chat.open": "AI 對話",
   "flow.chat.loading": "載入對話紀錄中…",
+  "flow.chat.clear": "清除對話",
   "flow.chat.promptLogCount": "已儲存 {count} 筆 AI prompt 紀錄",
   "flow.history.title": "執行歷史",
   "flow.history.loading": "載入執行紀錄中…",
