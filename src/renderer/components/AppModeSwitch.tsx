@@ -55,16 +55,26 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
   useLayoutEffect(() => {
     const root = navRef.current;
     if (!root) return;
-    const active = root.querySelector<HTMLElement>('[data-slot="toggle-group-item"][data-state="on"]');
-    if (!active) {
-      setIndicator((prev) => ({ ...prev, ready: false }));
-      return;
-    }
-    setIndicator({
-      left: active.offsetLeft,
-      width: active.offsetWidth,
-      ready: true,
-    });
+
+    const update = () => {
+      const active = root.querySelector<HTMLElement>(
+        '[data-slot="toggle-group-item"][data-state="on"]',
+      );
+      if (!active) {
+        setIndicator((prev) => ({ ...prev, ready: false }));
+        return;
+      }
+      setIndicator({
+        left: active.offsetLeft,
+        width: active.offsetWidth,
+        ready: true,
+      });
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(root);
+    return () => ro.disconnect();
   }, [mode, disabled]);
 
   return (

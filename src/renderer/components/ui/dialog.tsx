@@ -52,7 +52,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "ui-dialog-rise fixed top-1/2 left-1/2 z-[201] grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-chrome-border bg-chrome-surface p-5 shadow-float",
-          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
           className,
         )}
         {...props}

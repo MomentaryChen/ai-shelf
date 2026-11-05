@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { BackgroundAgentNotice } from "../hooks/usePaneAgentAwareness";
 import { useLocale } from "../i18n/LocaleProvider";
 import { BackgroundAttentionBadge } from "./BackgroundAttentionBadge";
@@ -9,6 +10,7 @@ export interface BackgroundAgentToast extends BackgroundAgentNotice {
 }
 
 const AUTO_DISMISS_MS = 8_000;
+const EXIT_MS = 280;
 
 function ToastItem({
   toast,
@@ -20,15 +22,24 @@ function ToastItem({
   onDismiss: (id: number) => void;
 }) {
   const { t } = useLocale();
+  const [exiting, setExiting] = useState(false);
+
+  const dismiss = useCallback(() => {
+    setExiting(true);
+    window.setTimeout(() => onDismiss(toast.id), EXIT_MS);
+  }, [onDismiss, toast.id]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => onDismiss(toast.id), AUTO_DISMISS_MS);
+    const timer = window.setTimeout(dismiss, AUTO_DISMISS_MS);
     return () => window.clearTimeout(timer);
-  }, [onDismiss, toast.id]);
+  }, [dismiss]);
 
   return (
     <div
-      className="ui-toast-enter pointer-events-auto flex items-start gap-2 rounded-lg border border-chrome-border bg-chrome-surface-raised/95 px-3 py-2.5 text-[11px] text-chrome-text shadow-lg backdrop-blur-sm"
+      className={cn(
+        exiting ? "ui-toast-exit" : "ui-toast-enter",
+        "pointer-events-auto flex items-start gap-2 rounded-lg border border-chrome-border bg-chrome-surface-raised/95 px-3 py-2.5 text-[11px] text-chrome-text shadow-lg backdrop-blur-sm",
+      )}
       role="status"
     >
       <BackgroundAttentionBadge kind={toast.kind} className="mt-1" />
@@ -43,7 +54,7 @@ function ToastItem({
       </button>
       <button
         type="button"
-        onClick={() => onDismiss(toast.id)}
+        onClick={dismiss}
         className="shrink-0 cursor-pointer rounded p-0.5 text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text"
         aria-label={t("pane.agent.bg.toastDismiss")}
       >

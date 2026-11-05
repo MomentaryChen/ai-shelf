@@ -12,6 +12,7 @@ import { canonicalToolId } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { ToolInstallPanel } from "./ToolInstallPanel";
 import { LoadingRow } from "./WarmTypingDots";
+import { StaggerStack } from "./StaggerStack";
 
 /** Live MCP connectivity test — runs a real `initialize` handshake per server. */
 function McpConnectivity({ entry }: { entry: ProviderEntry }) {
@@ -187,14 +188,14 @@ export function DoctorTab({
       <SectionHeading icon={Stethoscope}>{t("app.tab.doctor")}</SectionHeading>
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <DoctorCards entries={installed} results={results} onRefresh={onRefresh} />
-      </div>
+      </StaggerStack>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <DoctorCards entries={notInstalled} results={results} onRefresh={onRefresh} />
-      </div>
+      </StaggerStack>
     </>
   );
 }

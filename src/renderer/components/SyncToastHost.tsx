@@ -1,11 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Check, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useDismissibleSurface } from "../hooks/useDismissibleSurface";
 import { subscribeSyncToast, type SyncToast } from "../sync-status-store.js";
 
 export function SyncToastHost() {
-  const [toast, setToast] = useState<SyncToast | null>(null);
+  const { item: toast, exiting, show, hide } = useDismissibleSurface<SyncToast>();
 
-  useEffect(() => subscribeSyncToast(setToast), []);
+  useEffect(() => {
+    return subscribeSyncToast((next) => {
+      if (next) show(next);
+      else hide();
+    });
+  }, [show, hide]);
 
   if (!toast) return null;
 
@@ -18,11 +25,13 @@ export function SyncToastHost() {
       aria-live="polite"
     >
       <div
-        className={`ui-toast-enter flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[11px] shadow-lg backdrop-blur-sm ${
+        className={cn(
+          exiting ? "ui-toast-exit" : "ui-toast-enter",
+          "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[11px] shadow-lg backdrop-blur-sm",
           isSuccess
             ? "border-chrome-ui-accent/35 bg-chrome-surface-raised/95 text-chrome-text"
-            : "border-fail/40 bg-chrome-surface-raised/95 text-fail"
-        }`}
+            : "border-fail/40 bg-chrome-surface-raised/95 text-fail",
+        )}
       >
         <span
           className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full ${

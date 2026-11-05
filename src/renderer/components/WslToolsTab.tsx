@@ -32,6 +32,7 @@ import {
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
 import { StaggerStack } from "./StaggerStack";
+import { WarmTypingDots } from "./WarmTypingDots";
 
 type PanelId = "paths" | "distros" | "snippets";
 
@@ -404,7 +405,11 @@ export function WslToolsTab({ active = true }: { active?: boolean }) {
                   disabled={distrosLoading}
                   onClick={() => void refreshDistros()}
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${distrosLoading ? "animate-spin" : ""}`} />
+                  {distrosLoading ? (
+                    <WarmTypingDots tone="warm" size="sm" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
                   {distrosLoading ? t("wsl.refreshing") : t("wsl.refresh")}
                 </Button>
                 {selectedDistro && (

@@ -14,6 +14,8 @@ import { toolHasRemoteLatest } from "../../tools.js";
 import { versionsEqual } from "../../utils/version.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { ToolInstallPanel } from "./ToolInstallPanel";
+import { StaggerStack } from "./StaggerStack";
+import { WarmTypingDots } from "./WarmTypingDots";
 
 /** Cursor / Aider / OpenCode etc. — `agent update` reports already current. */
 function updateMessageIndicatesUpToDate(message: string): boolean {
@@ -224,7 +226,11 @@ export function UpdateTab({
 
       <div className="mb-3 flex justify-end">
         <Button variant="outline" onClick={() => void runCheckAll(false)} disabled={checkingAll}>
-          <RefreshCw aria-hidden className={checkingAll ? "animate-spin" : ""} />
+          {checkingAll ? (
+            <WarmTypingDots tone="warm" size="sm" />
+          ) : (
+            <RefreshCw aria-hidden />
+          )}
           {t("inventory.update.recheckAll")}
         </Button>
       </div>
@@ -258,7 +264,7 @@ export function UpdateTab({
       )}
 
       <InventorySectionHeader count={installedSectionCount} variant="installed" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
       {selfEntry && (
         <ToolUpdateCard
           tool={selfEntry}
@@ -278,14 +284,14 @@ export function UpdateTab({
           onUpdate={() => void handleUpdate(t.tool)}
         />
       ))}
-      </div>
+      </StaggerStack>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
       {notInstalled.map((entry) => (
         <NotInstalledUpdateCard key={entry.tool} entry={entry} onRefresh={onRefresh} />
       ))}
-      </div>
+      </StaggerStack>
     </>
   );
 }

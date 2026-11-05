@@ -150,6 +150,21 @@ input:focus-visible,
   animation: ui-toast-enter 320ms var(--ease-in) both;
 }
 
+@keyframes ui-toast-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.ui-toast-exit {
+  animation: ui-toast-exit 280ms var(--ease-in) both;
+}
+
 /* Dialog warm entrance (content rise; overlay uses ui-backdrop-enter) */
 @keyframes ui-dialog-rise-in {
   from {
@@ -162,8 +177,27 @@ input:focus-visible,
   }
 }
 
-[data-slot="dialog-content"].ui-dialog-rise {
+@keyframes ui-dialog-rise-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+}
+
+[data-slot="dialog-content"].ui-dialog-rise[data-state="open"] {
   animation: ui-dialog-rise-in 360ms var(--ease-in) both;
+}
+
+[data-slot="dialog-content"].ui-dialog-rise[data-state="closed"] {
+  animation: ui-dialog-rise-out 240ms var(--ease-in) both;
+}
+
+.flow-live-dot {
+  animation: pane-agent-pulse 1.4s ease-in-out infinite;
 }
 
 /* Flow run history — status rail */
@@ -602,8 +636,11 @@ input:focus-visible,
     animation: none;
   }
 
-  [data-slot="dialog-content"].ui-dialog-rise,
-  .ui-toast-enter {
+  [data-slot="dialog-content"].ui-dialog-rise[data-state="open"],
+  [data-slot="dialog-content"].ui-dialog-rise[data-state="closed"],
+  .ui-toast-enter,
+  .ui-toast-exit,
+  .flow-live-dot {
     animation: none;
   }
 }

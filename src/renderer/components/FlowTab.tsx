@@ -533,7 +533,7 @@ export function FlowTab() {
                 <div className="flex items-center gap-1.5 truncate">
                   {flowLive && (
                     <span
-                      className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent"
+                      className="flow-live-dot h-2 w-2 shrink-0 rounded-full bg-accent"
                       title={t("flow.running")}
                       aria-hidden
                     />

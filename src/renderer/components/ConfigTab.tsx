@@ -11,6 +11,7 @@ import { ConfigFileEditorModal } from "./ConfigFileEditorModal";
 import { ConfigSnapshotPanel } from "./ConfigSnapshotPanel";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
+import { StaggerStack } from "./StaggerStack";
 
 /** Config files are text-editable in-app; other formats fall back to open-only. */
 const EDITABLE_RE = /\.(json|jsonc|toml|ya?ml|md|txt)$/i;
@@ -95,14 +96,14 @@ export function ConfigTab({ data, onRefresh }: { data: ProviderEntry[]; onRefres
       <ConfigSnapshotPanel onRestored={onRefresh} />
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <ConfigCards entries={installed} onEdit={setEditPath} />
-      </div>
+      </StaggerStack>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <ConfigCards entries={notInstalled} onEdit={setEditPath} />
-      </div>
+      </StaggerStack>
 
       {editPath && (
         <ConfigFileEditorModal path={editPath} onClose={() => setEditPath(null)} />

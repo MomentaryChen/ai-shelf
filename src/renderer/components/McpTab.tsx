@@ -12,6 +12,7 @@ import { InventorySectionHeader } from "./InventorySection";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { MCP_SYNC_TOOL_IDS, canonicalToolId } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
+import { StaggerStack } from "./StaggerStack";
 
 const EDITABLE_TOOLS = new Set<string>(MCP_SYNC_TOOL_IDS);
 
@@ -91,14 +92,14 @@ export function McpTab({ data }: { data: ProviderEntry[] }) {
       )}
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <McpCards entries={installed} />
-      </div>
+      </StaggerStack>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <McpCards entries={notInstalled} />
-      </div>
+      </StaggerStack>
 
       <McpSyncPanel />
     </>
