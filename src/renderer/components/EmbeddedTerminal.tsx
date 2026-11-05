@@ -42,6 +42,7 @@ import { getXtermTheme } from "../app-theme";
 import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
 import { attachTerminalWebgl } from "../terminal/xterm-webgl";
+import { OS_RESUME_EVENT } from "../os-resume";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
 import { useLocale } from "../i18n/LocaleProvider";
@@ -125,6 +126,8 @@ function EmbeddedTerminalInner({
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
   const activeRef = useRef(active);
+  const focusedRef = useRef(focused);
+  focusedRef.current = focused;
   const fitRef = useRef<(() => void) | null>(null);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const [hasNewOutput, setHasNewOutput] = useState(false);
@@ -392,7 +395,7 @@ function EmbeddedTerminalInner({
     term.loadAddon(fitAddon);
     term.open(el);
     termRef.current = term;
-    const detachWebgl = webglEnabled ? attachTerminalWebgl(term) : () => {};
+    const webgl = webglEnabled ? attachTerminalWebgl(term) : null;
     const searchAddon = attachTerminalSearch(term);
     searchRef.current = searchAddon;
 
@@ -665,6 +668,21 @@ function EmbeddedTerminalInner({
     };
     el.addEventListener("pointerdown", onPointerDown);
 
+    // Sleep, unlock, and GPU resets leave the canvas blank and the caret dead
+    // until xterm is measured again and WebGL is recreated.
+    const onOsResume = () => {
+      if (cancelled) return;
+      webgl?.recover();
+      scheduleFit();
+      try {
+        term.refresh(0, Math.max(term.rows - 1, 0));
+      } catch {
+        /* disposed mid-wake */
+      }
+      if (focusedRef.current && !findOpenRef.current) term.focus();
+    };
+    window.addEventListener(OS_RESUME_EVENT, onOsResume);
+
     return () => {
       cancelled = true;
       opened = false;
@@ -682,6 +700,7 @@ function EmbeddedTerminalInner({
       el.removeEventListener("wheel", onWheel, { capture: true });
       el.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("resize", onWindowResize);
+      window.removeEventListener(OS_RESUME_EVENT, onOsResume);
       document.fonts.removeEventListener("loadingdone", onFontsLoadingDone);
       unregisterClear();
       unregisterPaste();
@@ -692,7 +711,7 @@ function EmbeddedTerminalInner({
       unbindImeTrace();
       unbindLinks();
       unbindCwd();
-      detachWebgl();
+      webgl?.dispose();
       ro.disconnect();
       searchAddon.dispose();
       disposeTerminal(term);
