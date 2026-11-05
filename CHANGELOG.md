@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Fixed
+
+- **Profiles workspace on the terminal sidebar** — The default Profiles workspace is left out of the terminal sidebar when it only duplicates profiles that already live in other workspaces. Opening the terminal no longer lands on that full list. Profiles you created in that workspace, and a Profiles workspace that is still the only one, stay where they are.
+
 ## [4.3.7] - 2026-11-05
 
 Neighboring profile and workspace switches slide into place, and the desktop stays responsive through output bursts, sleep, and Claude's first frame.
