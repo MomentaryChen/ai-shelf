@@ -31,6 +31,8 @@ import {
 } from "../../shared/wsl-paths.js";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
+import { WarmTypingDots } from "./WarmTypingDots";
 
 type PanelId = "paths" | "distros" | "snippets";
 
@@ -227,7 +229,8 @@ export function WslToolsTab({ active = true }: { active?: boolean }) {
   return (
     <>
       <SectionHeading icon={Terminal}>{t("tools.tab.wsl")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("wsl.subtitle")}
       </p>
 
@@ -402,7 +405,11 @@ export function WslToolsTab({ active = true }: { active?: boolean }) {
                   disabled={distrosLoading}
                   onClick={() => void refreshDistros()}
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${distrosLoading ? "animate-spin" : ""}`} />
+                  {distrosLoading ? (
+                    <WarmTypingDots tone="warm" size="sm" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
                   {distrosLoading ? t("wsl.refreshing") : t("wsl.refresh")}
                 </Button>
                 {selectedDistro && (
@@ -572,6 +579,7 @@ export function WslToolsTab({ active = true }: { active?: boolean }) {
           )}
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

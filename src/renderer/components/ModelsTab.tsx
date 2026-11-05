@@ -10,6 +10,7 @@ import { SectionHeading } from "./SectionHeading";
 import { formatContext, toolInstall } from "../utils";
 import { partitionByInstalled, installedRowClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
+import { StaggerStack } from "./StaggerStack";
 
 function ModelChip({ name, active }: { name: string; active?: boolean }) {
   return (
@@ -117,11 +118,16 @@ export function ModelsTab({ data }: { data: ProviderEntry[] }) {
     <>
       <SectionHeading icon={Brain}>{t("app.tab.models")}</SectionHeading>
 
-      <InventorySectionHeader count={installed.length} variant="installed" />
-      <ModelsTable entries={installed} expanded={expanded} toggleExpand={toggleExpand} />
-
-      <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <ModelsTable entries={notInstalled} expanded={expanded} toggleExpand={toggleExpand} />
+      <StaggerStack className="gap-5">
+        <div className="flex flex-col gap-3">
+          <InventorySectionHeader count={installed.length} variant="installed" />
+          <ModelsTable entries={installed} expanded={expanded} toggleExpand={toggleExpand} />
+        </div>
+        <div className="flex flex-col gap-3">
+          <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
+          <ModelsTable entries={notInstalled} expanded={expanded} toggleExpand={toggleExpand} />
+        </div>
+      </StaggerStack>
     </>
   );
 }

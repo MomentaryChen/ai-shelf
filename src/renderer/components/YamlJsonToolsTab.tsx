@@ -15,6 +15,7 @@ import {
 } from "../utils/yaml-json-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 const fieldClass =
   "h-[260px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
@@ -94,6 +95,7 @@ export function YamlJsonToolsTab() {
   return (
     <>
       <SectionHeading icon={FileCode2}>{t("tools.tab.yaml")}</SectionHeading>
+      <StaggerStack>
       <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("yaml.subtitle")}
       </p>
@@ -261,6 +263,7 @@ export function YamlJsonToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

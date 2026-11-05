@@ -11,6 +11,8 @@ import { partitionByInstalled, installedCardClass } from "../utils/inventory-dis
 import { canonicalToolId } from "../../tools.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { ToolInstallPanel } from "./ToolInstallPanel";
+import { LoadingRow } from "./WarmTypingDots";
+import { StaggerStack } from "./StaggerStack";
 
 /** Live MCP connectivity test — runs a real `initialize` handshake per server. */
 function McpConnectivity({ entry }: { entry: ProviderEntry }) {
@@ -122,10 +124,7 @@ function DoctorCards({
         {!available ? (
           <ToolInstallPanel tool={tool} onInstalled={onRefresh} />
         ) : !r ? (
-          <div className="flex items-center gap-2 text-[13px] text-text-secondary">
-            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-accent" />
-            {t("inventory.doctor.checking")}
-          </div>
+          <LoadingRow label={t("inventory.doctor.checking")} />
         ) : (
           <>
             {r.checks.map((c) => {
@@ -189,14 +188,14 @@ export function DoctorTab({
       <SectionHeading icon={Stethoscope}>{t("app.tab.doctor")}</SectionHeading>
 
       <InventorySectionHeader count={installed.length} variant="installed" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <DoctorCards entries={installed} results={results} onRefresh={onRefresh} />
-      </div>
+      </StaggerStack>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
-      <div className="ui-stagger-children">
+      <StaggerStack>
         <DoctorCards entries={notInstalled} results={results} onRefresh={onRefresh} />
-      </div>
+      </StaggerStack>
     </>
   );
 }

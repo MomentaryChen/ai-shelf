@@ -8,6 +8,7 @@ import { parseFlowDocument } from "../../shared/flow-parse.js";
 import { formatFlowValidationIssues, validateFlowDefinition } from "../../shared/flow-validate.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
+import { WarmTypingDots } from "./WarmTypingDots";
 
 type UiMessage = FlowChatMessage & { draft?: string; error?: boolean };
 
@@ -25,20 +26,6 @@ function welcomeMessage(welcomeText: string): UiMessage {
     content: welcomeText,
     createdAt: new Date().toISOString(),
   };
-}
-
-function TypingDots() {
-  return (
-    <span className="inline-flex items-center gap-1 px-1" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="inline-block h-1.5 w-1.5 rounded-full bg-text-tertiary motion-safe:animate-[warm-dot-blink_1.2s_ease-in-out_infinite]"
-          style={{ animationDelay: `${i * 0.2}s` }}
-        />
-      ))}
-    </span>
-  );
 }
 
 export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
@@ -282,7 +269,7 @@ export function FlowCreateChat({ flowId, onSaved, onCancel }: Props) {
         {generating && (
           <div className="flex justify-start">
             <div className="rounded-[20px] rounded-bl-[6px] bg-bg-card px-4 py-3 text-text-primary">
-              <TypingDots />
+              <WarmTypingDots className="px-1" />
             </div>
           </div>
         )}

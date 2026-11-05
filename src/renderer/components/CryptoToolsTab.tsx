@@ -29,6 +29,7 @@ import {
 } from "../utils/crypto-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 type ToolId = "aes" | "rsa" | "ecdsa";
 type AesAction = "encrypt" | "decrypt";
@@ -212,6 +213,7 @@ export function CryptoToolsTab() {
   return (
     <>
       <SectionHeading icon={KeyRound}>{t("tools.tab.crypto")}</SectionHeading>
+      <StaggerStack>
       <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("crypto.subtitle")}
       </p>
@@ -762,6 +764,7 @@ export function CryptoToolsTab() {
           </p>
         )}
       </Card>
+      </StaggerStack>
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Check, Cloud, GitMerge, Loader2, LogIn } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Cloud, GitMerge, LogIn } from "lucide-react";
+import { WarmTypingDots } from "./WarmTypingDots";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,9 +93,7 @@ function SyncStatusIcon({
 }) {
   const className = "mt-0.5 size-3.5 shrink-0";
   if (syncing || compareState === "checking") {
-    return (
-      <Loader2 className={`${className} animate-spin text-chrome-text-muted`} aria-hidden />
-    );
+    return <WarmTypingDots tone="chrome" size="sm" className={className} />;
   }
   switch (compareState) {
     case "in_sync":
@@ -187,7 +186,9 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
         title={collapsed ? tooltip : undefined}
       >
         {busy ? (
-          <Loader2 className="size-8 shrink-0 animate-spin text-chrome-text-muted" />
+          <span className="flex size-8 shrink-0 items-center justify-center">
+            <WarmTypingDots tone="chrome" size="md" />
+          </span>
         ) : (
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-chrome-hover text-chrome-text-muted">
             <LogIn className="size-4" />
@@ -266,7 +267,7 @@ export function AccountSidebar({ collapsed }: { collapsed: boolean }) {
           </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem disabled={busy || syncing} onSelect={handleSyncNow}>
-            {syncing ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {syncing ? <WarmTypingDots tone="chrome" size="sm" className="mr-1.5" /> : null}
             {syncLabel}
           </DropdownMenuItem>
           {syncStatus.lastError ? (

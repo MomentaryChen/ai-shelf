@@ -5,6 +5,7 @@ import type { FlowRunState } from "../types";
 import { useLocale } from "../i18n/LocaleProvider";
 import { formatRunDuration, formatRunTimestamp, runStatusTone } from "../utils/flow-run-utils";
 import { formatPhaseSteps } from "../utils/flow-run-progress";
+import { LoadingRow } from "./WarmTypingDots";
 
 const PAGE_SIZE = 10;
 
@@ -19,6 +20,31 @@ type Props = {
   refreshKey?: number;
   onSelectRun: (run: FlowRunState) => void;
 };
+
+function statusRailClass(tone: ReturnType<typeof runStatusTone>): string {
+  switch (tone) {
+    case "success":
+      return "bg-ok/80";
+    case "failed":
+      return "bg-fail/80";
+    case "running":
+      return "bg-accent flow-run-status-rail-running";
+    default:
+      return "bg-border";
+  }
+}
+
+function statusPillClass(tone: ReturnType<typeof runStatusTone>): string {
+  const base =
+    tone === "success"
+      ? "bg-ok/15 text-ok"
+      : tone === "failed"
+        ? "bg-fail/15 text-fail"
+        : tone === "running"
+          ? "bg-bg-card text-accent flow-run-status-pill-running"
+          : "bg-bg-elevated text-text-secondary";
+  return `shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors duration-300 ${base}`;
+}
 
 export function FlowRunHistoryPanel({ flowId, refreshKey = 0, onSelectRun }: Props) {
   const { t } = useLocale();
@@ -72,16 +98,18 @@ export function FlowRunHistoryPanel({ flowId, refreshKey = 0, onSelectRun }: Pro
 
   if (loading && runs.length === 0) {
     return (
-      <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card">
+      <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card warm-rise">
         <h2 className="text-[13px] font-medium text-text-primary">{t("flow.history.title")}</h2>
-        <p className="mt-3 text-[13px] text-text-secondary">{t("flow.history.loading")}</p>
+        <div className="mt-3">
+          <LoadingRow label={t("flow.history.loading")} />
+        </div>
       </section>
     );
   }
 
   if (total === 0) {
     return (
-      <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card">
+      <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card warm-rise">
         <h2 className="text-[13px] font-medium text-text-primary">{t("flow.history.title")}</h2>
         <p className="mt-3 text-[13px] text-text-secondary">{t("flow.history.empty")}</p>
       </section>
@@ -89,7 +117,7 @@ export function FlowRunHistoryPanel({ flowId, refreshKey = 0, onSelectRun }: Pro
   }
 
   return (
-    <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card">
+    <section className="rounded-[28px] border border-border bg-bg-secondary p-4 shadow-card warm-rise">
       <h2 className="mb-3 text-[13px] font-medium text-text-primary">{t("flow.history.title")}</h2>
       <ul className="divide-y divide-border">
         {runs.map((run) => {
@@ -100,19 +128,13 @@ export function FlowRunHistoryPanel({ flowId, refreshKey = 0, onSelectRun }: Pro
               <button
                 type="button"
                 onClick={() => onSelectRun(run)}
-                className="flex w-full cursor-pointer items-center gap-3 rounded-[16px] px-2 py-2.5 text-left transition-colors hover:bg-bg-elevated/50"
+                className="flow-run-row flex w-full cursor-pointer items-center gap-3 rounded-[16px] py-2.5 pr-2 pl-3 text-left transition-colors duration-200 hover:bg-bg-elevated/50"
               >
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    tone === "success"
-                      ? "bg-ok/15 text-ok"
-                      : tone === "failed"
-                        ? "bg-fail/15 text-fail"
-                        : tone === "running"
-                          ? "bg-bg-card text-accent"
-                          : "bg-bg-elevated text-text-secondary"
-                  }`}
-                >
+                  className={`flow-run-status-rail ${statusRailClass(tone)}`}
+                  aria-hidden
+                />
+                <span className={statusPillClass(tone)}>
                   {t(`flow.status.${run.status}` as "flow.status.completed")}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[13px] text-text-primary">
