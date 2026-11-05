@@ -34,6 +34,7 @@ import {
 } from "../utils/image-base64";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 type ToolId = "hash" | "base64" | "image" | "url" | "hex";
 type Direction = "encode" | "decode";
@@ -275,7 +276,8 @@ export function CodecToolsTab() {
   return (
     <>
       <SectionHeading icon={Hash}>{t("tools.tab.codec")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("codec.subtitle")}
       </p>
 
@@ -663,6 +665,7 @@ export function CodecToolsTab() {
           </div>
         )}
       </Card>
+      </StaggerStack>
     </>
   );
 }

@@ -89,9 +89,152 @@ input:focus-visible,
   animation: profile-live-pulse 2s ease-in-out infinite;
 }
 
-/* Broadcast input — static accent border on synced panes */
+/* Broadcast input — accent border on synced panes */
 .broadcast-pane-sync {
   border-color: color-mix(in srgb, var(--color-chrome-ui-accent) 38%, var(--color-chrome-border)) !important;
+  transition:
+    border-color 280ms var(--ease-in),
+    box-shadow 280ms var(--ease-in);
+}
+
+@keyframes broadcast-pane-highlight {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-chrome-ui-accent) 0%, transparent);
+  }
+  35% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-chrome-ui-accent) 42%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-chrome-ui-accent) 0%, transparent);
+  }
+}
+
+.broadcast-pane-sync-enter {
+  animation: broadcast-pane-highlight 520ms var(--ease-in) both;
+}
+
+.broadcast-sync-dot {
+  animation: profile-live-pulse 2s ease-in-out infinite;
+}
+
+/* Pane drag-drop overlay zones */
+.pane-drop-zone {
+  transition:
+    background-color 200ms var(--ease-in),
+    box-shadow 200ms var(--ease-in);
+}
+
+.pane-drop-zone-active {
+  background-color: color-mix(in srgb, var(--color-chrome-ui-accent) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-chrome-ui-accent) 40%, transparent);
+}
+
+.pane-drop-swap-active {
+  background-color: color-mix(in srgb, var(--color-chrome-ui-accent) 16%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-chrome-ui-accent) 48%, transparent);
+}
+
+/* Toasts */
+@keyframes ui-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ui-toast-enter {
+  animation: ui-toast-enter 320ms var(--ease-in) both;
+}
+
+@keyframes ui-toast-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.ui-toast-exit {
+  animation: ui-toast-exit 280ms var(--ease-in) both;
+}
+
+/* Dialog warm entrance (content rise; overlay uses ui-backdrop-enter) */
+@keyframes ui-dialog-rise-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes ui-dialog-rise-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+}
+
+[data-slot="dialog-content"].ui-dialog-rise[data-state="open"] {
+  animation: ui-dialog-rise-in 360ms var(--ease-in) both;
+}
+
+[data-slot="dialog-content"].ui-dialog-rise[data-state="closed"] {
+  animation: ui-dialog-rise-out 240ms var(--ease-in) both;
+}
+
+.flow-live-dot {
+  animation: pane-agent-pulse 1.4s ease-in-out infinite;
+}
+
+/* Flow run history — status rail */
+.flow-run-row {
+  position: relative;
+}
+
+.flow-run-status-rail {
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 3px;
+  border-radius: 999px;
+  transition:
+    background-color 280ms var(--ease-in),
+    opacity 280ms var(--ease-in);
+}
+
+.flow-run-status-rail-running {
+  animation: pane-agent-pulse 1.4s ease-in-out infinite;
+}
+
+.flow-run-status-pill-running {
+  position: relative;
+}
+
+.flow-run-status-pill-running::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 4px;
+  vertical-align: middle;
+  border-radius: 999px;
+  background: currentColor;
+  animation: pane-agent-pulse 1.4s ease-in-out infinite;
 }
 
 /* Dark-themed scrollbars (inventory / settings overflow areas) */
@@ -485,7 +628,19 @@ input:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   .pane-agent-dot-running,
   .pane-agent-dot-attention,
-  .pane-agent-dot-stalled {
+  .pane-agent-dot-stalled,
+  .flow-run-status-rail-running,
+  .flow-run-status-pill-running::before,
+  .broadcast-sync-dot,
+  .broadcast-pane-sync-enter {
+    animation: none;
+  }
+
+  [data-slot="dialog-content"].ui-dialog-rise[data-state="open"],
+  [data-slot="dialog-content"].ui-dialog-rise[data-state="closed"],
+  .ui-toast-enter,
+  .ui-toast-exit,
+  .flow-live-dot {
     animation: none;
   }
 }

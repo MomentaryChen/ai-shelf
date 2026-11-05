@@ -1,4 +1,12 @@
-import { Fragment, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  Fragment,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Search, X } from "lucide-react";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
@@ -40,6 +48,7 @@ export function InventoryNav<T extends string>({
   const { t } = useLocale();
   const [query, setQuery] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState({ top: 0, height: 0, ready: false });
 
   const needle = query.trim().toLowerCase();
   const visible = useMemo(() => {
@@ -48,6 +57,29 @@ export function InventoryNav<T extends string>({
       `${t(it.labelKey)} ${it.id} ${it.keywords ?? ""}`.toLowerCase().includes(needle),
     );
   }, [items, needle, t]);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const update = () => {
+      const current = list.querySelector<HTMLElement>('button[data-nav-item][aria-current="page"]');
+      if (!current) {
+        setIndicator((prev) => ({ ...prev, ready: false }));
+        return;
+      }
+      setIndicator({
+        top: current.offsetTop,
+        height: current.offsetHeight,
+        ready: true,
+      });
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [active, disabled, visible]);
 
   const focusItem = (index: number) => {
     const buttons = listRef.current?.querySelectorAll<HTMLButtonElement>("button[data-nav-item]");
@@ -119,7 +151,16 @@ export function InventoryNav<T extends string>({
           )}
         </div>
       )}
-      <div ref={listRef} onKeyDown={onListKeyDown} className="flex flex-col gap-0.5">
+      <div ref={listRef} onKeyDown={onListKeyDown} className="relative flex flex-col gap-0.5">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0.5 z-0 rounded-xl bg-accent-soft transition-[top,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          style={{
+            top: indicator.top,
+            height: indicator.height,
+            opacity: indicator.ready ? 1 : 0,
+          }}
+        />
         {visible.length === 0 && (
           <p className="hidden px-2 py-3 text-[12px] text-text-tertiary lg:block">
             {t("app.nav.noMatch", { query: query.trim() })}
@@ -150,11 +191,11 @@ export function InventoryNav<T extends string>({
                 aria-label={label}
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => onSelect(it.id)}
-                className={`group relative flex items-center justify-center gap-2.5 rounded-xl py-1.5 text-left text-[13px] transition-[color,background-color,transform] duration-200 lg:justify-start lg:pr-2.5 lg:pl-2 ${
+                className={`group relative z-[1] flex items-center justify-center gap-2.5 rounded-xl py-1.5 text-left text-[13px] transition-[color,background-color,transform] duration-200 lg:justify-start lg:pr-2.5 lg:pl-2 ${
                   disabled
                     ? "cursor-not-allowed text-text-tertiary opacity-50"
                     : isActive
-                      ? "bg-accent-soft font-medium text-accent"
+                      ? "bg-accent-soft font-medium text-accent lg:bg-transparent"
                       : "cursor-pointer text-text-secondary hover:bg-bg-secondary hover:text-text-primary"
                 }`}
               >

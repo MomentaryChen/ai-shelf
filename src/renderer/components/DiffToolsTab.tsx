@@ -14,6 +14,7 @@ import {
 } from "../utils/diff-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 const fieldClass =
   "h-[220px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
@@ -81,7 +82,8 @@ export function DiffToolsTab() {
   return (
     <>
       <SectionHeading icon={GitCompare}>{t("tools.tab.diff")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("diff.subtitle")}
       </p>
 
@@ -236,6 +238,7 @@ export function DiffToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

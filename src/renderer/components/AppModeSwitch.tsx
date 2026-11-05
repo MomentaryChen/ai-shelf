@@ -1,5 +1,5 @@
-import type { LucideIcon } from "lucide-react";
-import { Compass, Package, SquareTerminal, Wrench } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { Compass, Package, SquareTerminal, Wrench, type LucideIcon } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
@@ -49,13 +49,50 @@ export function matchModeSwitchShortcut(ev: KeyEventLike, map: KeybindingMap): A
 export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitchProps) {
   const { t } = useLocale();
   const keymap = useKeybindings();
+  const navRef = useRef<HTMLElement>(null);
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false });
+
+  useLayoutEffect(() => {
+    const root = navRef.current;
+    if (!root) return;
+
+    const update = () => {
+      const active = root.querySelector<HTMLElement>(
+        '[data-slot="toggle-group-item"][data-state="on"]',
+      );
+      if (!active) {
+        setIndicator((prev) => ({ ...prev, ready: false }));
+        return;
+      }
+      setIndicator({
+        left: active.offsetLeft,
+        width: active.offsetWidth,
+        ready: true,
+      });
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [mode, disabled]);
 
   return (
     <nav
+      ref={navRef}
       role="tablist"
       aria-label={t("app.mode.aria")}
-      className="flex shrink-0 items-center rounded-lg bg-bg-secondary p-0.5 transition-colors duration-200"
+      className="relative flex shrink-0 items-center rounded-lg bg-bg-secondary p-0.5 transition-colors duration-200"
     >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-0.5 bottom-0.5 rounded-md bg-bg-card shadow-card transition-[left,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+        style={{
+          left: indicator.left,
+          width: indicator.width,
+          opacity: indicator.ready ? 1 : 0,
+        }}
+      />
       <ToggleGroup
         type="single"
         value={mode}
@@ -63,7 +100,7 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
           if (value) onChange(value as AppMode);
         }}
         disabled={disabled}
-        className="gap-0.5"
+        className="relative z-[1] gap-0.5"
       >
         {APP_MODES.map((m) => {
           const Icon = m.icon;
@@ -78,7 +115,7 @@ export function AppModeSwitch({ mode, onChange, disabled = false }: AppModeSwitc
               aria-keyshortcuts={keys || undefined}
               title={keys ? t("app.mode.shortcutHint", { label, keys }) : label}
               size="chrome"
-              className="border-transparent data-[state=off]:border-transparent data-[state=off]:hover:border-transparent"
+              className="relative z-[1] border-transparent bg-transparent shadow-none data-[state=off]:border-transparent data-[state=off]:hover:border-transparent data-[state=on]:border-transparent data-[state=on]:bg-transparent data-[state=on]:shadow-none"
             >
               <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" />
               {label}

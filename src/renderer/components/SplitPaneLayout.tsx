@@ -292,6 +292,19 @@ function WarpPaneShell({
   const isProfileDragOver = profileDragOver?.targetPaneId === pane.id;
   const activeDropZone = isProfileDragOver ? profileDragOver.zone : dropZone;
   const isDragging = draggingPaneId === pane.id;
+  const [broadcastEnter, setBroadcastEnter] = useState(false);
+  const prevBroadcastRef = useRef(broadcastActive);
+
+  useEffect(() => {
+    if (broadcastActive && !prevBroadcastRef.current) {
+      setBroadcastEnter(true);
+      const timer = window.setTimeout(() => setBroadcastEnter(false), 520);
+      prevBroadcastRef.current = broadcastActive;
+      return () => window.clearTimeout(timer);
+    }
+    prevBroadcastRef.current = broadcastActive;
+    return undefined;
+  }, [broadcastActive]);
 
   function clearDrag() {
     setDraggingPaneId(null);
@@ -305,7 +318,7 @@ function WarpPaneShell({
       ref={shellRef}
       className={`group/pane relative flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
         broadcastActive ? "broadcast-pane-sync" : ""
-      } ${
+      } ${broadcastEnter ? "broadcast-pane-sync-enter" : ""} ${
         isDragOver || isProfileDragOver
           ? "ring-2 ring-chrome-ui-accent/35"
           : isDragging

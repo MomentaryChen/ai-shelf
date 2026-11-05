@@ -23,6 +23,7 @@ import { EmptyInventoryHint } from "./InventorySection";
 import { toolLabel, formatContext } from "../utils";
 import { partitionByInstalled, sortByInstalled, installedRowClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
+import { StaggerStack } from "./StaggerStack";
 import { ToolInstallPanel } from "./ToolInstallPanel";
 
 type ToolFilter = "all" | "installed" | "notInstalled";
@@ -248,7 +249,7 @@ export function OverviewTab({
       </Card>
 
       {/* Warnings + Environment — side by side on wide screens */}
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-start [&>*]:mb-0 [&>*]:min-w-0 [&>*]:flex-1">
+      <StaggerStack className="gap-3 xl:flex-row xl:items-start [&>*]:mb-0 [&>*]:min-w-0 [&>*]:flex-1">
       {warnings > 0 && (
         <Card
           title={
@@ -339,7 +340,7 @@ export function OverviewTab({
           ))}
         </Card>
       )}
-      </div>
+      </StaggerStack>
     </>
   );
 }

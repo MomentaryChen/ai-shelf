@@ -22,6 +22,7 @@ import {
 } from "../utils/uuid-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 type ToolId = "uuid" | "nanoid" | "validate";
 
@@ -129,7 +130,8 @@ export function UuidToolsTab() {
   return (
     <>
       <SectionHeading icon={Fingerprint}>{t("tools.tab.uuid")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("uuid.subtitle")}
       </p>
 
@@ -333,6 +335,7 @@ export function UuidToolsTab() {
           )}
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

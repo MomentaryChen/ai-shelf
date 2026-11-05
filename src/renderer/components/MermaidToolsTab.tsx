@@ -17,6 +17,7 @@ import {
 import { Card } from "./Card";
 import { MermaidBlock } from "./MermaidBlock";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 import { ToolsPreviewPane } from "./ToolsPreviewPane";
 
 const TEMPLATE_LABEL_KEYS: Record<MermaidTemplateId, MessageKey> = {
@@ -92,6 +93,7 @@ export function MermaidToolsTab() {
   return (
     <>
       <SectionHeading icon={Workflow}>{t("tools.tab.mermaid")}</SectionHeading>
+      <StaggerStack>
       <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("mermaid.subtitle")}
       </p>
@@ -247,6 +249,7 @@ export function MermaidToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

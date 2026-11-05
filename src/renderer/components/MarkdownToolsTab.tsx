@@ -7,6 +7,7 @@ import { useLocale } from "../i18n/LocaleProvider";
 import { Card } from "./Card";
 import { FlowMarkdownContent } from "./FlowMarkdownContent";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 import { ToolsPreviewPane } from "./ToolsPreviewPane";
 
 const SAMPLE_MARKDOWN = `# Markdown preview
@@ -41,7 +42,8 @@ export function MarkdownToolsTab() {
   return (
     <>
       <SectionHeading icon={FileText}>{t("tools.tab.markdown")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("markdown.subtitle")}
       </p>
 
@@ -99,6 +101,7 @@ export function MarkdownToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

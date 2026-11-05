@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Spinner } from "./components/Spinner";
+import { WarmTypingDots } from "./components/WarmTypingDots";
 import {
   AppModeSwitch,
   matchModeSwitchShortcut,
@@ -772,10 +773,11 @@ export function App() {
               disabled={scanning && !hasData}
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-secondary px-2.5 py-1 text-[11px] text-text-primary transition-colors duration-150 hover:border-accent hover:bg-bg-card disabled:opacity-50"
             >
-              <RefreshCw
-                aria-hidden
-                className={`h-3 w-3 text-text-secondary ${scanning && hasData ? "animate-spin" : ""}`}
-              />
+              {scanning && hasData ? (
+                <WarmTypingDots tone="warm" size="sm" />
+              ) : (
+                <RefreshCw aria-hidden className="h-3 w-3 text-text-secondary" />
+              )}
               {t("app.refresh")}
             </button>
           )}

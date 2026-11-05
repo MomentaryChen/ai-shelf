@@ -25,6 +25,7 @@ import {
 } from "../utils/regex-tools";
 import { Card } from "./Card";
 import { SectionHeading } from "./SectionHeading";
+import { StaggerStack } from "./StaggerStack";
 
 type Mode = "test" | "replace";
 
@@ -191,7 +192,8 @@ export function RegexToolsTab() {
   return (
     <>
       <SectionHeading icon={Braces}>{t("tools.tab.regex")}</SectionHeading>
-      <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+      <StaggerStack>
+      <p className="max-w-2xl text-[13px] leading-relaxed text-text-secondary">
         {t("regex.subtitle")}
       </p>
 
@@ -501,6 +503,7 @@ export function RegexToolsTab() {
           </div>
         </div>
       </Card>
+      </StaggerStack>
     </>
   );
 }

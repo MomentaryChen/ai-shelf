@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { Monitor, Terminal, FolderOpen, Loader2, Hand, SquareTerminal } from "lucide-react";
+import { Monitor, Terminal, FolderOpen, Hand, SquareTerminal } from "lucide-react";
+import { WarmTypingDots } from "./WarmTypingDots";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -41,6 +42,10 @@ import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useSlideDirection } from "../hooks/useSlideDirection";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
+import {
+  forestWithoutDefaultProfilesMirror,
+  preferredVisibleGroupId,
+} from "../terminal/default-profiles-workspace";
 import { shouldIgnoreShortcutForIme } from "../terminal/ime-keys";
 import { getActiveKeybindings } from "../shortcuts/active-keybindings";
 import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
@@ -470,18 +475,15 @@ function ChatTabInner({
       ...(r.forest.lastActiveByGroup ?? {}),
       ...lastActiveByGroupRef.current,
     };
-    setSidebarForest(r.forest);
-    const preferred =
-      (preferredGroupId &&
-        r.forest.groups.some((g) => g.id === preferredGroupId) &&
-        preferredGroupId) ||
-      (activeProfile?.workspaceId &&
-        r.forest.groups.some((g) => g.id === activeProfile.workspaceId) &&
-        activeProfile.workspaceId) ||
-      r.forest.lastActiveGroupId ||
-      r.forest.groups[0]?.id ||
-      null;
-    setSelectedGroupId(preferred);
+    const forest = forestWithoutDefaultProfilesMirror(r.forest);
+    setSidebarForest(forest);
+    setSelectedGroupId(
+      preferredVisibleGroupId(forest, [
+        preferredGroupId,
+        activeProfile?.workspaceId,
+        forest.lastActiveGroupId,
+      ]),
+    );
   }, [activeProfile?.workspaceId]);
 
   useEffect(() => {
@@ -1098,13 +1100,12 @@ function ChatTabInner({
     [addPane, openExternal, sidebarForest, broadcastCommandToPanes, runSavedCommand, onRequestTerminalMode],
   );
 
-  // Group used to map Ctrl+1–9 shortcut hints in the palette (mirrors currentGroupId below).
-  const paletteGroupId =
-    selectedGroupId ??
-    activeProfile?.workspaceId ??
-    sidebarForest?.lastActiveGroupId ??
-    sidebarForest?.groups[0]?.id ??
-    null;
+  // Skip the default Profiles mirror workspace so Ctrl+1–9 follows the sidebar.
+  const paletteGroupId = preferredVisibleGroupId(sidebarForest, [
+    selectedGroupId,
+    activeProfile?.workspaceId,
+    sidebarForest?.lastActiveGroupId,
+  ]);
 
   const terminalCommands = useTerminalCommands(
     t,
@@ -1142,12 +1143,7 @@ function ChatTabInner({
       })),
     [sidebarForest, backgroundAttention],
   );
-  const currentGroupId =
-    selectedGroupId ??
-    activeProfile?.workspaceId ??
-    sidebarForest?.lastActiveGroupId ??
-    sidebarGroups[0]?.id ??
-    "";
+  const currentGroupId = paletteGroupId ?? "";
   const currentGroup =
     sidebarForest?.groups.find((g) => g.id === currentGroupId) ?? sidebarForest?.groups[0] ?? null;
   const profileMotion = useSlideDirection(activeProfile?.id ?? null, currentGroup?.profiles ?? NO_SLIDE_ITEMS);
@@ -2105,11 +2101,11 @@ function ToolCard({
       ) : (
         <div className="mt-auto grid grid-cols-2 gap-3">
           <Button variant="chromeOutline" className="w-full" disabled={extBusy} onClick={handleExternal}>
-            {extBusy ? <Loader2 className="animate-spin" /> : <Monitor />}
+            {extBusy ? <WarmTypingDots tone="chrome" size="sm" /> : <Monitor />}
             {t("chat.externalBtn")}
           </Button>
           <Button variant="chromeSolid" className="w-full" disabled={inAppBusy} onClick={handleInApp}>
-            {inAppBusy ? <Loader2 className="animate-spin" /> : <Terminal />}
+            {inAppBusy ? <WarmTypingDots tone="chrome" size="sm" /> : <Terminal />}
             {t("chat.inAppBtn")}
           </Button>
         </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Check, Loader2 } from "lucide-react";
+import { BookOpen, Check } from "lucide-react";
+import { WarmTypingDots } from "./WarmTypingDots";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -141,7 +142,7 @@ export function FlowTemplateMarketplace({
                   >
                     {busy ? (
                       <>
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />
+                        <WarmTypingDots size="sm" className="mr-1.5" />
                         {t("flow.template.installing")}
                       </>
                     ) : item.installed ? (
