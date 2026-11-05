@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -111,11 +112,12 @@ export function ProfileSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm max-h-[min(90vh,720px)] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[min(90vh,720px)] max-w-sm flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-chrome-border-subtle px-5 py-4">
           <DialogTitle className="text-[15px]">{t("profile.dialog.settingsTitle")}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-4">
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.name")}
@@ -224,21 +226,21 @@ export function ProfileSettingsDialog({
         </Label>
 
         <SavedCommandsEditor value={savedCommands} onChange={setSavedCommands} disabled={busy} />
+        </div>
 
-        {saveError ? <p className="mb-3 text-[12px] text-fail">{saveError}</p> : null}
-
-        <div className="flex items-center justify-between gap-2">
+        <DialogFooter className="shrink-0 flex-col gap-2 border-t border-chrome-border-subtle px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          {saveError ? <p className="w-full text-[12px] text-fail sm:order-first sm:w-auto">{saveError}</p> : null}
           <Button
             type="button"
             variant="ghost"
             size="sm"
             disabled={busy}
             onClick={() => void onDelete(profile)}
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
             {t("profile.dialog.delete")}
           </Button>
-          <div className="flex gap-2">
+          <div className="flex w-full gap-2 sm:w-auto">
             <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
               {t("profile.dialog.cancel")}
             </Button>
@@ -246,7 +248,7 @@ export function ProfileSettingsDialog({
               {t("profile.dialog.save")}
             </Button>
           </div>
-        </div>
+        </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

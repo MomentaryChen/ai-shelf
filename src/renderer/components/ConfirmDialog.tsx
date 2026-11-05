@@ -16,6 +16,7 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   confirmVariant = "chromeSolid",
+  defaultFocus = "confirm",
   onCancel,
   onConfirm,
 }: {
@@ -24,11 +25,14 @@ export function ConfirmDialog({
   description: string;
   confirmLabel: string;
   confirmVariant?: "chromeSolid" | "destructive";
+  /** Prefer cancel for destructive confirmations so Enter does not dismiss a busy pane by accident. */
+  defaultFocus?: "cancel" | "confirm";
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const { t } = useLocale();
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
@@ -37,7 +41,8 @@ export function ConfirmDialog({
         showCloseButton={false}
         onOpenAutoFocus={(e) => {
           e.preventDefault();
-          confirmRef.current?.focus();
+          if (defaultFocus === "cancel") cancelRef.current?.focus();
+          else confirmRef.current?.focus();
         }}
       >
         <DialogHeader>
@@ -47,7 +52,7 @@ export function ConfirmDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          <Button ref={cancelRef} type="button" variant="ghost" size="sm" onClick={onCancel}>
             {t("profile.dialog.cancel")}
           </Button>
           <Button
