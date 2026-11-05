@@ -1,5 +1,6 @@
 import type { BrowserWindow } from "electron";
 import { readFlowSchedulePrefs } from "../shared/flow-schedule-pref.js";
+import { inPostResumeQuiet } from "../shared/system-resume.js";
 import { runDueFlows } from "../flow/core.js";
 
 const TICK_MS = 60_000;
@@ -40,6 +41,8 @@ export function stopFlowScheduler(): void {
 
 async function runSchedulerTick(): Promise<void> {
   if (tickInFlight) return;
+  // The next minute still catches fires missed while the machine was asleep.
+  if (inPostResumeQuiet()) return;
   const prefs = readFlowSchedulePrefs();
   if (!prefs.schedulerEnabled) return;
 

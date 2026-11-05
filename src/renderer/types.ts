@@ -896,6 +896,8 @@ export interface ElectronAPI {
       exitCode: number | null;
     }) => void,
   ) => (() => void);
+  /** Main process recovered from sleep, unlock, a stuck window, or a GPU reset. */
+  onOsResume: (cb: () => void) => () => void;
   setDefaultModel: (tool: string, model: string) => Promise<{ success: boolean; error?: string }>;
   getEnvVars: () => Promise<EnvVarGroup[]>;
   wsGetTree: () => Promise<WorkspaceTree>;

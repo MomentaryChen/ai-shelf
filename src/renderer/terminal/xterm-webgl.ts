@@ -1,61 +1,101 @@
 import type { WebglAddon } from "@xterm/addon-webgl";
 import type { Terminal } from "@xterm/xterm";
 
+/** GPU is often still resetting in the instant after wake. */
+const WEBGL_RECOVER_DELAY_MS = 700;
+
+export type TerminalWebglHandle = {
+  /** Drop WebGL immediately. xterm falls back to the canvas renderer. */
+  dispose: () => void;
+  /**
+   * After sleep or a lost GPU process, the current context is stale and the
+   * pane paints nothing. Drop it and try once more after the GPU settles.
+   * A context loss does not retry on its own — that loops on machines with no
+   * working WebGL.
+   */
+  recover: () => void;
+};
+
 /**
  * Attach the WebGL renderer when available. The addon is loaded on demand so
  * it stays out of the main xterm chunk. On context loss or activation failure,
  * dispose the addon so xterm falls back to the default canvas path.
  */
-export function attachTerminalWebgl(term: Terminal): () => void {
+export function attachTerminalWebgl(term: Terminal): TerminalWebglHandle {
   let addon: WebglAddon | null = null;
   let cancelled = false;
+  let generation = 0;
+  let recoverTimer = 0;
 
-  void import("@xterm/addon-webgl")
-    .then(({ WebglAddon: WebglAddonCtor }) => {
-      if (cancelled) return;
-      let instance: WebglAddon | null = null;
-      try {
-        instance = new WebglAddonCtor();
-        instance.onContextLoss(() => {
+  const detachCurrent = () => {
+    const current = addon;
+    addon = null;
+    if (!current) return;
+    try {
+      current.dispose();
+    } catch {
+      /* already torn down */
+    }
+  };
+
+  const mount = () => {
+    const gen = ++generation;
+    void import("@xterm/addon-webgl")
+      .then(({ WebglAddon: WebglAddonCtor }) => {
+        if (cancelled || gen !== generation) return;
+        let instance: WebglAddon | null = null;
+        try {
+          instance = new WebglAddonCtor();
+          instance.onContextLoss(() => {
+            try {
+              instance?.dispose();
+            } catch {
+              /* already torn down */
+            }
+            if (addon === instance) addon = null;
+          });
+          if (cancelled || gen !== generation) {
+            instance.dispose();
+            return;
+          }
+          term.loadAddon(instance);
+          if (cancelled || gen !== generation) {
+            instance.dispose();
+            return;
+          }
+          addon = instance;
+        } catch (err) {
+          console.warn("[xterm-webgl] falling back to canvas renderer", err);
           try {
             instance?.dispose();
           } catch {
-            /* already torn down */
+            /* ignore */
           }
           if (addon === instance) addon = null;
-        });
-        if (cancelled) {
-          instance.dispose();
-          return;
         }
-        term.loadAddon(instance);
-        if (cancelled) {
-          instance.dispose();
-          return;
-        }
-        addon = instance;
-      } catch (err) {
+      })
+      .catch((err) => {
         console.warn("[xterm-webgl] falling back to canvas renderer", err);
-        try {
-          instance?.dispose();
-        } catch {
-          /* ignore */
-        }
-        if (addon === instance) addon = null;
-      }
-    })
-    .catch((err) => {
-      console.warn("[xterm-webgl] falling back to canvas renderer", err);
-    });
+      });
+  };
 
-  return () => {
-    cancelled = true;
-    if (!addon) return;
-    try {
-      addon.dispose();
-    } catch {
-      /* terminal may already be disposed */
-    }
-    addon = null;
+  mount();
+
+  return {
+    recover() {
+      if (cancelled) return;
+      generation += 1;
+      detachCurrent();
+      window.clearTimeout(recoverTimer);
+      recoverTimer = window.setTimeout(() => {
+        if (!cancelled) mount();
+      }, WEBGL_RECOVER_DELAY_MS);
+    },
+    dispose() {
+      cancelled = true;
+      generation += 1;
+      window.clearTimeout(recoverTimer);
+      detachCurrent();
+    },
   };
 }
