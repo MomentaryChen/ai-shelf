@@ -40,6 +40,8 @@ import { removePaneFromCachedLayout, splitNextToPane } from "../terminal/popout-
 export interface SpawnPaneOptions {
   /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
   resumeAgentSessionId?: string;
+  /** Task prompt typed into the agent once it starts; never stored with the pane. */
+  initialInput?: string;
 }
 
 /** Lets the caller keep extra per-profile state (view windows) in step with save / restore. */

@@ -11,7 +11,6 @@ import { registerWorkspaceCommands } from "./commands/workspace.js";
 import { registerGroupCommands } from "./commands/group.js";
 import { registerSessionCommands } from "./commands/session.js";
 import { registerTuiCommand } from "./commands/tui.js";
-import { registerFlowCommands } from "./commands/flow.js";
 import { DEBUG_ENV, formatCliError, isDebugEnabled } from "./errors.js";
 import { installShutdownHandlers, shouldForceExit } from "./lifecycle.js";
 
@@ -51,7 +50,6 @@ registerWorkspaceCommands(program, getCtx);
 registerGroupCommands(program, getCtx);
 registerSessionCommands(program, getCtx);
 registerTuiCommand(program, getCtx);
-registerFlowCommands(program);
 
 program.parseAsync(process.argv).then(
   () => {

@@ -1,10 +1,7 @@
 import {
-  attributeRunCosts,
   buildAttributionInsights,
   collectProviderQuotaAlerts,
   evaluateBudgetAlert,
-  rangeWindowMs,
-  sumAttributedCost,
   weekSpendUsdFromTools,
   weekWindowMs,
 } from "./attribution.js";
@@ -14,8 +11,6 @@ import {
   isUsageEncryptionAvailable,
   isUsageToolConfigured,
 } from "./credential-store.js";
-import { scanFlowGenerateCostsForAttribution } from "./flow-generate-scan.js";
-import { scanRecentFlowRunsForAttribution } from "./flow-run-scan.js";
 import { fetchClaudeUsage } from "./providers/claude.js";
 import { fetchCopilotUsage } from "./providers/copilot.js";
 import { fetchCrushUsage } from "./providers/crush.js";
@@ -45,31 +40,20 @@ const LOCAL_USAGE_READERS: Partial<
   goose: fetchGooseUsage,
 };
 
-function buildCostInsights(tools: UsageToolSnapshot[], days: number): UsageCostInsights {
+function buildCostInsights(tools: UsageToolSnapshot[]): UsageCostInsights {
   const budget = readUsageBudgetPrefs();
-  const runs = [
-    ...scanRecentFlowRunsForAttribution(500),
-    ...scanFlowGenerateCostsForAttribution(500),
-  ];
-  const period = rangeWindowMs(days);
   const week = weekWindowMs();
+  const periodInsights = buildAttributionInsights(tools);
 
-  const periodAttr = attributeRunCosts(runs, tools, period.startMs, period.endMs);
-  const weekAttr = attributeRunCosts(runs, tools, week.startMs, week.endMs);
-  const periodInsights = buildAttributionInsights(periodAttr, tools);
-  const weekInsights = buildAttributionInsights(weekAttr, tools);
-
-  // Week spend prefers provider rollups for the 7-day window when daily data exists.
-  // Never fall back to the whole-period total — that inflates "this week" by up to
-  // the full range (e.g. 30 days) and trips false budget alerts.
-  const weekFromTools = weekSpendUsdFromTools(tools, week);
-  const weekSpendUsd = weekFromTools > 0 ? weekFromTools : sumAttributedCost(weekAttr);
+  // Week spend comes from provider rollups for the 7-day window. Never fall back to
+  // the whole-period total — that inflates "this week" by up to the full range
+  // (e.g. 30 days) and trips false budget alerts.
+  const weekSpendUsd = weekSpendUsdFromTools(tools, week);
 
   const alert = evaluateBudgetAlert(weekSpendUsd, budget, collectProviderQuotaAlerts(tools));
 
   return {
     ...periodInsights,
-    weekHottestFlow: weekInsights.hottestFlow,
     weekSpendUsd,
     budget,
     alert,
@@ -199,6 +183,6 @@ export async function fetchUsageDashboard(
     encryptionAvailable: isUsageEncryptionAvailable(),
     tools,
     summary: aggregateUsageDashboard(tools),
-    insights: buildCostInsights(tools, days),
+    insights: buildCostInsights(tools),
   };
 }

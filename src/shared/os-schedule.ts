@@ -4,9 +4,8 @@
  * Linux systemd user timers (.service + .timer).
  *
  * Schedule model:
- * - `interval` — run every N minutes (what the "Run when app is closed" job uses: 1 minute;
- *   per-flow cron is then evaluated by `ai-shelf flow due`).
- * - `cron` — classic 5-field cron (`min hour dom month dow`), same syntax flows use.
+ * - `interval` — run every N minutes (e.g. a 1-minute job that evaluates per-item cron itself).
+ * - `cron` — classic 5-field cron (`min hour dom month dow`).
  *
  * Unsupported combinations (mapping returns `{ ok: false, error }`):
  * - Windows: `cron` schedules (schtasks has no cron equivalent); intervals outside 1–1439 minutes.
@@ -473,7 +472,7 @@ export function buildSystemdService(opts: SystemdServiceOptions): string {
 
 export type SystemdTimerOptions = {
   description: string;
-  /** Service unit the timer activates, e.g. `ai-shelf-flow-due.service`. */
+  /** Service unit the timer activates, e.g. `ai-shelf-task-due.service`. */
   unit: string;
   schedule: OsSchedule;
 };

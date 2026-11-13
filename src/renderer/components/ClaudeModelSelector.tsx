@@ -16,7 +16,7 @@ type Props = {
   detectedModels?: string[];
   /** When set, empty model is treated as this preset (hides the CLI default chip). */
   implicitDefault?: string;
-  /** Warm surface (flow) vs chrome (settings). */
+  /** Warm surface vs chrome (settings). */
   surface?: "warm" | "chrome";
   showExtraArgs?: boolean;
 };

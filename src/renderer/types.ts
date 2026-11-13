@@ -8,39 +8,19 @@ import type {
 } from "../shared/git-worktree.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
-import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
-import type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
-import type {
-  FlowConsoleBufferSnapshot,
-  FlowConsoleChunk,
-} from "../shared/flow-console-types.js";
-import type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
-import type { FlowSchedulePrefs } from "../shared/flow-schedule-pref.js";
-import type { FlowTemplateCatalogEntry } from "../shared/flow-template-catalog.js";
-import type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
+import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
-export type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
-export type { FlowRunArtifact, FlowRunEvent } from "../shared/flow-run-types.js";
-export type { FlowListItem, FlowRunState } from "../shared/flow-types.js";
-export type { FlowDagNodeCommandDetail } from "../flow/flow-command-preview.js";
-
-export type FlowTemplateListItem = FlowTemplateCatalogEntry & { installed: boolean };
-
-/** OS-level "run when app is closed" job (Task Scheduler / launchd / systemd user timer). */
-export type FlowTaskSchedulerStatus = {
-  supported: boolean;
-  installed: boolean;
-  taskName: string;
-  backend?: "windows-task-scheduler" | "launchd" | "systemd";
-  launcherPath?: string;
-  definitionPath?: string;
-  /** Set when the platform has a backend but it cannot be used (e.g. no systemd --user). */
-  unavailableReason?: string;
-};
+export type {
+  RunTaskRequest,
+  RunTaskResult,
+  TaskDef,
+  TaskInput,
+  TaskSaveResult,
+} from "../shared/task-types.js";
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -678,14 +658,6 @@ export interface UsageAttributionRow {
   durationMs: number;
 }
 
-export interface UsageHottestFlow {
-  flowId: string;
-  label: string;
-  costUsd: number;
-  runCount: number;
-  estimated: boolean;
-}
-
 export interface UsageBudgetAlert {
   level: "ok" | "warn" | "over";
   weekSpendUsd: number;
@@ -708,10 +680,6 @@ export interface UsageBudgetPrefs {
 
 export interface UsageCostInsights {
   byTool: UsageAttributionRow[];
-  byProfile: UsageAttributionRow[];
-  byFlow: UsageAttributionRow[];
-  hottestFlow: UsageHottestFlow | null;
-  weekHottestFlow: UsageHottestFlow | null;
   weekSpendUsd: number;
   budget: UsageBudgetPrefs;
   alert: UsageBudgetAlert;
@@ -761,8 +729,8 @@ export interface ElectronAPI {
   getAppUpdateState: () => Promise<AppUpdateStatePayload>;
   confirmAppUpdateDownload: () => Promise<{ ok: boolean }>;
   quitAndInstallAppUpdate: () => Promise<{ ok: boolean }>;
-  /** Open terminals / running flows that a restart-to-install would close. */
-  getAppUpdateImpact: () => Promise<{ terminals: number; flows: number }>;
+  /** Open terminals that a restart-to-install would close. */
+  getAppUpdateImpact: () => Promise<{ terminals: number }>;
   onAppUpdateAvailable: (cb: (payload: AppUpdateAvailablePayload) => void) => () => void;
   onAppUpdateNotAvailable: (cb: (payload: { version: string | null }) => void) => () => void;
   onAppUpdateProgress: (cb: (payload: AppUpdateProgressPayload) => void) => () => void;
@@ -895,6 +863,8 @@ export interface ElectronAPI {
       wslDistro?: string;
       remote?: RemoteSshConfig | null;
       agentSession?: { resumeId?: string };
+      /** Prompt typed into the agent once its TUI is ready (Tasks); ignored for plain shells. */
+      initialInput?: string;
     },
   ) => Promise<{
     success: boolean;
@@ -1201,137 +1171,12 @@ export interface ElectronAPI {
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
   onSyncDataApplied: (cb: () => void) => () => void;
   onSettingsChanged: (cb: () => void) => () => void;
-  flowList: () => Promise<FlowListItem[]>;
-  flowListActiveRuns: () => Promise<FlowRunState[]>;
-  flowReadFile: (flowId: string) => Promise<{ content: string; path: string } | null>;
-  flowReadRunOutput: (
-    runId: string,
-  ) => Promise<{ ok: boolean; content?: string; outputPath?: string; startedAt?: string; error?: string }>;
-  flowGetLatestRunOutput: (flowId: string) => Promise<{
-    runId: string;
-    outputPath: string;
-    startedAt: string;
-    status: import("../shared/flow-types.js").FlowRunStatus;
-  } | null>;
-  flowRun: (
-    flowId: string,
-    options?: { globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs },
-  ) => Promise<{ ok: boolean; runId?: string; error?: string }>;
-  flowCancelRun: (flowId: string) => Promise<{ ok: boolean; runId?: string; error?: string }>;
-  flowApproveGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
-  flowRejectGate: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
-  flowGetTaskSchedulerStatus: () => Promise<FlowTaskSchedulerStatus>;
-  flowInstallTaskScheduler: () => Promise<{
-    ok: boolean;
-    error?: string;
-    status?: FlowTaskSchedulerStatus;
-  }>;
-  flowRemoveTaskScheduler: () => Promise<{
-    ok: boolean;
-    error?: string;
-    status?: FlowTaskSchedulerStatus;
-  }>;
-  flowGetRunState: (runId: string) => Promise<FlowRunState | null>;
-  flowListRecentRuns: (limit?: number) => Promise<FlowRunState[]>;
-  flowListRunsForFlow: (
-    flowId: string,
-    limit?: number,
-    offset?: number,
-  ) => Promise<{ items: FlowRunState[]; total: number }>;
-  flowGetRunEvents: (runId: string) => Promise<FlowRunEvent[]>;
-  flowGetConsoleBuffer: (runId: string) => Promise<FlowConsoleBufferSnapshot>;
-  flowOpenRunArtifact: (
-    runId: string,
-    artifact: FlowRunArtifact,
-  ) => Promise<{ ok: boolean; path?: string; error?: string }>;
-  flowOpenFlowsDir: () => Promise<void>;
-  flowDelete: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
-  flowOpenFile: (flowId: string) => Promise<{ ok: boolean; error?: string; path?: string }>;
-  flowGetSchedulePrefs: () => Promise<FlowSchedulePrefs>;
-  flowSetSchedulePrefs: (partial: {
-    schedulerEnabled?: boolean;
-    historyMaxRuns?: number | null;
-    historyMaxDays?: number | null;
-  }) => Promise<{ ok: boolean; prefs?: FlowSchedulePrefs; error?: string }>;
-  flowPruneHistory: (flowId?: string) => Promise<{
-    ok: boolean;
-    deleted?: number;
-    byFlow?: Record<string, number>;
-    error?: string;
-  }>;
-  flowSaveSource: (flowId: string, content: string) => Promise<{ ok: boolean; error?: string }>;
-  flowSaveNotifySettings: (
-    flowId: string,
-    patch: {
-      notify?: import("../shared/flow-types.js").FlowDesktopNotifyMode;
-      onSuccess?: "slack" | "none";
-      onFail?: "slack" | "none";
-      webhooks?: import("../shared/flow-types.js").FlowWebhookDef[] | null;
-      historyMaxRuns?: number | null;
-      historyMaxDays?: number | null;
-    },
-  ) => Promise<{ ok: boolean; error?: string }>;
-  flowRunDue: () => Promise<{
-    ok: boolean;
-    result?: {
-      checked: number;
-      started: string[];
-      skipped: string[];
-      errors: { flowId: string; error: string }[];
-    };
-  }>;
-  flowSaveSchedule: (
-    flowId: string,
-    patch: { schedule: string | null; timezone?: string | null },
-  ) => Promise<{ ok: boolean; error?: string }>;
-  flowSaveRunnerSettings: (
-    flowId: string,
-    patch: {
-      tool: string;
-      toolArgs: string | null;
-      cwd: string | null;
-      profile: string | null;
-      env?: Record<string, string> | null;
-    },
-  ) => Promise<{ ok: boolean; error?: string }>;
-  flowGenerate: (
-    turns: { role: "user" | "assistant"; content: string }[],
-    flowId?: string,
-  ) => Promise<{ ok: boolean; content?: string; error?: string }>;
-  flowGetChat: (flowId: string) => Promise<FlowChatMessage[] | null>;
-  flowSaveChat: (
-    flowId: string,
-    messages: FlowChatMessage[],
-  ) => Promise<{ ok: boolean; error?: string }>;
-  flowClearChat: (flowId: string) => Promise<{ ok: boolean; error?: string }>;
-  flowListPromptLogs: (
-    flowId: string,
-    limit?: number,
-  ) => Promise<FlowPromptLogEntry[]>;
-  flowGetDagNodeCommand: (
-    flowId: string,
-    node: {
-      kind: "trigger" | "phase" | "output";
-      phaseId?: string;
-      phaseLabel?: string;
-      phaseMessage?: string | null;
-    },
-    options?: {
-      runId?: string;
-      outputPath?: string | null;
-      globalToolLaunchArgs?: Record<string, string>;
-    },
-  ) => Promise<FlowDagNodeCommandDetail | { error: string }>;
-  flowCreate: (
-    content: string,
-    overwriteOrOptions?: boolean | { overwrite?: boolean; migrateChatFromDraft?: boolean },
-  ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
-  flowListTemplates: () => Promise<FlowTemplateListItem[]>;
-  flowInstallTemplate: (
-    templateId: string,
-  ) => Promise<{ ok: boolean; flowId?: string; path?: string; error?: string }>;
-  onFlowRunState: (cb: (state: FlowRunState) => void) => () => void;
-  onFlowConsoleChunk: (cb: (chunk: FlowConsoleChunk) => void) => () => void;
+  tasksList: () => Promise<TaskDef[]>;
+  /** Creates the task when `input.id` is empty. */
+  tasksSave: (input: TaskInput) => Promise<TaskSaveResult>;
+  tasksDelete: (id: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Returns shell.openPath's error string (empty on success). */
+  tasksOpenDir: () => Promise<string>;
   portsList: (port?: number | null) => Promise<
     | {
         ok: true;

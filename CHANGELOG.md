@@ -9,6 +9,14 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Added
+
+- **Tasks mode** — Save prompts you use often and run one in a profile with a single click. AI Shelf switches to the profile, opens a new pane with its agent CLI (or the tool the task names), and sends the prompt once the agent is ready. If the agent shows a start-up dialog such as folder trust or login, the prompt waits until you answer it. Five built-in templates are included. Tasks are files under the app data `tasks/` folder.
+
+### Removed
+
+- **AI Flow** — The AI Flow mode is replaced by Tasks (breaking). Headless `claude -p` runs, DAG phases, gates, retries, schedules, run history, webhooks, Slack notifications, flow chat authoring, and the `ai-shelf flow` CLI commands are gone. On first start, each existing `.flow.md` becomes a task with the same prompt (phase markers removed; `runner: http` flows are skipped). The `flows/` and `runs/` folders are left on disk. The every-minute `flow due` job in Task Scheduler, launchd, or systemd is removed. Usage no longer attributes spend to flows. Alt/Option+4 now opens Tasks, and a custom shortcut for AI Flow carries over.
+
 ## [5.0.0] - 2026-11-13
 
 Terminals can move into their own windows, profiles can run over SSH, and Windows updates install without the setup wizard.

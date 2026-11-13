@@ -20,7 +20,7 @@ interface Options {
   panes: PaneInfo[];
   focusedPaneId: string | null;
   windowFocused: boolean;
-  /** Terminal view is showing (not Inventory / Tools / Flow). */
+  /** Terminal view is showing (not Inventory / Tools / Tasks). */
   viewActive: boolean;
   settings: ChatSettings;
   t: T;

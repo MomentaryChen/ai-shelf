@@ -117,9 +117,9 @@ export const MERMAID_TEMPLATES: readonly MermaidTemplate[] = [
     Tools
       Codec
       Mermaid
-    Flow
-      DAG
-      Runs`,
+    Tasks
+      Prompts
+      Schedules`,
   },
 ] as const;
 

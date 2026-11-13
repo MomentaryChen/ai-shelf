@@ -18,7 +18,7 @@
 |---|---|---|
 | **Inventory CLI** | `ai` | Scan models, skills, MCP, config; run doctor/update/raw |
 | **Profile CLI** | `ai-shelf` | Manage profiles, CLI sessions, broadcast exec; TUI |
-| **Desktop app** | `pnpm electron` | Terminal · Inventory · Tools · AI Flow (Electron + React) |
+| **Desktop app** | `pnpm electron` | Terminal · Inventory · Tools · Tasks (Electron + React) |
 
 The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** split and organize **Profiles** (names, defaults, pane layouts) across both surfaces.
 
@@ -50,11 +50,11 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 
 ### Desktop app (Electron)
 
-- **Four modes** — **Terminal** (default) · **Inventory** · **Tools** · **AI Flow**
+- **Four modes** — **Terminal** (default) · **Inventory** · **Tools** · **Tasks**
 - **Terminal** — profiles sidebar, embedded multi-pane xterm.js + node-pty, broadcast input, external launch
 - **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage** (spend / budgets)
 - **Tools** — everyday utilities: Codec, Crypto, Time, Cron, Regex, JSON, Markdown, Mermaid, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL
-- **AI Flow** — author, schedule, and run multi-agent `.flow.md` workflows (templates, chat authoring, run history)
+- **Tasks** — saved prompts: pick a profile, press Run, and a new pane starts its agent CLI and sends the prompt (built-in templates)
 - **Profiles sidebar** — create/rename/delete profiles; each profile stores split-pane layout in SQLite
 - **External launch** — Windows Terminal / PowerShell / CMD on Windows; `$SHELL` (bash / zsh / fish / sh) on macOS and Linux
 - **Cloud backup** — optional Google sign-in to back up profiles (manual sync; see in-app Account settings)
@@ -81,7 +81,7 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 
 ![Overview](tests/screenshots/en/01.overview.png)
 
-Switch **Terminal**, **Inventory**, **Tools**, and **AI Flow** from the header. Inventory opens the tabbed dashboard above (including Usage); Terminal is the embedded multi-pane launcher with a profiles sidebar; Tools holds local utilities; AI Flow is the automation console.
+Switch **Terminal**, **Inventory**, **Tools**, and **Tasks** from the header. Inventory opens the tabbed dashboard above (including Usage); Terminal is the embedded multi-pane launcher with a profiles sidebar; Tools holds local utilities; Tasks runs saved prompts in a profile's terminal.
 
 → **[Full page-by-page guide with screenshots](docs/pages.md)** · [繁體中文版](docs/pages.zh-TW.md)
 
@@ -101,7 +101,7 @@ Download the asset for your OS from [GitHub Releases](https://github.com/Momenta
 | **macOS** | `AI-Shelf-<version>-arm64.dmg` or `-x64.dmg` | Unsigned — first launch may need right-click → **Open**, or clear quarantine (`xattr -dr com.apple.quarantine "/Applications/AI Shelf.app"`). |
 | **Linux** | `AI-Shelf-<version>.AppImage` | Unsigned — `chmod +x` then run. Static AppImage runtime (no libfuse2). |
 
-The installed app includes Terminal, Inventory, Tools, AI Flow, and embedded terminals. You do **not** need Node.js on the machine.
+The installed app includes Terminal, Inventory, Tools, Tasks, and embedded terminals. You do **not** need Node.js on the machine.
 
 Step-by-step install, uninstall, and in-app updates: [docs/RELEASE.md](docs/RELEASE.md) (For users). Maintainer release flow is in the same guide.
 
@@ -284,7 +284,7 @@ ai-shelf/                 # root workspace (Electron app + inventory CLI)
 │   ├── commands/                 # CLI command handlers
 │   ├── inventory/                # Claude / Copilot / Cursor detectors
 │   ├── electron/                 # Main process, preload, workspace-host
-│   ├── renderer/                 # React UI (Terminal · Inventory · Tools · Flow)
+│   ├── renderer/                 # React UI (Terminal · Inventory · Tools · Tasks)
 │   │   ├── components/           # ChatTab, ProfileSidebar, *Tab, …
 │   │   ├── hooks/                # useInventoryScan, useProfileWorkspace, …
 │   │   └── terminal/             # split-tree, layout serialize, SQLite sync

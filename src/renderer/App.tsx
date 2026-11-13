@@ -9,7 +9,7 @@ import {
   useTransition,
 } from "react";
 import {
-  Compass,
+  ListChecks,
   FileText,
   Monitor,
   Package,
@@ -36,7 +36,9 @@ import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
 import { TitleBarBrand, useTitleBarOverlaySync, type TitleBarTone } from "./components/TitleBarBrand";
-import type { ProviderEntry } from "./types";
+import type { ProviderEntry, RunTaskRequest, RunTaskResult } from "./types";
+import type { TaskRunner } from "./components/ChatTab";
+import { toolIdsFromInventory } from "./utils/available-tools";
 import { registerShortcutCheatsheetOpener } from "./shortcuts/open-shortcuts";
 import { cheatsheetToggleKeys } from "./shortcuts/shortcut-registry";
 import { getActiveKeybindings } from "./shortcuts/active-keybindings";
@@ -121,7 +123,9 @@ const OnboardingModal = lazy(() =>
   import("./components/OnboardingModal").then((m) => ({ default: m.OnboardingModal })),
 );
 const ChatTab = lazy(() => import("./components/ChatTab").then((m) => ({ default: m.ChatTab })));
-const FlowTab = lazy(() => import("./components/FlowTab").then((m) => ({ default: m.FlowTab })));
+const TasksTab = lazy(() =>
+  import("./components/TasksTab").then((m) => ({ default: m.TasksTab })),
+);
 const CommandPalette = lazy(() =>
   import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
 );
@@ -353,6 +357,11 @@ export function App() {
     terminalCommandsRef.current = cmds;
     if (paletteOpenRef.current) setPaletteCommandsRev((r) => r + 1);
   }, []);
+  /** Set by ChatTab: opens a pane in a profile and types the task prompt into the agent. */
+  const taskRunnerRef = useRef<TaskRunner | null>(null);
+  const registerTaskRunner = useCallback((runner: TaskRunner | null) => {
+    taskRunnerRef.current = runner;
+  }, []);
   const [, startTransition] = useTransition();
 
   const openPalette = useCallback(() => {
@@ -524,11 +533,12 @@ export function App() {
         run: () => handleModeChange("tools"),
       },
       {
-        id: "mode-flow",
-        title: t("cmd.action.flow"),
+        id: "mode-tasks",
+        title: t("cmd.action.tasks"),
         group: t("cmd.group.actions"),
-        icon: <Compass className="h-4 w-4" />,
-        run: () => handleModeChange("flow"),
+        icon: <ListChecks className="h-4 w-4" />,
+        keywords: "tasks prompts run saved prompt agent flow",
+        run: () => handleModeChange("tasks"),
       },
       {
         id: "refresh",
@@ -601,11 +611,12 @@ export function App() {
         run: () => handleModeChange("tools"),
       },
       {
-        id: "mode-flow",
-        title: t("cmd.action.flow"),
+        id: "mode-tasks",
+        title: t("cmd.action.tasks"),
         group: t("cmd.group.actions"),
-        icon: <Compass className="h-4 w-4" />,
-        run: () => handleModeChange("flow"),
+        icon: <ListChecks className="h-4 w-4" />,
+        keywords: "tasks prompts run saved prompt agent flow",
+        run: () => handleModeChange("tasks"),
       },
       {
         id: "show-shortcuts",
@@ -647,11 +658,12 @@ export function App() {
         run: () => handleModeChange("tools"),
       },
       {
-        id: "mode-flow",
-        title: t("cmd.action.flow"),
+        id: "mode-tasks",
+        title: t("cmd.action.tasks"),
         group: t("cmd.group.actions"),
-        icon: <Compass className="h-4 w-4" />,
-        run: () => handleModeChange("flow"),
+        icon: <ListChecks className="h-4 w-4" />,
+        keywords: "tasks prompts run saved prompt agent flow",
+        run: () => handleModeChange("tasks"),
       },
       {
         id: "show-shortcuts",
@@ -669,6 +681,22 @@ export function App() {
   const requestTerminalMode = useCallback(() => {
     handleModeChange("terminal");
   }, []);
+
+  const taskTools = useMemo(() => toolIdsFromInventory(data), [data]);
+
+  const runTask = useCallback(
+    async (request: RunTaskRequest): Promise<RunTaskResult> => {
+      const runner = taskRunnerRef.current;
+      if (!runner) return { ok: false, reason: "busy" };
+      // Show the terminal while the pane opens (xterm needs a visible host to size itself);
+      // a failed run returns to Tasks, where the page shows why.
+      handleModeChange("terminal");
+      const result = await runner(request);
+      if (!result.ok) handleModeChange("tasks");
+      return result;
+    },
+    [handleModeChange],
+  );
 
   // Built only while the palette is open — inventory search + profiles in every mode.
   const commands = useMemo<Command[]>(() => {
@@ -814,6 +842,7 @@ export function App() {
               inventoryScanning={scanning}
               onRegisterCommands={registerTerminalCommands}
               onRequestTerminalMode={requestTerminalMode}
+              onRegisterTaskRunner={registerTaskRunner}
             />
           </Suspense>
         </main>
@@ -908,11 +937,15 @@ export function App() {
         </div>
 
         <div
-          data-active={appMode === "flow"}
+          data-active={appMode === "tasks"}
           className="ui-mode-panel absolute inset-0 flex h-full min-h-0 flex-col overflow-hidden"
         >
-          <Suspense fallback={<Spinner label={t("flow.loading")} />}>
-            <FlowTab />
+          <Suspense fallback={<Spinner label={t("tasks.loading")} />}>
+            <TasksTab
+              active={appMode === "tasks"}
+              onRunTask={runTask}
+              availableTools={taskTools}
+            />
           </Suspense>
         </div>
       </div>

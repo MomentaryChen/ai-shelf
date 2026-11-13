@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { aggregateUsageDashboard } from "./aggregate-daily.js";
-import { attributeRunCosts, buildAttributionInsights } from "./attribution.js";
+import { buildAttributionInsights } from "./attribution.js";
 import type { UsageToolSnapshot } from "./types.js";
 
 function snap(partial: Partial<UsageToolSnapshot> & Pick<UsageToolSnapshot, "toolId" | "status">): UsageToolSnapshot {
@@ -54,31 +54,12 @@ test("reporting requires cost, tokens or quotas in the period", () => {
   assert.equal(summary.activeCount, 2);
 });
 
-test("attribution does not split billing-cycle spend across period runs", () => {
+test("attribution excludes billing-cycle spend from period tool totals", () => {
   const tools: UsageToolSnapshot[] = [
     snap({ toolId: "claude", status: "ok", totalCostUsd: 40, costScope: "billingCycle" }),
     snap({ toolId: "codex", status: "ok", totalCostUsd: 10 }),
   ];
-  const now = Date.now();
-  const run = (runId: string, agentTool: string) => ({
-    runId,
-    flowId: "f1",
-    status: "completed" as const,
-    startedAt: new Date(now - 60_000).toISOString(),
-    updatedAt: new Date(now).toISOString(),
-    completedAt: new Date(now).toISOString(),
-    agentTool,
-  });
-  const attributed = attributeRunCosts(
-    [run("r1", "claude"), run("r2", "codex")],
-    tools,
-    now - 86_400_000,
-    now + 1_000,
-  );
-  assert.equal(attributed.find((r) => r.runId === "r1")?.attributedCostUsd, 0);
-  assert.equal(attributed.find((r) => r.runId === "r2")?.attributedCostUsd, 10);
-
-  const insights = buildAttributionInsights(attributed, tools);
+  const insights = buildAttributionInsights(tools);
   assert.equal(insights.byTool.find((r) => r.id === "claude"), undefined);
   assert.equal(insights.byTool.find((r) => r.id === "codex")?.costUsd, 10);
 });

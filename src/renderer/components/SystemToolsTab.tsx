@@ -10,7 +10,7 @@ import {
   type HostResourceSnapshot,
 } from "../../shared/host-env.js";
 import { Card } from "./Card";
-import { FlowMarkdownContent } from "./FlowMarkdownContent";
+import { MarkdownContent } from "./MarkdownContent";
 import { SectionHeading } from "./SectionHeading";
 import { StaggerStack } from "./StaggerStack";
 import { WarmTypingDots } from "./WarmTypingDots";
@@ -248,7 +248,7 @@ export function SystemToolsTab({ active = true }: { active?: boolean }) {
                 {t("system.analyze.workingHint")}
               </p>
             ) : report ? (
-              <FlowMarkdownContent content={report} />
+              <MarkdownContent content={report} />
             ) : null}
           </div>
         </Card>

@@ -17,6 +17,8 @@ import type {
   ProviderEntry,
   ProfileInfo,
   RemoteSshConfig,
+  RunTaskRequest,
+  RunTaskResult,
 } from "../types";
 import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
@@ -163,6 +165,9 @@ import {
   SIDEBAR_RAIL_WIDTH,
 } from "../sidebar-collapse";
 
+/** Opens a pane in the task's profile and types the prompt into the agent (Tasks mode). */
+export type TaskRunner = (request: RunTaskRequest) => Promise<RunTaskResult>;
+
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
 const SIDEBAR_COLLAPSED_KEY = "ai-inventory-sidebar-collapsed";
 const SIDEBAR_MIN = 200;
@@ -218,12 +223,14 @@ function ChatTabInner({
   inventoryScanning = false,
   onRegisterCommands,
   onRequestTerminalMode,
+  onRegisterTaskRunner,
 }: {
   data: ProviderEntry[];
   active?: boolean;
   inventoryScanning?: boolean;
   onRegisterCommands?: (commands: Command[]) => void;
   onRequestTerminalMode?: () => void;
+  onRegisterTaskRunner?: (runner: TaskRunner | null) => void;
 }) {
   const { t } = useLocale();
   const [layout, setLayout] = useState<LayoutNode | null>(null);
@@ -335,12 +342,14 @@ function ChatTabInner({
       !remote && settings.terminalResumeAgentSessions && agentSessionSupported(tool)
         ? { resumeId: opts?.resumeAgentSessionId }
         : undefined;
+    const initialInput = opts?.initialInput?.trim() ? { initialInput: opts.initialInput } : {};
     const spawnOptions = remote
-      ? { remote }
-      : shell === "wsl" || agentSession
+      ? { remote, ...initialInput }
+      : shell === "wsl" || agentSession || opts?.initialInput
         ? {
             ...(shell === "wsl" ? { wslDistro: settings.wslDistro } : {}),
             ...(agentSession ? { agentSession } : {}),
+            ...initialInput,
           }
         : undefined;
     const result = await window.api.ptySpawn(
@@ -834,7 +843,7 @@ function ChatTabInner({
       cwd?: string,
       splitTargetId?: string,
       direction: SplitDirection = "horizontal",
-      opts?: { keepOthersVisible?: boolean },
+      opts?: { keepOthersVisible?: boolean; initialInput?: string },
     ): Promise<PaneInfo | null> => {
       if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
@@ -853,6 +862,7 @@ function ChatTabInner({
         tool || "shell",
         resolveCwd(cwd),
         activeRemoteRef.current,
+        opts?.initialInput ? { initialInput: opts.initialInput } : undefined,
       );
       if (!pane) return null;
 
@@ -1315,6 +1325,50 @@ function ChatTabInner({
 
   const handleNewTerminalRef = useRef(handleNewTerminal);
   handleNewTerminalRef.current = handleNewTerminal;
+
+  /**
+   * Tasks: activate the task's profile (by id, or by name for hand-written files), open a
+   * pane with its agent tool, and have main type the prompt in once the agent is ready.
+   */
+  async function runTask({ prompt, profileId, tool }: RunTaskRequest): Promise<RunTaskResult> {
+    if (addingTerminal || profileBusy || isRestoring()) return { ok: false, reason: "busy" };
+    let profile: ProfileInfo | null = activeProfile ?? null;
+    const wanted = profileId?.trim();
+    if (wanted) {
+      const r = await window.api.profileGroupGetForest();
+      const all = r.success && r.forest ? r.forest.groups.flatMap((g) => g.profiles) : [];
+      profile = all.find((p) => p.id === wanted) ?? all.find((p) => p.name === wanted) ?? null;
+      if (!profile) return { ok: false, reason: "profile-not-found" };
+    }
+    const launchTool = resolveInstalledLaunchTool(tool?.trim() || profile?.defaultTool, data);
+    if (isPlainShellTool(launchTool)) return { ok: false, reason: "no-agent-tool" };
+
+    setAddingTerminal(true);
+    setTerminalError(null);
+    try {
+      if (profile && activeProfile?.id !== profile.id) {
+        await handleActivateProfile(profile);
+      }
+      const cwd = profile?.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
+      const created = await addPane(launchTool, cwd, undefined, "horizontal", {
+        initialInput: prompt,
+      });
+      return created ? { ok: true } : { ok: false, reason: "spawn-failed" };
+    } catch (err) {
+      setTerminalError(err instanceof Error ? err.message : String(err));
+      return { ok: false, reason: "spawn-failed" };
+    } finally {
+      setAddingTerminal(false);
+    }
+  }
+
+  const runTaskRef = useRef(runTask);
+  runTaskRef.current = runTask;
+  useEffect(() => {
+    if (!onRegisterTaskRunner) return;
+    onRegisterTaskRunner((request) => runTaskRef.current(request));
+    return () => onRegisterTaskRunner(null);
+  }, [onRegisterTaskRunner]);
 
   const runSavedCommand = useCallback(
     async (profileId: string, command: string, broadcast: boolean) => {
@@ -2715,6 +2769,7 @@ export const ChatTab = memo(ChatTabInner, (prev, next) => {
     prev.inventoryScanning === next.inventoryScanning &&
     prev.onRegisterCommands === next.onRegisterCommands &&
     prev.onRequestTerminalMode === next.onRequestTerminalMode &&
+    prev.onRegisterTaskRunner === next.onRegisterTaskRunner &&
     inventoryTerminalFingerprint(prev.data) === inventoryTerminalFingerprint(next.data)
   );
 });

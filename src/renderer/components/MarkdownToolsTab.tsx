@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "../i18n/LocaleProvider";
 import { Card } from "./Card";
-import { FlowMarkdownContent } from "./FlowMarkdownContent";
+import { MarkdownContent } from "./MarkdownContent";
 import { SectionHeading } from "./SectionHeading";
 import { StaggerStack } from "./StaggerStack";
 import { ToolsPreviewPane } from "./ToolsPreviewPane";
@@ -83,7 +83,7 @@ export function MarkdownToolsTab() {
                 <p className="text-[13px] text-text-tertiary">{t("markdown.empty")}</p>
               }
             >
-              <FlowMarkdownContent content={input} />
+              <MarkdownContent content={input} />
             </ToolsPreviewPane>
           </div>
 

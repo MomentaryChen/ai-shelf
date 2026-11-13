@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { cpus, freemem, platform, release, arch, totalmem, type CpuInfo } from "node:os";
 import { run } from "../utils/exec.js";
-import { spawnAgentPrint } from "../flow/claude-spawn.js";
+import { spawnAgentPrint } from "./agent-print-spawn.js";
 import { buildToolLaunchCommand } from "../tool-launch.js";
 import { TOOL_LAUNCH_CMD } from "../tools.js";
-import { applyFlowClaudeDefaultModel } from "../shared/claude-tool-args.js";
+import { applyClaudeDefaultModel } from "../shared/claude-tool-args.js";
 import {
   buildEnvAnalyzePrompt,
   extractReportMarkdown,
@@ -158,7 +158,7 @@ export async function analyzeHostEnv(locale: "en" | "zh"): Promise<AnalyzeEnvRes
     const prompt = buildEnvAnalyzePrompt(snapshot, locale);
     const launchCommand = buildToolLaunchCommand(
       TOOL_LAUNCH_CMD.claude ?? "claude",
-      applyFlowClaudeDefaultModel(""),
+      applyClaudeDefaultModel(""),
     );
 
     return await new Promise((resolve) => {
