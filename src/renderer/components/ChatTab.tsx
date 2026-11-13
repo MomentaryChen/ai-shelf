@@ -907,13 +907,17 @@ function ChatTabInner({
         setTerminalError(t("git.worktree.err.noPane"));
         return;
       }
+      if (isRestoring()) {
+        setTerminalError(t("chat.err.restoringWait"));
+        return;
+      }
       if (!canAddPane) {
         setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
         return;
       }
       setWorktreePaneId(pane.id);
     },
-    [focusedPaneId, layout, canAddPane, maxPanes, t],
+    [focusedPaneId, layout, isRestoring, canAddPane, maxPanes, t],
   );
 
   /** Split the source pane and start the same tool in the new worktree. */

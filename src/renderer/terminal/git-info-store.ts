@@ -11,6 +11,8 @@ type Entry = { info: GitCwdInfo | null; at: number };
 const cache = new Map<string, Entry>();
 const inflight = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
+/** cwd → number of mounted hooks showing it. */
+const subscribed = new Map<string, number>();
 
 function emit() {
   for (const fn of listeners) fn();
@@ -34,10 +36,13 @@ export function refreshGitInfo(cwd: string, maxAgeMs = FRESH_MS): void {
   inflight.set(key, job);
 }
 
-/** Drop cached answers (e.g. right after `git worktree add`). */
+/**
+ * Mark cached answers stale (e.g. right after `git worktree add`) and re-fetch
+ * the cwds on screen. Old values stay visible until the new ones land.
+ */
 export function invalidateGitInfo(): void {
-  cache.clear();
-  emit();
+  for (const entry of cache.values()) entry.at = 0;
+  for (const key of subscribed.keys()) refreshGitInfo(key, 0);
 }
 
 /**
@@ -56,6 +61,7 @@ export function usePaneGitInfo(cwd: string | undefined | null): GitCwdInfo | nul
     }
     const sync = () => setInfo(cache.get(key)?.info ?? null);
     listeners.add(sync);
+    subscribed.set(key, (subscribed.get(key) ?? 0) + 1);
     sync();
     refreshGitInfo(key);
 
@@ -67,6 +73,9 @@ export function usePaneGitInfo(cwd: string | undefined | null): GitCwdInfo | nul
 
     return () => {
       listeners.delete(sync);
+      const left = (subscribed.get(key) ?? 1) - 1;
+      if (left > 0) subscribed.set(key, left);
+      else subscribed.delete(key);
       window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
     };
