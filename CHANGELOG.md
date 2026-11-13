@@ -9,6 +9,43 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-13
+
+Terminals can move into their own windows, profiles can run over SSH, and Windows updates install without the setup wizard.
+
+### Added
+
+- **Title bar** — Mode tabs (Terminal, Inventory, Tools, AI Flow) and the header actions sit in the window caption. Empty space drags the window, and a double-click maximizes it. AI Terminal and Settings keep the native title bar.
+- **Profile view windows** — Drag a pane outside the window to open a view for that profile. A view holds several panes of one profile, refuses a pane from another profile, and comes back with the same layout and position after a restart. Closing the view closes its terminals, and asks first when an agent is busy.
+- **SSH remote profiles** — A profile can run every pane through the local OpenSSH client (host, user, port, jump host, and remote directory). Keys, the agent, and `~/.ssh/config` stay on the machine. A missing client or a failed connection is reported instead of opening a local shell. `ai-shelf session` uses the same path.
+- **Command marks** — OSC 133 marks let you jump between prompts, copy the last command's output, and see its exit code and how long it ran.
+- **Sidebar running lights** — Each terminal row, and each profile row, shows when a command is running, waiting for input, or stalled. Shells that emit OSC 133 are the source of truth, including profiles you are not looking at.
+- **Automatic pane titles** — A program that sets the terminal title (OSC 0 or 2), such as Claude Code's task summary, names the pane. A title you type yourself still wins, and it is not saved across a restart.
+- **Long-command notifications** — A command that runs for at least 10 seconds in a pane you are not watching can raise a notification with the command, the exit status, and the duration. Bell, OSC 9, and OSC 777 notifications use the same rule. The threshold is under Alerts.
+- **OSC 52 clipboard** — A terminal can write the clipboard only when you allow it. The setting is off, ask, or always, and ask is the default. Read requests are ignored.
+- **Command history** — Ctrl/Cmd+Shift+H opens a searchable list for the focused pane or the whole workspace. You can jump to the output, copy it, run the command again, or save it.
+- **Keyboard pane layout** — Swap a pane with its neighbour, nudge the nearest divider, or make every split the same size. The shortcuts can be changed in Settings.
+- **Maximize, font size, path links, and file drop** — Maximize the focused pane without changing the saved layout. Ctrl/Cmd with plus, minus, or 0 changes the terminal font (8–32 pt; 0 returns to 14). A relative `file:line` path is clickable when that file exists. Dropping files into a pane pastes their paths.
+- **Git in the status bar** — The focused pane shows its branch, or a short SHA when detached, plus a mark for a linked worktree and a dot when tracked files have changes. From the pane menu you can open the same tool in a new worktree.
+- **Resume Claude Code** — A restored Claude Code pane continues the previous conversation when the session file is still on disk. The setting is on by default. **Start new conversation** drops the saved id. WSL panes are left unchanged.
+- **Windows setup window** — A setup app in `installer/` can show Install, Update, and Reinstall around the existing NSIS payload, including a folder choice and progress. A scripted `/S` install, or a machine without WebView2, still runs the NSIS wizard. This tag's GitHub asset is still `AI-Shelf-Setup-5.0.0.exe`; the release workflow does not build or attach the custom setup program yet.
+- **Silent desktop updates** — On Windows, an update no longer opens the NSIS wizard. The app shows download progress, warns when a restart would close terminals or stop a flow, and after relaunch links to the release notes. Installing 5.0.0 itself does not show that toast; the next update does.
+- **Billing toast** — Once each day, a short toast appears when the last seven days of spend, Claude extra usage, or a limited Cursor on-demand budget reaches 90%.
+
+### Changed
+
+- **Documentation visuals** — Refreshed README and docs screenshots, and the terminal demo GIFs, for the title bar.
+- **Dialogs** — Dialogs open centered, stay inside the window, and can be dragged by the header. Profile create and settings keep the actions on screen while the form scrolls. Closing a busy pane focuses Cancel. The paste confirmation says that Esc cancels.
+- **Character width** — The terminal uses Unicode 11 widths, so emoji and CJK glyphs take the right number of columns.
+
+### Fixed
+
+- **Window placement** — The main window and AI Terminal remember position, size, and maximized state on this machine, and move onto a connected monitor instead of opening off-screen.
+- **Display scale** — Moving a window onto a monitor with a different scale refits the terminal and the shell.
+- **Costs tab** — The connected-tool count includes local-data tools. Claude extra usage for the billing cycle is shown on its own and is no longer added to the selected period total.
+
+[5.0.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.0.0
+
 ## [4.3.8] - 2026-11-05
 
 AI Flow chat is easier to author, tool previews can be enlarged, and Cursor cost decisions show real spend.

@@ -9,12 +9,14 @@ import {
 } from "./docs-demo-workspace.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN = join(__dirname, "../../../dist/electron/main.js");
+/** App root so Electron reads this repo's package.json (`app.getVersion()`). */
+const APP_ROOT = join(__dirname, "../../..");
 
 export async function launchDocsElectron(): Promise<ElectronApplication> {
   const appDataDir = resetDocsDemoUserData();
   return electron.launch({
-    args: [MAIN, `--user-data-dir=${docsElectronUserDataDir(appDataDir)}`],
+    cwd: APP_ROOT,
+    args: [APP_ROOT, `--user-data-dir=${docsElectronUserDataDir(appDataDir)}`],
     env: docsElectronEnv(appDataDir),
   });
 }

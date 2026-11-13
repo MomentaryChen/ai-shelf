@@ -24,6 +24,7 @@ import {
 import { bindTerminalLinks } from "../terminal/xterm-links";
 import { attachUnicode11 } from "../terminal/xterm-unicode";
 import { bindTerminalCwd } from "../terminal/xterm-cwd";
+import { bindTerminalTitle } from "../terminal/terminal-title";
 import { bindTerminalNotifications } from "../terminal/xterm-notify";
 import type { TerminalNotifyEvent } from "../terminal/terminal-notify";
 import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
@@ -99,6 +100,8 @@ interface Props {
   onOpenInNewWindow?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
   onCwdReport?: (sessionId: string, cwd: string) => void;
+  /** Program-set window title (OSC 0 / 2), normalized; "" clears it. */
+  onTitleReport?: (sessionId: string, title: string) => void;
   /** Pane cwd; relative path links in the output resolve against it. */
   cwd?: string;
   /** Long command finished, BEL, or OSC 9 / 777 — live output only, unfiltered. */
@@ -114,6 +117,7 @@ type TerminalCallbacks = Pick<
   | "onRestart"
   | "onNewConversation"
   | "onCwdReport"
+  | "onTitleReport"
   | "onNewWorktreePane"
   | "onOpenInNewWindow"
   | "onTerminalNotify"
@@ -637,6 +641,9 @@ function EmbeddedTerminalInner({
       currentCwd = cwd;
       callbacksRef.current.onCwdReport?.(sessionId, cwd);
     });
+    const unbindTitle = bindTerminalTitle(term, (title) => {
+      callbacksRef.current.onTitleReport?.(sessionId, title);
+    });
     const unbindNotify = bindTerminalNotifications(term, commandMarks.isLive, (event) => {
       callbacksRef.current.onTerminalNotify?.(sessionId, event);
     });
@@ -942,6 +949,7 @@ function EmbeddedTerminalInner({
       unbindImeTrace();
       unbindLinks();
       unbindCwd();
+      unbindTitle();
       unbindNotify();
       unregisterHistory();
       commandMarks.dispose();
@@ -1107,6 +1115,8 @@ export function EmbeddedTerminal({
   onRestart,
   onNewConversation,
   onCwdReport,
+
+  onTitleReport,
   onNewWorktreePane,
   onOpenInNewWindow,
   onTerminalNotify,
@@ -1119,6 +1129,8 @@ export function EmbeddedTerminal({
     onRestart,
     onNewConversation,
     onCwdReport,
+
+    onTitleReport,
     onNewWorktreePane,
     onOpenInNewWindow,
     onTerminalNotify,
@@ -1131,6 +1143,8 @@ export function EmbeddedTerminal({
       onRestart,
       onNewConversation,
       onCwdReport,
+
+      onTitleReport,
       onNewWorktreePane,
       onOpenInNewWindow,
       onTerminalNotify,
