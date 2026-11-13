@@ -854,41 +854,47 @@ html[data-app-theme="dark"] {
   --accent-surface-foreground: var(--color-chrome-text);
   --input: var(--color-chrome-border-input);
   --ring: var(--color-chrome-border-focus);
-  --color-chrome-bg: #0a0a0a;
-  --color-chrome-bg-top: #0c0c0e;
-  --color-chrome-bg-bottom: #09090b;
-  --color-chrome-surface: #111114;
-  --color-chrome-surface-raised: #141414;
-  --color-chrome-surface-focus: #131316;
-  --color-chrome-surface-hover: #1a1a1a;
-  --color-chrome-surface-hover-strong: #1f1f1f;
-  --color-chrome-surface-menu: #151515;
-  --color-chrome-border: #25252a;
-  --color-chrome-border-subtle: #252525;
-  --color-chrome-border-input: #252528;
-  --color-chrome-border-strong: #2a2a2a;
-  --color-chrome-border-hover: #404040;
-  --color-chrome-border-focus: #2e86b0;
-  --color-chrome-text: #e8e8ec;
-  --color-chrome-text-secondary: #b4b4ba;
-  --color-chrome-text-muted: #8b8b92;
-  --color-chrome-text-subtle: #7c7c84;
-  --color-chrome-text-faint: #6b6b72;
-  --color-chrome-text-dim: #6a6a72;
-  --color-chrome-accent-text: #8ab4ff;
+  /* Terminal chrome — one cool blue-grey ramp, hue-matched to --color-bg-* above so the
+     title bar does not shift hue between modes. Layers, darkest first: terminal-bg <
+     chrome-bg < surface < surface-raised < hover. Borders step subtle < default < input <
+     strong < hover; accent-text / border-focus / active profile all derive from ui-accent.
+     chrome-bg, chrome-text-secondary and terminal-bg must stay opaque hex (Electron
+     caption buttons and xterm read the raw values). */
+  --color-chrome-bg: #0d1117;
+  --color-chrome-bg-top: #0f141b;
+  --color-chrome-bg-bottom: #0b0f14;
+  --color-chrome-surface: #131922;
+  --color-chrome-surface-raised: #171e28;
+  --color-chrome-surface-focus: #161c26;
+  --color-chrome-surface-hover: #1a222d;
+  --color-chrome-surface-hover-strong: #202a37;
+  --color-chrome-surface-menu: #161c26;
+  --color-chrome-border: #232b36;
+  --color-chrome-border-subtle: #1b222c;
+  --color-chrome-border-input: #283140;
+  --color-chrome-border-strong: #303a48;
+  --color-chrome-border-hover: #44505f;
+  --color-chrome-border-focus: #2b90c2;
+  --color-chrome-text: #e6edf3;
+  --color-chrome-text-secondary: #b1bac4;
+  --color-chrome-text-muted: #8b949e;
+  --color-chrome-text-subtle: #7d8590;
+  --color-chrome-text-faint: #6e7681;
+  --color-chrome-text-dim: #656d76;
+  --color-chrome-accent-text: #7dd3fc;
   --color-chrome-ui-accent: #38bdf8;
   --color-chrome-ui-accent-soft: rgb(56 189 248 / 0.14);
-  --color-chrome-hover: rgb(255 255 255 / 0.04);
-  --color-chrome-hover-strong: rgb(255 255 255 / 0.06);
-  --color-chrome-profile-card-bg: #111113;
-  --color-chrome-profile-card-active-bg: #12161f;
-  --color-chrome-profile-card-border: #303035;
-  --color-chrome-profile-card-active-border: #3a5070;
-  --color-chrome-badge-bg: #1e1e22;
-  --color-chrome-sessions-well-bg: rgb(0 0 0 / 0.22);
-  --color-chrome-pane-header-unfocused: rgb(0 0 0 / 0.4);
-  --color-sidebar-accent: rgb(255 255 255 / 0.06);
-  --color-terminal-bg: #0c0c0c;
+  --color-chrome-hover: rgb(177 186 196 / 0.06);
+  --color-chrome-hover-strong: rgb(177 186 196 / 0.1);
+  --color-chrome-profile-card-bg: #131922;
+  --color-chrome-profile-card-active-bg: #10202c;
+  --color-chrome-profile-card-border: #283140;
+  --color-chrome-profile-card-active-border: #1f6a8f;
+  --color-chrome-badge-bg: #1c2430;
+  --color-chrome-sessions-well-bg: rgb(1 4 9 / 0.3);
+  --color-chrome-pane-header-unfocused: rgb(1 4 9 / 0.4);
+  --color-sidebar-accent: rgb(177 186 196 / 0.08);
+  --color-terminal-bg: #0a0d12;
   /* Warm alias bridge — keep legacy var(--ink)/var(--sand) readable in dark */
   --cream: var(--color-bg-primary);
   --surface: var(--color-bg-card);
