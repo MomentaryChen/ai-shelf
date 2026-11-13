@@ -73,6 +73,8 @@ export interface ChatSettings {
   terminalCopyOnSelect: boolean;
   /** Prefer WebGL terminal renderer; falls back to canvas if unavailable. */
   terminalWebglEnabled: boolean;
+  /** Reopen AI agent panes (Claude Code) with their previous conversation after a restart. */
+  terminalResumeAgentSessions: boolean;
   /** Ask before pasting text over the line / size thresholds below. */
   terminalPasteConfirm: boolean;
   /** Confirm pastes with more lines than this. */
@@ -261,6 +263,7 @@ const DEFAULTS: ChatSettings = {
   terminalRightClickPaste: true,
   terminalCopyOnSelect: true,
   terminalWebglEnabled: true,
+  terminalResumeAgentSessions: true,
   terminalPasteConfirm: true,
   terminalPasteConfirmMaxLines: DEFAULT_PASTE_CONFIRM_MAX_LINES,
   terminalPasteConfirmMaxChars: DEFAULT_PASTE_CONFIRM_MAX_CHARS,
@@ -319,6 +322,7 @@ export function loadSettings(): ChatSettings {
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       terminalWebglEnabled: normalizeWebglEnabled(stored.terminalWebglEnabled),
+      terminalResumeAgentSessions: normalizePaneAgentBool(stored.terminalResumeAgentSessions, true),
       terminalPasteConfirm: normalizePaneAgentBool(stored.terminalPasteConfirm, true),
       terminalPasteConfirmMaxLines: normalizePasteConfirmMaxLines(stored.terminalPasteConfirmMaxLines),
       terminalPasteConfirmMaxChars: normalizePasteConfirmMaxChars(stored.terminalPasteConfirmMaxChars),

@@ -9,6 +9,8 @@ export interface PaneInfo {
   cwd: string;
   /** User-defined tab label; falls back to tool name when empty. */
   title?: string;
+  /** AI agent conversation id (Claude Code `--session-id`), resumed on restore. */
+  agentSessionId?: string;
 }
 
 export type SplitDirection = "horizontal" | "vertical";

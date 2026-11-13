@@ -35,6 +35,11 @@ import {
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
 
+export interface SpawnPaneOptions {
+  /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
+  resumeAgentSessionId?: string;
+}
+
 interface ProfileLiveState {
   layout: LayoutNode;
   focusedPaneId: string | null;
@@ -68,6 +73,7 @@ type SpawnPaneFn = (
   tool: string,
   cwd: string,
   remote: RemoteSshConfig | null,
+  opts?: SpawnPaneOptions,
 ) => Promise<PaneInfo | null>;
 
 async function reconcileLayoutPtys(
@@ -81,7 +87,9 @@ async function reconcileLayoutPtys(
     if (attached.alive) continue;
 
     window.api.ptyKill(pane.sessionId);
-    let replacement = await spawnPane(pane.tool, pane.cwd, remote);
+    let replacement = await spawnPane(pane.tool, pane.cwd, remote, {
+      resumeAgentSessionId: pane.agentSessionId,
+    });
     if (!replacement && pane.tool !== "shell") {
       replacement = await spawnPane("shell", pane.cwd, remote);
     }
@@ -266,7 +274,9 @@ export function useProfileWorkspace(
           };
         }
         const paneCwd = slot.cwd?.trim() || cwdDefault;
-        let pane = await spawnPane(slot.tool, paneCwd, profile.remote ?? null);
+        let pane = await spawnPane(slot.tool, paneCwd, profile.remote ?? null, {
+          resumeAgentSessionId: slot.agentSessionId,
+        });
         if (!pane && slot.tool !== "shell") {
           pane = await spawnPane("shell", paneCwd, profile.remote ?? null);
         }

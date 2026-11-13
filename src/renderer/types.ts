@@ -877,9 +877,24 @@ export interface ElectronAPI {
     /**
      * `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro.
      * `remote` runs the pane over ssh (no local fallback); `code: "SSH_NOT_FOUND"` when no client.
+     * `agentSession` opts into agent conversation resume (Claude Code): resume
+     * `resumeId` when its transcript exists, else start with a new session id.
      */
-    options?: { wslDistro?: string; remote?: RemoteSshConfig | null },
-  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string; code?: string }>;
+    options?: {
+      wslDistro?: string;
+      remote?: RemoteSshConfig | null;
+      agentSession?: { resumeId?: string };
+    },
+  ) => Promise<{
+    success: boolean;
+    sessionId?: string;
+    cwd?: string;
+    error?: string;
+    code?: string;
+    /** Agent conversation id the pane now holds (resume on next launch). */
+    agentSessionId?: string;
+    agentSessionResumed?: boolean;
+  }>;
   /** Local ssh client used by remote (SSH) profiles; `path` null when none is installed. */
   sshClientStatus: () => Promise<{ found: boolean; path: string | null }>;
   /** File picker for an SSH private key (opens in ~/.ssh); null when canceled. */

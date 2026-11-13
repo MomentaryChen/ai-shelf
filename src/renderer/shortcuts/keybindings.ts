@@ -54,6 +54,9 @@ export const SHORTCUT_IDS = [
   "paste",
   "pasteAlt",
   "selectAll",
+  "jumpPrevPrompt",
+  "jumpNextPrompt",
+  "copyLastCommandOutput",
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_IDS)[number];
@@ -94,6 +97,9 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "paste", section: "terminal" },
   { id: "pasteAlt", section: "terminal" },
   { id: "selectAll", section: "terminal" },
+  { id: "jumpPrevPrompt", section: "terminal" },
+  { id: "jumpNextPrompt", section: "terminal" },
+  { id: "copyLastCommandOutput", section: "terminal" },
 ];
 
 const DEF_BY_ID = new Map(SHORTCUT_DEFS.map((d) => [d.id, d]));
@@ -144,6 +150,10 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
         : platform === "win"
           ? { key: "a", mod: true }
           : { key: "a", mod: true, shift: true },
+    // OSC 133 command marks; only consumed while shell integration marks exist.
+    jumpPrevPrompt: { key: "arrowup", mod: true, shift: true },
+    jumpNextPrompt: { key: "arrowdown", mod: true, shift: true },
+    copyLastCommandOutput: { key: "o", mod: true, shift: true },
   };
 }
 

@@ -147,6 +147,9 @@ export interface TerminalClipboardOptions {
   onOpenFind?: () => void;
   onClear?: () => void;
   onRestart?: () => void;
+  /** Restart an agent pane with a brand-new conversation (menu item shown while this returns true). */
+  onNewConversation?: () => void;
+  canStartNewConversation?: () => boolean;
   /** "New pane in git worktree" entry. */
   onNewWorktreePane?: () => void;
   onExportOutput?: () => void;
@@ -161,6 +164,17 @@ export interface TerminalClipboardOptions {
    * When set, native DOM paste events are routed here too.
    */
   onPaste?: (text: string, term: Terminal) => void;
+  /** OSC 133 command-mark actions. Unavailable → shortcut keys pass through to the shell. */
+  commandMarks?: TerminalCommandMarkActions;
+}
+
+export interface TerminalCommandMarkActions {
+  /** Shell integration marks were ever received (menu items shown only then). */
+  hasMarks: () => boolean;
+  canJump: () => boolean;
+  canCopyLastOutput: () => boolean;
+  jumpPrompt: (direction: "prev" | "next") => void;
+  copyLastOutput: () => void;
 }
 
 /** Stop Electron Edit-menu accelerators from duplicating our handler. */
@@ -192,6 +206,9 @@ const TERMINAL_SHORTCUT_IDS: readonly ShortcutId[] = [
   "selectAll",
   "clearScreen",
   "restartSession",
+  "jumpPrevPrompt",
+  "jumpNextPrompt",
+  "copyLastCommandOutput",
 ];
 
 /**
@@ -333,6 +350,17 @@ export function bindTerminalClipboard(
         consumeKey(ev);
         options.onRestart?.();
         return false;
+      case "jumpPrevPrompt":
+      case "jumpNextPrompt":
+        if (!options.commandMarks?.canJump()) break;
+        consumeKey(ev);
+        options.commandMarks.jumpPrompt(match.id === "jumpPrevPrompt" ? "prev" : "next");
+        return false;
+      case "copyLastCommandOutput":
+        if (!options.commandMarks?.canCopyLastOutput()) break;
+        consumeKey(ev);
+        options.commandMarks.copyLastOutput();
+        return false;
       default:
         break;
     }
@@ -410,8 +438,22 @@ export function bindTerminalClipboard(
     if (options.onCopyOutputForIssue) {
       addItem(getStoredT("terminal.ctx.copyOutputForIssue"), true, options.onCopyOutputForIssue);
     }
+    const marks = options.commandMarks;
+    if (marks?.hasMarks()) {
+      const canJump = marks.canJump();
+      addItem(getStoredT("terminal.marks.jumpPrev"), canJump, () => marks.jumpPrompt("prev"));
+      addItem(getStoredT("terminal.marks.jumpNext"), canJump, () => marks.jumpPrompt("next"));
+      addItem(
+        getStoredT("terminal.marks.copyLastOutput"),
+        marks.canCopyLastOutput(),
+        marks.copyLastOutput,
+      );
+    }
     if (options.onClear) addItem(getStoredT("terminal.ctx.clear"), true, options.onClear);
     if (options.onRestart) addItem(getStoredT("terminal.ctx.restart"), true, options.onRestart);
+    if (options.onNewConversation && (options.canStartNewConversation?.() ?? true)) {
+      addItem(getStoredT("terminal.ctx.newConversation"), true, options.onNewConversation);
+    }
     if (options.onNewWorktreePane) {
       addItem(getStoredT("git.worktree.ctx"), true, options.onNewWorktreePane);
     }

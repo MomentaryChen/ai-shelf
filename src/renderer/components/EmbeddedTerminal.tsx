@@ -5,7 +5,9 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import type { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
-import { bindTerminalClipboard } from "../terminal/xterm-clipboard";
+import { bindTerminalClipboard, writeClipboardText } from "../terminal/xterm-clipboard";
+import { bindTerminalCommandMarks } from "../terminal/xterm-command-marks";
+import { getCommandStatus, setCommandStatus } from "../terminal/command-marks";
 import {
   attachTerminalSearch,
   buildSearchSnapshot,
@@ -48,6 +50,7 @@ import { getXtermTheme } from "../app-theme";
 import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
 import { attachTerminalWebgl } from "../terminal/xterm-webgl";
+import { watchDevicePixelRatio } from "../terminal/dpr-watch";
 import { OS_RESUME_EVENT } from "../os-resume";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
@@ -77,6 +80,8 @@ interface Props {
   onSessionLost?: (sessionId: string) => void;
   onWrite?: (data: string, sessionId: string) => void;
   onRestart?: () => void;
+  /** Agent panes only: restart with a brand-new conversation (context-menu item). */
+  onNewConversation?: () => void;
   /** Context menu: open a new pane in a git worktree of this pane's repo. */
   onNewWorktreePane?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
@@ -86,7 +91,7 @@ interface Props {
 /** Callback props — routed through a ref so they never force an xterm re-render. */
 type TerminalCallbacks = Pick<
   Props,
-  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onCwdReport" | "onNewWorktreePane"
+  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onNewConversation" | "onCwdReport" | "onNewWorktreePane"
 >;
 
 type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
@@ -475,10 +480,25 @@ function EmbeddedTerminalInner({
     };
     const unregisterClear = registerTerminalClear(sessionId, doClear);
     let pasteToThisPaneOnly = false;
+    // OSC 133 prompt / output marks. Not live until the replayed backlog is parsed.
+    const commandMarks = bindTerminalCommandMarks(term, {
+      onStatus: (status, live) => {
+        if (!live) {
+          // Replayed backlog has no timings; keep a stored result unless the replay
+          // shows a different one (a command finished while this pane was unmounted).
+          const prev = getCommandStatus(sessionId);
+          if (!status || (prev && prev.exitCode === status.exitCode)) return;
+        }
+        setCommandStatus(sessionId, status);
+      },
+    });
+    commandMarks.setLive(false);
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
       onRestart: () => callbacksRef.current.onRestart?.(),
+      onNewConversation: () => callbacksRef.current.onNewConversation?.(),
+      canStartNewConversation: () => Boolean(callbacksRef.current.onNewConversation),
       onNewWorktreePane: () => callbacksRef.current.onNewWorktreePane?.(),
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
@@ -486,6 +506,16 @@ function EmbeddedTerminalInner({
       getCopyOnSelect: () => copyOnSelectRef.current,
       // Paste confirmation (multi-line / large / broadcast) decides the targets.
       onPaste: (text) => requestPasteRef.current(text),
+      commandMarks: {
+        hasMarks: commandMarks.hasMarks,
+        canJump: commandMarks.canJump,
+        canCopyLastOutput: commandMarks.canCopyLastOutput,
+        jumpPrompt: (direction) => void commandMarks.jumpPrompt(direction),
+        copyLastOutput: () => {
+          const text = commandMarks.lastOutputText();
+          if (text) void writeClipboardText(text);
+        },
+      },
     });
     const pasteLocal = (text: string) => {
       if (cancelled || exited) return;
@@ -692,6 +722,7 @@ function EmbeddedTerminalInner({
         typeof r.endSeq === "number" ? r.endSeq : (r.buffer?.length ?? 0),
       );
       for (const chunk of writes) writeSafe(chunk);
+      term.write("", () => commandMarks.setLive(true));
       replayed = true;
       scheduleFit(true);
     };
@@ -773,6 +804,18 @@ function EmbeddedTerminalInner({
     };
     window.addEventListener(OS_RESUME_EVENT, onOsResume);
 
+    // A monitor with another scale changes DPR, often with no CSS resize.
+    // xterm redraws glyphs itself; refit so cols/rows and the PTY follow.
+    const unwatchDpr = watchDevicePixelRatio(window, () => {
+      if (cancelled) return;
+      scheduleFit(true);
+      try {
+        term.refresh(0, Math.max(term.rows - 1, 0));
+      } catch {
+        /* disposed mid-change */
+      }
+    });
+
     return () => {
       cancelled = true;
       opened = false;
@@ -791,6 +834,7 @@ function EmbeddedTerminalInner({
       el.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("resize", onWindowResize);
       window.removeEventListener(OS_RESUME_EVENT, onOsResume);
+      unwatchDpr();
       document.fonts.removeEventListener("loadingdone", onFontsLoadingDone);
       unregisterClear();
       unregisterPaste();
@@ -801,6 +845,7 @@ function EmbeddedTerminalInner({
       unbindImeTrace();
       unbindLinks();
       unbindCwd();
+      commandMarks.dispose();
       webgl?.dispose();
       ro.disconnect();
       searchAddon.dispose();
@@ -956,6 +1001,7 @@ export function EmbeddedTerminal({
   onSessionLost,
   onWrite,
   onRestart,
+  onNewConversation,
   onCwdReport,
   onNewWorktreePane,
   ...dataProps
@@ -965,6 +1011,7 @@ export function EmbeddedTerminal({
     onSessionLost,
     onWrite,
     onRestart,
+    onNewConversation,
     onCwdReport,
     onNewWorktreePane,
   });
@@ -974,6 +1021,7 @@ export function EmbeddedTerminal({
       onSessionLost,
       onWrite,
       onRestart,
+      onNewConversation,
       onCwdReport,
       onNewWorktreePane,
     };

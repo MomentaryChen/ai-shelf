@@ -5,6 +5,8 @@ export interface SavedPaneSlot {
   tool: string;
   cwd: string;
   title?: string;
+  /** AI agent conversation id to resume when the pane is restored (optional; older layouts omit it). */
+  agentSessionId?: string;
 }
 
 export type SerializedLayoutNode =
@@ -30,6 +32,7 @@ export function serializeLayout(root: LayoutNode): {
       const slot: SavedPaneSlot = { tool: node.pane.tool, cwd: node.pane.cwd };
       const title = node.pane.title?.trim();
       if (title) slot.title = title;
+      if (node.pane.agentSessionId) slot.agentSessionId = node.pane.agentSessionId;
       panes.push(slot);
       return { kind: "pane", index };
     }

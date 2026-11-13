@@ -243,7 +243,7 @@ export function ProfileCreateDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="flex max-w-md flex-col overflow-hidden"
+        className="flex max-h-[min(90vh,720px)] max-w-md flex-col overflow-hidden p-0"
         onOpenAutoFocus={(e) => {
           // Radix focuses the first tabbable (the "start from" select) by default;
           // land the caret in the name field instead, like the pre-shadcn dialog.
@@ -251,17 +251,19 @@ export function ProfileCreateDialog({
           nameInputRef.current?.focus();
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b border-chrome-border-subtle px-5 py-4">
           <DialogTitle className="text-[15px]">{t("profile.dialog.createTitle")}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-        <ProfileDialogTabs
-          value={tab}
-          onChange={setTab}
-          remoteEnabled={remoteDraft.enabled}
-          remoteInvalid={remoteTouched && remoteInvalid !== null}
-        />
-        <div className="-mx-5 min-h-0 flex-1 overflow-y-auto px-5 py-0.5">
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+        <div className="shrink-0 px-5 pt-3">
+          <ProfileDialogTabs
+            value={tab}
+            onChange={setTab}
+            remoteEnabled={remoteDraft.enabled}
+            remoteInvalid={remoteTouched && remoteInvalid !== null}
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 pb-4">
         {tab === "general" ? (
         <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general">
         <fieldset className="mb-4">
@@ -437,7 +439,7 @@ export function ProfileCreateDialog({
           </div>
         </fieldset>
 
-        <Label className="mb-5 flex cursor-pointer items-center gap-2 rounded-md border border-chrome-border-subtle px-3 py-2.5 text-[13px] font-normal text-chrome-text-secondary">
+        <Label className="mb-1 flex cursor-pointer items-center gap-2 rounded-md border border-chrome-border-subtle px-3 py-2.5 text-[13px] font-normal text-chrome-text-secondary">
           <Checkbox checked={broadcastInput} onCheckedChange={(v) => setBroadcastInput(v === true)} />
           {t("profile.syncBroadcast")}
         </Label>
@@ -455,11 +457,11 @@ export function ProfileCreateDialog({
         </div>
 
         {submitError ? (
-          <p role="alert" className="mt-2 text-[12px] text-fail">
+          <p role="alert" className="shrink-0 px-5 pb-3 text-[12px] text-fail">
             {submitError}
           </p>
         ) : null}
-        <DialogFooter className="mt-2">
+        <DialogFooter className="shrink-0 border-t border-chrome-border-subtle px-5 py-4">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t("profile.dialog.cancel")}
           </Button>

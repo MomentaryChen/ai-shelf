@@ -34,6 +34,8 @@ import { sortProviderEntries } from "../tool-sort.js";
 import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { testSshConnection } from "./ssh-test.js";
+import { planAgentSessionLaunch } from "../shared/agent-session-resume.js";
+import { claudeConfigDirForEnv, claudeTranscriptExists } from "./agent-session.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import {
@@ -175,6 +177,12 @@ import { registerPortsHandlers } from "./ports-handlers.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
 import { registerGitHandlers } from "./git-handlers.js";
 import { initSystemResume } from "./system-resume.js";
+import {
+  boundsCenteredOnWindow,
+  getInitialWindowBounds,
+  initDisplayWatcher,
+  trackWindowState,
+} from "./window-state.js";
 import { ptyWakeResizeSteps } from "../shared/system-resume.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
@@ -517,18 +525,28 @@ function attachWindow(win: BrowserWindow, titleBase: string) {
   bindWindowTitle(win, titleBase);
 }
 
+const TERMINAL_WINDOW_SIZE = { width: 1200, height: 800 };
+const TERMINAL_WINDOW_MIN = { width: 900, height: 600 };
+
 function createWindow() {
+  const { isMaximized, ...bounds } = getInitialWindowBounds(
+    "main",
+    TERMINAL_WINDOW_SIZE,
+    TERMINAL_WINDOW_MIN,
+  );
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    ...bounds,
+    minWidth: TERMINAL_WINDOW_MIN.width,
+    minHeight: TERMINAL_WINDOW_MIN.height,
     title: formatWindowTitle("AI Shelf"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
+
+  if (isMaximized) mainWindow.maximize();
+  trackWindowState(mainWindow, "main");
 
   mainWindow.loadURL(getRendererPageUrl());
   attachWindow(mainWindow, "AI Shelf");
@@ -539,22 +557,29 @@ function createWindow() {
   });
 }
 
-function createChatWindow() {
+function createChatWindow(opener?: BrowserWindow | null) {
   if (chatWindow && !chatWindow.isDestroyed()) {
     chatWindow.focus();
     return;
   }
+  const { isMaximized, ...bounds } = getInitialWindowBounds(
+    "chat",
+    TERMINAL_WINDOW_SIZE,
+    TERMINAL_WINDOW_MIN,
+    opener,
+  );
   chatWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    ...bounds,
+    minWidth: TERMINAL_WINDOW_MIN.width,
+    minHeight: TERMINAL_WINDOW_MIN.height,
     title: formatWindowTitle("AI Terminal"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
+  if (isMaximized) chatWindow.maximize();
+  trackWindowState(chatWindow, "chat");
   chatWindow.loadURL(getRendererPageUrl("chat"));
   attachWindow(chatWindow, "AI Terminal");
   bindMinimizeToTray(chatWindow);
@@ -563,14 +588,20 @@ function createChatWindow() {
   });
 }
 
-function createSettingsWindow() {
+/**
+ * Short-lived settings dialog: owned by the window that opened it, so it stays above
+ * that window and opens centered on the same monitor.
+ */
+function createSettingsWindow(opener?: BrowserWindow | null) {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.focus();
     return;
   }
+  const size = { width: 680, height: 760 };
+  const parent = opener && !opener.isDestroyed() ? opener : (mainWindow ?? undefined);
   settingsWindow = new BrowserWindow({
-    width: 680,
-    height: 760,
+    ...(boundsCenteredOnWindow(size, parent) ?? size),
+    parent,
     minWidth: 560,
     minHeight: 560,
     title: formatWindowTitle("Terminal Settings"),
@@ -586,12 +617,12 @@ function createSettingsWindow() {
   });
 }
 
-ipcMain.handle("open-chat-window", () => {
-  createChatWindow();
+ipcMain.handle("open-chat-window", (event) => {
+  createChatWindow(BrowserWindow.fromWebContents(event.sender));
 });
 
-ipcMain.handle("open-settings-window", () => {
-  createSettingsWindow();
+ipcMain.handle("open-settings-window", (event) => {
+  createSettingsWindow(BrowserWindow.fromWebContents(event.sender));
 });
 
 ipcMain.handle("toggle-devtools", (event) => {
@@ -1812,7 +1843,11 @@ ipcMain.handle(
     cwd?: string,
     extraArgs?: string,
     shell?: string,
-    spawnOptions?: { wslDistro?: unknown; remote?: unknown },
+    spawnOptions?: {
+      wslDistro?: unknown;
+      remote?: unknown;
+      agentSession?: { resumeId?: unknown };
+    },
   ) => {
     let pty: PtyModule;
     try {
@@ -1821,12 +1856,6 @@ ipcMain.handle(
       return { success: false, error: (err as Error).message };
     }
     const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
-    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
-    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
-
-    // Date.now() alone collides when the same tool spawns twice in one ms.
-    const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
-
     // SSH remote profile: never fall back to a local shell (see resolvePtySpawnPlan).
     const hasRemote = spawnOptions?.remote !== undefined && spawnOptions.remote !== null;
     const remote = hasRemote ? normalizeRemoteSshConfig(spawnOptions?.remote) : null;
@@ -1860,6 +1889,32 @@ ipcMain.handle(
       return { success: false, error: workDirResult.error };
     }
     const workDir = workDirResult.dir;
+
+    // Agent conversation resume (the renderer opts in via `agentSession`). Skipped
+    // under WSL / SSH: the transcript lives on the other machine, not visible from here.
+    let launchArgs = extraArgs;
+    let agentSessionId: string | undefined;
+    let agentSessionResumed = false;
+    if (!shellOnly && !remote && spawnOptions?.agentSession && shell !== "wsl") {
+      const resumeId = spawnOptions.agentSession.resumeId;
+      const configDir = claudeConfigDirForEnv(process.env);
+      const sessionPlan = planAgentSessionLaunch({
+        tool,
+        extraArgs,
+        resumeId: typeof resumeId === "string" ? resumeId : undefined,
+        transcriptExists: (id) => claudeTranscriptExists(configDir, workDir, id),
+        newId: randomUUID,
+      });
+      launchArgs = sessionPlan.extraArgs;
+      agentSessionId = sessionPlan.sessionId;
+      agentSessionResumed = sessionPlan.resumed;
+    }
+
+    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, launchArgs) ?? "");
+    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
+
+    // Date.now() alone collides when the same tool spawns twice in one ms.
+    const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
     // OSC 7 hooks so `cd` updates the status bar without respawning the PTY.
     // If script install fails, still spawn — cwd just won't track until restart succeeds.
@@ -1958,7 +2013,13 @@ ipcMain.handle(
       const reportedCwd = remote
         ? `${remote.user ? `${remote.user}@` : ""}${remote.host}:${remote.cwd || "~"}`
         : workDir;
-      return { success: true, sessionId, cwd: reportedCwd };
+      return {
+        success: true,
+        sessionId,
+        cwd: reportedCwd,
+        agentSessionId,
+        agentSessionResumed,
+      };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
@@ -3226,6 +3287,7 @@ app.whenReady().then(async () => {
 
   setupAppMenu();
   createWindow();
+  initDisplayWatcher();
   initSystemResume({ wakePtys: wakePtySessions });
 
   if (trayEnabled) {
