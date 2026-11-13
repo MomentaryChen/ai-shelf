@@ -96,6 +96,7 @@ import {
   displayLayoutWithoutPoppedOut,
   focusAfterPopOut,
   withoutPoppedOut,
+  splitNextToPane,
 } from "../terminal/popout-panes";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -395,6 +396,8 @@ function ChatTabInner({
     persistCurrentProfile,
     flushPersistCurrentProfile,
     closePaneInStashedProfile,
+    findStashedProfileOfPane,
+    insertPaneInStashedProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -1575,11 +1578,89 @@ function ChatTabInner({
     setFocusedPaneId((prev) => focusAfterPopOut(layoutRef.current, hidden, paneId, prev));
   }
 
-  /** Pane came back from its pop-out window (dock / close / window gone). */
+  const resolveProfileByKey = (workspaceId: string, profileId: string): ProfileInfo | null =>
+    allProfiles.find((p) => p.id === profileId && p.workspaceId === workspaceId) ??
+    allProfiles.find((p) => p.id === profileId) ??
+    null;
+
+  /**
+   * "New terminal" pressed inside a pop-out window. This window owns spawning and
+   * the layout: the pane is added next to `anchorPaneId` in that pane's profile
+   * (active or stashed) and shown in the same pop-out window, never here.
+   * Returns a localized error, or null on success.
+   */
+  async function spawnPaneForPopout(anchorPaneId: string): Promise<string | null> {
+    if (isRestoring()) return t("chat.err.restoringWait");
+    const activeLayout = layoutRef.current;
+    const inActive = Boolean(activeLayout && findPane(activeLayout, anchorPaneId));
+    const stashed = inActive ? null : findStashedProfileOfPane(anchorPaneId);
+    const siblings = inActive ? collectPanes(activeLayout) : stashed?.panes;
+    const anchor = siblings?.find((p) => p.id === anchorPaneId);
+    if (!siblings || !anchor) return t("pane.popout.missing");
+    if (siblings.length >= maxPanes) return t("chat.err.maxPanes", { max: maxPanes });
+    // Spawn on the anchor profile's target (remote / default cwd), not the active one's.
+    const stashedProfile = stashed
+      ? resolveProfileByKey(stashed.workspaceId, stashed.profileId)
+      : null;
+    if (stashed && !stashedProfile) return t("pane.popout.missing");
+    const remote = stashedProfile ? (stashedProfile.remote ?? null) : activeRemoteRef.current;
+    const cwd =
+      anchor.cwd || (stashedProfile ? (stashedProfile.defaultCwd?.trim() ?? "") : resolveCwd());
+    const pane = await spawnPaneResilient(
+      resolveLaunchTool(anchor.tool, availableTools),
+      cwd,
+      remote,
+    );
+    if (!pane) return t("chat.err.cannotOpen");
+
+    const attached = await window.api.panePopoutAttach({
+      anchorPaneId,
+      pane: {
+        id: pane.id,
+        tool: pane.tool,
+        sessionId: pane.sessionId,
+        cwd: pane.cwd,
+        ...(pane.agentSessionId ? { agentSessionId: pane.agentSessionId } : {}),
+      },
+      label: paneDisplayLabels([...siblings, pane])[pane.id] ?? paneDisplayLabel(pane),
+    });
+    if (!attached.ok) {
+      window.api.ptyKill(pane.sessionId);
+      return t("pane.popout.missing");
+    }
+
+    // Popped out before it enters the layout, so this window never mounts or resizes it.
+    const nextPopped = new Set(poppedOutPaneIdsRef.current);
+    nextPopped.add(pane.id);
+    poppedOutPaneIdsRef.current = nextPopped;
+    setPoppedOutPaneIds(nextPopped);
+    // The profile may have been switched while spawning: look the anchor up again.
+    if (layoutRef.current && findPane(layoutRef.current, anchorPaneId)) {
+      setLayout((prev) => splitNextToPane(prev, anchorPaneId, pane, Infinity) ?? prev);
+      return null;
+    }
+    if (insertPaneInStashedProfile(anchorPaneId, pane, resolveProfileByKey)) return null;
+    // Anchor closed meanwhile: killing the session also drops it from the pop-out.
+    window.api.ptyKill(pane.sessionId);
+    return t("pane.popout.missing");
+  }
+
+  /** Pane came back from its pop-out window (dock / close / window gone), or it wants a new one. */
   const handlePopoutEventRef = useRef((_event: PanePopoutEvent) => {});
   handlePopoutEventRef.current = (event: PanePopoutEvent) => {
     if (event.type === "cwd") {
       reportPaneCwd(event.sessionId, event.cwd);
+      return;
+    }
+    if (event.type === "new-pane") {
+      void spawnPaneForPopout(event.anchorPaneId)
+        .catch((err: unknown) => (err instanceof Error ? err.message : String(err)))
+        .then((error) =>
+          window.api.panePopoutNewPaneResult(
+            event.requestId,
+            error ? { ok: false, error } : { ok: true },
+          ),
+        );
       return;
     }
     const { paneId, reason } = event;
@@ -1593,12 +1674,7 @@ function ChatTabInner({
     if (reason === "closed") {
       // Closing the pop-out closes the pane (PTY already killed by main).
       if (inActiveLayout) performClosePane(paneId);
-      else
-        closePaneInStashedProfile(paneId, (workspaceId, profileId) =>
-          allProfiles.find((p) => p.id === profileId && p.workspaceId === workspaceId) ??
-          allProfiles.find((p) => p.id === profileId) ??
-          null,
-        );
+      else closePaneInStashedProfile(paneId, resolveProfileByKey);
       return;
     }
     if (reason === "docked") {
@@ -1629,6 +1705,14 @@ function ChatTabInner({
       if (!poppedOutPaneIds.has(paneId)) reported.delete(paneId);
     }
   }, [poppedOutPaneIds, paneAgentStates]);
+
+  // Numbered labels ("Shell 1", "Shell 2") shift as panes come and go; keep the pop-outs' in sync.
+  useEffect(() => {
+    for (const paneId of poppedOutPaneIds) {
+      const label = paneLabels[paneId];
+      if (label) window.api.panePopoutReportLabel(paneId, label);
+    }
+  }, [poppedOutPaneIds, paneLabels]);
   /** History panel "save": append to the active profile's saved commands. */
   const saveCommandToProfile = async (command: string): Promise<SaveCommandResult> => {
     const profile = activeProfile;

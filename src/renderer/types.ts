@@ -1123,17 +1123,30 @@ export interface ElectronAPI {
   sendProfileLayoutFlushDone: () => void;
   /** Open a pane in its own window ("drag" = tear-off; main checks the cursor is outside every window). */
   panePopoutOpen: (req: PanePopoutOpenRequest) => Promise<PanePopoutOpenResult>;
-  /** Pop-out window: the pane it shows (null when this window is not a pop-out). */
+  /** Pop-out window: the panes it shows (null when this window is not a pop-out). */
   panePopoutInfo: () => Promise<PanePopoutInfo | null>;
-  /** Dock a popped-out pane back into its origin window (no id = this pop-out's own pane). */
+  /** Dock a popped-out pane back into its origin window (no id = every pane of this pop-out). */
   panePopoutDock: (paneId?: string) => Promise<{ ok: boolean }>;
   panePopoutFocus: (paneId: string) => Promise<{ ok: boolean }>;
-  /** Pop-out window: close it and its pane (kills the PTY). */
-  panePopoutClose: () => Promise<{ ok: boolean }>;
+  /**
+   * Pop-out window: close one of its panes (kills the PTY), or the whole window
+   * without an id. A pane whose agent is busy answers `busy` unless `force`.
+   */
+  panePopoutClose: (paneId?: string, force?: boolean) => Promise<{ ok: boolean; busy?: boolean }>;
+  /** Pop-out window: new terminal in this window, next to `anchorPaneId` (spawned by the origin). */
+  panePopoutNewPane: (anchorPaneId: string) => Promise<PanePopoutNewPaneResult>;
+  /** Origin window: show a freshly spawned pane in the pop-out window that holds `anchorPaneId`. */
+  panePopoutAttach: (req: PanePopoutAttachRequest) => Promise<{ ok: boolean }>;
+  /** Origin window: answer a pop-out's "new-pane" request. */
+  panePopoutNewPaneResult: (requestId: string, result: PanePopoutNewPaneResult) => void;
   /** Origin window: whether a popped-out pane's agent is busy (drives the close prompt). */
   panePopoutReportBusy: (paneId: string, busy: boolean) => void;
+  /** Origin window: a popped-out pane's numbered label. */
+  panePopoutReportLabel: (paneId: string, label: string) => void;
   /** Pop-out window: OSC 7 cwd, forwarded to the origin's layout. */
-  panePopoutReportCwd: (cwd: string) => void;
+  panePopoutReportCwd: (paneId: string, cwd: string) => void;
+  /** Pop-out window: its pane list changed. */
+  onPanePopoutPanes: (cb: (info: PanePopoutInfo) => void) => () => void;
   onPanePopoutEvent: (cb: (event: PanePopoutEvent) => void) => () => void;
   onPanePopoutConfirmClose: (cb: () => void) => () => void;
   usageGetProviders: () => Promise<{
@@ -1403,11 +1416,23 @@ export type PanePopoutOpenResult =
   | { ok: false; reason: "inside-window" | "invalid" | "no-origin" };
 
 export interface PanePopoutInfo {
+  panes: { pane: PanePopoutPane; label: string }[];
+  accentColor: string | null;
+  /** Pane to bring to the front (just created in, or focused from, the origin). */
+  activePaneId?: string;
+}
+
+export interface PanePopoutAttachRequest {
+  anchorPaneId: string;
   pane: PanePopoutPane;
   label: string;
-  accentColor: string | null;
 }
+
+/** `error` is a localized message from the origin window. */
+export type PanePopoutNewPaneResult = { ok: true } | { ok: false; error?: string };
 
 export type PanePopoutEvent =
   | { type: "ended"; paneId: string; reason: "docked" | "closed" | "gone" }
-  | { type: "cwd"; paneId: string; sessionId: string; cwd: string };
+  | { type: "cwd"; paneId: string; sessionId: string; cwd: string }
+  /** A pop-out window asks for a new terminal next to `anchorPaneId`. */
+  | { type: "new-pane"; requestId: string; anchorPaneId: string };

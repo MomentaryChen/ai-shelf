@@ -1,6 +1,7 @@
 /**
  * Bookkeeping for popped-out terminal panes: which pane lives in which pop-out
- * window and which window it came from. Window handles stay in the Electron
+ * window and which window it came from. A pop-out window can hold several
+ * panes (terminals created inside it). Window handles stay in the Electron
  * glue (popout-window.ts); this only tracks ids so it can be unit-tested.
  */
 
@@ -51,11 +52,15 @@ export class PopoutRegistry {
     return null;
   }
 
-  byPopout(popoutId: number): PopoutEntry | null {
-    for (const entry of this.byPaneId.values()) {
-      if (entry.popoutId === popoutId) return entry;
-    }
-    return null;
+  /** Every pane shown in one pop-out window, in the order they were added. */
+  byPopout(popoutId: number): PopoutEntry[] {
+    return [...this.byPaneId.values()].filter((e) => e.popoutId === popoutId);
+  }
+
+  /** The pane's entry, only when it lives in that pop-out window. */
+  inPopout(paneId: string, popoutId: number): PopoutEntry | null {
+    const entry = this.byPaneId.get(paneId);
+    return entry && entry.popoutId === popoutId ? entry : null;
   }
 
   byOrigin(originId: number): PopoutEntry[] {
@@ -67,6 +72,14 @@ export class PopoutRegistry {
     const entry = this.byPaneId.get(paneId);
     if (!entry || entry.originId !== reporterId) return false;
     entry.busy = busy;
+    return true;
+  }
+
+  /** Numbered label from the origin; only the origin of that pane may set it. */
+  setLabel(paneId: string, label: string, reporterId: number): boolean {
+    const entry = this.byPaneId.get(paneId);
+    if (!entry || entry.originId !== reporterId || entry.label === label) return false;
+    entry.label = label;
     return true;
   }
 

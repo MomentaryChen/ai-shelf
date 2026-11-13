@@ -225,9 +225,19 @@ contextBridge.exposeInMainWorld("api", {
   panePopoutInfo: () => ipcRenderer.invoke("pane-popout-info"),
   panePopoutDock: (paneId) => ipcRenderer.invoke("pane-popout-dock", paneId),
   panePopoutFocus: (paneId) => ipcRenderer.invoke("pane-popout-focus", paneId),
-  panePopoutClose: () => ipcRenderer.invoke("pane-popout-close"),
+  panePopoutClose: (paneId, force) => ipcRenderer.invoke("pane-popout-close", paneId, force),
+  panePopoutNewPane: (anchorPaneId) => ipcRenderer.invoke("pane-popout-new", anchorPaneId),
+  panePopoutAttach: (req) => ipcRenderer.invoke("pane-popout-attach", req),
+  panePopoutNewPaneResult: (requestId, result) =>
+    ipcRenderer.send("pane-popout-new-result", requestId, result),
   panePopoutReportBusy: (paneId, busy) => ipcRenderer.send("pane-popout-busy", paneId, busy),
-  panePopoutReportCwd: (cwd) => ipcRenderer.send("pane-popout-cwd", cwd),
+  panePopoutReportLabel: (paneId, label) => ipcRenderer.send("pane-popout-label", paneId, label),
+  panePopoutReportCwd: (paneId, cwd) => ipcRenderer.send("pane-popout-cwd", paneId, cwd),
+  onPanePopoutPanes: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("pane-popout-panes", handler);
+    return () => ipcRenderer.off("pane-popout-panes", handler);
+  },
   onPanePopoutEvent: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("pane-popout-event", handler);

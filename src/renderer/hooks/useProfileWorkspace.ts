@@ -35,7 +35,7 @@ import {
   parseProfileCacheKey,
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
-import { removePaneFromCachedLayout } from "../terminal/popout-panes";
+import { removePaneFromCachedLayout, splitNextToPane } from "../terminal/popout-panes";
 
 export interface SpawnPaneOptions {
   /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
@@ -807,6 +807,49 @@ export function useProfileWorkspace(
     [cacheKey, persistProfile],
   );
 
+  /** The stashed (non-active) profile whose live layout holds `paneId`. */
+  const findStashedProfileOfPane = useCallback(
+    (paneId: string): { workspaceId: string; profileId: string; panes: PaneInfo[] } | null => {
+      const active = activeProfileRef.current;
+      const activeKey = active ? cacheKey(active.workspaceId, active.id) : null;
+      for (const [key, entry] of profileLiveCacheRef.current.entries()) {
+        if (key === activeKey || !findPane(entry.layout, paneId)) continue;
+        return { ...parseProfileCacheKey(key), panes: collectPanes(entry.layout) };
+      }
+      return null;
+    },
+    [cacheKey],
+  );
+
+  /**
+   * Add a pane next to `anchorPaneId` in a stashed profile's live layout — a
+   * terminal created inside a pop-out window whose profile is not the active
+   * one. Saves that profile. False when no stashed profile holds the anchor or
+   * it is full.
+   */
+  const insertPaneInStashedProfile = useCallback(
+    (
+      anchorPaneId: string,
+      pane: PaneInfo,
+      resolveProfile: (workspaceId: string, profileId: string) => ProfileInfo | null,
+    ): boolean => {
+      const active = activeProfileRef.current;
+      const activeKey = active ? cacheKey(active.workspaceId, active.id) : null;
+      for (const [key, entry] of profileLiveCacheRef.current.entries()) {
+        if (key === activeKey || !findPane(entry.layout, anchorPaneId)) continue;
+        const layoutNext = splitNextToPane(entry.layout, anchorPaneId, pane, MAX_GROUP_PANES);
+        if (!layoutNext) return false;
+        profileLiveCacheRef.current.set(key, { ...entry, layout: layoutNext });
+        const { workspaceId, profileId } = parseProfileCacheKey(key);
+        const profile = resolveProfile(workspaceId, profileId);
+        if (profile) void persistProfile(profile, layoutNext);
+        return true;
+      }
+      return false;
+    },
+    [cacheKey, persistProfile],
+  );
+
   // Memoized so it only rebuilds when layout / minimized / focus actually change
   // references — a fresh tree every render would remount-reconcile every pane.
   const displayLayout = useMemo(
@@ -857,5 +900,7 @@ export function useProfileWorkspace(
     unminimizePanes,
     forgetMinimizedPane,
     closePaneInStashedProfile,
+    findStashedProfileOfPane,
+    insertPaneInStashedProfile,
   };
 }

@@ -196,6 +196,7 @@ import {
   getPopoutWindows,
   initPanePopouts,
   onPtySessionKilled,
+  selectPopoutPane,
 } from "./popout-window.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
@@ -309,7 +310,11 @@ function getTrayDeps(): TrayDeps {
     getChatWindow: () => chatWindow,
     createChatWindow,
     getPopoutWindows,
-    getPopoutWindowForPane,
+    // Notification click: the window may hold several panes, so switch to the right one.
+    getPopoutWindowForPane: (paneId) => {
+      selectPopoutPane(paneId);
+      return getPopoutWindowForPane(paneId);
+    },
   };
 }
 
