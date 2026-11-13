@@ -38,6 +38,8 @@ import type { PaneAgentStatus } from "../../shared/pane-agent-state.js";
 import { PaneGitBranch } from "./TerminalGitStatus";
 
 const DIVIDER_PX = 10;
+/** How long the in-pane broadcast hint stays up after broadcast turns on. */
+const BROADCAST_HINT_MS = 4000;
 
 function clampRatio(ratio: number): number {
   return Math.min(0.9, Math.max(0.1, ratio));
@@ -67,6 +69,8 @@ interface Props {
   onResizeSplit: (splitId: string, ratio: number) => void;
   onRenamePane?: (paneId: string, title: string) => void;
   onPaneCwdClick?: (paneId: string) => void;
+  /** Click on a pane header's git branch (main window: worktree dialog). */
+  onPaneBranchClick?: (paneId: string) => void;
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   /** True while dragging a tab from the profile sidebar (enables drop overlay over xterm). */
@@ -106,6 +110,8 @@ type PaneDragState = {
   dropZone: PaneDropZone | null;
   profileDragOver: ProfileDragOver | null;
   canReorder: boolean;
+  /** Several panes are on screen and one of them has focus: fade the others back. */
+  dimUnfocused: boolean;
   setDraggingPaneId: (id: string | null) => void;
   setDragOverPaneId: (id: string | null) => void;
   setDropZone: (zone: PaneDropZone | null) => void;
@@ -127,6 +133,13 @@ export function SplitPaneLayout(props: Props) {
     if (!props.sidebarPaneDragActive) setProfileDragOver(null);
   }, [props.sidebarPaneDragActive]);
   const canReorder = paneCount > 1 && Boolean(props.onMovePane);
+  // Broadcast types into every pane, and a maximized pane hides the rest, so
+  // neither case has a single "current" pane worth singling out.
+  const dimUnfocused =
+    paneCount > 1 &&
+    !props.broadcastActive &&
+    !props.maximizedPaneId &&
+    collectPanes(props.node).some((p) => p.id === props.focusedPaneId);
 
   const drag: PaneDragState = {
     draggingPaneId,
@@ -134,6 +147,7 @@ export function SplitPaneLayout(props: Props) {
     dropZone,
     profileDragOver,
     canReorder,
+    dimUnfocused,
     setDraggingPaneId,
     setDragOverPaneId,
     setDropZone,
@@ -164,6 +178,7 @@ function SplitPaneLayoutInner({
   onResizeSplit,
   onRenamePane,
   onPaneCwdClick,
+  onPaneBranchClick,
   renderTerminal,
   sidebarPaneDragActive = false,
   profileAccentColor = null,
@@ -199,6 +214,9 @@ function SplitPaneLayoutInner({
             onRenamePane ? (title) => onRenamePane(node.pane.id, title) : undefined
           }
           onCwdClick={onPaneCwdClick ? () => onPaneCwdClick(node.pane.id) : undefined}
+          onBranchClick={
+            onPaneBranchClick ? () => onPaneBranchClick(node.pane.id) : undefined
+          }
           sidebarPaneDragActive={sidebarPaneDragActive}
           maximized={maximizedPaneId === node.pane.id}
           onToggleMaximize={
@@ -246,6 +264,7 @@ function SplitPaneLayoutInner({
           onResizeSplit={onResizeSplit}
           onRenamePane={onRenamePane}
           onPaneCwdClick={onPaneCwdClick}
+          onPaneBranchClick={onPaneBranchClick}
           renderTerminal={renderTerminal}
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
@@ -292,6 +311,7 @@ function SplitPaneLayoutInner({
           onResizeSplit={onResizeSplit}
           onRenamePane={onRenamePane}
           onPaneCwdClick={onPaneCwdClick}
+          onPaneBranchClick={onPaneBranchClick}
           renderTerminal={renderTerminal}
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
@@ -325,6 +345,7 @@ function WarpPaneShell({
   onSplit,
   onRename,
   onCwdClick,
+  onBranchClick,
   sidebarPaneDragActive = false,
   maximized = false,
   onToggleMaximize,
@@ -347,6 +368,7 @@ function WarpPaneShell({
   onSplit?: (dir: SplitDirection) => void;
   onRename?: (title: string) => void;
   onCwdClick?: () => void;
+  onBranchClick?: () => void;
   maximized?: boolean;
   onToggleMaximize?: () => void;
   maximizeShortcutKeys?: string;
@@ -363,6 +385,7 @@ function WarpPaneShell({
     dropZone,
     profileDragOver,
     canReorder,
+    dimUnfocused,
     setDraggingPaneId,
     setDragOverPaneId,
     setDropZone,
@@ -372,6 +395,10 @@ function WarpPaneShell({
     onPopOutPane,
     onDockPane,
   } = drag;
+  const dimmed = dimUnfocused && !focused;
+  const titleClass = `min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium transition-colors ${
+    dimmed ? "text-chrome-text-muted" : "text-chrome-text"
+  }`;
   const popOut = (trigger: PanePopOutTrigger) => {
     if (!onPopOutPane) return;
     const rect = shellRef.current?.getBoundingClientRect();
@@ -385,6 +412,9 @@ function WarpPaneShell({
   const activeDropZone = isProfileDragOver ? profileDragOver.zone : dropZone;
   const isDragging = draggingPaneId === pane.id;
   const [broadcastEnter, setBroadcastEnter] = useState(false);
+  // The in-pane hint covers the last terminal rows, so it only announces the
+  // switch and then fades; the header badge and border keep showing the state.
+  const [broadcastHint, setBroadcastHint] = useState(false);
   const prevBroadcastRef = useRef(broadcastActive);
 
   useEffect(() => {
@@ -396,6 +426,18 @@ function WarpPaneShell({
     }
     prevBroadcastRef.current = broadcastActive;
     return undefined;
+  }, [broadcastActive]);
+
+  // Also runs for a pane that mounts while broadcast is already on (a new split,
+  // or switching to a broadcast profile), which the enter animation above skips.
+  useEffect(() => {
+    if (!broadcastActive) {
+      setBroadcastHint(false);
+      return undefined;
+    }
+    setBroadcastHint(true);
+    const timer = window.setTimeout(() => setBroadcastHint(false), BROADCAST_HINT_MS);
+    return () => window.clearTimeout(timer);
   }, [broadcastActive]);
 
   function clearDrag() {
@@ -553,17 +595,17 @@ function WarpPaneShell({
           <EditablePaneTitle
             label={label}
             onRename={onRename}
-            className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text"
+            className={titleClass}
             inputClassName="text-[12px] font-medium"
           />
         ) : (
-          <span className="min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium text-chrome-text">
+          <span className={titleClass}>
             {label}
           </span>
         )}
         {broadcastActive && (
           <span
-            className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
+            className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-chrome-accent-text"
             title={t("chat.broadcastSyncTitle", { count: broadcastPaneCount })}
           >
             <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-chrome-ui-accent" aria-hidden />
@@ -578,7 +620,7 @@ function WarpPaneShell({
               e.stopPropagation();
               onToggleMaximize();
             }}
-            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text transition-colors hover:bg-chrome-ui-accent/20"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-chrome-accent-text transition-colors hover:bg-chrome-ui-accent/20"
             title={t("pane.maximizedHint", { keys: maximizeShortcutKeys ?? "" })}
             aria-label={t("pane.restoreLayout")}
           >
@@ -586,7 +628,7 @@ function WarpPaneShell({
             {t("pane.maximizedBadge")}
           </button>
         )}
-        <PaneGitBranch cwd={pane.cwd} />
+        <PaneGitBranch cwd={pane.cwd} onClick={onBranchClick} />
         {onCwdClick ? (
           <button
             type="button"
@@ -606,7 +648,14 @@ function WarpPaneShell({
             {cwdShort || "~"}
           </span>
         )}
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/pane:opacity-100">
+        {/* Always shown on the focused pane; other panes reveal them on hover or keyboard focus. */}
+        <div
+          className={`flex items-center gap-0.5 transition-opacity ${
+            focused
+              ? "opacity-100"
+              : "opacity-0 focus-within:opacity-100 group-hover/pane:opacity-100"
+          }`}
+        >
           {onSplit && (
             <>
               <IconBtn title={t("pane.splitRight")} onClick={() => onSplit("horizontal")}>
@@ -665,7 +714,11 @@ function WarpPaneShell({
           <TooltipContent>{t("pane.close")}</TooltipContent>
         </Tooltip>
       </div>
-      <div className="warp-pane-body relative z-0 min-h-0 flex-1 overflow-hidden">
+      <div
+        className={`warp-pane-body relative z-0 min-h-0 flex-1 overflow-hidden transition-opacity duration-200 ${
+          dimmed ? "opacity-80" : "opacity-100"
+        }`}
+      >
         {sidebarPaneDragActive && onProfilePaneDrop && (
           <div
             className="absolute inset-0 z-30"
@@ -709,7 +762,12 @@ function WarpPaneShell({
         )}
         {children}
         {broadcastActive && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-center bg-gradient-to-t from-[color-mix(in_srgb,var(--color-chrome-bg)_90%,transparent)] to-transparent px-2 pb-1.5 pt-5">
+          <div
+            aria-hidden={!broadcastHint}
+            className={`pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-center px-2 pb-2 transition-opacity duration-500 ${
+              broadcastHint ? "opacity-100" : "opacity-0"
+            }`}
+          >
             <span className="inline-flex items-center gap-1 rounded-md border border-chrome-ui-accent/25 bg-chrome-surface-raised/92 px-2 py-0.5 text-[10px] text-chrome-accent-text shadow-sm backdrop-blur-sm">
               <span className="broadcast-sync-dot h-1 w-1 shrink-0 rounded-full bg-chrome-ui-accent" aria-hidden />
               {t("pane.broadcastInputHint", { count: broadcastPaneCount })}

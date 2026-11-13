@@ -88,6 +88,8 @@ export const en = {
   "status.size": "Size",
   "status.pid": "pid",
   "status.exit": "exit",
+  "status.copyCwd": "Click to copy the path",
+  "status.cwdCopied": "Path copied",
   "cmd.action.inventory": "Switch to Inventory",
   "cmd.action.tools": "Switch to Tools",
   "cmd.action.refresh": "Refresh inventory",
@@ -985,7 +987,6 @@ export const en = {
   "chat.plainShellTitle": "Open a plain shell (no AI CLI)",
   "chat.addPane": "+ Pane",
   "chat.addPaneTitle": "Add terminal pane ({splitRight} split right, {splitDown} split down)",
-  "chat.syncLabel": "sync",
   "chat.broadcastSyncTitle": "Input syncs to all {count} terminals",
   "chat.allTerminalsMinimized": "All terminals are tucked away in the sidebar",
   "chat.selectTerminalFromSidebar":

@@ -3,6 +3,12 @@ import appIcon from "../../assets/icon.png";
 
 export type TitleBarTone = "chrome" | "default";
 
+/**
+ * Element in the main window's title bar that terminal mode fills with its
+ * profile chip and pane actions. Windows without it keep their own top bar.
+ */
+export const TITLE_BAR_TERMINAL_SLOT_ID = "app-title-bar-terminal-slot";
+
 /** CSS variables that paint the title bar for each tone (see App header). */
 const TONE_VARS: Record<TitleBarTone, { bg: string; fg: string }> = {
   chrome: { bg: "--color-chrome-bg", fg: "--color-chrome-text-secondary" },

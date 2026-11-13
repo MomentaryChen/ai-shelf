@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Copy } from "lucide-react";
 import type { PaneInfo } from "../terminal/split-tree";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 import { TerminalCommandStatus } from "./TerminalCommandStatus";
-import { TerminalGitStatus } from "./TerminalGitStatus";
 
 type SessionStatus = "live" | "exited" | "stale";
 
@@ -40,11 +40,27 @@ function formatSize(cols: number | null, rows: number | null): string | null {
   return `${cols}×${rows}`;
 }
 
-/** Bottom status strip — cwd, real shell, pid, size, exit (Part I desktop chrome). */
+const COPIED_FLASH_MS = 1400;
+
+/**
+ * Bottom status strip for the focused pane — session state, full cwd (click to
+ * copy), last command, shell, exit code. The branch is in the pane header, and
+ * pid / grid size are diagnostics, so those two live in the shell tooltip.
+ */
 export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
   const { t } = useLocale();
   const [status, setStatus] = useState<SessionStatus>("live");
   const [meta, setMeta] = useState<PtyMetaView>(EMPTY_META);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
+  useEffect(() => setCopied(false), [pane?.id, pane?.cwd]);
 
   useEffect(() => {
     if (!pane?.sessionId) {
@@ -106,11 +122,27 @@ export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
 
   if (!pane) return null;
 
-  const cwd = pane.cwd?.trim() || "—";
+  const cwdPath = pane.cwd?.trim() || "";
   const shell = meta.shell?.trim() || "—";
   const size = formatSize(meta.cols, meta.rows);
-  const pidLabel = meta.pid != null ? String(meta.pid) : "—";
   const showExit = status === "exited" || meta.exitCode != null;
+  const shellTitle = [
+    `${t("status.shell")}: ${shell}`,
+    size ? `${t("status.size")}: ${size}` : "",
+    meta.pid != null ? `${t("status.pid")}: ${meta.pid}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const copyCwd = () => {
+    if (!cwdPath) return;
+    void window.api.clipboardWriteText(cwdPath).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_FLASH_MS);
+    });
+  };
 
   return (
     <div
@@ -122,17 +154,29 @@ export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[status]}`} aria-hidden />
         <span className="shrink-0 text-chrome-text-subtle">{t(STATUS_LABEL[status])}</span>
       </span>
-      <span className="min-w-0 truncate font-mono tabular-nums" title={cwd}>
-        {cwd}
-      </span>
-      <TerminalGitStatus cwd={pane.cwd} />
+      {cwdPath ? (
+        <button
+          type="button"
+          onClick={copyCwd}
+          className="group/cwd inline-flex min-w-0 cursor-pointer items-center gap-1 rounded px-1 font-mono tabular-nums text-chrome-text-secondary transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
+          title={`${cwdPath}\n\n${t("status.copyCwd")}`}
+        >
+          <span className="min-w-0 truncate">{cwdPath}</span>
+          {copied ? (
+            <Check className="h-3 w-3 shrink-0 text-ok" aria-label={t("status.cwdCopied")} />
+          ) : (
+            <Copy
+              className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/cwd:opacity-70 group-focus-visible/cwd:opacity-70"
+              aria-hidden
+            />
+          )}
+        </button>
+      ) : (
+        <span className="font-mono">—</span>
+      )}
       <span className="ml-auto flex shrink-0 items-center gap-3 font-mono tabular-nums text-chrome-text-subtle">
         <TerminalCommandStatus sessionId={pane.sessionId} />
-        <span title={t("status.shell")}>{shell}</span>
-        {size ? <span title={t("status.size")}>{size}</span> : null}
-        <span title={t("status.pid")}>
-          {t("status.pid")} {pidLabel}
-        </span>
+        <span title={shellTitle}>{shell}</span>
         {showExit ? (
           <span title={t("status.exit")}>
             {t("status.exit")} {meta.exitCode ?? "—"}
