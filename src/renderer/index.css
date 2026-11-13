@@ -1144,3 +1144,31 @@ html[data-surface-context="chrome"] [data-slot="dropdown-menu-item"][data-highli
   background: var(--color-chrome-surface-hover-strong);
   color: var(--color-chrome-text);
 }
+
+/* ── In-app title bar (main window draws its own caption; see mainTitleBarOptions) ── */
+.app-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Leave room for the native caption buttons (Window Controls Overlay on Windows/Linux). */
+.app-title-bar {
+  padding-right: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px
+  );
+}
+
+/* Floating UI can overlap the title bar strip; keep it clickable instead of dragging the window. */
+[role="dialog"],
+[role="alertdialog"],
+[role="menu"],
+[role="listbox"],
+[data-radix-popper-content-wrapper] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

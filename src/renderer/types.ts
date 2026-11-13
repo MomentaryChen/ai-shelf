@@ -754,6 +754,8 @@ export interface ElectronAPI {
     commitShort: string | null;
     dirty: boolean;
   }>;
+  /** Recolor the native window caption buttons (Windows/Linux); no-op on macOS. */
+  setTitleBarOverlay?: (opts: { color?: string; symbolColor?: string }) => void;
   getAppUpdateChannel: () => Promise<AppUpdateChannelInfo>;
   checkAppUpdate: () => Promise<AppUpdateStatePayload>;
   getAppUpdateState: () => Promise<AppUpdateStatePayload>;

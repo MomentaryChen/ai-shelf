@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("api", {
   runDoctorTool: (tool) => ipcRenderer.invoke("doctor-tool", tool),
   checkUpdate: () => ipcRenderer.invoke("check-update"),
   getSelfInfo: () => ipcRenderer.invoke("get-self-info"),
+  setTitleBarOverlay: (opts) => ipcRenderer.send("set-title-bar-overlay", opts),
   getToolsList: () => ipcRenderer.invoke("get-tools-list"),
   checkToolLatest: (tool) => ipcRenderer.invoke("refresh-tool-update-info", tool),
   refreshToolUpdateInfo: (tool) => ipcRenderer.invoke("refresh-tool-update-info", tool),

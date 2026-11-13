@@ -35,6 +35,7 @@ import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
+import { TitleBarBrand, useTitleBarOverlaySync, type TitleBarTone } from "./components/TitleBarBrand";
 import type { ProviderEntry } from "./types";
 import { registerShortcutCheatsheetOpener } from "./shortcuts/open-shortcuts";
 import { cheatsheetToggleKeys } from "./shortcuts/shortcut-registry";
@@ -336,6 +337,8 @@ const IS_MAC =
 export function App() {
   const { t } = useLocale();
   const [appMode, setAppMode] = useState<AppMode>("terminal");
+  const titleBarTone: TitleBarTone = appMode === "terminal" ? "chrome" : "default";
+  useTitleBarOverlaySync(titleBarTone);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [activeTool, setActiveTool] = useState<ToolId>("codec");
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -731,13 +734,24 @@ export function App() {
       )}
 
       <header
-        className={`flex h-9 shrink-0 items-center gap-1 border-b px-2 transition-colors duration-300 ${
+        className={`app-title-bar app-drag flex h-10 shrink-0 items-center gap-2 border-b transition-colors duration-300 ${
+          IS_MAC ? "pl-[78px]" : "pl-2.5"
+        } ${
           appMode === "terminal"
             ? "border-chrome-border bg-chrome-bg text-chrome-text"
             : "border-border bg-bg-primary text-text-primary"
         }`}
       >
-        <AppModeSwitch mode={appMode} onChange={handleModeChange} />
+        <TitleBarBrand tone={titleBarTone} />
+        <span
+          aria-hidden
+          className={`h-4 w-px shrink-0 ${
+            appMode === "terminal" ? "bg-chrome-border-strong" : "bg-border"
+          }`}
+        />
+        <div className="app-no-drag shrink-0">
+          <AppModeSwitch mode={appMode} onChange={handleModeChange} />
+        </div>
 
         {appMode === "terminal" && (scanning || enriching) && (
           <span className="shrink-0 px-3 text-[11px] text-text-secondary">
@@ -747,7 +761,7 @@ export function App() {
           </span>
         )}
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 pl-2">
+        <div className="app-no-drag ml-auto flex shrink-0 items-center gap-1.5 pl-2">
           <button
             type="button"
             onClick={openPalette}
