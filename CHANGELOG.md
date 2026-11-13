@@ -9,9 +9,19 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-11-13
+
+Tasks run from the card and reuse the same terminal until you close it.
+
 ### Changed
 
-- **Task cards** — Click a task card to run it. A task keeps one terminal: while it is open the card shows **Terminal open**, and a click switches to that terminal instead of sending the prompt again. Close the terminal to run the task again.
+- **Task cards** — Click a task card to run it. A task keeps one terminal: while it is open the card shows **Terminal open**, and a click switches to that terminal (activating its profile or focusing its view window) instead of sending the prompt again. The pane stores the task id in the profile layout so the link survives a restart. Close the terminal to run the task again.
+
+### Fixed
+
+- **Task re-run** — A pane that starts a **new conversation** drops its task link so the card runs the prompt again instead of switching to an empty terminal.
+
+[5.2.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.2.0
 
 ## [5.1.0] - 2026-11-13
 
