@@ -162,24 +162,14 @@
       </section>
     </main>
 
-    <!-- Confirm leaving mid-install -->
-    <div class="overlay" id="confirm-exit" hidden>
-      <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-exit-title">
-        <h2 id="confirm-exit-title" data-i18n="exitTitle"></h2>
-        <p class="muted" data-i18n="exitBody"></p>
+    <!-- In-window confirm (leave mid-install, force close) — filled by askConfirm() -->
+    <div class="overlay" id="confirm" hidden>
+      <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h2 id="confirm-title"></h2>
+        <p class="muted" id="confirm-body"></p>
         <div class="actions">
-          <button
-            type="button"
-            class="btn btn-outline"
-            id="btn-exit-cancel"
-            data-i18n="keepInstalling"
-          ></button>
-          <button
-            type="button"
-            class="btn btn-danger"
-            id="btn-exit-confirm"
-            data-i18n="exitAnyway"
-          ></button>
+          <button type="button" class="btn btn-outline" id="btn-confirm-cancel"></button>
+          <button type="button" class="btn btn-danger" id="btn-confirm-ok"></button>
         </div>
       </div>
     </div>

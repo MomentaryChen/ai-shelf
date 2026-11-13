@@ -33,6 +33,9 @@ try {
     # Separate folder + exe name, so the stub never overwrites or closes a real AI Shelf.
     $env:AISHELF_APP_DIR_NAME = "AI Shelf Stub"
   } else {
+    if (-not $PSBoundParameters.ContainsKey("Version")) {
+      throw "-Version is required with -Payload (setup verifies the installed version against it)."
+    }
     $Payload = (Resolve-Path $Payload).Path
     Remove-Item Env:AISHELF_REGISTRY_KEY -ErrorAction SilentlyContinue
     Remove-Item Env:AISHELF_APP_DIR_NAME -ErrorAction SilentlyContinue

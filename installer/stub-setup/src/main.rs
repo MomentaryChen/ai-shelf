@@ -11,6 +11,7 @@
 //!   AISHELF_STUB_VERSION          version to register (default 0.0.0-dev)
 //!   AISHELF_STUB_SKIP_REGISTRY=1  exit 0 without registering (simulates a declined UAC)
 //!   AISHELF_STUB_APP_NAME         folder + exe base name (default "AI Shelf Stub")
+//!   AISHELF_STUB_LINGER_SECONDS   when run as the installed app, stay alive this long
 //!
 //! Launched with no arguments (as the "installed app"), it exits immediately.
 
@@ -29,6 +30,12 @@ fn env_or(name: &str, default: &str) -> String {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
+        // Acting as the installed app: optionally stay alive so setup's
+        // "AI Shelf is running" flow can be exercised.
+        let linger: u64 = env_or("AISHELF_STUB_LINGER_SECONDS", "0")
+            .parse()
+            .unwrap_or(0);
+        std::thread::sleep(Duration::from_secs(linger));
         return;
     }
     let all_users = args.iter().any(|a| a.eq_ignore_ascii_case("/allusers"));

@@ -27,10 +27,21 @@ fn main() {
     println!("cargo:rerun-if-changed={}", payload.display());
     println!("cargo:rustc-env=AISHELF_PAYLOAD_PATH={}", payload.display());
 
-    let version = std::env::var("AISHELF_PAYLOAD_VERSION").unwrap_or_else(|_| "0.0.0-dev".into());
+    let key = std::env::var("AISHELF_REGISTRY_KEY").unwrap_or_else(|_| "com.ai-shelf".into());
+    let version = match std::env::var("AISHELF_PAYLOAD_VERSION") {
+        Ok(v) if !v.trim().is_empty() => v,
+        // Setup verifies the installed version against this; a placeholder would turn
+        // every successful real install into an error screen.
+        _ if key == "com.ai-shelf" && std::env::var("PROFILE").as_deref() == Ok("release") => {
+            panic!(
+                "AISHELF_PAYLOAD_VERSION must be set for a release build with a real payload \
+             (the version of the embedded AI-Shelf-Setup exe)."
+            )
+        }
+        _ => "0.0.0-dev".into(),
+    };
     println!("cargo:rustc-env=AISHELF_PAYLOAD_VERSION={version}");
 
-    let key = std::env::var("AISHELF_REGISTRY_KEY").unwrap_or_else(|_| "com.ai-shelf".into());
     println!("cargo:rustc-env=AISHELF_REGISTRY_KEY={key}");
 
     // Install folder and exe name. Stub builds use "AI Shelf Stub" so a dev run can

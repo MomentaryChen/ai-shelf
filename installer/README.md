@@ -19,6 +19,9 @@ ai-shelf-setup.exe  (Tauri window: Start → Installing → Done / Error)
   - The folder always ends in `AI Shelf`. If it doesn't, setup appends `AI Shelf`.
   - A folder that already holds other files is refused. The NSIS uninstaller deletes
     `$INSTDIR` recursively, and in silent mode the wizard's own guard never runs.
+  - Only a custom folder is passed as `/D=` (last and unquoted, which NSIS's
+    `GetDParameter` reads to the end of the line). The default location lets NSIS pick
+    the path itself.
 - **Update / reinstall:** if `Software\com.ai-shelf\InstallLocation` exists (HKCU or HKLM)
   and the exe is there, setup shows `vOld → vNew`. It keeps the registered location, so
   `/D` is not passed: `/D` would override the existing install path.
@@ -52,13 +55,14 @@ Requires Rust (stable, MSVC) and WebView2 (built into Windows 11).
 
 Stub knobs (environment variables, inherited by the payload):
 
-| Variable                       | Effect                                                  |
-| ------------------------------ | ------------------------------------------------------- |
-| `AISHELF_STUB_SECONDS`         | how long the fake install takes (default 6)             |
-| `AISHELF_STUB_EXIT`            | exit code to return, e.g. `2` → Error screen            |
-| `AISHELF_STUB_VERSION`         | version it registers. Must match `-Version` for success |
-| `AISHELF_STUB_SKIP_REGISTRY=1` | exit 0 without installing (simulates a declined UAC)    |
-| `AISHELF_SETUP_LOCALE`         | force the UI language (`zh-TW`, `en`)                   |
+| Variable                       | Effect                                                         |
+| ------------------------------ | -------------------------------------------------------------- |
+| `AISHELF_STUB_SECONDS`         | how long the fake install takes (default 6)                    |
+| `AISHELF_STUB_EXIT`            | exit code to return, e.g. `2` → Error screen                   |
+| `AISHELF_STUB_VERSION`         | version it registers. Must match `-Version` for success        |
+| `AISHELF_STUB_SKIP_REGISTRY=1` | exit 0 without installing (simulates a declined UAC)           |
+| `AISHELF_STUB_LINGER_SECONDS`  | keep the "installed app" alive, to test the running-app banner |
+| `AISHELF_SETUP_LOCALE`         | force the UI language (`zh-TW`, `en`)                          |
 
 Remove a stub install with:
 

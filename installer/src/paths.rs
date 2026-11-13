@@ -76,6 +76,17 @@ pub fn validate_install_dir(path: &Path, dir_state: DirState) -> Result<(), DirE
     }
 }
 
+/// Windows paths compare case-insensitively and ignore trailing separators.
+pub fn same_dir(a: &Path, b: &Path) -> bool {
+    let norm = |p: &Path| {
+        p.to_string_lossy()
+            .trim_end_matches(['\\', '/'])
+            .replace('/', "\\")
+            .to_lowercase()
+    };
+    norm(a) == norm(b)
+}
+
 /// `C:\...` or `\\server\share\...` — checked on the string so tests run on any OS.
 fn is_absolute_windows(raw: &str) -> bool {
     let b = raw.as_bytes();
@@ -167,6 +178,22 @@ mod tests {
             validate_install_dir(Path::new("  "), DirState::Missing),
             Err(DirError::Empty)
         );
+    }
+
+    #[test]
+    fn same_dir_ignores_case_and_trailing_separators() {
+        assert!(same_dir(
+            Path::new(r"C:\Users\Me\AI Shelf"),
+            Path::new(r"c:\users\me\ai shelf\")
+        ));
+        assert!(same_dir(
+            Path::new("C:/Apps/AI Shelf"),
+            Path::new(r"C:\Apps\AI Shelf")
+        ));
+        assert!(!same_dir(
+            Path::new(r"C:\Apps\AI Shelf"),
+            Path::new(r"D:\Apps\AI Shelf")
+        ));
     }
 
     #[test]

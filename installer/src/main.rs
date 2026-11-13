@@ -114,7 +114,9 @@ fn start_install(
         Some(d) => {
             let path = normalize_install_dir(&d);
             validate_install_dir(&path, system::dir_state(&path)).map_err(|e| format!("{e:?}"))?;
-            Some(path)
+            // The default location takes NSIS's own path logic; only a custom folder
+            // is passed as /D.
+            (!paths::same_dir(&path, &system::default_dir(mode))).then_some(path)
         }
         None => None,
     };

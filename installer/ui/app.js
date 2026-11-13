@@ -33,6 +33,7 @@ const MESSAGES = {
     closeApp: "Close AI Shelf",
     forceClose: "Force close",
     forceCloseConfirm: "Force closing ends open terminals immediately. Continue?",
+    cancel: "Cancel",
     recheck: "Check again",
     installingTitle: "Installing AI Shelf",
     updatingTitle: "Updating AI Shelf",
@@ -85,6 +86,7 @@ const MESSAGES = {
     closeApp: "關閉 AI Shelf",
     forceClose: "強制關閉",
     forceCloseConfirm: "強制關閉會立即結束所有開著的終端機，確定要繼續嗎？",
+    cancel: "取消",
     recheck: "重新檢查",
     installingTitle: "正在安裝 AI Shelf",
     updatingTitle: "正在更新 AI Shelf",
@@ -286,13 +288,41 @@ function showError(outcome) {
   show("error");
 }
 
-// ---- Exit ----
+// ---- Confirm / exit ----
 
-function requestExit() {
+let settleConfirm = null;
+
+/** In-window confirm (window.confirm would show a browser-styled box). */
+function askConfirm({ title, body, cancel, ok }) {
+  settleConfirm?.(false);
+  $("confirm-title").textContent = title;
+  $("confirm-body").textContent = body;
+  $("btn-confirm-cancel").textContent = cancel;
+  $("btn-confirm-ok").textContent = ok;
+  $("confirm").hidden = false;
+  $("btn-confirm-cancel").focus();
+  return new Promise((resolve) => {
+    settleConfirm = (answer) => {
+      settleConfirm = null;
+      $("confirm").hidden = true;
+      resolve(answer);
+    };
+  });
+}
+
+function dismissConfirm() {
+  settleConfirm?.(false);
+}
+
+async function requestExit() {
   if (state.installing) {
-    $("confirm-exit").hidden = false;
-    $("btn-exit-cancel").focus();
-    return;
+    const leave = await askConfirm({
+      title: t("exitTitle"),
+      body: t("exitBody"),
+      cancel: t("keepInstalling"),
+      ok: t("exitAnyway"),
+    });
+    if (!leave) return;
   }
   void invoke("exit_setup");
 }
@@ -304,8 +334,8 @@ function wire() {
   $("btn-close").addEventListener("click", requestExit);
   $("btn-done-close").addEventListener("click", () => void invoke("exit_setup"));
   $("btn-error-close").addEventListener("click", () => void invoke("exit_setup"));
-  $("btn-exit-cancel").addEventListener("click", () => ($("confirm-exit").hidden = true));
-  $("btn-exit-confirm").addEventListener("click", () => void invoke("exit_setup"));
+  $("btn-confirm-cancel").addEventListener("click", () => settleConfirm?.(false));
+  $("btn-confirm-ok").addEventListener("click", () => settleConfirm?.(true));
 
   $("btn-install").addEventListener("click", () => void startInstall());
   $("btn-retry").addEventListener("click", () => {
@@ -328,7 +358,13 @@ function wire() {
     if (!closed) $("btn-force-close").hidden = false;
   });
   $("btn-force-close").addEventListener("click", async () => {
-    if (!window.confirm(t("forceCloseConfirm"))) return;
+    const ok = await askConfirm({
+      title: t("forceClose"),
+      body: t("forceCloseConfirm"),
+      cancel: t("cancel"),
+      ok: t("forceClose"),
+    });
+    if (!ok) return;
     renderRunning(!(await invoke("close_app", { force: true })));
   });
   $("btn-recheck").addEventListener("click", async () =>
@@ -359,7 +395,7 @@ function wire() {
   void listen("install-progress", ({ payload }) => setProgress(payload.stage, payload.percent));
   void listen("install-done", ({ payload }) => {
     state.installing = false;
-    $("confirm-exit").hidden = true;
+    dismissConfirm();
     if (payload.kind === "installed") {
       setProgress("finalize", 100);
       window.setTimeout(() => showDone(payload), 350);
@@ -370,7 +406,7 @@ function wire() {
   void listen("close-requested", requestExit);
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !$("confirm-exit").hidden) $("confirm-exit").hidden = true;
+    if (e.key === "Escape") dismissConfirm();
   });
   // No browser context menu / reload in an installer window.
   document.addEventListener("contextmenu", (e) => {
