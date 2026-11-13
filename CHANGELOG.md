@@ -9,6 +9,25 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-13
+
+Terminal chrome is sharper across themes, with a rebuilt dark palette and refreshed README visuals.
+
+### Changed
+
+- **Terminal title bar** — Profile chip, Folder, and **+ Pane** move into the app title bar on the main window, returning vertical space to the panes. Narrow layouts collapse Folder to an icon and tuck the panes-left hint so **+ Pane** stays clear of the caption buttons.
+- **Terminal focus and broadcast** — Pane header actions stay on the focused pane and appear on keyboard focus elsewhere. The broadcast hint shows in-pane for four seconds when broadcast turns on, without a duplicate title-bar badge.
+- **Status bar** — Click the cwd to copy it. Pane headers keep the git branch (click to open the worktree dialog); pid and grid size live in the shell tooltip.
+- **Warm theme contrast** — Chrome text tokens split into readable muted, subtle, and dim steps instead of sharing one low-contrast grey.
+- **Dark theme ramp** — Terminal chrome derives from one cool blue-grey hue aligned with inventory, with elevation and border steps, sky-accent focus, and an xterm palette where every colour except black clears 4:1 contrast.
+- **Documentation visuals** — Refreshed terminal screenshots and README demo GIFs for the updated chrome.
+
+### Fixed
+
+- **xterm padding** — Prompt and output no longer hug the pane edge.
+
+[5.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.1.0
+
 ## [5.0.0] - 2026-11-13
 
 Terminals can move into their own windows, profiles can run over SSH, and Windows updates install without the setup wizard.
