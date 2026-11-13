@@ -634,6 +634,8 @@ export interface UsageToolSnapshot {
   totalOutputTokens?: number;
   /** Provider-measured spend for the last 7 UTC days, when daily rows have no dollars. */
   weekCostUsd?: number;
+  /** "billingCycle" = totalCostUsd covers the provider billing cycle, not the selected range. */
+  costScope?: "period" | "billingCycle";
   daily: UsageDayBucket[];
   byModel?: UsageModelBreakdown[];
   quotas?: UsageQuotaWindow[];
@@ -695,10 +697,12 @@ export interface UsageDashboardResult {
   tools: UsageToolSnapshot[];
   summary: {
     totalCostUsd: number;
+    billingCycleCostUsd: number;
     totalInputTokens: number;
     totalOutputTokens: number;
     configuredCount: number;
     supportedCount: number;
+    activeCount: number;
     dailyUnified: UsageDailyUnifiedRow[];
   };
   insights: UsageCostInsights;

@@ -68,11 +68,20 @@ function inRange(run: AttributionRunInput, rangeStartMs: number, rangeEndMs: num
   return start >= rangeStartMs && start <= rangeEndMs;
 }
 
+/**
+ * Tool spend for the selected period. Billing-cycle totals (claude.ai extra-usage
+ * credits) cover a different window, so they are not split across period runs.
+ */
+function periodToolCostUsd(tool: UsageToolSnapshot): number {
+  if (tool.costScope === "billingCycle") return 0;
+  return tool.totalCostUsd ?? 0;
+}
+
 function toolCostMap(tools: UsageToolSnapshot[]): Map<UsageToolId, number> {
   const map = new Map<UsageToolId, number>();
   for (const tool of tools) {
     if (tool.status !== "ok") continue;
-    const cost = tool.totalCostUsd ?? 0;
+    const cost = periodToolCostUsd(tool);
     if (cost > 0) map.set(tool.toolId, cost);
   }
   return map;
@@ -243,7 +252,7 @@ export function buildAttributionInsights(
 
   for (const tool of tools) {
     if (tool.status !== "ok") continue;
-    const cost = tool.totalCostUsd ?? 0;
+    const cost = periodToolCostUsd(tool);
     if (cost <= 0 && (tool.totalInputTokens ?? 0) <= 0) continue;
     // Seed tool rows with provider totals; run counts added below.
     const row = byToolMap.get(tool.toolId) ?? {
