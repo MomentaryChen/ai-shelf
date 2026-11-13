@@ -60,6 +60,7 @@ export const SHORTCUT_IDS = [
   "fontZoomIn",
   "fontZoomOut",
   "fontZoomReset",
+  "toggleMaximizePane",
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_IDS)[number];
@@ -106,6 +107,7 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "fontZoomIn", section: "terminal" },
   { id: "fontZoomOut", section: "terminal" },
   { id: "fontZoomReset", section: "terminal" },
+  { id: "toggleMaximizePane", section: "pane" },
 ];
 
 const DEF_BY_ID = new Map(SHORTCUT_DEFS.map((d) => [d.id, d]));
@@ -164,6 +166,8 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
     fontZoomIn: { key: "=", mod: true },
     fontZoomOut: { key: "-", mod: true },
     fontZoomReset: { key: "0", mod: true },
+    // Show only the focused pane (iTerm2 uses Cmd+Shift+Enter for the same thing).
+    toggleMaximizePane: { key: "enter", mod: true, shift: true },
   };
 }
 

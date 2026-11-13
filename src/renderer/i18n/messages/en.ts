@@ -766,6 +766,10 @@ export const en = {
   "pane.popout.allPoppedOut": "These terminals are open in separate windows",
   "pane.popout.loading": "Opening terminal…",
   "pane.popout.missing": "This terminal is no longer available.",
+  "pane.maximize": "Maximize pane",
+  "pane.restoreLayout": "Restore split layout",
+  "pane.maximizedBadge": "Maximized",
+  "pane.maximizedHint": "Other panes are hidden but still running. Click or press {keys} to restore the split layout.",
   "pane.dropAbove": "Place above",
   "pane.dropBelow": "Place below",
   "pane.dropLeft": "Place left",
@@ -1552,6 +1556,7 @@ export const en = {
   "shortcuts.terminal.fontZoomIn": "Increase terminal font size",
   "shortcuts.terminal.fontZoomOut": "Decrease terminal font size",
   "shortcuts.terminal.fontZoomReset": "Reset terminal font size",
+  "shortcuts.pane.toggleMaximize": "Maximize / restore focused pane",
 
   // Tools mode — Codec
   "tools.tab.codec": "Codec",

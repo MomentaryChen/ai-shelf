@@ -18,7 +18,8 @@ export type PaneShortcutAction =
   | { type: "clear-screen" }
   | { type: "restart-session" }
   | { type: "split"; direction: "horizontal" | "vertical" }
-  | { type: "font-zoom"; direction: FontZoomDirection };
+  | { type: "font-zoom"; direction: FontZoomDirection }
+  | { type: "toggle-maximize" };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -49,6 +50,7 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     onClearPane,
     onRestartPane,
     onFontZoom,
+    onToggleMaximizePane,
   } = h;
 
   // Ctrl+Tab MRU must work with zero local panes (e.g. empty workspace after a
@@ -93,6 +95,9 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     case "font-zoom":
       onFontZoom?.(action.direction);
       break;
+    case "toggle-maximize":
+      onToggleMaximizePane?.(focusId);
+      break;
   }
 }
 
@@ -109,6 +114,8 @@ export interface PaneShortcutHandlers {
   onSplitPane: (paneId: string, direction: "horizontal" | "vertical") => void;
   /** Ctrl/Cmd + = / - / 0 — global terminal font size. */
   onFontZoom?: (direction: FontZoomDirection) => void;
+  /** Show only this pane (or restore the split view); the layout is not changed. */
+  onToggleMaximizePane?: (paneId: string) => void;
 }
 
 let getHandlers: (() => PaneShortcutHandlers | null) | null = null;
@@ -131,6 +138,7 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "fontZoomIn",
   "fontZoomOut",
   "fontZoomReset",
+  "toggleMaximizePane",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -227,6 +235,8 @@ export function matchPaneShortcutWithBindings(
       return { type: "font-zoom", direction: "out" };
     case "fontZoomReset":
       return { type: "font-zoom", direction: "reset" };
+    case "toggleMaximizePane":
+      return { type: "toggle-maximize" };
     default:
       return null;
   }
@@ -261,7 +271,10 @@ export function tryConsumePaneShortcut(ev: KeyboardEvent): boolean {
 /** Whether a matched action should run (and consume the key) for the current handlers. */
 export function shouldConsumePaneShortcut(
   action: PaneShortcutAction,
-  h: Pick<PaneShortcutHandlers, "panes" | "onFocusRecentTerminal" | "onFontZoom">,
+  h: Pick<
+    PaneShortcutHandlers,
+    "panes" | "onFocusRecentTerminal" | "onFontZoom" | "onToggleMaximizePane"
+  >,
 ): boolean {
   // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
   // split keys — those may belong to profile quick-switch or should no-op cleanly.
@@ -269,6 +282,7 @@ export function shouldConsumePaneShortcut(
     return action.type === "focus-next" && Boolean(h.onFocusRecentTerminal);
   }
   if (action.type === "font-zoom") return Boolean(h.onFontZoom);
+  if (action.type === "toggle-maximize") return Boolean(h.onToggleMaximizePane);
   return true;
 }
 

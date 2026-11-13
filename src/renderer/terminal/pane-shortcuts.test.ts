@@ -222,6 +222,18 @@ describe("font zoom shortcuts", () => {
     );
   });
 
+  it("maps Ctrl+Shift+Enter to toggle maximize for the focused pane", () => {
+    const chord = key("Enter", { ctrlKey: true, shiftKey: true, code: "Enter" });
+    assert.deepEqual(matchPaneShortcutWithBindings(chord, map), { type: "toggle-maximize" });
+    const seen: string[] = [];
+    applyPaneShortcutAction(
+      { type: "toggle-maximize" },
+      handlers({ panes: [pane("a"), pane("b")], focusedPaneId: "b", onToggleMaximizePane: (id) => seen.push(id) }),
+    );
+    assert.deepEqual(seen, ["b"]);
+    assert.equal(shouldConsumePaneShortcut({ type: "toggle-maximize" }, { panes: [pane("a")] }), false);
+  });
+
   it("runs the zoom handler", () => {
     const seen: string[] = [];
     applyPaneShortcutAction(

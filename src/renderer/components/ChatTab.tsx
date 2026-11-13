@@ -124,6 +124,7 @@ import {
 import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
 import { zoomFontSize } from "../terminal/font-zoom";
+import { effectiveMaximizedPaneId, toggleMaximizedPaneId } from "../terminal/split-tree";
 import type { Command } from "./CommandPalette";
 import { useTerminalCommands } from "../hooks/useTerminalCommands";
 import {
@@ -263,6 +264,7 @@ function ChatTabInner({
       splitRight: shortcutKeys("splitHorizontal", keymap),
       splitDown: shortcutKeys("splitVertical", keymap),
       commandPalette: shortcutKeys("commandPalette", keymap),
+      toggleMaximize: shortcutKeys("toggleMaximizePane", keymap),
     }),
     [keymap],
   );
@@ -395,6 +397,33 @@ function ChatTabInner({
   /** Read at call time so add / restart always target the active profile's machine. */
   const activeRemoteRef = useRef<RemoteSshConfig | null>(null);
   activeRemoteRef.current = activeProfile?.remote ?? null;
+
+  /** Layout drawn in this window: popped-out panes are left out. */
+  const shownLayout = useMemo(
+    () => displayLayoutWithoutPoppedOut(displayLayout, poppedOutPaneIds, focusedPaneId),
+    [displayLayout, poppedOutPaneIds, focusedPaneId],
+  );
+
+  /**
+   * Maximized pane — view state only, never written to the layout. It lapses on
+   * its own when the pane closes, is minimized, or another pane takes focus.
+   */
+  const [maximizedPaneId, setMaximizedPaneId] = useState<string | null>(null);
+  const shownMaximizedPaneId = effectiveMaximizedPaneId(
+    shownLayout,
+    maximizedPaneId,
+    focusedPaneId,
+  );
+  useEffect(() => {
+    // Drop a lapsed maximize so refocusing that pane later does not re-maximize it.
+    if (maximizedPaneId && !shownMaximizedPaneId) setMaximizedPaneId(null);
+  }, [maximizedPaneId, shownMaximizedPaneId]);
+  const toggleMaximizePane = useCallback(
+    (paneId: string) => {
+      setMaximizedPaneId((prev) => toggleMaximizedPaneId(shownLayout, prev, paneId));
+    },
+    [shownLayout],
+  );
 
   /** Live panes of non-active profiles, labelled for notifications. */
   const backgroundAgentPanes = useMemo<BackgroundAgentPane[]>(() => {
@@ -1450,6 +1479,7 @@ function ChatTabInner({
     onClearPane: clearPaneScreen,
     onRestartPane: (id) => void respawnPane(id),
     onSplitPane: (id, dir) => void splitPane(id, dir),
+    onToggleMaximizePane: toggleMaximizePane,
     onFontZoom: (direction) => {
       const next = zoomFontSize(settings.terminalFontSize, direction, DEFAULT_TERMINAL_FONT_SIZE);
       if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
@@ -1457,10 +1487,6 @@ function ChatTabInner({
   });
 
   // --- Pane pop-out windows -------------------------------------------------
-  const shownLayout = useMemo(
-    () => displayLayoutWithoutPoppedOut(displayLayout, poppedOutPaneIds, focusedPaneId),
-    [displayLayout, poppedOutPaneIds, focusedPaneId],
-  );
   /** Popped-out panes of the active profile (listed when nothing else is on screen). */
   const poppedOutShown = useMemo(
     () => (poppedOutPaneIds.size === 0 ? [] : panes.filter((p) => poppedOutPaneIds.has(p.id))),
@@ -1968,6 +1994,9 @@ function ChatTabInner({
         broadcastPaneCount={dockedPanes.length}
         paneAgentStates={paneAgentStates}
         paneLabels={paneLabels}
+        maximizedPaneId={shownMaximizedPaneId}
+        onToggleMaximizePane={toggleMaximizePane}
+        maximizeShortcutKeys={paneShortcutLabels.toggleMaximize}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
           else setFocusedPaneId(paneId);
@@ -2003,7 +2032,8 @@ function ChatTabInner({
             copyOnSelect={settings.terminalCopyOnSelect}
             pasteConfirm={pasteConfirm}
             getPasteTargets={getPasteTargets}
-            active={active}
+            // Hidden behind a maximized pane: becoming active again refits xterm.
+            active={active && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)}
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onCwdReport={reportPaneCwd}
