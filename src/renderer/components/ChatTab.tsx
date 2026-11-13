@@ -2037,6 +2037,7 @@ function ChatTabInner({
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onCwdReport={reportPaneCwd}
+            cwd={pane.cwd}
             onSessionLost={() => {
               if (respawningPaneIdsRef.current.has(pane.id)) return;
               void respawnPane(pane.id);

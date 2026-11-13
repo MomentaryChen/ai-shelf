@@ -89,6 +89,8 @@ interface Props {
   onOpenInNewWindow?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
   onCwdReport?: (sessionId: string, cwd: string) => void;
+  /** Pane cwd; relative path links in the output resolve against it. */
+  cwd?: string;
 }
 
 /** Callback props — routed through a ref so they never force an xterm re-render. */
@@ -143,6 +145,7 @@ function EmbeddedTerminalInner({
   getPasteTargets,
   active = true,
   focused = true,
+  cwd,
   callbacksRef,
 }: InnerProps) {
   const { t } = useLocale();
@@ -153,6 +156,8 @@ function EmbeddedTerminalInner({
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
   const activeRef = useRef(active);
+  const cwdRef = useRef(cwd);
+  cwdRef.current = cwd;
   const focusedRef = useRef(focused);
   focusedRef.current = focused;
   const fitRef = useRef<((forceMetrics?: boolean) => void) | null>(null);
@@ -560,7 +565,7 @@ function EmbeddedTerminalInner({
     const unbindImeCommitGuard = attachImeCommitGuard(term);
     // Dropped CJK input has no live repro; see terminal/ime-input-log.
     const unbindImeTrace = attachImeInputTrace(term, sessionId);
-    const unbindLinks = bindTerminalLinks(term);
+    const unbindLinks = bindTerminalLinks(term, { getCwd: () => cwdRef.current });
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
       callbacksRef.current.onCwdReport?.(sessionId, cwd);
     });

@@ -174,6 +174,7 @@ import { getRendererPageUrl, startRendererServer, stopRendererServer } from "./r
 import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 import { registerPortsHandlers } from "./ports-handlers.js";
+import { registerOpenInEditorHandlers } from "./open-in-editor.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
 import { registerGitHandlers } from "./git-handlers.js";
 import { initSystemResume } from "./system-resume.js";
@@ -275,6 +276,7 @@ registerSettingsHandlers();
 registerSyncHandlers();
 registerUsageHandlers();
 registerPortsHandlers();
+registerOpenInEditorHandlers();
 registerWslHandlers();
 registerGitHandlers();
 
