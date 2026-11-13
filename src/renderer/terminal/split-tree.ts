@@ -317,3 +317,47 @@ export function movePaneInTree(
   const inserted = insertPaneRelative(tree, targetPaneId, dragged, zone);
   return inserted ?? root;
 }
+
+// ---------------------------------------------------------------------------
+// Maximize (view-only: the tree itself is never changed)
+// ---------------------------------------------------------------------------
+
+/**
+ * The pane to show maximized, or `null` for the normal split view.
+ *
+ * Maximize is view state kept outside the layout. It only applies while the
+ * pane is still in the shown layout, is the focused pane, and has siblings, so
+ * closing it, focusing another pane, or splitting (the new pane takes focus)
+ * restores the split view without any extra bookkeeping.
+ */
+export function effectiveMaximizedPaneId(
+  root: LayoutNode | null,
+  maximizedPaneId: string | null,
+  focusedPaneId: string | null,
+): string | null {
+  if (!root || !maximizedPaneId || root.kind === "pane") return null;
+  if (maximizedPaneId !== focusedPaneId) return null;
+  return findPane(root, maximizedPaneId) ? maximizedPaneId : null;
+}
+
+/** Which side of `split` holds the maximized pane (the other side is hidden). */
+export function maximizedSplitSide(
+  split: LayoutNode,
+  maximizedPaneId: string | null,
+): "first" | "second" | null {
+  if (!maximizedPaneId || split.kind !== "split") return null;
+  if (findPane(split.first, maximizedPaneId)) return "first";
+  if (findPane(split.second, maximizedPaneId)) return "second";
+  return null;
+}
+
+/** Toggle target: restore when `paneId` is already maximized, otherwise maximize it. */
+export function toggleMaximizedPaneId(
+  root: LayoutNode | null,
+  maximizedPaneId: string | null,
+  paneId: string,
+): string | null {
+  const current = effectiveMaximizedPaneId(root, maximizedPaneId, paneId);
+  if (current === paneId) return null;
+  return effectiveMaximizedPaneId(root, paneId, paneId);
+}

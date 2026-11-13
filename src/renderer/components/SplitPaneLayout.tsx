@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { SplitSquareHorizontal, SplitSquareVertical, Minus, X, ExternalLink } from "lucide-react";
+import {
+  SplitSquareHorizontal,
+  SplitSquareVertical,
+  Minus,
+  X,
+  ExternalLink,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
@@ -9,7 +17,15 @@ import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
 import { hitPaneDropZone, type PaneDropZone } from "../terminal/pane-drop-zone";
 import { hasProfilePaneDrag, readProfilePaneDrag } from "../terminal/profile-pane-display";
-import { collectPanes, type LayoutNode, type PaneInfo, type SplitDirection } from "../terminal/split-tree";
+import { formatDroppedPaths, isOsFileDrag } from "../terminal/file-drop";
+import { pasteToTerminalSession } from "../terminal/terminal-session-actions";
+import {
+  collectPanes,
+  maximizedSplitSide,
+  type LayoutNode,
+  type PaneInfo,
+  type SplitDirection,
+} from "../terminal/split-tree";
 import { formatPaneCwdShort } from "../utils/pane-cwd";
 import { useLocale } from "../i18n/LocaleProvider";
 import {
@@ -65,6 +81,14 @@ interface Props {
    * page (the main process then checks the cursor is outside every app window).
    */
   onPopOutPane?: (paneId: string, trigger: PanePopOutTrigger, size: PanePopOutSize) => void;
+  /**
+   * Show only this pane (view-only; see `effectiveMaximizedPaneId`). Other panes
+   * stay mounted but hidden so their PTYs and xterm buffers keep running.
+   */
+  maximizedPaneId?: string | null;
+  onToggleMaximizePane?: (paneId: string) => void;
+  /** Formatted maximize shortcut for tooltips (e.g. `Ctrl+Shift+Enter`). */
+  maximizeShortcutKeys?: string;
 }
 
 export type PanePopOutTrigger = "drag" | "menu";
@@ -114,7 +138,13 @@ export function SplitPaneLayout(props: Props) {
     onPopOutPane: props.onPopOutPane,
   };
 
-  return <SplitPaneLayoutInner {...props} drag={drag} />;
+  return (
+    <SplitPaneLayoutInner
+      {...props}
+      onToggleMaximizePane={paneCount > 1 ? props.onToggleMaximizePane : undefined}
+      drag={drag}
+    />
+  );
 }
 
 function SplitPaneLayoutInner({
@@ -135,6 +165,9 @@ function SplitPaneLayoutInner({
   broadcastPaneCount = 0,
   paneAgentStates,
   paneLabels,
+  maximizedPaneId = null,
+  onToggleMaximizePane,
+  maximizeShortcutKeys,
   drag,
 }: Props & { drag: PaneDragState }) {
   if (node.kind === "pane") {
@@ -161,6 +194,11 @@ function SplitPaneLayoutInner({
           }
           onCwdClick={onPaneCwdClick ? () => onPaneCwdClick(node.pane.id) : undefined}
           sidebarPaneDragActive={sidebarPaneDragActive}
+          maximized={maximizedPaneId === node.pane.id}
+          onToggleMaximize={
+            onToggleMaximizePane ? () => onToggleMaximizePane(node.pane.id) : undefined
+          }
+          maximizeShortcutKeys={maximizeShortcutKeys}
         >
           {renderTerminal(node.pane, focused)}
         </WarpPaneShell>
@@ -171,6 +209,15 @@ function SplitPaneLayoutInner({
   const horizontal = node.direction === "horizontal";
   const ratio = clampRatio(node.ratio);
   const rest = 1 - ratio;
+  // Maximized: same element tree (nothing unmounts), the other side and the
+  // divider are display:none and the kept side takes the full split.
+  const keep = maximizedSplitSide(node, maximizedPaneId);
+  const sideStyle = (side: "first" | "second", grow: number, basisPx: number) =>
+    keep === null
+      ? { flex: `${grow} 1 ${basisPx}px` }
+      : keep === side
+        ? { flex: "1 1 0px" }
+        : { display: "none" };
 
   return (
     <div
@@ -180,7 +227,7 @@ function SplitPaneLayoutInner({
     >
       <div
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={{ flex: `${ratio} 1 ${nestedDividerPx(node.first, node.direction)}px` }}
+        style={sideStyle("first", ratio, nestedDividerPx(node.first, node.direction))}
       >
         <SplitPaneLayoutInner
           node={node.first}
@@ -200,13 +247,22 @@ function SplitPaneLayoutInner({
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStates={paneAgentStates}
           paneLabels={paneLabels}
+          maximizedPaneId={maximizedPaneId}
+          onToggleMaximizePane={onToggleMaximizePane}
+          maximizeShortcutKeys={maximizeShortcutKeys}
           drag={drag}
         />
       </div>
 
       <div
         className={`shrink-0 ${horizontal ? "w-2.5 self-stretch" : "h-2.5 w-full"}`}
-        style={horizontal ? { width: DIVIDER_PX } : { height: DIVIDER_PX }}
+        style={
+          keep !== null
+            ? { display: "none" }
+            : horizontal
+              ? { width: DIVIDER_PX }
+              : { height: DIVIDER_PX }
+        }
       >
         <ResizeDivider
           mode="ratio"
@@ -217,7 +273,7 @@ function SplitPaneLayoutInner({
 
       <div
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={{ flex: `${rest} 1 ${nestedDividerPx(node.second, node.direction)}px` }}
+        style={sideStyle("second", rest, nestedDividerPx(node.second, node.direction))}
       >
         <SplitPaneLayoutInner
           node={node.second}
@@ -237,6 +293,9 @@ function SplitPaneLayoutInner({
           broadcastPaneCount={broadcastPaneCount}
           paneAgentStates={paneAgentStates}
           paneLabels={paneLabels}
+          maximizedPaneId={maximizedPaneId}
+          onToggleMaximizePane={onToggleMaximizePane}
+          maximizeShortcutKeys={maximizeShortcutKeys}
           drag={drag}
         />
       </div>
@@ -261,6 +320,9 @@ function WarpPaneShell({
   onRename,
   onCwdClick,
   sidebarPaneDragActive = false,
+  maximized = false,
+  onToggleMaximize,
+  maximizeShortcutKeys,
   children,
 }: {
   pane: PaneInfo;
@@ -279,6 +341,9 @@ function WarpPaneShell({
   onSplit: (dir: SplitDirection) => void;
   onRename?: (title: string) => void;
   onCwdClick?: () => void;
+  maximized?: boolean;
+  onToggleMaximize?: () => void;
+  maximizeShortcutKeys?: string;
   children: ReactNode;
 }) {
   const { t } = useLocale();
@@ -377,6 +442,12 @@ function WarpPaneShell({
           }
           return;
         }
+        if (!draggingPaneId && isOsFileDrag(Array.from(e.dataTransfer.types))) {
+          // Files from Explorer / Finder: drop pastes their paths into this pane.
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          return;
+        }
         if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
         e.preventDefault();
         e.stopPropagation();
@@ -408,6 +479,16 @@ function WarpPaneShell({
           const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
           onProfilePaneDrop(payload.paneId, pane.id, zone);
           clearDrag();
+          return;
+        }
+        if (!draggingPaneId && isOsFileDrag(Array.from(e.dataTransfer.types))) {
+          e.preventDefault();
+          e.stopPropagation();
+          const paths = droppedFilePaths(e.dataTransfer);
+          if (paths.length === 0) return;
+          onFocus();
+          // term.paste: honours bracketed paste and reaches this pane only.
+          pasteToTerminalSession(pane.sessionId, formatDroppedPaths(paths));
           return;
         }
         if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
@@ -478,6 +559,22 @@ function WarpPaneShell({
             {t("pane.broadcastSyncBadge")}
           </span>
         )}
+        {maximized && onToggleMaximize && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleMaximize();
+            }}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text transition-colors hover:bg-chrome-ui-accent/20"
+            title={t("pane.maximizedHint", { keys: maximizeShortcutKeys ?? "" })}
+            aria-label={t("pane.restoreLayout")}
+          >
+            <Maximize2 className="h-2.5 w-2.5" aria-hidden />
+            {t("pane.maximizedBadge")}
+          </button>
+        )}
         <PaneGitBranch cwd={pane.cwd} />
         {onCwdClick ? (
           <button
@@ -505,6 +602,21 @@ function WarpPaneShell({
           <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
             <SplitSquareVertical className="h-3.5 w-3.5" />
           </IconBtn>
+          {onToggleMaximize && (
+            <IconBtn
+              title={withKeys(
+                maximized ? t("pane.restoreLayout") : t("pane.maximize"),
+                maximizeShortcutKeys,
+              )}
+              onClick={onToggleMaximize}
+            >
+              {maximized ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </IconBtn>
+          )}
           {onMinimize && (
             <IconBtn title={t("pane.minimize")} onClick={onMinimize}>
               <Minus className="h-3.5 w-3.5" />
@@ -587,6 +699,21 @@ function WarpPaneShell({
       </div>
     </div>
   );
+}
+
+/** OS paths of dropped files (Electron: webUtils via preload; `File.path` is gone). */
+function droppedFilePaths(dataTransfer: DataTransfer): string[] {
+  const out: string[] = [];
+  for (const file of Array.from(dataTransfer.files)) {
+    const legacy = (file as File & { path?: string }).path;
+    const path = window.api.getPathForFile?.(file) || legacy || "";
+    if (path) out.push(path);
+  }
+  return out;
+}
+
+function withKeys(label: string, keys: string | undefined): string {
+  return keys ? `${label} (${keys})` : label;
 }
 
 function IconBtn({

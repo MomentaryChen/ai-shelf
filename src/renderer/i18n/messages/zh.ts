@@ -740,6 +740,10 @@ export const zh: Record<MessageKey, string> = {
   "pane.popout.allPoppedOut": "這些終端機開在獨立視窗中",
   "pane.popout.loading": "正在開啟終端機…",
   "pane.popout.missing": "這個終端機已不存在。",
+  "pane.maximize": "最大化窗格",
+  "pane.restoreLayout": "還原分割版面",
+  "pane.maximizedBadge": "最大化",
+  "pane.maximizedHint": "其他窗格已隱藏但仍在執行。點一下或按 {keys} 還原分割版面。",
   "pane.dropAbove": "放到上方",
   "pane.dropBelow": "放到下方",
   "pane.dropLeft": "放到左側",
@@ -1490,6 +1494,10 @@ export const zh: Record<MessageKey, string> = {
   "shortcuts.terminal.paste": "貼上",
   "shortcuts.terminal.pasteAlt": "貼上（替代鍵）",
   "shortcuts.terminal.selectAll": "全選捲動緩衝",
+  "shortcuts.terminal.fontZoomIn": "放大終端機字型",
+  "shortcuts.terminal.fontZoomOut": "縮小終端機字型",
+  "shortcuts.terminal.fontZoomReset": "重設終端機字型大小",
+  "shortcuts.pane.toggleMaximize": "最大化 / 還原目前窗格",
 
   // Tools 模式 — 編解碼
   "tools.tab.codec": "編解碼",

@@ -862,6 +862,12 @@ export interface ElectronAPI {
   mcpPingTool: (tool: string) => Promise<McpPingToolResult>;
   openPath: (filePath: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
+  /** Open a file at a line (VS Code when available, else the OS handler). */
+  openPathAt?: (req: { path: string; line?: number; col?: number }) => Promise<void>;
+  /** Which absolute paths exist (terminal relative-path link filter). */
+  pathsExist?: (paths: string[]) => Promise<boolean[]>;
+  /** Absolute path of a File dropped from the OS ("" when it has none). */
+  getPathForFile?: (file: File) => string;
   launchInTerminal: (
     tool: string,
     terminal?: string,

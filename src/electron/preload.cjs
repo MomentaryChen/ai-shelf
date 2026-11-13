@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   getInventory: () => ipcRenderer.invoke("get-inventory"),
@@ -97,6 +97,16 @@ contextBridge.exposeInMainWorld("api", {
   mcpPingTool: (tool) => ipcRenderer.invoke("mcp-ping-tool", tool),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  openPathAt: (req) => ipcRenderer.invoke("open-path-at", req),
+  pathsExist: (paths) => ipcRenderer.invoke("paths-exist", paths),
+  // File.path was removed in Electron 32; dropped OS files resolve here.
+  getPathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return "";
+    }
+  },
   launchInTerminal: (tool, terminal, cwd, extraArgs) =>
     ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
   ptySpawn: (tool, cwd, extraArgs, shell, options) =>
