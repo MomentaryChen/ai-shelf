@@ -57,7 +57,14 @@ export function bootstrap(): AppContext {
   const processRegistry = new ProcessRegistry();
   const outputBuffer = new OutputBuffer();
   const ptyRuntime = new PtyRuntime(outputBuffer);
-  const sessionRuntime = new SessionRuntime(processRegistry, ptyRuntime, eventBus, sessions);
+  const sessionRuntime = new SessionRuntime(
+    processRegistry,
+    ptyRuntime,
+    eventBus,
+    sessions,
+    undefined,
+    (groupId) => groupLayouts.findByGroupId(groupId)?.remote ?? null,
+  );
   const workspaceRuntime = new WorkspaceRuntime();
 
   const workspaceService = new WorkspaceService(workspaces, eventBus, workspaceRuntime);

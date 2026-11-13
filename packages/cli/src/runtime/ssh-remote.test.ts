@@ -74,15 +74,26 @@ describe("buildRemoteSshCommand", () => {
     );
   });
 
-  it("keeps ~ expansion and quotes the rest", () => {
-    assert.match(buildRemoteSshCommand({ cwd: "~/my dir" }), /cd ~\/'\\''my dir'\\''/);
-    assert.match(buildRemoteSshCommand({ cwd: "~" }), /'cd ~; exec/);
+  it("shell-only pane does not require bash on the remote", () => {
+    assert.equal(buildRemoteSshCommand({ cwd: "~/my dir" }), `cd ~/'my dir'; exec "$SHELL" -l`);
+    assert.equal(buildRemoteSshCommand({ cwd: "~" }), `cd ~; exec "$SHELL" -l`);
+  });
+
+  it("keeps ~ expansion inside the bash wrapper", () => {
+    assert.match(
+      buildRemoteSshCommand({ cwd: "~/my dir", command: "claude" }),
+      /cd ~\/'\\''my dir'\\''/,
+    );
   });
 
   it("neutralizes quotes in the remote dir", () => {
-    const cmd = buildRemoteSshCommand({ cwd: "/tmp/it's; rm -rf ~" });
+    assert.equal(
+      buildRemoteSshCommand({ cwd: "/tmp/it's; rm -rf ~" }),
+      `cd '/tmp/it'\\''s; rm -rf ~'; exec "$SHELL" -l`,
+    );
+    const wrapped = buildRemoteSshCommand({ cwd: "/tmp/it's; rm -rf ~", command: "claude" });
     // Inner script must be a single cd argument: the quote is escaped, not closed.
-    assert.ok(cmd.includes(`it'\\''\\'\\'''\\''s; rm -rf ~`));
+    assert.ok(wrapped.includes(`it'\\''\\'\\'''\\''s; rm -rf ~`));
   });
 });
 

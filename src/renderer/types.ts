@@ -487,7 +487,7 @@ export interface ProfileInfo {
   broadcastInput: boolean;
   accentColor: string | null;
   /** SSH remote every pane connects to; null = local. */
-  remote?: RemoteSshConfig | null;
+  remote: RemoteSshConfig | null;
   paneCount: number;
   terminals: ProfileTerminal[];
   savedCommands: SavedCommandSnippet[];

@@ -3,6 +3,11 @@ import type { IPty } from "node-pty";
 import { RuntimeError } from "../core/errors/app-error.js";
 import type { OutputBuffer } from "./output-buffer.js";
 import {
+  SSH_CLIENT_NOT_FOUND_ERROR,
+  resolveSshExecutable,
+  type RemoteSshConfig,
+} from "./ssh-remote.js";
+import {
   NO_SUITABLE_UNIX_SHELL_ERROR,
   NO_SUITABLE_WINDOWS_SHELL_ERROR,
   resolvePtySpawnPlan,
@@ -29,6 +34,8 @@ export interface PtySpawnOptions {
   command?: string;
   cols?: number;
   rows?: number;
+  /** Owning profile's SSH remote; the PTY runs over ssh with no local fallback. */
+  remote?: RemoteSshConfig | null;
   onData?: (data: string) => void;
   onExit?: (exitCode: number) => void;
 }
@@ -58,11 +65,19 @@ export class PtyRuntime {
     }
 
     const pty = await this.getPty();
-    const workDir = options.cwd || homedir();
+    const remote = options.remote ?? null;
+    let sshExecutable: string | null = null;
+    if (remote) {
+      sshExecutable = resolveSshExecutable();
+      if (!sshExecutable) throw new RuntimeError(SSH_CLIENT_NOT_FOUND_ERROR);
+    }
+    // A remote session's cwd is a remote path (remote.cwd); ssh itself starts in home.
+    const workDir = remote ? homedir() : options.cwd || homedir();
     const cmd = options.command ?? resolveLaunchCommand(options.tool);
     const plan = resolvePtySpawnPlan({
       command: cmd,
       shell: options.shell,
+      ssh: remote && sshExecutable ? { executable: sshExecutable, config: remote } : undefined,
     });
 
     const ptyOpts = {

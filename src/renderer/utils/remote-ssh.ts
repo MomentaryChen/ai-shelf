@@ -4,10 +4,10 @@ import type { RemoteSshConfig } from "../types";
  * Form-side mirror of packages/cli/src/runtime/ssh-remote.ts validation.
  * The main process re-validates every spawn; this only gives early feedback.
  */
-const HOST_RE = /^[A-Za-z0-9_][A-Za-z0-9._:%-]{0,252}$/u;
+const HOST_RE = /^[A-Za-z0-9_][A-Za-z0-9._:-]{0,252}$/u;
 const USER_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/u;
 const JUMP_HOP_RE =
-  /^(?:[A-Za-z0-9_][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9_][A-Za-z0-9._%-]{0,252}(?::\d{1,5})?$/u;
+  /^(?:[A-Za-z0-9_][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9_][A-Za-z0-9._-]{0,252}(?::\d{1,5})?$/u;
 
 export interface RemoteSshDraft {
   enabled: boolean;

@@ -24,10 +24,10 @@ export interface RemoteSshConfig {
 
 export const SSH_CLIENT_NOT_FOUND_ERROR = "SSH client not found";
 
-const HOST_RE = /^[A-Za-z0-9_][A-Za-z0-9._:%-]{0,252}$/u;
+const HOST_RE = /^[A-Za-z0-9_][A-Za-z0-9._:-]{0,252}$/u;
 const USER_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/u;
 const JUMP_HOP_RE =
-  /^(?:[A-Za-z0-9_][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9_][A-Za-z0-9._%-]{0,252}(?::\d{1,5})?$/u;
+  /^(?:[A-Za-z0-9_][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9_][A-Za-z0-9._-]{0,252}(?::\d{1,5})?$/u;
 const MAX_JUMP_HOPS = 4;
 const MAX_REMOTE_CWD = 1024;
 
@@ -123,9 +123,11 @@ export function buildRemoteSshCommand(options: { cwd?: string; command?: string 
   const cwd = options.cwd?.trim() ?? "";
   const command = options.command?.trim() ?? "";
   if (!cwd && !command) return "";
+  // Shell-only pane: no bash needed (BusyBox / embedded hosts behind a gateway).
+  if (!command) return `cd ${remoteCwdExpr(cwd)}; exec "$SHELL" -l`;
   const steps: string[] = [];
   if (cwd) steps.push(`cd ${remoteCwdExpr(cwd)}`);
-  if (command) steps.push(command);
+  steps.push(command);
   steps.push(`exec "\${SHELL:-bash}" -l`);
   return `exec bash -lic ${posixQuote(steps.join("; "))}`;
 }

@@ -501,7 +501,7 @@ export const en = {
   "profile.remote.cwdPlaceholder": "Leave empty for the remote home, e.g. ~/projects/app",
   "profile.remote.appliesOnRestart":
     "Open terminals keep their current connection; close and reopen panes to apply.",
-  "profile.remote.invalid.host": "Host may only contain letters, digits, . _ - : % and cannot start with -.",
+  "profile.remote.invalid.host": "Host may only contain letters, digits, . _ - : and cannot start with -.",
   "profile.remote.invalid.user": "User may only contain letters, digits, . _ -.",
   "profile.remote.invalid.port": "Port must be 1–65535.",
   "profile.remote.invalid.jump": "Jump host format: [user@]host[:port], up to 4 hops separated by commas.",

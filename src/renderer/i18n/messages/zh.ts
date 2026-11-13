@@ -482,7 +482,7 @@ export const zh: Record<MessageKey, string> = {
   "profile.remote.cwd": "遠端目錄",
   "profile.remote.cwdPlaceholder": "留空則為遠端家目錄，例如 ~/projects/app",
   "profile.remote.appliesOnRestart": "已開啟的 terminal 維持原連線；關閉後重開 pane 才會套用。",
-  "profile.remote.invalid.host": "主機只能包含英數字與 . _ - : %，且不可以 - 開頭。",
+  "profile.remote.invalid.host": "主機只能包含英數字與 . _ - :，且不可以 - 開頭。",
   "profile.remote.invalid.user": "使用者只能包含英數字與 . _ -。",
   "profile.remote.invalid.port": "Port 需介於 1–65535。",
   "profile.remote.invalid.jump": "跳板機格式：[user@]host[:port]，最多 4 層並以逗號分隔。",
