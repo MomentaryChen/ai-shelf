@@ -301,64 +301,10 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("settings-changed", handler);
     return () => ipcRenderer.off("settings-changed", handler);
   },
-  flowList: () => ipcRenderer.invoke("flow-list"),
-  flowListActiveRuns: () => ipcRenderer.invoke("flow-list-active-runs"),
-  flowReadFile: (flowId) => ipcRenderer.invoke("flow-read-file", flowId),
-  flowReadRunOutput: (runId) => ipcRenderer.invoke("flow-read-run-output", runId),
-  flowGetLatestRunOutput: (flowId) => ipcRenderer.invoke("flow-get-latest-run-output", flowId),
-  flowRun: (flowId, options) => ipcRenderer.invoke("flow-run", flowId, options),
-  flowCancelRun: (flowId) => ipcRenderer.invoke("flow-cancel-run", flowId),
-  flowApproveGate: (flowId) => ipcRenderer.invoke("flow-approve-gate", flowId),
-  flowRejectGate: (flowId) => ipcRenderer.invoke("flow-reject-gate", flowId),
-  flowGetTaskSchedulerStatus: () => ipcRenderer.invoke("flow-get-task-scheduler-status"),
-  flowInstallTaskScheduler: () => ipcRenderer.invoke("flow-install-task-scheduler"),
-  flowRemoveTaskScheduler: () => ipcRenderer.invoke("flow-remove-task-scheduler"),
-  flowGetRunState: (runId) => ipcRenderer.invoke("flow-get-run-state", runId),
-  flowListRecentRuns: (limit) => ipcRenderer.invoke("flow-list-recent-runs", limit),
-  flowListRunsForFlow: (flowId, limit, offset) =>
-    ipcRenderer.invoke("flow-list-runs-for-flow", flowId, limit, offset),
-  flowGetRunEvents: (runId) => ipcRenderer.invoke("flow-get-run-events", runId),
-  flowGetConsoleBuffer: (runId) => ipcRenderer.invoke("flow-get-console-buffer", runId),
-  flowOpenRunArtifact: (runId, artifact) => ipcRenderer.invoke("flow-open-run-artifact", runId, artifact),
-  flowOpenFlowsDir: () => ipcRenderer.invoke("flow-open-flows-dir"),
-  flowDelete: (flowId) => ipcRenderer.invoke("flow-delete", flowId),
-  flowOpenFile: (flowId) => ipcRenderer.invoke("flow-open-file", flowId),
-  flowGetSchedulePrefs: () => ipcRenderer.invoke("flow-get-schedule-prefs"),
-  flowSetSchedulePrefs: (partial) => ipcRenderer.invoke("flow-set-schedule-prefs", partial),
-  flowRunDue: () => ipcRenderer.invoke("flow-run-due"),
-  flowSaveSchedule: (flowId, patch) => ipcRenderer.invoke("flow-save-schedule", flowId, patch),
-  flowSaveRunnerSettings: (flowId, patch) =>
-    ipcRenderer.invoke("flow-save-runner-settings", flowId, patch),
-  flowSaveNotifySettings: (flowId, patch) =>
-    ipcRenderer.invoke("flow-save-notify-settings", flowId, patch),
-  flowSaveSource: (flowId, content) => ipcRenderer.invoke("flow-save-source", flowId, content),
-  flowPruneHistory: (flowId) => ipcRenderer.invoke("flow-prune-history", flowId),
-  flowGenerate: (turns, flowId) => ipcRenderer.invoke("flow-generate", { turns, flowId }),
-  flowGetChat: (flowId) => ipcRenderer.invoke("flow-get-chat", flowId),
-  flowSaveChat: (flowId, messages) => ipcRenderer.invoke("flow-save-chat", flowId, messages),
-  flowClearChat: (flowId) => ipcRenderer.invoke("flow-clear-chat", flowId),
-  flowListPromptLogs: (flowId, limit) => ipcRenderer.invoke("flow-list-prompt-logs", flowId, limit),
-  flowGetDagNodeCommand: (flowId, node, options) =>
-    ipcRenderer.invoke("flow-get-dag-node-command", flowId, node, options),
-  flowCreate: (content, overwriteOrOptions) => {
-    const options =
-      overwriteOrOptions && typeof overwriteOrOptions === "object"
-        ? overwriteOrOptions
-        : { overwrite: overwriteOrOptions === true };
-    return ipcRenderer.invoke("flow-create", content, options);
-  },
-  flowListTemplates: () => ipcRenderer.invoke("flow-list-templates"),
-  flowInstallTemplate: (templateId) => ipcRenderer.invoke("flow-install-template", templateId),
-  onFlowRunState: (cb) => {
-    const handler = (_e, state) => cb(state);
-    ipcRenderer.on("flow-run-state", handler);
-    return () => ipcRenderer.off("flow-run-state", handler);
-  },
-  onFlowConsoleChunk: (cb) => {
-    const handler = (_e, chunk) => cb(chunk);
-    ipcRenderer.on("flow-console-chunk", handler);
-    return () => ipcRenderer.off("flow-console-chunk", handler);
-  },
+  tasksList: () => ipcRenderer.invoke("tasks-list"),
+  tasksSave: (input) => ipcRenderer.invoke("tasks-save", input),
+  tasksDelete: (id) => ipcRenderer.invoke("tasks-delete", id),
+  tasksOpenDir: () => ipcRenderer.invoke("tasks-open-dir"),
   portsList: (port) => ipcRenderer.invoke("ports-list", port),
   portsKill: (pid) => ipcRenderer.invoke("ports-kill", pid),
   portsAnalyzeEnv: (locale) => ipcRenderer.invoke("ports-analyze-env", locale),

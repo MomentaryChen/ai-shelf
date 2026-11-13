@@ -222,57 +222,9 @@ import {
   readPtyLogRetentionPrefs,
   writePtyLogRetentionPrefs,
 } from "./pty-log-retention-pref.js";
-import {
-  deleteFlow,
-  deleteFlowChatData,
-  createFlowFromContent,
-  FLOW_CHAT_DRAFT_ID,
-  getFlowDagNodeCommand,
-  getFlowFilePath,
-  getFlowRunState,
-  getRunArtifactPath,
-  getRunEvents,
-  getFlowsDir,
-  initFlowService,
-  installBundledFlowTemplate,
-  listBundledFlowTemplates,
-  listFlows,
-  listActiveFlowRuns,
-  listFlowPromptLogs,
-  listRecentRuns,
-  listRunsPageForFlow,
-  onFlowRunState,
-  onFlowConsoleChunk,
-  getFlowConsoleBuffer,
-  readFlowFile,
-  readRunOutput,
-  getLatestRunWithOutput,
-  readFlowChat,
-  runDueFlows,
-  runFlow,
-  cancelFlowRun,
-  cancelAllFlowRuns,
-  approveFlowGate,
-  rejectFlowGate,
-  saveFlowSchedule,
-  saveFlowRunner,
-  saveFlowChat,
-  saveFlowSource,
-  saveFlowNotifications,
-  pruneAllFlowRunHistory,
-} from "./flow-service.js";
-import {
-  getFlowTaskSchedulerStatus,
-  installFlowTaskScheduler,
-  removeFlowTaskScheduler,
-} from "./flow-task-scheduler.js";
-import { generateFlowFromChat } from "../flow/generate.js";
-import type { FlowChatMessage } from "../shared/flow-chat-types.js";
-import { initFlowScheduler, stopFlowScheduler } from "./flow-scheduler.js";
-import {
-  readFlowSchedulePrefs,
-  writeFlowSchedulePrefs,
-} from "../shared/flow-schedule-pref.js";
+import { deleteTask, getTasksDir, initTaskService, listTasks, saveTask } from "./task-service.js";
+import type { TaskInput } from "../shared/task-types.js";
+import { InitialInputGate, bracketedPaste } from "../shared/pty-initial-input.js";
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
 
 registerAuthHandlers();
@@ -1131,13 +1083,7 @@ ipcMain.handle("quit-and-install-app-update", () => {
 
 /** What a restart-to-install would interrupt, so the update modal can warn first. */
 ipcMain.handle("get-app-update-impact", () => {
-  let flows = 0;
-  try {
-    flows = listActiveFlowRuns().length;
-  } catch {
-    /* best-effort */
-  }
-  return { terminals: PTY_SESSIONS.size, flows };
+  return { terminals: PTY_SESSIONS.size };
 });
 
 // --- MCP Sync ---
@@ -1910,6 +1856,7 @@ ipcMain.handle(
       wslDistro?: unknown;
       remote?: unknown;
       agentSession?: { resumeId?: unknown };
+      initialInput?: unknown;
     },
   ) => {
     let pty: PtyModule;
@@ -2069,6 +2016,12 @@ ipcMain.handle(
         /* ignore */
       }
 
+      const initialInput =
+        !shellOnly && typeof spawnOptions?.initialInput === "string"
+          ? spawnOptions.initialInput.trim()
+          : "";
+      if (initialInput) scheduleInitialInput(sessionId, proc, initialInput);
+
       proc.onExit(({ exitCode }) => {
         PTY_SESSIONS.delete(sessionId);
         // Keep the output buffer for Find / export until the pane is killed.
@@ -2096,6 +2049,41 @@ ipcMain.handle(
     }
   },
 );
+
+/**
+ * Type a task prompt into an agent pane once its TUI has settled (see pty-initial-input).
+ * Only the main process sees every output chunk, so the wait lives here, not in a renderer.
+ */
+function scheduleInitialInput(
+  sessionId: string,
+  proc: import("node-pty").IPty,
+  text: string,
+): void {
+  const gate = new InitialInputGate(Date.now());
+  const sub = proc.onData((data) => gate.noteOutput(data, Date.now()));
+  const timer = setInterval(() => {
+    if (PTY_SESSIONS.get(sessionId) !== proc) {
+      stop();
+      return;
+    }
+    const decision = gate.decide(Date.now());
+    if (decision === "wait") return;
+    stop();
+    if (decision === "give-up") {
+      console.warn("[pty-spawn] task prompt not sent: agent stayed on a start-up dialog");
+      return;
+    }
+    proc.write(bracketedPaste(text));
+    // Separate write so the TUI has ended the paste before Enter arrives.
+    setTimeout(() => {
+      if (PTY_SESSIONS.get(sessionId) === proc) proc.write("\r");
+    }, 150);
+  }, 200);
+  function stop() {
+    clearInterval(timer);
+    sub.dispose();
+  }
+}
 
 /** Private key picker for SSH profiles; starts in ~/.ssh (hidden files shown). */
 ipcMain.handle("pick-ssh-key", async (event, defaultPath?: string) => {
@@ -2918,472 +2906,34 @@ ipcMain.handle("set-tray-pane-attention", (_event, count: unknown) => {
   return { ok: true, count: n };
 });
 
-ipcMain.handle("flow-list", () => listFlows());
-ipcMain.handle("flow-list-active-runs", () => listActiveFlowRuns());
-ipcMain.handle("flow-read-run-output", (_event, runId: unknown) => {
-  if (typeof runId !== "string" || !runId.trim()) {
-    return { ok: false, error: "Invalid run id" };
-  }
-  return readRunOutput(runId.trim());
-});
-ipcMain.handle("flow-get-latest-run-output", (_event, flowId: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return null;
-  }
-  return getLatestRunWithOutput(flowId.trim());
-});
-ipcMain.handle("flow-read-file", (_event, flowId: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) return null;
-  return readFlowFile(flowId.trim());
-});
+ipcMain.handle("tasks-list", () => listTasks());
 
-ipcMain.handle("flow-get-dag-node-command", (_event, flowId: unknown, node: unknown, options: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { error: "Invalid flow id" };
+ipcMain.handle("tasks-save", (_event, input: unknown) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ok: false, error: "invalid-input" };
   }
-  if (!node || typeof node !== "object") {
-    return { error: "Invalid node" };
-  }
-  const n = node as {
-    kind?: unknown;
-    phaseId?: unknown;
-    phaseLabel?: unknown;
-    phaseMessage?: unknown;
+  const raw = input as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === "string" ? v : undefined);
+  const task: TaskInput = {
+    id: text(raw.id),
+    name: text(raw.name) ?? "",
+    prompt: text(raw.prompt) ?? "",
+    description: text(raw.description),
+    profileId: text(raw.profileId),
+    tool: text(raw.tool),
   };
-  if (n.kind !== "trigger" && n.kind !== "phase" && n.kind !== "output") {
-    return { error: "Invalid node kind" };
-  }
-  let runOptions: {
-    globalToolLaunchArgs?: import("../tool-launch.js").ToolLaunchArgs;
-    runId?: string;
-    outputPath?: string | null;
-  } = {};
-  if (options && typeof options === "object") {
-    const o = options as {
-      globalToolLaunchArgs?: unknown;
-      runId?: unknown;
-      outputPath?: unknown;
-    };
-    if (o.globalToolLaunchArgs && typeof o.globalToolLaunchArgs === "object") {
-      runOptions.globalToolLaunchArgs = o.globalToolLaunchArgs as import("../tool-launch.js").ToolLaunchArgs;
-    }
-    if (typeof o.runId === "string" && o.runId.trim()) {
-      runOptions.runId = o.runId.trim();
-    }
-    if (typeof o.outputPath === "string") {
-      runOptions.outputPath = o.outputPath;
-    } else if (o.outputPath === null) {
-      runOptions.outputPath = null;
-    }
-  }
-  return getFlowDagNodeCommand(
-    flowId.trim(),
-    {
-      kind: n.kind,
-      phaseId: typeof n.phaseId === "string" ? n.phaseId : undefined,
-      phaseLabel: typeof n.phaseLabel === "string" ? n.phaseLabel : undefined,
-      phaseMessage:
-        typeof n.phaseMessage === "string" || n.phaseMessage === null ? n.phaseMessage : undefined,
-    },
-    runOptions,
-  );
+  return saveTask(task);
 });
 
-ipcMain.handle("flow-run", (_event, flowId: unknown, options: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  let runOptions: import("../flow/core.js").RunFlowOptions = {};
-  if (options && typeof options === "object") {
-    const o = options as { globalToolLaunchArgs?: unknown };
-    if (o.globalToolLaunchArgs && typeof o.globalToolLaunchArgs === "object") {
-      runOptions = {
-        globalToolLaunchArgs: o.globalToolLaunchArgs as import("../tool-launch.js").ToolLaunchArgs,
-      };
-    }
-  }
-  return runFlow(flowId.trim(), runOptions);
-});
-ipcMain.handle("flow-cancel-run", (_event, flowId: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  return cancelFlowRun(flowId.trim());
-});
-ipcMain.handle("flow-approve-gate", (_event, flowId: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  return approveFlowGate(flowId.trim());
-});
-ipcMain.handle("flow-reject-gate", (_event, flowId: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  return rejectFlowGate(flowId.trim());
-});
-ipcMain.handle("flow-get-task-scheduler-status", () => getFlowTaskSchedulerStatus());
-ipcMain.handle("flow-install-task-scheduler", () => installFlowTaskScheduler());
-ipcMain.handle("flow-remove-task-scheduler", () => removeFlowTaskScheduler());
-ipcMain.handle("flow-get-run-state", (_event, runId: unknown) => {
-  if (typeof runId !== "string" || !runId.trim()) return null;
-  return getFlowRunState(runId.trim());
-});
-ipcMain.handle("flow-list-recent-runs", (_event, limit: unknown) => {
-  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 20;
-  return listRecentRuns(n);
+ipcMain.handle("tasks-delete", (_event, id: unknown) => {
+  if (typeof id !== "string" || !id.trim()) return { ok: false, error: "invalid-id" };
+  return deleteTask(id.trim());
 });
 
-ipcMain.handle("flow-list-runs-for-flow", (_event, flowId: unknown, limit: unknown, offset: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) return { items: [], total: 0 };
-  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 10;
-  const o = typeof offset === "number" && Number.isFinite(offset) ? Math.max(0, Math.round(offset)) : 0;
-  const id = flowId.trim();
-  return listRunsPageForFlow(id, n, o);
-});
-
-ipcMain.handle("flow-get-console-buffer", (_event, runId: unknown) => {
-  if (typeof runId !== "string" || !runId.trim()) {
-    return { runId: "", text: "", truncated: false, phaseId: null, alive: false, lastSeq: 0 };
-  }
-  return getFlowConsoleBuffer(runId.trim());
-});
-ipcMain.handle("flow-get-run-events", (_event, runId: unknown) => {
-  if (typeof runId !== "string" || !runId.trim()) return [];
-  return getRunEvents(runId.trim());
-});
-
-ipcMain.handle("flow-open-run-artifact", (_event, runId: unknown, artifact: unknown) => {
-  if (typeof runId !== "string" || !runId.trim()) {
-    return { ok: false, error: "Invalid run id" };
-  }
-  const kind =
-    artifact === "prompt" || artifact === "events" || artifact === "output" || artifact === "runDir"
-      ? artifact
-      : null;
-  if (!kind) return { ok: false, error: "Invalid artifact" };
-  const path = getRunArtifactPath(runId.trim(), kind);
-  if (!path) return { ok: false, error: "File not found" };
-  void shell.openPath(path);
-  return { ok: true, path };
-});
-
-ipcMain.handle("flow-open-flows-dir", () => {
-  void shell.openPath(getFlowsDir());
-});
-
-ipcMain.handle("flow-delete", (_event, flowId: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  return deleteFlow(flowId.trim());
-});
-
-ipcMain.handle("flow-open-file", (_event, flowId: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) return { ok: false };
-  const filePath = getFlowFilePath(flowId.trim());
-  if (!filePath) return { ok: false, error: "Flow not found" };
-  void shell.openPath(filePath);
-  return { ok: true, path: filePath };
-});
-
-ipcMain.handle("flow-get-schedule-prefs", () => readFlowSchedulePrefs());
-
-ipcMain.handle("flow-set-schedule-prefs", (_event, partial: unknown) => {
-  if (!partial || typeof partial !== "object") {
-    return { ok: false, error: "Invalid prefs" };
-  }
-  const p = partial as {
-    schedulerEnabled?: unknown;
-    historyMaxRuns?: unknown;
-    historyMaxDays?: unknown;
-  };
-  const limit = (v: unknown): number | null | undefined => {
-    if (v === null) return null;
-    if (typeof v === "number" && Number.isFinite(v)) return v > 0 ? Math.floor(v) : null;
-    return undefined;
-  };
-  const next = writeFlowSchedulePrefs({
-    schedulerEnabled:
-      typeof p.schedulerEnabled === "boolean" ? p.schedulerEnabled : undefined,
-    historyMaxRuns: limit(p.historyMaxRuns),
-    historyMaxDays: limit(p.historyMaxDays),
-  });
-  return { ok: true, prefs: next };
-});
-
-ipcMain.handle("flow-prune-history", (_event, flowId: unknown) => {
-  const id = typeof flowId === "string" && flowId.trim() ? flowId.trim() : undefined;
-  try {
-    return { ok: true, ...pruneAllFlowRunHistory({ flowId: id }) };
-  } catch (err: unknown) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
-
-ipcMain.handle("flow-save-source", (_event, flowId: unknown, content: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  if (typeof content !== "string" || !content.trim()) {
-    return { ok: false, error: "Invalid flow content" };
-  }
-  return saveFlowSource(flowId.trim(), content);
-});
-
-ipcMain.handle("flow-save-notify-settings", (_event, flowId: unknown, patch: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  if (!patch || typeof patch !== "object") {
-    return { ok: false, error: "Invalid notification patch" };
-  }
-  const p = patch as Record<string, unknown>;
-  const notify =
-    p.notify === "all" || p.notify === "success" || p.notify === "failure" || p.notify === "none"
-      ? p.notify
-      : undefined;
-  const slack = (v: unknown) => (v === "slack" ? "slack" : v === "none" ? "none" : undefined);
-  const limit = (v: unknown): number | null | undefined => {
-    if (v === null) return null;
-    if (typeof v === "number" && Number.isFinite(v)) return v > 0 ? Math.floor(v) : null;
-    return undefined;
-  };
-  let webhooks: import("../shared/flow-types.js").FlowWebhookDef[] | null | undefined;
-  if (p.webhooks === null) {
-    webhooks = null;
-  } else if (Array.isArray(p.webhooks)) {
-    webhooks = [];
-    for (const raw of p.webhooks) {
-      if (!raw || typeof raw !== "object") continue;
-      const h = raw as Record<string, unknown>;
-      if (typeof h.url !== "string" || !h.url.trim()) {
-        return { ok: false, error: "Each webhook needs a url" };
-      }
-      const method =
-        h.method === "PUT" || h.method === "PATCH" || h.method === "GET" ? h.method : "POST";
-      const on = Array.isArray(h.on)
-        ? h.on.filter((v): v is "success" | "failure" => v === "success" || v === "failure")
-        : [];
-      webhooks.push({
-        url: h.url.trim(),
-        method,
-        on: on.length > 0 ? on : ["success", "failure"],
-        payload: typeof h.payload === "string" && h.payload.trim() ? h.payload : undefined,
-        contentType:
-          typeof h.contentType === "string" && h.contentType.trim() ? h.contentType.trim() : undefined,
-        authorization:
-          typeof h.authorization === "string" && h.authorization.trim()
-            ? h.authorization.trim()
-            : undefined,
-      });
-    }
-  }
-  return saveFlowNotifications(flowId.trim(), {
-    notify,
-    onSuccess: slack(p.onSuccess),
-    onFail: slack(p.onFail),
-    webhooks,
-    historyMaxRuns: limit(p.historyMaxRuns),
-    historyMaxDays: limit(p.historyMaxDays),
-  });
-});
-
-ipcMain.handle("flow-save-schedule", (_event, flowId: unknown, patch: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  if (!patch || typeof patch !== "object") {
-    return { ok: false, error: "Invalid schedule patch" };
-  }
-  const p = patch as { schedule?: unknown; timezone?: unknown };
-  const schedule =
-    p.schedule === null
-      ? null
-      : typeof p.schedule === "string"
-        ? p.schedule
-        : undefined;
-  if (schedule === undefined) {
-    return { ok: false, error: "schedule is required (string or null)" };
-  }
-  const timezone =
-    p.timezone === null || p.timezone === undefined
-      ? p.timezone === null
-        ? null
-        : undefined
-      : typeof p.timezone === "string"
-        ? p.timezone
-        : undefined;
-  return saveFlowSchedule(flowId.trim(), { schedule, timezone });
-});
-
-ipcMain.handle("flow-save-runner-settings", (_event, flowId: unknown, patch: unknown) => {
-  if (typeof flowId !== "string" || !flowId.trim()) {
-    return { ok: false, error: "Invalid flow id" };
-  }
-  if (!patch || typeof patch !== "object") {
-    return { ok: false, error: "Invalid runner patch" };
-  }
-  const p = patch as {
-    tool?: unknown;
-    toolArgs?: unknown;
-    cwd?: unknown;
-    profile?: unknown;
-    env?: unknown;
-  };
-  if (typeof p.tool !== "string" || !p.tool.trim()) {
-    return { ok: false, error: "tool is required" };
-  }
-  const nullableString = (v: unknown): string | null | undefined => {
-    if (v === null) return null;
-    if (typeof v === "string") return v;
-    return undefined;
-  };
-  const toolArgs = nullableString(p.toolArgs);
-  const cwd = nullableString(p.cwd);
-  const profile = nullableString(p.profile);
-  if (toolArgs === undefined || cwd === undefined || profile === undefined) {
-    return { ok: false, error: "Invalid runner patch fields" };
-  }
-  let env: Record<string, string> | null | undefined;
-  if (p.env === null) {
-    env = null;
-  } else if (p.env && typeof p.env === "object" && !Array.isArray(p.env)) {
-    env = {};
-    for (const [key, value] of Object.entries(p.env as Record<string, unknown>)) {
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== "string") {
-        return { ok: false, error: `Invalid env variable: ${key}` };
-      }
-      env[key] = value;
-    }
-  }
-  return saveFlowRunner(flowId.trim(), {
-    tool: p.tool.trim(),
-    toolArgs,
-    cwd,
-    profile,
-    env,
-  });
-});
-
-ipcMain.handle("flow-run-due", async () => {
-  // wait:false so a long-running flow doesn't hold the renderer invoke open;
-  // run progress is delivered through flow run-state events.
-  const result = await runDueFlows(new Date(), { wait: false });
-  return { ok: true, result };
-});
-
-ipcMain.handle("flow-generate", async (_event, payload: unknown) => {
-  if (!payload || typeof payload !== "object") {
-    return { ok: false, error: "Invalid request" };
-  }
-  const { turns, flowId } = payload as { turns?: unknown; flowId?: unknown };
-  if (!Array.isArray(turns)) {
-    return { ok: false, error: "Invalid conversation" };
-  }
-  const parsed = turns
-    .filter((t): t is { role: "user" | "assistant"; content: string } => {
-      if (!t || typeof t !== "object") return false;
-      const role = (t as { role?: unknown }).role;
-      const content = (t as { content?: unknown }).content;
-      return (
-        (role === "user" || role === "assistant") &&
-        typeof content === "string" &&
-        content.trim().length > 0
-      );
-    })
-    .map((t) => ({ role: t.role, content: t.content.trim() }));
-  const logFlowId =
-    typeof flowId === "string" && flowId.trim() ? flowId.trim() : FLOW_CHAT_DRAFT_ID;
-  return generateFlowFromChat(parsed, { flowId: logFlowId });
-});
-
-function normalizeChatFlowId(flowId: unknown): string | null {
-  if (typeof flowId !== "string" || !flowId.trim()) return null;
-  const id = flowId.trim();
-  if (id === FLOW_CHAT_DRAFT_ID) return id;
-  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(id)) return null;
-  return id;
-}
-
-function parseChatMessages(raw: unknown): FlowChatMessage[] | null {
-  if (!Array.isArray(raw)) return null;
-  const messages: FlowChatMessage[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const rec = item as Record<string, unknown>;
-    const role = rec.role;
-    const content = rec.content;
-    const id = rec.id;
-    if ((role !== "user" && role !== "assistant") || typeof content !== "string") continue;
-    if (typeof id !== "string" || !id.trim()) continue;
-    messages.push({
-      id: id.trim(),
-      role,
-      content,
-      draft: typeof rec.draft === "string" ? rec.draft : undefined,
-      error: rec.error === true,
-      createdAt:
-        typeof rec.createdAt === "string" && rec.createdAt
-          ? rec.createdAt
-          : new Date().toISOString(),
-    });
-  }
-  return messages;
-}
-
-ipcMain.handle("flow-get-chat", (_event, flowId: unknown) => {
-  const id = normalizeChatFlowId(flowId);
-  if (!id) return null;
-  const state = readFlowChat(id);
-  return state?.messages ?? [];
-});
-
-ipcMain.handle("flow-save-chat", (_event, flowId: unknown, messages: unknown) => {
-  const id = normalizeChatFlowId(flowId);
-  if (!id) return { ok: false, error: "Invalid flow id" };
-  const parsed = parseChatMessages(messages);
-  if (!parsed) return { ok: false, error: "Invalid messages" };
-  saveFlowChat(id, parsed);
-  return { ok: true };
-});
-
-ipcMain.handle("flow-clear-chat", (_event, flowId: unknown) => {
-  const id = normalizeChatFlowId(flowId);
-  if (!id) return { ok: false, error: "Invalid flow id" };
-  deleteFlowChatData(id);
-  return { ok: true };
-});
-
-ipcMain.handle("flow-list-prompt-logs", (_event, flowId: unknown, limit: unknown) => {
-  const id = normalizeChatFlowId(flowId);
-  if (!id) return [];
-  const n = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.round(limit)) : 50;
-  return listFlowPromptLogs(id, n);
-});
-
-ipcMain.handle("flow-create", (_event, content: unknown, options: unknown) => {
-  if (typeof content !== "string" || !content.trim()) {
-    return { ok: false, error: "Invalid flow content" };
-  }
-  // Backward compatible: second arg was `overwrite: boolean`.
-  const opts =
-    options && typeof options === "object"
-      ? (options as { overwrite?: unknown; migrateChatFromDraft?: unknown })
-      : { overwrite: options === true };
-  return createFlowFromContent(content, {
-    overwrite: opts.overwrite === true,
-    migrateChatFromDraft: opts.migrateChatFromDraft !== false,
-  });
-});
-
-ipcMain.handle("flow-list-templates", () => listBundledFlowTemplates());
-
-ipcMain.handle("flow-install-template", (_event, templateId: unknown) => {
-  if (typeof templateId !== "string" || !templateId.trim()) {
-    return { ok: false, error: "Invalid template id" };
-  }
-  return installBundledFlowTemplate(templateId.trim());
+ipcMain.handle("tasks-open-dir", () => {
+  const dir = getTasksDir();
+  mkdirSync(dir, { recursive: true });
+  return shell.openPath(dir);
 });
 
 app.whenReady().then(async () => {
@@ -3411,23 +2961,11 @@ app.whenReady().then(async () => {
   scheduleStartupUpdateCheck();
   initHealthMonitor(() => mainWindow);
   initPtyLogGc();
-  initFlowService();
-  initFlowScheduler(() => mainWindow);
-  onFlowRunState((state) => {
-    const win = mainWindow;
-    if (!win || win.isDestroyed()) return;
-    win.webContents.send("flow-run-state", state);
-  });
-  onFlowConsoleChunk((chunk) => {
-    const win = mainWindow;
-    if (!win || win.isDestroyed()) return;
-    win.webContents.send("flow-console-chunk", chunk);
-  });
+  initTaskService();
   onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
 });
 
 app.on("will-quit", () => {
-  stopFlowScheduler();
   stopRendererServer();
 });
 
@@ -3480,12 +3018,6 @@ function flushProfileLayoutsFromRenderer(): Promise<void> {
 
 function tearDownOnQuit(): void {
   setAppQuitting(true);
-  stopFlowScheduler();
-  try {
-    cancelAllFlowRuns();
-  } catch {
-    /* never block quit */
-  }
   for (const [, proc] of PTY_SESSIONS) {
     try { proc.kill(); } catch { /* already dead */ }
   }

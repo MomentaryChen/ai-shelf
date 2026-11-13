@@ -168,6 +168,15 @@ describe("overrides", () => {
     });
   });
 
+  it("carries a rebinding saved under the old AI Flow id over to Tasks", () => {
+    assert.deepEqual(normalizeKeybindingOverrides({ modeFlow: { key: "9", alt: true } }), {
+      modeTasks: { key: "9", alt: true },
+    });
+    assert.deepEqual(normalizeKeybindingOverrides({ modeFlow: null, modeTasks: { key: "8", alt: true } }), {
+      modeTasks: { key: "8", alt: true },
+    });
+  });
+
   it("migrates legacy paneShortcuts settings", () => {
     assert.deepEqual(
       migrateLegacyPaneShortcuts({
@@ -239,7 +248,7 @@ describe("conflicts", () => {
   it("mode digits clash with a remapped digit-family shortcut", () => {
     const map = resolveKeybindings({ focusPane: { key: DIGIT_KEY, alt: true } }, "win");
     const c = findKeybindingConflicts(map);
-    assert.deepEqual(c.get("focusPane"), ["modeTerminal", "modeInventory", "modeTools", "modeFlow"]);
+    assert.deepEqual(c.get("focusPane"), ["modeTerminal", "modeInventory", "modeTools", "modeTasks"]);
   });
 });
 

@@ -734,7 +734,6 @@ function CostDecisionsPanel({
   onBudgetSaved?: () => void;
 }) {
   const { t } = useLocale();
-  const [attrTab, setAttrTab] = useState<"tool" | "profile" | "flow">("flow");
   const [budgetInput, setBudgetInput] = useState(
     insights.budget.weeklyBudgetUsd != null ? String(insights.budget.weeklyBudgetUsd) : "",
   );
@@ -757,9 +756,7 @@ function CostDecisionsPanel({
         ? "border-accent/25 bg-secondary"
         : "border-border bg-bg-primary/80";
 
-  const hottest = insights.weekHottestFlow;
-  const attrRows =
-    attrTab === "tool" ? insights.byTool : attrTab === "profile" ? insights.byProfile : insights.byFlow;
+  const attrRows = insights.byTool;
 
   const saveBudget = async (clear = false) => {
     setBudgetBusy(true);
@@ -790,29 +787,6 @@ function CostDecisionsPanel({
           {t("usage.decisions.title")}
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
-          <div>
-            <div className="text-[12px] text-text-secondary">{t("usage.decisions.hottest")}</div>
-            {hottest ? (
-              <>
-                <div className="mt-1 truncate text-[17px] font-semibold text-text-primary">
-                  {hottest.label}
-                </div>
-                <p className="mt-1 text-[13px] text-text-secondary">
-                  {t("usage.decisions.hottestHint", {
-                    runs: String(hottest.runCount),
-                    cost: formatUsd(hottest.costUsd),
-                  })}
-                </p>
-                {hottest.estimated && hottest.costUsd > 0 && (
-                  <p className="mt-1 text-[11px] text-text-secondary">{t("usage.decisions.estimated")}</p>
-                )}
-              </>
-            ) : (
-              <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
-                {t("usage.decisions.hottestEmpty")}
-              </p>
-            )}
-          </div>
           <div>
             <div className="text-[12px] text-text-secondary">{t("usage.decisions.weekSpend")}</div>
             <div className="mt-1 text-[22px] font-semibold tabular-nums text-accent">
@@ -848,28 +822,6 @@ function CostDecisionsPanel({
         <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">
           {t("usage.attribution.hint")}
         </p>
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {(
-            [
-              ["flow", "usage.attribution.byFlow"],
-              ["profile", "usage.attribution.byProfile"],
-              ["tool", "usage.attribution.byTool"],
-            ] as const
-          ).map(([id, key]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setAttrTab(id)}
-              className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] transition-colors duration-200 ${
-                attrTab === id
-                  ? "bg-accent font-medium text-on-accent warm-shadow-accent"
-                  : "bg-secondary text-text-primary hover:bg-accent-surface"
-              }`}
-            >
-              {t(key)}
-            </button>
-          ))}
-        </div>
         <AttributionList rows={attrRows} emptyLabel={t("usage.attribution.empty")} />
       </Card>
 

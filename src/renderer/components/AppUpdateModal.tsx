@@ -50,7 +50,7 @@ export function AppUpdateModal() {
   const [total, setTotal] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [installStalled, setInstallStalled] = useState(false);
-  const [impact, setImpact] = useState<{ terminals: number; flows: number } | null>(null);
+  const [impact, setImpact] = useState<{ terminals: number } | null>(null);
 
   const releaseNotesHtml = useMemo(
     () => (releaseNotes ? sanitizeReleaseNotesHtml(releaseNotes) : null),
@@ -355,18 +355,11 @@ export function AppUpdateModal() {
                 {t("appUpdate.downloadComplete")}
                 {version ? ` (v${version})` : ""}. {t("appUpdate.silentInstallNote")}
               </p>
-              {impact && (impact.terminals > 0 || impact.flows > 0) && (
+              {impact && impact.terminals > 0 && (
                 <div className="mt-4 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/8 px-3 py-2.5 text-xs leading-relaxed text-text-primary">
                   <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
                   <span>
-                    {impact.flows > 0 && impact.terminals > 0
-                      ? t("appUpdate.impactTerminalsFlows", {
-                          terminals: impact.terminals,
-                          flows: impact.flows,
-                        })
-                      : impact.flows > 0
-                        ? t("appUpdate.impactFlows", { flows: impact.flows })
-                        : t("appUpdate.impactTerminals", { terminals: impact.terminals })}
+                    {t("appUpdate.impactTerminals", { terminals: impact.terminals })}
                   </span>
                 </div>
               )}

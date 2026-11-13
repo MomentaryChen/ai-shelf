@@ -38,7 +38,7 @@ const MODE_CARDS: { mode: AppMode; icon: string; key: MessageKey }[] = [
   { mode: "terminal", icon: "🖥️", key: "onboarding.start.modeTerminal" },
   { mode: "inventory", icon: "📦", key: "onboarding.start.modeInventory" },
   { mode: "tools", icon: "🔧", key: "onboarding.start.modeTools" },
-  { mode: "flow", icon: "🧭", key: "onboarding.start.modeFlow" },
+  { mode: "tasks", icon: "▶️", key: "onboarding.start.modeTasks" },
 ];
 
 export function OnboardingModal({

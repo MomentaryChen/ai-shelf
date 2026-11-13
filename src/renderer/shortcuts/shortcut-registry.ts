@@ -27,7 +27,7 @@ export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
   modeTerminal: "shortcuts.general.modeTerminal",
   modeInventory: "shortcuts.general.modeInventory",
   modeTools: "shortcuts.general.modeTools",
-  modeFlow: "shortcuts.general.modeFlow",
+  modeTasks: "shortcuts.general.modeTasks",
   toggleSidebar: "shortcuts.terminal.toggleSidebar",
   focusNext: "shortcuts.pane.focusNext",
   focusPrev: "shortcuts.pane.focusPrev",

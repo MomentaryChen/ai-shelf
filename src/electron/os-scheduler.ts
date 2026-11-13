@@ -22,11 +22,11 @@ export type OsJobSpec = {
   /** Human-readable description (systemd `Description=`). */
   description: string;
   names: {
-    /** Task Scheduler task name, e.g. `AI Shelf Flow Due`. */
+    /** Task Scheduler task name, e.g. `AI Shelf Task Due`. */
     windowsTaskName: string;
-    /** LaunchAgent label, e.g. `com.ai-shelf.flow-due`. */
+    /** LaunchAgent label, e.g. `com.ai-shelf.task-due`. */
     launchdLabel: string;
-    /** systemd unit base name (no suffix), e.g. `ai-shelf-flow-due`. */
+    /** systemd unit base name (no suffix), e.g. `ai-shelf-task-due`. */
     systemdUnit: string;
   };
   program: string;
@@ -168,7 +168,7 @@ const systemdBackend: OsSchedulerBackend = {
     const res = await run("systemctl", ["--user", "show-environment"], 15_000);
     if (res.ok) return null;
     const detail = res.stderr || res.stdout || "systemctl not found";
-    return `systemd user session is not available (systemctl --user: ${detail}). Add a crontab entry that runs "ai-shelf flow due" every minute instead.`;
+    return `systemd user session is not available (systemctl --user: ${detail}).`;
   },
   async isInstalled(spec) {
     const res = await run(

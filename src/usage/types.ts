@@ -130,14 +130,6 @@ export interface UsageAttributionRow {
   durationMs: number;
 }
 
-export interface UsageHottestFlow {
-  flowId: string;
-  label: string;
-  costUsd: number;
-  runCount: number;
-  estimated: boolean;
-}
-
 export interface UsageBudgetAlert {
   level: "ok" | "warn" | "over";
   weekSpendUsd: number;
@@ -164,11 +156,6 @@ export interface UsageBudgetPrefs {
 
 export interface UsageCostInsights {
   byTool: UsageAttributionRow[];
-  byProfile: UsageAttributionRow[];
-  byFlow: UsageAttributionRow[];
-  hottestFlow: UsageHottestFlow | null;
-  /** Always last 7 UTC days — for the "this week" decision card. */
-  weekHottestFlow: UsageHottestFlow | null;
   weekSpendUsd: number;
   budget: UsageBudgetPrefs;
   alert: UsageBudgetAlert;

@@ -19,7 +19,7 @@
 8. [更新](#8-更新)
 9. [Usage（用量）](#9-usage用量)
 10. [Tools（工具）](#10-tools工具)
-11. [AI Flow](#11-ai-flow)
+11. [Tasks](#11-tasks)
 
 ---
 
@@ -32,7 +32,7 @@
 | **Terminal**（預設） | Profile 側欄、內嵌多窗格終端機、外部啟動                                                                                |
 | **Inventory**        | 儀表板：Overview、Models、Skills、MCP、Config、Doctor、Update、**Usage**                                                |
 | **Tools**            | 本機工具（Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL） |
-| **AI Flow**          | 撰寫、排程與執行多代理 `.flow.md` 工作流                                                                                |
+| **Tasks**            | 存好的 prompt：在 Profile 開新 pane，並把 prompt 送給代理 CLI                                                           |
 
 隨時可用標題列切換模式。命令面板（`Cmd/Ctrl+K`）也可跳到任一模式或 Inventory／Tools 分頁。
 
@@ -318,7 +318,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 常見能力：
 
 - 日彙總與供應商拆分（Claude、Codex、Cursor、Gemini、Copilot，視憑證而定；OpenCode、Crush、Goose 直接讀取本機工作階段資料，不需金鑰；Aider 沒有可讀取的用量紀錄，顯示為不提供）
-- 每週預算目標；Flow 撰寫／執行可歸因回 Usage
+- 每週預算目標；依工具與 Profile 歸因花費
 - 憑證在可用時以 OS `safeStorage` 保存；部分供應商需在 App 內設定 API 金鑰或帳號 cookie
 
 從標題列開啟 **Inventory → Usage**，或用命令面板跳轉。
@@ -351,24 +351,23 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ---
 
-## 11. AI Flow
+## 11. Tasks
 
-**AI Flow** 是頂層模式，用於多步驟代理自動化。目前尚無專用截圖。
+**Tasks（任務）** 是頂層模式，用來存放會重複使用的 prompt。目前尚無專用截圖。
 
 你可以：
 
-- 瀏覽並安裝 **flow 範本**，或透過 App 內對話建立 flow（草稿為 `.flow.md`）
-- 檢視 **DAG**、runner 設定、排程（cron）與下次執行時間
-- 手動執行 flow；執行中串流代理控制台輸出
-- 檢視 **執行紀錄**（狀態、時長、進度、事件）並開啟執行產物
-- App 開啟時優先使用內建排程；在 Windows 上可於 App 關閉時以 OS 工作排程器呼叫 `ai-shelf flow due`（見 [ai-flow-phase1.md](ai-flow-phase1.md)）
+- 從空白或 **內建範本** 建立任務：名稱、prompt，以及可選的 Profile 與代理工具
+- 按 **執行**：AI Shelf 會切到該 Profile、開一個新 pane 啟動代理 CLI（預設用 Profile 的預設工具，任務可另外指定），等代理就緒後送出 prompt
+- 執行的是一般互動終端機，可以隨時回答問題、核准工具或直接接手
+- 編輯、複製或刪除任務；**開啟任務資料夾** 可看到檔案
 
-Flow 檔案位於應用資料目錄的 `flows/`；格式說明見 [flow-format.md](flow-format.md)。
+如果代理停在啟動對話框（資料夾信任、登入），prompt 會等你處理完再送出。任務檔位於應用資料目錄的 `tasks/`；格式見 [tasks.md](tasks.md)。
 
 ---
 
 ## 備註
 
-- Overview–Update 的截圖順序由 `tests/e2e/screenshot.spec.ts` 產出至 `tests/screenshots/zh/`（本頁）與 `tests/screenshots/en/`（[pages.md](pages.md)）。上方 Usage／Tools／Flow 章節目前無 PNG，待截圖涵蓋範圍擴大後再補。
+- Overview–Update 的截圖順序由 `tests/e2e/screenshot.spec.ts` 產出至 `tests/screenshots/zh/`（本頁）與 `tests/screenshots/en/`（[pages.md](pages.md)）。上方 Usage／Tools／Tasks 章節目前無 PNG，待截圖涵蓋範圍擴大後再補。
 - Release 前重產 README/docs 圖片：在 Windows 本地執行 `pnpm gen:docs-assets`（見 [RELEASE.md](RELEASE.md)）。
 - 若 Inventory 分頁標籤或順序異動，請同步更新中英文頁面與前述測試常數。

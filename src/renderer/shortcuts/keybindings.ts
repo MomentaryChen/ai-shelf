@@ -36,7 +36,7 @@ export const SHORTCUT_IDS = [
   "modeTerminal",
   "modeInventory",
   "modeTools",
-  "modeFlow",
+  "modeTasks",
   "toggleSidebar",
   "focusNext",
   "focusPrev",
@@ -93,7 +93,7 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "modeTerminal", section: "general" },
   { id: "modeInventory", section: "general" },
   { id: "modeTools", section: "general" },
-  { id: "modeFlow", section: "general" },
+  { id: "modeTasks", section: "general" },
   { id: "toggleSidebar", section: "general" },
   { id: "focusNext", section: "pane" },
   { id: "focusPrev", section: "pane" },
@@ -154,7 +154,7 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
     modeTerminal: { key: "1", alt: true },
     modeInventory: { key: "2", alt: true },
     modeTools: { key: "3", alt: true },
-    modeFlow: { key: "4", alt: true },
+    modeTasks: { key: "4", alt: true },
     toggleSidebar: { key: "s", mod: true },
     focusNext: { key: "tab", mod: true },
     focusPrev: { key: "tab", mod: true, shift: true },
@@ -247,7 +247,9 @@ export function normalizeCombo(raw: unknown): KeyCombo | null {
 export function normalizeKeybindingOverrides(raw: unknown): KeybindingOverrides {
   const out: KeybindingOverrides = {};
   if (!raw || typeof raw !== "object") return out;
-  const o = raw as Record<string, unknown>;
+  const o = { ...(raw as Record<string, unknown>) };
+  // AI Flow mode became Tasks; keep a rebinding saved under the old id.
+  if ("modeFlow" in o && !("modeTasks" in o)) o.modeTasks = o.modeFlow;
   for (const id of SHORTCUT_IDS) {
     if (!(id in o)) continue;
     const v = o[id];

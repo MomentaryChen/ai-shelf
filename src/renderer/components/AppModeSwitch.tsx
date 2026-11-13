@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { Compass, Package, SquareTerminal, Wrench, type LucideIcon } from "lucide-react";
+import { ListChecks, Package, SquareTerminal, Wrench, type LucideIcon } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
@@ -12,7 +12,7 @@ import {
   type ShortcutId,
 } from "../shortcuts/keybindings";
 
-export type AppMode = "terminal" | "inventory" | "tools" | "flow";
+export type AppMode = "terminal" | "inventory" | "tools" | "tasks";
 
 interface AppModeSwitchProps {
   mode: AppMode;
@@ -29,7 +29,7 @@ export const APP_MODES: {
   { id: "terminal", labelKey: "app.mode.terminal", icon: SquareTerminal, shortcutId: "modeTerminal" },
   { id: "inventory", labelKey: "app.mode.inventory", icon: Package, shortcutId: "modeInventory" },
   { id: "tools", labelKey: "app.mode.tools", icon: Wrench, shortcutId: "modeTools" },
-  { id: "flow", labelKey: "app.mode.flow", icon: Compass, shortcutId: "modeFlow" },
+  { id: "tasks", labelKey: "app.mode.tasks", icon: ListChecks, shortcutId: "modeTasks" },
 ];
 
 /**

@@ -18,7 +18,7 @@
 |---|---|---|
 | **清單 CLI** | `ai` | 掃描模型、技能、MCP、設定；執行 doctor / update / raw |
 | **Profile CLI** | `ai-shelf` | 管理 Profile、CLI session、廣播執行；TUI |
-| **桌面應用** | `pnpm electron` | Terminal · Inventory · Tools · AI Flow（Electron + React） |
+| **桌面應用** | `pnpm electron` | Terminal · Inventory · Tools · Tasks（Electron + React） |
 
 桌面應用與 `ai-shelf` 共用同一 SQLite 資料庫。**Profile Group** 用來分割與整理 **Profile**（名稱、預設值、窗格版面），兩邊資料一致。
 
@@ -48,11 +48,11 @@
 
 ### 桌面應用（Electron）
 
-- **四種模式** — **Terminal**（預設）· **Inventory** · **Tools** · **AI Flow**
+- **四種模式** — **Terminal**（預設）· **Inventory** · **Tools** · **Tasks**
 - **Terminal** — Profile 側欄、內嵌多窗格 xterm.js + node-pty、廣播輸入、外部啟動
 - **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage**（花費／預算）
 - **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL
-- **AI Flow** — 撰寫、排程與執行多代理 `.flow.md` 工作流（範本、對話撰寫、執行紀錄）
+- **Tasks（任務）** — 存好的 prompt：選一個 Profile 按執行，就會開新 pane 啟動代理 CLI 並送出 prompt（附內建範本）
 - **Profile 側欄** — 建立 / 重新命名 / 刪除 Profile；每個 Profile 的分割版面存入 SQLite
 - **外部啟動** — Windows 上為 Windows Terminal / PowerShell / CMD；macOS／Linux 依 `$SHELL`（bash / zsh / fish / sh）
 - **雲端備份** — 可選 Google 登入備份 Profile（手動同步；見 App 內帳戶設定）
@@ -79,7 +79,7 @@
 
 ![Overview](tests/screenshots/zh/01.overview.png)
 
-在標題列切換 **Terminal**、**Inventory**、**Tools**、**AI Flow**。Inventory 為上圖的分頁儀表板（含 Usage）；Terminal 為內嵌多窗格啟動器與 Profile 側欄；Tools 為本機工具集；AI Flow 為自動化控制台。
+在標題列切換 **Terminal**、**Inventory**、**Tools**、**Tasks**。Inventory 為上圖的分頁儀表板（含 Usage）；Terminal 為內嵌多窗格啟動器與 Profile 側欄；Tools 為本機工具集；Tasks 在 Profile 終端機執行存好的 prompt。
 
 → **[完整頁面介紹（含截圖 · 繁中）](docs/pages.zh-TW.md)** · [English](docs/pages.md)
 
@@ -99,7 +99,7 @@
 | **macOS** | `AI-Shelf-<version>-arm64.dmg` 或 `-x64.dmg` | 未簽名 — 首次開啟可能需右鍵 → **打開**，或清除隔離屬性（`xattr -dr com.apple.quarantine "/Applications/AI Shelf.app"`）。 |
 | **Linux** | `AI-Shelf-<version>.AppImage` | 未簽名 — `chmod +x` 後執行。使用靜態 AppImage runtime（不需 libfuse2）。 |
 
-安裝後包含 Terminal、Inventory、Tools、AI Flow 與內嵌終端機，**不需要**在本機安裝 Node.js。
+安裝後包含 Terminal、Inventory、Tools、Tasks 與內嵌終端機，**不需要**在本機安裝 Node.js。
 
 安裝步驟、解除安裝與 App 內更新見 [docs/RELEASE.md](docs/RELEASE.md)（For users）。維護者發佈流程亦在同一份文件。
 
@@ -281,7 +281,7 @@ ai-shelf/                 # 根 workspace（Electron + 清單 CLI）
 │   ├── commands/                 # CLI 指令處理
 │   ├── inventory/                # Claude / Copilot / Cursor 偵測器
 │   ├── electron/                 # 主程序、preload、workspace-host
-│   ├── renderer/                 # React UI（Terminal · Inventory · Tools · Flow）
+│   ├── renderer/                 # React UI（Terminal · Inventory · Tools · Tasks）
 │   │   ├── components/           # ChatTab、ProfileSidebar、*Tab 等
 │   │   ├── hooks/                # useInventoryScan、useProfileWorkspace 等
 │   │   └── terminal/             # 分割樹、版面序列化、SQLite 同步
