@@ -954,16 +954,33 @@ export const zh: Record<MessageKey, string> = {
   "appUpdate.later": "稍後",
   "appUpdate.now": "立即更新",
   "appUpdate.downloading": "下載中",
+  "appUpdate.downloadingHint": "可以繼續使用 AI Shelf，下載完成後再重啟即可。",
   "appUpdate.downloadComplete": "下載完成",
-  "appUpdate.restartFinish": "請重新啟動 AI Shelf 以完成安裝。",
+  "appUpdate.whatsNew": "更新內容",
+  "appUpdate.silentInstallNote": "安裝會在背景自動完成，不需要再操作安裝精靈。",
+  "appUpdate.restartFinish": "重啟後將自動完成安裝並重新開啟。",
   "appUpdate.restartLater": "稍後重啟",
   "appUpdate.restartNow": "立即重啟",
+  "appUpdate.installing": "安裝中",
+  "appUpdate.installingHint": "AI Shelf 即將關閉並自動重新啟動。",
+  "appUpdate.installingBody": "正在背景安裝新版本，請稍候，不要手動關閉程式。",
+  "appUpdate.installStalledHint":
+    "安裝似乎沒有如預期進行。你可以關閉此視窗繼續使用，或到 GitHub Releases 手動下載安裝。",
+  "appUpdate.errorSubtitle": "本次更新未能完成，你可以稍後重試。",
   "appUpdate.errorDefault": "無法檢查或下載更新。",
   "appUpdate.errorSignature":
     "下載的安裝程式簽章無法通過驗證（自簽憑證或發行者不符）。請改從 GitHub Releases 手動安裝，或待新版桌面程式發佈後再試自動更新。",
   "appUpdate.errorDetail": "技術細節",
   "appUpdate.close": "關閉",
   "appUpdate.retry": "重試",
+  "appUpdate.manualDownload": "手動下載",
+  "appUpdate.impactTerminals":
+    "目前有 {terminals} 個終端機工作階段，重新啟動時會關閉。",
+  "appUpdate.impactFlows": "目前有 {flows} 個 Flow 正在執行，重新啟動時會被中斷。",
+  "appUpdate.impactTerminalsFlows":
+    "目前有 {terminals} 個終端機工作階段、{flows} 個 Flow 正在執行，重新啟動時會被中斷。",
+  "appUpdate.updatedTo": "已更新至 v{version}",
+  "appUpdate.viewWhatsNew": "查看更新內容",
 
   // 設定檔編輯器
   "configEditor.title": "編輯設定檔",

@@ -992,16 +992,34 @@ export const en = {
   "appUpdate.later": "Later",
   "appUpdate.now": "Update now",
   "appUpdate.downloading": "Downloading",
+  "appUpdate.downloadingHint": "Keep working — restart whenever the download finishes.",
   "appUpdate.downloadComplete": "Download complete",
-  "appUpdate.restartFinish": "Restart AI Shelf to finish installing.",
+  "appUpdate.whatsNew": "What's new",
+  "appUpdate.silentInstallNote": "Installs silently in the background — no setup wizard to click through.",
+  "appUpdate.restartFinish": "Restarting installs the update and reopens AI Shelf.",
   "appUpdate.restartLater": "Restart later",
   "appUpdate.restartNow": "Restart now",
+  "appUpdate.installing": "Installing",
+  "appUpdate.installingHint": "AI Shelf will close and reopen automatically.",
+  "appUpdate.installingBody":
+    "Installing the new version in the background — please don't close the app.",
+  "appUpdate.installStalledHint":
+    "The install doesn't seem to be progressing. You can close this dialog and keep working, or install manually from GitHub Releases.",
+  "appUpdate.errorSubtitle": "This update didn't finish. You can try again later.",
   "appUpdate.errorDefault": "Could not check or download the update.",
   "appUpdate.errorSignature":
     "The downloaded installer signature could not be verified (self-signed or publisher mismatch). Install manually from GitHub Releases, or update after a newer app build with matching signing.",
   "appUpdate.errorDetail": "Technical details",
   "appUpdate.close": "Close",
   "appUpdate.retry": "Retry",
+  "appUpdate.manualDownload": "Download manually",
+  "appUpdate.impactTerminals":
+    "{terminals} open terminal session(s) will close when AI Shelf restarts.",
+  "appUpdate.impactFlows": "{flows} running Flow(s) will be stopped when AI Shelf restarts.",
+  "appUpdate.impactTerminalsFlows":
+    "{terminals} open terminal session(s) and {flows} running Flow(s) will be stopped when AI Shelf restarts.",
+  "appUpdate.updatedTo": "Updated to v{version}",
+  "appUpdate.viewWhatsNew": "See what's new",
 
   // Config file editor
   "configEditor.title": "Edit config file",

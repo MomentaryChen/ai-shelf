@@ -19,6 +19,7 @@ export type AppUpdateStatus =
   | "not-available"
   | "downloading"
   | "downloaded"
+  | "installing"
   | "error";
 
 export type AppUpdateState = {
@@ -31,6 +32,8 @@ export type AppUpdateState = {
 };
 
 const STARTUP_CHECK_DELAY_MS = 4_000;
+/** Give the renderer one paint to show the "installing" state before the process exits. */
+const INSTALL_HANDOFF_DELAY_MS = 700;
 
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 let startupTimer: ReturnType<typeof setTimeout> | null = null;
@@ -94,7 +97,7 @@ function formatReleaseNotes(notes: unknown): string | null {
   if (typeof notes === "string") return notes.trim() || null;
   if (Array.isArray(notes)) {
     const text = notes
-      .map((n) => (typeof n === "string" ? n : (n as { note?: string }).note ?? ""))
+      .map((n) => (typeof n === "string" ? n : ((n as { note?: string }).note ?? "")))
       .filter(Boolean)
       .join("\n\n");
     return text.trim() || null;
@@ -182,6 +185,9 @@ export function syncAppUpdateUiToRenderer(): void {
     case "downloaded":
       sendToRenderer("app-update-downloaded", { version: state.latestVersion });
       break;
+    case "installing":
+      sendToRenderer("app-update-installing", { version: state.latestVersion });
+      break;
     case "error":
       if (state.error) {
         sendToRenderer("app-update-error", { message: state.error });
@@ -260,7 +266,16 @@ export function downloadAppUpdate(): void {
 export function quitAndInstallAppUpdate(): void {
   if (!app.isPackaged) return;
   if (state.status !== "downloaded") return;
-  autoUpdater.quitAndInstall(false, true);
+
+  state.status = "installing";
+  sendToRenderer("app-update-installing", { version: state.latestVersion });
+
+  setTimeout(() => {
+    // isSilent: true — run the NSIS installer with /S so the Windows setup wizard
+    // never appears on update. It reuses the existing install directory and
+    // isForceRunAfter relaunches AI Shelf, keeping the whole flow inside our own UI.
+    autoUpdater.quitAndInstall(true, true);
+  }, INSTALL_HANDOFF_DELAY_MS);
 }
 
 export function getDesktopSelfLatestVersion(): string | null {

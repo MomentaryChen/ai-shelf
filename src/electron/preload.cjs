@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld("api", {
   getAppUpdateState: () => ipcRenderer.invoke("get-app-update-state"),
   confirmAppUpdateDownload: () => ipcRenderer.invoke("confirm-app-update-download"),
   quitAndInstallAppUpdate: () => ipcRenderer.invoke("quit-and-install-app-update"),
+  getAppUpdateImpact: () => ipcRenderer.invoke("get-app-update-impact"),
   onAppUpdateAvailable: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("app-update-available", handler);
@@ -54,6 +55,11 @@ contextBridge.exposeInMainWorld("api", {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("app-update-downloaded", handler);
     return () => ipcRenderer.off("app-update-downloaded", handler);
+  },
+  onAppUpdateInstalling: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-installing", handler);
+    return () => ipcRenderer.off("app-update-installing", handler);
   },
   onAppUpdateError: (cb) => {
     const handler = (_e, payload) => cb(payload);
