@@ -17,6 +17,8 @@ import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
 import { hitPaneDropZone, type PaneDropZone } from "../terminal/pane-drop-zone";
 import { hasProfilePaneDrag, readProfilePaneDrag } from "../terminal/profile-pane-display";
+import { formatDroppedPaths, isOsFileDrag } from "../terminal/file-drop";
+import { pasteToTerminalSession } from "../terminal/terminal-session-actions";
 import {
   collectPanes,
   maximizedSplitSide,
@@ -440,6 +442,12 @@ function WarpPaneShell({
           }
           return;
         }
+        if (!draggingPaneId && isOsFileDrag(Array.from(e.dataTransfer.types))) {
+          // Files from Explorer / Finder: drop pastes their paths into this pane.
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          return;
+        }
         if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
         e.preventDefault();
         e.stopPropagation();
@@ -471,6 +479,16 @@ function WarpPaneShell({
           const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
           onProfilePaneDrop(payload.paneId, pane.id, zone);
           clearDrag();
+          return;
+        }
+        if (!draggingPaneId && isOsFileDrag(Array.from(e.dataTransfer.types))) {
+          e.preventDefault();
+          e.stopPropagation();
+          const paths = droppedFilePaths(e.dataTransfer);
+          if (paths.length === 0) return;
+          onFocus();
+          // term.paste: honours bracketed paste and reaches this pane only.
+          pasteToTerminalSession(pane.sessionId, formatDroppedPaths(paths));
           return;
         }
         if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
@@ -681,6 +699,17 @@ function WarpPaneShell({
       </div>
     </div>
   );
+}
+
+/** OS paths of dropped files (Electron: webUtils via preload; `File.path` is gone). */
+function droppedFilePaths(dataTransfer: DataTransfer): string[] {
+  const out: string[] = [];
+  for (const file of Array.from(dataTransfer.files)) {
+    const legacy = (file as File & { path?: string }).path;
+    const path = window.api.getPathForFile?.(file) || legacy || "";
+    if (path) out.push(path);
+  }
+  return out;
 }
 
 function withKeys(label: string, keys: string | undefined): string {

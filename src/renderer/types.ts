@@ -862,6 +862,8 @@ export interface ElectronAPI {
   mcpPingTool: (tool: string) => Promise<McpPingToolResult>;
   openPath: (filePath: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
+  /** Absolute path of a File dropped from the OS ("" when it has none). */
+  getPathForFile?: (file: File) => string;
   launchInTerminal: (
     tool: string,
     terminal?: string,
