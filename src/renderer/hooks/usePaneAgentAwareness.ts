@@ -4,6 +4,7 @@ import type { ChatSettings } from "../chat-settings";
 import {
   applyPaneAgentOutput,
   applyPaneAgentUserInput,
+  applyPaneCommandRunning,
   createPaneAgentState,
   paneNeedsAttention,
   PANE_AGENT_MIN_RUNNING_FOR_READY_MS,
@@ -488,9 +489,21 @@ export function usePaneAgentAwareness(
       updateSession(sessionId, () => createPaneAgentState());
     });
 
+    // OSC 133 command start / prompt return, parsed in main from the raw stream.
+    const offMeta = window.api.onPtyMeta(({ sessionId, alive, commandRunning }) => {
+      if (commandRunning === undefined || !alive) return;
+      // Flush coalesced output first so the state change is ordered after it.
+      if (pendingOutputRef.current.has(sessionId)) flushPendingOutput();
+      const now = Date.now();
+      updateSession(sessionId, (prev) =>
+        applyPaneCommandRunning(prev, commandRunning, now, stateOptions(settings)),
+      );
+    });
+
     return () => {
       offData();
       offExit();
+      offMeta();
       cancelOutputCoalesce();
     };
   }, [
@@ -498,6 +511,7 @@ export function usePaneAgentAwareness(
     clearReadyPending,
     commitPaneState,
     dispatchAttention,
+    flushPendingOutput,
     notify,
     scheduleOutputFlush,
     settings,

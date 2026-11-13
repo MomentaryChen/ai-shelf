@@ -102,6 +102,11 @@ import {
 } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
 import {
+  INITIAL_OSC133_STREAM,
+  scanOsc133Running,
+  type Osc133StreamState,
+} from "../shared/osc133-stream.js";
+import {
   ensureShellIntegrationScripts,
   psSingleQuote,
 } from "./shell-integration.js";
@@ -1440,6 +1445,8 @@ type PtySessionMeta = {
   cols: number;
   rows: number;
   exitCode: number | null;
+  /** OSC 133 command state (true = command executing, null = never reported). */
+  osc133: Osc133StreamState;
 };
 const PTY_META = new Map<string, PtySessionMeta>();
 
@@ -1749,6 +1756,7 @@ function ptyMetaPayload(sessionId: string) {
     cols: meta.cols,
     rows: meta.rows,
     exitCode: meta.exitCode,
+    commandRunning: meta.osc133.running,
   };
 }
 
@@ -1942,10 +1950,18 @@ ipcMain.handle(
         cols: ptyOpts.cols,
         rows: ptyOpts.rows,
         exitCode: null,
+        osc133: INITIAL_OSC133_STREAM,
       });
 
       proc.onData((data) => {
         broadcastPtyData(sessionId, data);
+        const meta = PTY_META.get(sessionId);
+        if (!meta) return;
+        const next = scanOsc133Running(meta.osc133, data);
+        if (next === meta.osc133) return;
+        const changed = next.running !== meta.osc133.running;
+        meta.osc133 = next;
+        if (changed) broadcastPtyMeta(sessionId);
       });
 
       // Kick the shell to emit a prompt after attach (some shells wait for first resize).

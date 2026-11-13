@@ -921,6 +921,8 @@ export interface ElectronAPI {
       cols: number;
       rows: number;
       exitCode: number | null;
+      /** OSC 133: true while a shell command executes, null when unknown. */
+      commandRunning?: boolean | null;
     }) => void,
   ) => (() => void);
   /** Main process recovered from sleep, unlock, a stuck window, or a GPU reset. */
