@@ -704,7 +704,6 @@ export const en = {
   "pane.popout.dock": "Return to original window",
   "pane.popout.dockHere": "Return here",
   "pane.popout.show": "Show window",
-  "pane.popout.inOtherWindow": "Open in a separate window",
   "pane.popout.allPoppedOut": "These terminals are open in separate windows",
   "pane.popout.loading": "Opening terminal…",
   "pane.popout.missing": "This terminal is no longer available.",

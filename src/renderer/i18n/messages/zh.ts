@@ -679,7 +679,6 @@ export const zh: Record<MessageKey, string> = {
   "pane.popout.dock": "放回原視窗",
   "pane.popout.dockHere": "放回這裡",
   "pane.popout.show": "顯示視窗",
-  "pane.popout.inOtherWindow": "已在獨立視窗開啟",
   "pane.popout.allPoppedOut": "這些終端機開在獨立視窗中",
   "pane.popout.loading": "正在開啟終端機…",
   "pane.popout.missing": "這個終端機已不存在。",

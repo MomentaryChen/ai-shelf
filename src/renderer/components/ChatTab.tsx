@@ -1160,10 +1160,12 @@ function ChatTabInner({
         await handleActivateProfileRef.current(profile);
       }
 
-      let targetPanes = getProfilePanes(profileId);
+      // Popped-out panes take input only from their own window.
+      const docked = () => withoutPoppedOut(getProfilePanes(profileId), poppedOutPaneIdsRef.current);
+      let targetPanes = docked();
       if (targetPanes.length === 0) {
         await handleNewTerminalRef.current(profile);
-        targetPanes = getProfilePanes(profileId);
+        targetPanes = docked();
       }
       if (targetPanes.length === 0) return;
 
