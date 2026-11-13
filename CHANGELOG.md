@@ -9,13 +9,33 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-13
+
+Tasks replace AI Flow, profile view windows gain a terminal sidebar, and terminal chrome is sharper across themes.
+
 ### Added
 
 - **Tasks mode** — Save prompts you use often and run one in a profile with a single click. AI Shelf switches to the profile, opens a new pane with its agent CLI (or the tool the task names), and sends the prompt once the agent is ready. If the agent shows a start-up dialog such as folder trust or login, the prompt waits until you answer it. Five built-in templates are included. Tasks are files under the app data `tasks/` folder.
+- **View-window terminal sidebar** — A profile view window lists its terminals in a collapsible sidebar: click to switch, close per row, or start a new terminal. One pane is visible at a time while the others stay mounted so scrollback and TUI state survive. Drag a main-window sidebar row into a view window to move that terminal. Closing the view window closes every pane in it (with a busy prompt when an agent is running).
 
 ### Removed
 
 - **AI Flow** — The AI Flow mode is replaced by Tasks (breaking). Headless `claude -p` runs, DAG phases, gates, retries, schedules, run history, webhooks, Slack notifications, flow chat authoring, and the `ai-shelf flow` CLI commands are gone. On first start, each existing `.flow.md` becomes a task with the same prompt (phase markers removed; `runner: http` flows are skipped). The `flows/` and `runs/` folders are left on disk. The every-minute `flow due` job in Task Scheduler, launchd, or systemd is removed. Usage no longer attributes spend to flows. Alt/Option+4 now opens Tasks, and a custom shortcut for AI Flow carries over.
+
+### Changed
+
+- **Terminal title bar** — Profile chip, Folder, and **+ Pane** move into the app title bar on the main window, returning vertical space to the panes. Narrow layouts collapse Folder to an icon and tuck the panes-left hint so **+ Pane** stays clear of the caption buttons.
+- **Terminal focus and broadcast** — Pane header actions stay on the focused pane and appear on keyboard focus elsewhere. The broadcast hint shows in-pane for four seconds when broadcast turns on, without a duplicate title-bar badge.
+- **Status bar** — Click the cwd to copy it. Pane headers keep the git branch (click to open the worktree dialog); pid and grid size live in the shell tooltip.
+- **Warm theme contrast** — Chrome text tokens split into readable muted, subtle, and dim steps instead of sharing one low-contrast grey.
+- **Dark theme ramp** — Terminal chrome derives from one cool blue-grey hue aligned with inventory, with elevation and border steps, sky-accent focus, and an xterm palette where every colour except black clears 4:1 contrast.
+- **Documentation visuals** — Refreshed terminal screenshots and README demo GIFs for the updated chrome.
+
+### Fixed
+
+- **xterm padding** — Prompt and output no longer hug the pane edge.
+
+[5.1.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.1.0
 
 ## [5.0.0] - 2026-11-13
 

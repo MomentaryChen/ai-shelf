@@ -19,7 +19,7 @@ export const APP_THEME_OPTIONS: {
   },
   { value: "warm", label: "暖色", preview: { bg: "#FBF7F0", fg: "#4A4039", accent: "#C97B5A" } },
   { value: "light", label: "淺色", preview: { bg: "#f8fafc", fg: "#0f172a", accent: "#0284c7" } },
-  { value: "dark", label: "深色", preview: { bg: "#0f172a", fg: "#f1f5f9", accent: "#38bdf8" } },
+  { value: "dark", label: "深色", preview: { bg: "#0d1117", fg: "#e6edf3", accent: "#38bdf8" } },
   { value: "contrast", label: "對比色", preview: { bg: "#000000", fg: "#ffffff", accent: "#ffff00" } },
 ];
 
@@ -122,28 +122,31 @@ export function getXtermTheme(background: string): Record<string, string> {
     };
   }
   if (theme === "dark") {
+    /* Cool blue-grey palette matched to the dark chrome. Every colour except ANSI
+       black clears 4:1 on --color-terminal-bg (#0a0d12); the previous Campbell
+       blue (#0037da) and magenta (#881798) were close to unreadable on it. */
     return {
       background,
-      foreground: "#cccccc",
-      cursor: "#ffffff",
+      foreground: "#d1d7e0",
+      cursor: "#e6edf3",
       cursorAccent: background,
-      selectionBackground: "#ffffff40",
-      black: "#0c0c0c",
-      brightBlack: "#767676",
-      red: "#c50f1f",
-      brightRed: "#e74856",
-      green: "#13a10e",
-      brightGreen: "#16c60c",
-      yellow: "#c19c00",
-      brightYellow: "#f9f1a5",
-      blue: "#0037da",
-      brightBlue: "#3b78ff",
-      magenta: "#881798",
-      brightMagenta: "#b4009e",
-      cyan: "#3a96dd",
-      brightCyan: "#61d6d6",
-      white: "#cccccc",
-      brightWhite: "#f2f2f2",
+      selectionBackground: "#38bdf84d",
+      black: "#484f58",
+      brightBlack: "#6e7681",
+      red: "#ff7b72",
+      brightRed: "#ffa198",
+      green: "#3fb950",
+      brightGreen: "#56d364",
+      yellow: "#d29922",
+      brightYellow: "#e3b341",
+      blue: "#58a6ff",
+      brightBlue: "#79c0ff",
+      magenta: "#bc8cff",
+      brightMagenta: "#d2a8ff",
+      cyan: "#39c5cf",
+      brightCyan: "#56d4dd",
+      white: "#b1bac4",
+      brightWhite: "#f0f6fc",
     };
   }
   /* warm: brown-tinted terminal palette synced with clay/cream UI */

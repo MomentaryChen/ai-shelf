@@ -35,7 +35,12 @@ import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
 import type { MessageKey } from "./i18n/messages/en";
-import { TitleBarBrand, useTitleBarOverlaySync, type TitleBarTone } from "./components/TitleBarBrand";
+import {
+  TITLE_BAR_TERMINAL_SLOT_ID,
+  TitleBarBrand,
+  useTitleBarOverlaySync,
+  type TitleBarTone,
+} from "./components/TitleBarBrand";
 import type { ProviderEntry, RunTaskRequest, RunTaskResult } from "./types";
 import type { TaskRunner } from "./components/ChatTab";
 import { toolIdsFromInventory } from "./utils/available-tools";
@@ -788,6 +793,13 @@ export function App() {
             {enriching && t("app.loadingModels")}
           </span>
         )}
+
+        {/* Terminal mode's profile chip and pane actions portal in here (see ChatTab). */}
+        <div
+          id={TITLE_BAR_TERMINAL_SLOT_ID}
+          data-surface="chrome"
+          className={appMode === "terminal" ? "flex min-w-0 flex-1 items-center" : "hidden"}
+        />
 
         <div className="app-no-drag ml-auto flex shrink-0 items-center gap-1.5 pl-2">
           <button

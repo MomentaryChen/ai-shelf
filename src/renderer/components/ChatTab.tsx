@@ -1,5 +1,25 @@
-import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo, type CSSProperties } from "react";
-import { ChevronLeft, Monitor, Terminal, FolderOpen, Hand, SquareTerminal } from "lucide-react";
+import {
+  Fragment,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  memo,
+  type CSSProperties,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  ChevronDown,
+  ChevronLeft,
+  Monitor,
+  Terminal,
+  FolderOpen,
+  Hand,
+  SquareTerminal,
+} from "lucide-react";
+import { TITLE_BAR_TERMINAL_SLOT_ID } from "./TitleBarBrand";
 import { WarmTypingDots } from "./WarmTypingDots";
 import { Button } from "@/components/ui/button";
 import {
@@ -245,6 +265,14 @@ function ChatTabInner({
   const [addingTerminal, setAddingTerminal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
+  // Main window: the top bar lives in the app title bar. Chat / pop-out windows
+  // have no slot, so they keep it as a row above the panes.
+  const [titleBarSlot, setTitleBarSlot] = useState<HTMLElement | null>(() =>
+    document.getElementById(TITLE_BAR_TERMINAL_SLOT_ID),
+  );
+  useLayoutEffect(() => {
+    setTitleBarSlot(document.getElementById(TITLE_BAR_TERMINAL_SLOT_ID));
+  }, []);
   const [sidebarContentCollapsed, setSidebarContentCollapsed] = useState(loadSidebarCollapsed);
   const sidebarCollapsedRef = useRef(sidebarCollapsed);
   sidebarCollapsedRef.current = sidebarCollapsed;
@@ -2415,6 +2443,7 @@ function ChatTabInner({
 
   const topBar = (
     <WarpTopBar
+      embedded={Boolean(titleBarSlot)}
       profileKey={activeProfile?.id ?? null}
       profileEnterClass={profileBadgeClass}
       profileLabel={profileLabel}
@@ -2422,7 +2451,6 @@ function ChatTabInner({
       paneCount={panes.length}
       maxPanes={maxPanes}
       canAddPane={canAddPane}
-      broadcastInput={broadcastInput}
       restoring={profileBusy || restoring}
       onAddPane={(tool) => void addPane(tool)}
       onOpenFolder={() => void openFolderPane()}
@@ -2476,6 +2504,7 @@ function ChatTabInner({
         onRenamePane={renamePane}
         onSplitPane={(id, dir) => void splitPane(id, dir)}
         onPaneCwdClick={(paneId) => void changePaneCwd(paneId)}
+        onPaneBranchClick={openWorktreeDialog}
         onResizeSplit={(splitId, ratio) =>
           setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
         }
@@ -2749,7 +2778,7 @@ function ChatTabInner({
           />
         </div>
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-          {topBar}
+          {titleBarSlot ? createPortal(topBar, titleBarSlot) : topBar}
           {terminalError && (
             <div className="shrink-0 border-b border-fail/30 bg-fail/15 px-3 py-2 text-[12px] text-fail">
               {terminalError}
@@ -2785,13 +2814,15 @@ function WarpTopBar({
   paneCount,
   maxPanes,
   canAddPane,
-  broadcastInput,
   restoring,
   onAddPane,
   onOpenFolder,
   available,
   splitShortcutLabels,
+  embedded = false,
 }: {
+  /** Rendered inside the app title bar instead of as its own row. */
+  embedded?: boolean;
   profileKey?: string | null;
   profileEnterClass?: string;
   profileLabel: string | null;
@@ -2799,7 +2830,6 @@ function WarpTopBar({
   paneCount: number;
   maxPanes: number;
   canAddPane: boolean;
-  broadcastInput: boolean;
   restoring: boolean;
   onAddPane: (tool: string) => void;
   onOpenFolder: () => void;
@@ -2811,13 +2841,23 @@ function WarpTopBar({
   const hasAccent = Boolean(accent);
   const panesLeft = Math.max(0, maxPanes - paneCount);
   const limitTitle = t("chat.err.maxPanes", { max: maxPanes });
+  // The title bar is 40px tall; the default `sm` button (36px) would crowd it.
+  const buttonClass = embedded ? "min-h-7 px-2.5 text-[12px]" : undefined;
 
   return (
-    <div className="relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm">
+    <div
+      className={
+        embedded
+          ? "flex min-w-0 flex-1 items-center gap-2 pl-1"
+          : "relative z-40 flex h-10 shrink-0 items-center gap-2 overflow-visible border-b border-chrome-border bg-chrome-bg/95 px-3 backdrop-blur-sm"
+      }
+    >
       {profileLabel && (
         <div
           key={profileKey ?? profileLabel}
-          className={`flex min-w-0 max-w-[280px] items-center gap-2 rounded-lg border px-2 py-1 ${profileEnterClass}`}
+          className={`flex min-w-0 items-center gap-2 rounded-lg border px-2 ${
+            embedded ? "max-w-[220px] py-0.5" : "max-w-[280px] py-1"
+          } ${profileEnterClass}`}
           style={profileTopBarBadgeStyle(accent)}
           title={profileLabel}
         >
@@ -2834,20 +2874,11 @@ function WarpTopBar({
           >
             {profileLabel}
           </span>
-          {broadcastInput && paneCount > 1 && (
-            <span
-              className="broadcast-sync-badge inline-flex shrink-0 items-center gap-1 rounded-full border border-chrome-ui-accent/30 bg-chrome-ui-accent/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-chrome-accent-text"
-              title={t("chat.broadcastSyncTitle", { count: paneCount })}
-            >
-              <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-chrome-ui-accent" aria-hidden />
-              {t("chat.syncLabel")}
-            </span>
-          )}
         </div>
       )}
       {restoring && <span className="text-[11px] text-chrome-text-subtle">{t("chat.restoringShort")}</span>}
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className={`ml-auto flex shrink-0 items-center gap-2 ${embedded ? "app-no-drag" : ""}`}>
         {panesLeft <= PANES_LEFT_HINT_THRESHOLD && (
           <span
             role="status"
@@ -2858,7 +2889,7 @@ function WarpTopBar({
             }
             className={`inline-flex items-center gap-1.5 text-[11px] tabular-nums ${
               canAddPane ? "text-chrome-text-subtle" : "text-chrome-accent-text"
-            }`}
+            } ${embedded ? "max-lg:hidden" : ""}`}
           >
             <span
               aria-hidden
@@ -2875,12 +2906,14 @@ function WarpTopBar({
           <Button
             variant="chromeOutline"
             size="sm"
+            className={buttonClass}
             disabled={!canAddPane || restoring}
             onClick={onOpenFolder}
             title={canAddPane ? t("chat.pickFolderPane") : undefined}
           >
             <FolderOpen />
-            {t("chat.folderBtn")}
+            {/* Narrow title bar: icon only, so "+ Pane" never slides under the caption buttons. */}
+            <span className={embedded ? "max-lg:hidden" : undefined}>{t("chat.folderBtn")}</span>
           </Button>
         </span>
         <DropdownMenu>
@@ -2889,10 +2922,12 @@ function WarpTopBar({
               <Button
                 variant="chromeOutline"
                 size="sm"
+                className={buttonClass}
                 disabled={!canAddPane}
                 title={canAddPane ? t("chat.addPaneTitle", splitShortcutLabels) : undefined}
               >
                 {t("chat.addPane")}
+                <ChevronDown aria-hidden className="opacity-70" />
               </Button>
             </DropdownMenuTrigger>
           </span>
