@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
+import type { ProfileForest, ProviderEntry, ProfileInfo, RemoteSshConfig } from "../types";
+import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import { EmptyState } from "./EmptyState";
 import { toolLabel } from "../utils";
@@ -245,24 +246,38 @@ function ChatTabInner({
   const terminalScrollback = settings.terminalScrollback;
   const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
 
-  const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+  const spawnPane = useCallback(async (
+    tool: string,
+    cwd: string,
+    remote: RemoteSshConfig | null,
+  ): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
     const shell = resolveEmbeddedPtyShell(
       settings.preferredShell,
       settings.externalTerminal,
       tool,
     );
+    // A remote pane's cwd (`host:dir`) is meaningless locally, and vice versa.
+    const localCwd = remote || isRemotePaneCwd(cwd) ? "" : cwd;
     const result = await window.api.ptySpawn(
       tool,
-      cwd || undefined,
+      localCwd || undefined,
       extraArgs,
       shell,
-      shell === "wsl" ? { wslDistro: settings.wslDistro } : undefined,
+      remote
+        ? { remote }
+        : shell === "wsl"
+          ? { wslDistro: settings.wslDistro }
+          : undefined,
     );
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
-      setTerminalError(t("chat.err.startFailed", { tool, msg }));
+      setTerminalError(
+        result.code === "SSH_NOT_FOUND"
+          ? t("chat.err.sshNotFound")
+          : t("chat.err.startFailed", { tool, msg }),
+      );
       return null;
     }
     setTerminalError(null);
@@ -281,13 +296,14 @@ function ChatTabInner({
   ]);
 
   const spawnPaneResilient = useCallback(
-    async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+    async (tool: string, cwd: string, remote: RemoteSshConfig | null): Promise<PaneInfo | null> => {
+      // Fallbacks stay on the same target: a remote profile retries over ssh, never locally.
       const order = [tool, ...(tool !== "shell" ? ["shell"] : [])];
       for (const t of order) {
-        const pane = await spawnPane(t, cwd);
+        const pane = await spawnPane(t, cwd, remote);
         if (pane) return pane;
       }
-      return spawnPane("shell", cwd);
+      return spawnPane("shell", cwd, remote);
     },
     [spawnPane],
   );
@@ -329,6 +345,10 @@ function ChatTabInner({
     settings.workingDir,
     broadcastInput,
   );
+
+  /** Read at call time so add / restart always target the active profile's machine. */
+  const activeRemoteRef = useRef<RemoteSshConfig | null>(null);
+  activeRemoteRef.current = activeProfile?.remote ?? null;
 
   /** Live panes of non-active profiles, labelled for notifications. */
   const backgroundAgentPanes = useMemo<BackgroundAgentPane[]>(() => {
@@ -664,7 +684,11 @@ function ChatTabInner({
         return null;
       }
 
-      const pane = await spawnPaneResilient(tool || "shell", resolveCwd(cwd));
+      const pane = await spawnPaneResilient(
+        tool || "shell",
+        resolveCwd(cwd),
+        activeRemoteRef.current,
+      );
       if (!pane) return null;
 
       setLayout((prev) => {
@@ -708,7 +732,7 @@ function ChatTabInner({
       const tool = victim.tool;
       try {
         window.api.ptyKill(victim.sessionId);
-        const next = await spawnPaneResilient(tool, cwd);
+        const next = await spawnPaneResilient(tool, cwd, activeRemoteRef.current);
         if (!next) {
           setTerminalError(
             (prev) =>
@@ -747,7 +771,7 @@ function ChatTabInner({
       const tool = victim.tool;
       try {
         window.api.ptyKill(victim.sessionId);
-        const next = await spawnPaneResilient(tool, cwd);
+        const next = await spawnPaneResilient(tool, cwd, activeRemoteRef.current);
         if (!next) {
           setTerminalError(
             (prev) =>

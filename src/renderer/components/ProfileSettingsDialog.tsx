@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import type { ProfileInfo, SavedCommandSnippet } from "../types";
+import type { ProfileInfo, RemoteSshConfig, SavedCommandSnippet } from "../types";
+import { ProfileRemoteSshSection } from "./ProfileRemoteSshSection";
+import {
+  draftToRemote,
+  invalidRemoteField,
+  remoteToDraft,
+  type RemoteSshDraft,
+} from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import {
   PLAIN_SHELL_TOOL_ID,
@@ -28,6 +35,8 @@ export interface ProfileSettingsPatch {
   accentColor: string | null;
   savedCommands: SavedCommandSnippet[];
   groupId: string;
+  /** null = local profile. */
+  remote: RemoteSshConfig | null;
 }
 
 interface Props {
@@ -62,6 +71,8 @@ export function ProfileSettingsDialog({
   const [savedCommands, setSavedCommands] = useState<SavedCommandSnippet[]>([]);
   const [groupId, setGroupId] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [remoteDraft, setRemoteDraft] = useState<RemoteSshDraft>(() => remoteToDraft(null));
+  const [remoteTouched, setRemoteTouched] = useState(false);
 
   const tools = profileToolChoices(availableTools, profile?.defaultTool);
 
@@ -74,12 +85,15 @@ export function ProfileSettingsDialog({
     setAccentColor(profile.accentColor ?? null);
     setSavedCommands(profile.savedCommands ?? []);
     setGroupId(profile.workspaceId);
+    setRemoteDraft(remoteToDraft(profile.remote));
+    setRemoteTouched(false);
     setSaveError("");
   }, [open, profile]);
 
   if (!profile) return null;
 
   const effectiveTool = tools.includes(tool) ? tool : (tools[0] ?? PLAIN_SHELL_TOOL_ID);
+  const remoteInvalid = invalidRemoteField(remoteDraft);
 
   async function handleBrowse() {
     const picked = await window.api.pickFolder(cwd || undefined);
@@ -90,6 +104,10 @@ export function ProfileSettingsDialog({
     e.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) return;
+    if (remoteInvalid) {
+      setRemoteTouched(true);
+      return;
+    }
     setSaveError("");
     const error = await onSave(profile!.id, {
       name: trimmedName,
@@ -98,6 +116,7 @@ export function ProfileSettingsDialog({
       broadcastInput,
       accentColor,
       groupId: groupId || profile!.workspaceId,
+      remote: draftToRemote(remoteDraft),
       savedCommands: savedCommands
         .map((s) => ({
           ...s,
@@ -174,6 +193,16 @@ export function ProfileSettingsDialog({
             </button>
           </div>
         </Label>
+
+        <ProfileRemoteSshSection
+          value={remoteDraft}
+          onChange={(next) => {
+            setRemoteDraft(next);
+            setRemoteTouched(true);
+          }}
+          invalidField={remoteTouched ? remoteInvalid : null}
+          disabled={busy}
+        />
 
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.accentLegend")}</legend>

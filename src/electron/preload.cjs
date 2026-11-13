@@ -101,6 +101,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
   ptySpawn: (tool, cwd, extraArgs, shell, options) =>
     ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell, options),
+  sshClientStatus: ()                      => ipcRenderer.invoke("ssh-client-status"),
   ptyAttach: (sessionId, opts)              => ipcRenderer.invoke("pty-attach", sessionId, opts),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
   ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),

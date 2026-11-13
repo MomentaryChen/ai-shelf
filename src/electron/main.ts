@@ -94,8 +94,12 @@ import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import {
   NO_SUITABLE_UNIX_SHELL_ERROR,
   NO_SUITABLE_WINDOWS_SHELL_ERROR,
+  SSH_CLIENT_NOT_FOUND_ERROR,
+  describeRemoteSsh,
   isValidWslDistroName,
+  normalizeRemoteSshConfig,
   resolvePtySpawnPlan,
+  resolveSshExecutable,
   type GroupLayoutSnapshot,
 } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
@@ -1804,7 +1808,7 @@ ipcMain.handle(
     cwd?: string,
     extraArgs?: string,
     shell?: string,
-    spawnOptions?: { wslDistro?: unknown },
+    spawnOptions?: { wslDistro?: unknown; remote?: unknown },
   ) => {
     let pty: PtyModule;
     try {
@@ -1818,7 +1822,23 @@ ipcMain.handle(
 
     // Date.now() alone collides when the same tool spawns twice in one ms.
     const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
-    const workDirResult = resolvePtyWorkDir(cwd);
+
+    // SSH remote profile: never fall back to a local shell (see resolvePtySpawnPlan).
+    const hasRemote = spawnOptions?.remote !== undefined && spawnOptions.remote !== null;
+    const remote = hasRemote ? normalizeRemoteSshConfig(spawnOptions?.remote) : null;
+    if (hasRemote && !remote) {
+      return { success: false, error: "Invalid SSH remote configuration" };
+    }
+    let sshExecutable: string | null = null;
+    if (remote) {
+      sshExecutable = resolveSshExecutable();
+      if (!sshExecutable) {
+        return { success: false, error: SSH_CLIENT_NOT_FOUND_ERROR, code: "SSH_NOT_FOUND" };
+      }
+    }
+
+    // The pane cwd of a remote profile is a remote path (remote.cwd); the local ssh process starts in home.
+    const workDirResult = remote ? { ok: true as const, dir: homedir() } : resolvePtyWorkDir(cwd);
     if (!workDirResult.ok) {
       return { success: false, error: workDirResult.error };
     }
@@ -1845,6 +1865,7 @@ ipcMain.handle(
       shell,
       shellIntegration,
       wsl: { distro: wslDistro, cwd: workDir },
+      ssh: remote && sshExecutable ? { executable: sshExecutable, config: remote } : undefined,
     });
 
     const ptyOpts = {
@@ -1881,8 +1902,9 @@ ipcMain.handle(
       PTY_SESSIONS.set(sessionId, proc);
       PTY_META.set(sessionId, {
         pid: typeof proc.pid === "number" ? proc.pid : null,
-        shell:
-          shellPath === "wsl.exe" && wslDistro
+        shell: remote
+          ? describeRemoteSsh(remote)
+          : shellPath === "wsl.exe" && wslDistro
             ? `wsl:${wslDistro}`
             : basename(shellPath) || shellPath,
         cols: ptyOpts.cols,
@@ -1912,12 +1934,22 @@ ipcMain.handle(
       });
 
       broadcastPtyMeta(sessionId);
-      return { success: true, sessionId, cwd: workDir };
+      // Remote panes report `[user@]host:dir` so the status bar shows where the shell really is.
+      const reportedCwd = remote
+        ? `${remote.user ? `${remote.user}@` : ""}${remote.host}:${remote.cwd || "~"}`
+        : workDir;
+      return { success: true, sessionId, cwd: reportedCwd };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
   },
 );
+
+/** Which local ssh client a remote profile would use (null = none installed). */
+ipcMain.handle("ssh-client-status", () => {
+  const path = resolveSshExecutable();
+  return { found: Boolean(path), path };
+});
 
 ipcMain.handle(
   "pty-attach",
@@ -2396,6 +2428,7 @@ ipcMain.handle(
       defaultCwd?: string;
       defaultTool?: string;
       accentColor?: string | null;
+      remote?: import("ai-shelf").RemoteSshConfig | null;
       broadcastInput?: boolean;
       copyFromProfileId?: string;
     },
@@ -2419,6 +2452,7 @@ ipcMain.handle("profile-update", (
       defaultTool?: string;
       broadcastInput?: boolean;
       accentColor?: string | null;
+      remote?: import("ai-shelf").RemoteSshConfig | null;
       savedCommands?: { id: string; name: string; command: string; broadcast?: boolean }[];
       groupId?: string;
     },

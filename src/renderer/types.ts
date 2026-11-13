@@ -459,6 +459,19 @@ export interface SavedCommandSnippet {
   broadcast?: boolean;
 }
 
+/** SSH remote for a profile (mirrors RemoteSshConfig in packages/cli runtime/ssh-remote). */
+export interface RemoteSshConfig {
+  kind: "ssh";
+  /** Hostname, IP, or a Host alias from ~/.ssh/config. */
+  host: string;
+  user?: string;
+  port?: number;
+  /** ProxyJump hops: `[user@]host[:port]`, comma-separated. */
+  jump?: string;
+  /** Remote start directory; empty = remote login directory. */
+  cwd?: string;
+}
+
 export interface ProfileTerminal {
   tool: string;
   cwd: string;
@@ -473,6 +486,8 @@ export interface ProfileInfo {
   defaultTool: string;
   broadcastInput: boolean;
   accentColor: string | null;
+  /** SSH remote every pane connects to; null = local. */
+  remote?: RemoteSshConfig | null;
   paneCount: number;
   terminals: ProfileTerminal[];
   savedCommands: SavedCommandSnippet[];
@@ -511,6 +526,7 @@ export interface ProfileCreateInput {
   defaultTool?: string;
   accentColor?: string | null;
   broadcastInput?: boolean;
+  remote?: RemoteSshConfig | null;
   copyFromProfileId?: string;
 }
 
@@ -847,9 +863,14 @@ export interface ElectronAPI {
     extraArgs?: string,
     /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | wsl | bash | zsh | fish | sh. */
     shell?: string,
-    /** `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro. */
-    options?: { wslDistro?: string },
-  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
+    /**
+     * `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro.
+     * `remote` runs the pane over ssh (no local fallback); `code: "SSH_NOT_FOUND"` when no client.
+     */
+    options?: { wslDistro?: string; remote?: RemoteSshConfig | null },
+  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string; code?: string }>;
+  /** Local ssh client used by remote (SSH) profiles; `path` null when none is installed. */
+  sshClientStatus: () => Promise<{ found: boolean; path: string | null }>;
   ptyAttach: (
     sessionId: string,
     opts?: { includeBuffer?: boolean },
@@ -965,6 +986,8 @@ export interface ElectronAPI {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      /** null clears (local); omitted keeps the stored remote. */
+      remote?: RemoteSshConfig | null;
       groupId?: string;
     },
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
