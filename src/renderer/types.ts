@@ -1,6 +1,11 @@
 /** Types mirroring the inventory data from the main process. */
 
 import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
+import type {
+  GitCwdInfo,
+  GitWorktreeAddRequest,
+  GitWorktreeAddResult,
+} from "../shared/git-worktree.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
@@ -1263,6 +1268,10 @@ export interface ElectronAPI {
     | { ok: true; ip: string; distro: string }
     | { ok: false; error: string; code?: "unsupported" | "missing" | "failed" | "invalid" }
   >;
+  /** Branch / worktree / dirty state for a pane cwd; null when not a repo or git is unavailable. */
+  gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
+  /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
+  gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
 }
 
 export type WslDistroRow = {
