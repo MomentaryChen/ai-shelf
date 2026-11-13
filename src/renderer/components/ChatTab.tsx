@@ -97,7 +97,7 @@ import {
   paneToolLabel,
 } from "../utils/pane-label";
 import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
-import { collectTaskPanes } from "../tasks/task-utils";
+import { collectTaskPanes, keepTaskLink } from "../tasks/task-utils";
 import { slideClassName } from "../utils/workspace-slide";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -168,11 +168,6 @@ import {
 
 /** Opens a pane in the task's profile and types the prompt into the agent (Tasks mode). */
 export type TaskRunner = (request: RunTaskRequest) => Promise<RunTaskResult>;
-
-/** A respawned pane stays its task's terminal unless it fell back to another tool. */
-function keepTaskLink(prev: PaneInfo, next: PaneInfo): { taskId?: string } {
-  return prev.taskId && next.tool === prev.tool ? { taskId: prev.taskId } : {};
-}
 
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
 const SIDEBAR_COLLAPSED_KEY = "ai-inventory-sidebar-collapsed";
@@ -1384,7 +1379,7 @@ function ChatTabInner({
     if (existing) {
       if (existing.profileId) await restorePaneToDisplayById(existing.profileId, existing.paneId);
       else setFocusedPaneId(existing.paneId);
-      return { ok: true, focused: true };
+      return { ok: true };
     }
     let profile: ProfileInfo | null = activeProfile ?? null;
     const wanted = profileId?.trim();
@@ -1408,7 +1403,7 @@ function ChatTabInner({
           : undefined;
         if (restored) {
           focusPaneInDisplay(profile.id, restored.id);
-          return { ok: true, focused: true };
+          return { ok: true };
         }
       }
       const cwd = profile?.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;

@@ -131,3 +131,17 @@ export function collectTaskPanes(
   }
   return out;
 }
+
+/**
+ * The task link a pane keeps when its PTY is started again (restart, restore, respawn).
+ * It survives only if the same tool resumed the same agent conversation: a fresh agent
+ * never got the prompt, so its task must be runnable again.
+ */
+export function keepTaskLink(
+  prev: { tool: string; taskId?: string; agentSessionId?: string },
+  next: { tool: string; agentSessionId?: string },
+): { taskId?: string } {
+  if (!prev.taskId || next.tool !== prev.tool) return {};
+  if (!prev.agentSessionId || next.agentSessionId !== prev.agentSessionId) return {};
+  return { taskId: prev.taskId };
+}

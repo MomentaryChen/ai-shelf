@@ -36,6 +36,7 @@ import {
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
 import { removePaneFromCachedLayout, splitNextToPane } from "../terminal/popout-panes";
+import { keepTaskLink } from "../tasks/task-utils";
 
 export interface SpawnPaneOptions {
   /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
@@ -123,7 +124,7 @@ async function reconcileLayoutPtys(
             id: pane.id,
             cwd: pane.cwd || replacement.cwd,
             title: pane.title,
-            ...(pane.taskId ? { taskId: pane.taskId } : {}),
+            ...keepTaskLink(pane, replacement),
           }
         : p,
     );
@@ -316,8 +317,7 @@ export function useProfileWorkspace(
           const restored: PaneInfo = {
             ...pane,
             ...(title ? { title } : {}),
-            // A shell fallback is not the task's agent; only the saved tool keeps the link.
-            ...(slot.taskId && pane.tool === slot.tool ? { taskId: slot.taskId } : {}),
+            ...keepTaskLink(slot, pane),
           };
           spawned.push(restored);
           slotPanes.push(restored);

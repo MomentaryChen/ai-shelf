@@ -41,7 +41,7 @@ A plain-shell profile (no agent CLI installed) cannot run tasks.
 
 Each task is a card on the Tasks page. Click the card to run it.
 
-A task has at most one terminal. While that terminal is open, the card shows **Terminal open** and a click switches to it instead of sending the prompt again. Close the terminal to run the task again. The link is saved with the profile layout, so a terminal restored after a restart still belongs to its task.
+A task has at most one terminal. While that terminal is open, the card shows **Terminal open** and a click switches to it instead of sending the prompt again. Close the terminal to run the task again. The link is saved with the profile layout. A terminal restored after a restart still belongs to its task when it resumes the same agent conversation; a terminal that starts a new conversation (resume turned off, a tool without resume, an SSH profile, or **Start new conversation**) is released, and the card runs the task again.
 
 ## Migration from AI Flow
 

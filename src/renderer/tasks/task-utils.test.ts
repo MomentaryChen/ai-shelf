@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   collectTaskPanes,
+  keepTaskLink,
   duplicateTaskName,
   filterTasks,
   precheckTaskRun,
@@ -140,5 +141,32 @@ describe("collectTaskPanes", () => {
       { profileId: "p2", panes: [{ id: "b", taskId: "review" }] },
     ]);
     assert.deepEqual(map.get("review"), { profileId: "p1", paneId: "a" });
+  });
+});
+
+describe("keepTaskLink", () => {
+  const prev = { tool: "claude", taskId: "review", agentSessionId: "s1" };
+
+  it("keeps the link when the same tool resumed the same conversation", () => {
+    assert.deepEqual(keepTaskLink(prev, { tool: "claude", agentSessionId: "s1" }), {
+      taskId: "review",
+    });
+  });
+
+  it("drops it for a new conversation, a tool without resume, or a shell fallback", () => {
+    assert.deepEqual(keepTaskLink(prev, { tool: "claude", agentSessionId: "s2" }), {});
+    assert.deepEqual(keepTaskLink(prev, { tool: "claude" }), {});
+    assert.deepEqual(keepTaskLink(prev, { tool: "shell", agentSessionId: "s1" }), {});
+    assert.deepEqual(
+      keepTaskLink({ tool: "codex", taskId: "review" }, { tool: "codex" }),
+      {},
+    );
+  });
+
+  it("returns nothing for a pane that is not a task's", () => {
+    assert.deepEqual(
+      keepTaskLink({ tool: "claude", agentSessionId: "s1" }, { tool: "claude", agentSessionId: "s1" }),
+      {},
+    );
   });
 });

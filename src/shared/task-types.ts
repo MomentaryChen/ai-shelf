@@ -31,9 +31,5 @@ export interface RunTaskRequest {
 }
 
 export type RunTaskResult =
-  | {
-      ok: true;
-      /** True when the task's existing terminal was shown instead of a new run. */
-      focused?: boolean;
-    }
+  | { ok: true }
   | { ok: false; reason: "profile-not-found" | "no-agent-tool" | "spawn-failed" | "busy" };
