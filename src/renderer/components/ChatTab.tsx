@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type {
-  PanePopoutEvent,
+  PaneViewDecl,
+  PaneViewIntent,
   ProfileForest,
   ProviderEntry,
   ProfileInfo,
@@ -33,7 +34,11 @@ import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
 import { SplitPaneLayout, type PanePopOutSize, type PanePopOutTrigger } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
-import { useProfileWorkspace, type SpawnPaneOptions } from "../hooks/useProfileWorkspace";
+import {
+  useProfileWorkspace,
+  type ProfileWorkspaceViewHooks,
+  type SpawnPaneOptions,
+} from "../hooks/useProfileWorkspace";
 import {
   usePaneAgentAwareness,
   type BackgroundAgentNotice,
@@ -97,6 +102,18 @@ import {
   focusAfterPopOut,
   withoutPoppedOut,
 } from "../terminal/popout-panes";
+import {
+  addPaneToView,
+  deserializeViews,
+  findViewOfPane,
+  hiddenPaneIds,
+  newViewId,
+  removePaneFromViews,
+  resolveViews,
+  serializeViews,
+  viewPaneIds,
+  type PaneView,
+} from "../terminal/pane-views";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   hasProfilePaneDrag,
@@ -183,6 +200,16 @@ function inventoryTerminalFingerprint(data: ProviderEntry[]): string {
   return data.map((e) => `${e.tool}:${e.available ? 1 : 0}`).join("|");
 }
 
+function profileKeyOf(profile: { workspaceId: string; id: string }): string {
+  return `${profile.workspaceId}:${profile.id}`;
+}
+
+/** Main and chat windows restore the same profile independently — keep their views apart. */
+function viewStoreKey(profileKey: string): string {
+  const route = window.location.hash.replace(/^#\/?/, "").split("?")[0];
+  return `${route === "chat" ? "chat" : "main"}|${profileKey}`;
+}
+
 function ChatTabInner({
   data,
   active = true,
@@ -216,10 +243,17 @@ function ChatTabInner({
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
-  /** Panes shown in their own pop-out window: still in `layout` (saved / restored here), just not displayed. */
-  const [poppedOutPaneIds, setPoppedOutPaneIds] = useState<ReadonlySet<string>>(() => new Set());
-  const poppedOutPaneIdsRef = useRef(poppedOutPaneIds);
-  poppedOutPaneIdsRef.current = poppedOutPaneIds;
+  /**
+   * Extra view windows of this window's profiles. Their panes stay in the profile
+   * layout (saved / restored / counted there) and are only hidden from this display.
+   */
+  const [views, setViewsState] = useState<PaneView[]>([]);
+  const viewsRef = useRef(views);
+  const setViews = useCallback((next: PaneView[] | ((prev: PaneView[]) => PaneView[])) => {
+    const value = typeof next === "function" ? next(viewsRef.current) : next;
+    viewsRef.current = value;
+    setViewsState(value);
+  }, []);
   const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
   /** Pane the "new pane in a git worktree" dialog splits from. */
   const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
@@ -247,12 +281,6 @@ function ChatTabInner({
     [layout],
   );
   const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
-  /** Panes on screen in this window (popped-out ones take input only from their own window). */
-  const dockedPanes = useMemo(
-    () => withoutPoppedOut(panes, poppedOutPaneIds),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layout, poppedOutPaneIds],
-  );
 
   useEffect(() => {
     const onFocus = () => setWindowFocused(true);
@@ -366,6 +394,29 @@ function ChatTabInner({
     [spawnPane],
   );
 
+  // Views are saved per machine with the profile layout and reopened when the profile restores.
+  const viewHooks = useMemo<ProfileWorkspaceViewHooks>(
+    () => ({
+      onPersist: (profile, tree) => {
+        const key = profileKeyOf(profile);
+        void window.api.paneViewStoreSave(
+          viewStoreKey(key),
+          serializeViews(
+            viewsRef.current.filter((v) => v.profileKey === key),
+            tree,
+          ),
+        );
+      },
+      prepareRestoredViews: async (profile, slotPanes) => {
+        const key = profileKeyOf(profile);
+        const saved = await window.api.paneViewStoreGet(viewStoreKey(key));
+        const restored = deserializeViews(saved, slotPanes, key);
+        return () => setViews((prev) => [...prev.filter((v) => v.profileKey !== key), ...restored]);
+      },
+    }),
+    [setViews],
+  );
+
   const {
     activeProfile,
     backgroundProfilePanes,
@@ -395,6 +446,7 @@ function ChatTabInner({
     persistCurrentProfile,
     flushPersistCurrentProfile,
     closePaneInStashedProfile,
+    getProfileLayoutByKey,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -403,6 +455,19 @@ function ChatTabInner({
     spawnPaneResilient,
     settings.workingDir,
     broadcastInput,
+    viewHooks,
+  );
+  const activeProfileKey = activeProfile ? profileKeyOf(activeProfile) : null;
+  /** Active-profile panes living in a view window (hidden here). */
+  const poppedOutPaneIds = useMemo(
+    () => hiddenPaneIds(views, activeProfileKey),
+    [views, activeProfileKey],
+  );
+  /** Panes on screen in this window (view panes take input only from their own window). */
+  const dockedPanes = useMemo(
+    () => withoutPoppedOut(panes, poppedOutPaneIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, poppedOutPaneIds],
   );
 
   /** Read at call time so add / restart always target the active profile's machine. */
@@ -1108,8 +1173,8 @@ function ChatTabInner({
 
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
-      if (poppedOutPaneIdsRef.current.has(paneId)) {
-        void window.api.panePopoutFocus(paneId);
+      if (findViewOfPane(viewsRef.current, paneId)) {
+        void window.api.paneViewFocus(paneId);
         return;
       }
       const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
@@ -1124,8 +1189,8 @@ function ChatTabInner({
   }, [activeProfile, focusPaneInDisplay]);
 
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
-    if (poppedOutPaneIdsRef.current.has(paneId)) {
-      void window.api.panePopoutFocus(paneId);
+    if (findViewOfPane(viewsRef.current, paneId)) {
+      void window.api.paneViewFocus(paneId);
       return;
     }
     if (activeProfile?.id !== profile.id) {
@@ -1139,8 +1204,8 @@ function ChatTabInner({
     paneId: string,
     opts?: { targetPaneId?: string; zone?: PaneDropZone },
   ) {
-    if (poppedOutPaneIdsRef.current.has(paneId)) {
-      void window.api.panePopoutFocus(paneId);
+    if (findViewOfPane(viewsRef.current, paneId)) {
+      void window.api.paneViewFocus(paneId);
       return;
     }
     if (activeProfile?.id !== profileId) {
@@ -1247,7 +1312,11 @@ function ChatTabInner({
       }
 
       // Popped-out panes take input only from their own window.
-      const docked = () => withoutPoppedOut(getProfilePanes(profileId), poppedOutPaneIdsRef.current);
+      const docked = () =>
+        withoutPoppedOut(
+          getProfilePanes(profileId),
+          hiddenPaneIds(viewsRef.current, profileKeyOf(profile)),
+        );
       let targetPanes = docked();
       if (targetPanes.length === 0) {
         await handleNewTerminalRef.current(profile);
@@ -1533,17 +1602,100 @@ function ChatTabInner({
     },
   });
 
-  // --- Pane pop-out windows -------------------------------------------------
-  /** Popped-out panes of the active profile (listed when nothing else is on screen). */
+  // --- Profile view windows -------------------------------------------------
+  /** Active-profile panes in view windows (listed when nothing else is on screen). */
   const poppedOutShown = useMemo(
     () => (poppedOutPaneIds.size === 0 ? [] : panes.filter((p) => poppedOutPaneIds.has(p.id))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [layout, poppedOutPaneIds],
   );
 
-  async function popOutPane(paneId: string, trigger: PanePopOutTrigger, size?: PanePopOutSize) {
-    const pane = layoutRef.current ? findPane(layoutRef.current, paneId) : null;
-    if (!pane || poppedOutPaneIdsRef.current.has(paneId)) return;
+  const lookupProfilePane = useCallback(
+    (profileKey: string, paneId: string): PaneInfo | null =>
+      findPane(getProfileLayoutByKey(profileKey), paneId),
+    [getProfileLayoutByKey],
+  );
+
+  const profileByKey = useCallback(
+    (profileKey: string): ProfileInfo | null => {
+      if (activeProfile && profileKeyOf(activeProfile) === profileKey) return activeProfile;
+      const i = profileKey.indexOf(":");
+      const workspaceId = profileKey.slice(0, i);
+      const profileId = profileKey.slice(i + 1);
+      return (
+        allProfiles.find((p) => p.id === profileId && p.workspaceId === workspaceId) ??
+        allProfiles.find((p) => p.id === profileId) ??
+        null
+      );
+    },
+    [activeProfile, allProfiles],
+  );
+
+  // Panes closed / restarted in the profile: drop them from views (or pick up the new session).
+  useEffect(() => {
+    if (restoring || profileBusy) return;
+    const next = resolveViews(views, lookupProfilePane);
+    if (next !== views) setViews(next);
+  }, [views, layout, backgroundProfilePanes, restoring, profileBusy, lookupProfilePane, setViews]);
+
+  // Keep the per-machine view store in step with every view change (any profile).
+  const savedViewKeysRef = useRef(new Set<string>());
+  useEffect(() => {
+    const keys = new Set([...savedViewKeysRef.current, ...views.map((v) => v.profileKey)]);
+    for (const key of keys) {
+      const tree = getProfileLayoutByKey(key);
+      if (!tree) continue;
+      void window.api.paneViewStoreSave(
+        viewStoreKey(key),
+        serializeViews(
+          views.filter((v) => v.profileKey === key),
+          tree,
+        ),
+      );
+    }
+    savedViewKeysRef.current = new Set(views.map((v) => v.profileKey));
+  }, [views, getProfileLayoutByKey]);
+
+  // A pane moved into a view must not stay focused here.
+  useEffect(() => {
+    if (!focusedPaneId || !poppedOutPaneIds.has(focusedPaneId)) return;
+    const hidden = new Set([...minimizedPaneIds, ...poppedOutPaneIds]);
+    setFocusedPaneId(focusAfterPopOut(layoutRef.current, hidden, focusedPaneId, focusedPaneId));
+  }, [focusedPaneId, poppedOutPaneIds, minimizedPaneIds]);
+
+  // Declare every view to main, which opens / updates / closes the windows to match.
+  const lastViewSyncRef = useRef("");
+  useEffect(() => {
+    const decls: PaneViewDecl[] = views.map((v) => {
+      const profile = profileByKey(v.profileKey);
+      const labels: Record<string, string> = {};
+      const busy: Record<string, boolean> = {};
+      for (const pane of collectPanes(v.layout)) {
+        labels[pane.id] = paneLabels[pane.id] ?? paneDisplayLabel(pane);
+        const status = paneAgentStates[pane.id];
+        busy[pane.id] = Boolean(status && isPaneAgentBusy(status));
+      }
+      return {
+        viewId: v.id,
+        profileKey: v.profileKey,
+        profileName: profile?.name ?? "",
+        accentColor: profile?.accentColor ?? null,
+        layout: v.layout,
+        focusedPaneId: v.focusedPaneId,
+        labels,
+        busy,
+        bounds: v.bounds,
+      };
+    });
+    const serialized = JSON.stringify(decls);
+    if (serialized === lastViewSyncRef.current) return;
+    lastViewSyncRef.current = serialized;
+    window.api.paneViewSync(decls);
+  }, [views, profileByKey, paneLabels, paneAgentStates]);
+
+  /** Drag released off this window, or "Open in new window": main decides, then sends a move intent. */
+  function popOutPane(paneId: string, trigger: PanePopOutTrigger, size?: PanePopOutSize) {
+    if (!activeProfile || !layoutRef.current || !findPane(layoutRef.current, paneId)) return;
     let paneSize = size;
     if (!paneSize) {
       const rect = document
@@ -1551,84 +1703,131 @@ function ChatTabInner({
         ?.getBoundingClientRect();
       if (rect) paneSize = { width: rect.width, height: rect.height };
     }
-    const result = await window.api.panePopoutOpen({
-      pane: {
-        id: pane.id,
-        tool: pane.tool,
-        sessionId: pane.sessionId,
-        cwd: pane.cwd,
-        ...(pane.title ? { title: pane.title } : {}),
-        ...(pane.agentSessionId ? { agentSessionId: pane.agentSessionId } : {}),
-      },
-      label: paneLabels[paneId] ?? paneDisplayLabel(pane),
-      accentColor: activeProfile?.accentColor ?? null,
+    void window.api.paneViewDragEnd({
+      paneId,
+      profileKey: profileKeyOf(activeProfile),
+      profileName: activeProfile.name,
+      trigger,
       width: paneSize?.width,
       height: paneSize?.height,
-      trigger,
     });
-    if (!result.ok) return;
-    const nextPopped = new Set(poppedOutPaneIdsRef.current);
-    nextPopped.add(paneId);
-    poppedOutPaneIdsRef.current = nextPopped;
-    setPoppedOutPaneIds(nextPopped);
-    const hidden = new Set([...minimizedPaneIds, ...nextPopped]);
-    setFocusedPaneId((prev) => focusAfterPopOut(layoutRef.current, hidden, paneId, prev));
   }
 
-  /** Pane came back from its pop-out window (dock / close / window gone). */
-  const handlePopoutEventRef = useRef((_event: PanePopoutEvent) => {});
-  handlePopoutEventRef.current = (event: PanePopoutEvent) => {
-    if (event.type === "cwd") {
-      reportPaneCwd(event.sessionId, event.cwd);
+  /** Show a pane that just left a view here again (switching profile when needed). */
+  function focusDockedPane(profileKey: string, paneId: string) {
+    if (activeProfileKey === profileKey) {
+      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+      else setFocusedPaneId(paneId);
       return;
     }
-    const { paneId, reason } = event;
-    if (poppedOutPaneIdsRef.current.has(paneId)) {
-      const next = new Set(poppedOutPaneIdsRef.current);
-      next.delete(paneId);
-      poppedOutPaneIdsRef.current = next;
-      setPoppedOutPaneIds(next);
-    }
-    const inActiveLayout = Boolean(layoutRef.current && findPane(layoutRef.current, paneId));
-    if (reason === "closed") {
-      // Closing the pop-out closes the pane (PTY already killed by main).
-      if (inActiveLayout) performClosePane(paneId);
-      else
-        closePaneInStashedProfile(paneId, (workspaceId, profileId) =>
-          allProfiles.find((p) => p.id === profileId && p.workspaceId === workspaceId) ??
-          allProfiles.find((p) => p.id === profileId) ??
-          null,
-        );
+    const profile = profileByKey(profileKey);
+    if (profile) void openBackgroundPaneRef.current(profile.id, paneId);
+  }
+
+  function dockPane(paneId: string) {
+    const view = findViewOfPane(viewsRef.current, paneId);
+    if (!view) return;
+    setViews((prev) => removePaneFromViews(prev, paneId));
+    focusDockedPane(view.profileKey, paneId);
+  }
+
+  /** Close a pane wherever its profile is (active layout or stashed). */
+  function closeProfilePane(profileKey: string, paneId: string) {
+    if (activeProfileKey === profileKey && layoutRef.current && findPane(layoutRef.current, paneId)) {
+      performClosePane(paneId);
       return;
     }
-    if (reason === "docked") {
-      if (inActiveLayout) {
-        if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
-        else setFocusedPaneId(paneId);
+    closePaneInStashedProfile(paneId, (workspaceId, profileId) =>
+      profileByKey(`${workspaceId}:${profileId}`),
+    );
+  }
+
+  function updateView(viewId: string, fn: (view: PaneView) => PaneView) {
+    setViews((prev) => prev.map((v) => (v.id === viewId ? fn(v) : v)));
+  }
+
+  const handleViewIntentRef = useRef((_intent: PaneViewIntent) => {});
+  handleViewIntentRef.current = (intent: PaneViewIntent) => {
+    if (intent.type === "move") {
+      const { paneId, fromViewId, target } = intent;
+      const fromView = fromViewId ? viewsRef.current.find((v) => v.id === fromViewId) : null;
+      if (fromViewId && !fromView) return;
+      const profileKey = fromView ? fromView.profileKey : activeProfileKey;
+      if (!profileKey) return;
+      const pane = lookupProfilePane(profileKey, paneId);
+      if (!pane) return;
+      if (target.kind === "dock") {
+        dockPane(paneId);
         return;
       }
-      const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
-      if (bg) void openBackgroundPaneRef.current(bg.profileId, paneId);
+      if (target.kind === "into-view") {
+        const into = viewsRef.current.find((v) => v.id === target.viewId);
+        // Main checks this too: a view only ever holds panes of its own profile.
+        if (!into || into.profileKey !== profileKey) return;
+        setViews((prev) =>
+          removePaneFromViews(prev, paneId).map((v) =>
+            v.id === into.id ? addPaneToView(v, pane) : v,
+          ),
+        );
+        return;
+      }
+      setViews((prev) => [
+        ...removePaneFromViews(prev, paneId),
+        {
+          id: newViewId(),
+          profileKey,
+          layout: { kind: "pane", pane },
+          focusedPaneId: paneId,
+          bounds: target.bounds,
+        },
+      ]);
+      return;
+    }
+
+    const view = viewsRef.current.find((v) => v.id === intent.viewId);
+    if (!view) return;
+    const { action } = intent;
+    switch (action.type) {
+      case "focus":
+        updateView(view.id, (v) => ({ ...v, focusedPaneId: action.paneId }));
+        return;
+      case "close-pane":
+        closeProfilePane(view.profileKey, action.paneId);
+        return;
+      case "dock-pane":
+        dockPane(action.paneId);
+        return;
+      case "dock-all": {
+        const first = viewPaneIds(view)[0];
+        setViews((prev) => prev.filter((v) => v.id !== view.id));
+        if (first) focusDockedPane(view.profileKey, first);
+        return;
+      }
+      case "close-view":
+        for (const paneId of viewPaneIds(view)) closeProfilePane(view.profileKey, paneId);
+        setViews((prev) => prev.filter((v) => v.id !== view.id));
+        return;
+      case "move-in-view":
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: movePaneInTree(v.layout, action.dragPaneId, action.targetPaneId, action.zone),
+        }));
+        return;
+      case "resize":
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: updateSplitRatio(v.layout, action.splitId, action.ratio),
+        }));
+        return;
+      case "cwd":
+        reportPaneCwd(action.sessionId, action.cwd);
+        return;
+      case "bounds":
+        updateView(view.id, (v) => ({ ...v, bounds: action.bounds }));
+        return;
     }
   };
-  useEffect(() => window.api.onPanePopoutEvent((event) => handlePopoutEventRef.current(event)), []);
-
-  // The pop-out asks for a confirm on close only while its agent is busy — this
-  // window tracks agent state for the pane, so report it to main.
-  const reportedPopoutBusyRef = useRef(new Map<string, boolean>());
-  useEffect(() => {
-    const reported = reportedPopoutBusyRef.current;
-    for (const paneId of poppedOutPaneIds) {
-      const status = paneAgentStates[paneId];
-      const busy = Boolean(status && isPaneAgentBusy(status));
-      if (reported.get(paneId) === busy) continue;
-      reported.set(paneId, busy);
-      window.api.panePopoutReportBusy(paneId, busy);
-    }
-    for (const paneId of [...reported.keys()]) {
-      if (!poppedOutPaneIds.has(paneId)) reported.delete(paneId);
-    }
-  }, [poppedOutPaneIds, paneAgentStates]);
+  useEffect(() => window.api.onPaneViewIntent((intent) => handleViewIntentRef.current(intent)), []);
   /** History panel "save": append to the active profile's saved commands. */
   const saveCommandToProfile = async (command: string): Promise<SaveCommandResult> => {
     const profile = activeProfile;
@@ -1963,9 +2162,10 @@ function ChatTabInner({
       <CommandHistoryPanel
         open={commandHistoryOpen}
         onClose={() => setCommandHistoryOpen(false)}
-        panes={panes}
+        // Panes in a view window take input only there (re-run would be dropped).
+        panes={dockedPanes}
         focusedPaneId={focusedPaneId}
-        broadcastCount={broadcastActive ? panes.length : 1}
+        broadcastCount={broadcastActive ? dockedPanes.length : 1}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
           else setFocusedPaneId(paneId);
@@ -2096,7 +2296,7 @@ function ChatTabInner({
           if (!activeProfile) return;
           placePaneInDisplay(activeProfile.id, dragPaneId, targetPaneId, zone);
         }}
-        onPopOutPane={(paneId, trigger, size) => void popOutPane(paneId, trigger, size)}
+        onPopOutPane={(paneId, trigger, size) => popOutPane(paneId, trigger, size)}
         renderTerminal={(pane, paneFocused) => (
           <EmbeddedTerminal
             key={pane.sessionId}
@@ -2129,7 +2329,7 @@ function ChatTabInner({
                 : undefined
             }
             onNewWorktreePane={() => openWorktreeDialog(pane.id)}
-            onOpenInNewWindow={() => void popOutPane(pane.id, "menu")}
+            onOpenInNewWindow={() => popOutPane(pane.id, "menu")}
             onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
@@ -2150,14 +2350,14 @@ function ChatTabInner({
                     <span className="ml-auto flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => void window.api.panePopoutFocus(p.id)}
+                        onClick={() => void window.api.paneViewFocus(p.id)}
                         className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
                       >
                         {t("pane.popout.show")}
                       </button>
                       <button
                         type="button"
-                        onClick={() => void window.api.panePopoutDock(p.id)}
+                        onClick={() => dockPane(p.id)}
                         className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
                       >
                         {t("pane.popout.dockHere")}

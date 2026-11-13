@@ -744,6 +744,10 @@ export const zh: Record<MessageKey, string> = {
   "pane.restoreLayout": "還原分割版面",
   "pane.maximizedBadge": "最大化",
   "pane.maximizedHint": "其他窗格已隱藏但仍在執行。點一下或按 {keys} 還原分割版面。",
+  "pane.view.dockAll": "全部放回原視窗",
+  "pane.view.paneCount": "{count} 個終端機",
+  "pane.view.rejectOtherProfile":
+    "這個視窗只能放「{profile}」的終端機。其他設定檔的終端機請拖到視窗外，另開獨立視窗。",
   "pane.dropAbove": "放到上方",
   "pane.dropBelow": "放到下方",
   "pane.dropLeft": "放到左側",

@@ -770,6 +770,10 @@ export const en = {
   "pane.restoreLayout": "Restore split layout",
   "pane.maximizedBadge": "Maximized",
   "pane.maximizedHint": "Other panes are hidden but still running. Click or press {keys} to restore the split layout.",
+  "pane.view.dockAll": "Return all to original window",
+  "pane.view.paneCount": "{count} terminals",
+  "pane.view.rejectOtherProfile":
+    "This window only holds terminals from {profile}. Drag terminals of another profile outside any window to open them in their own window.",
   "pane.dropAbove": "Place above",
   "pane.dropBelow": "Place below",
   "pane.dropLeft": "Place left",
