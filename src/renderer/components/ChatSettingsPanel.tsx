@@ -903,6 +903,29 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
           </Label>
 
           <div className="rounded-lg border border-border px-3.5 py-3">
+            <p className="text-[13px] text-text-primary">{t("settings.osc52")}</p>
+            <p className="mb-2 text-[11px] leading-snug text-text-tertiary">{t("settings.osc52Hint")}</p>
+            <ToggleGroup
+              type="single"
+              value={settings.terminalOsc52}
+              onValueChange={(v) => {
+                if (v === "off" || v === "ask" || v === "always") updateSettings({ terminalOsc52: v });
+              }}
+              className="flex flex-wrap justify-start gap-1"
+            >
+              <ToggleGroupItem value="off" size="sm" className="text-xs">
+                {t("settings.osc52Off")}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="ask" size="sm" className="text-xs">
+                {t("settings.osc52Ask")}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="always" size="sm" className="text-xs">
+                {t("settings.osc52Always")}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          <div className="rounded-lg border border-border px-3.5 py-3">
             <Label className="flex cursor-pointer items-start gap-3 font-normal">
               <Checkbox
                 checked={settings.terminalPasteConfirm}

@@ -20,6 +20,7 @@ import {
   normalizePasteConfirmMaxChars,
   normalizePasteConfirmMaxLines,
 } from "./terminal/paste-confirm";
+import { DEFAULT_OSC52_MODE, normalizeOsc52Mode, type Osc52Mode } from "./terminal/osc52";
 
 export type { AppColorTheme, AppLocale, LocalePreference };
 
@@ -112,6 +113,8 @@ export interface ChatSettings {
   terminalNotifyLongCommandSec: number;
   /** Desktop notification for BEL and OSC 9 / OSC 777 requests from unattended panes. */
   terminalNotifyBell: boolean;
+  /** OSC 52 clipboard writes from programs (never reads): off / ask / always. */
+  terminalOsc52: Osc52Mode;
 }
 
 export type { KeybindingOverrides, ToolLaunchArgs };
@@ -292,6 +295,7 @@ const DEFAULTS: ChatSettings = {
   terminalNotifyLongCommand: true,
   terminalNotifyLongCommandSec: DEFAULT_LONG_COMMAND_NOTIFY_SEC,
   terminalNotifyBell: true,
+  terminalOsc52: DEFAULT_OSC52_MODE,
 };
 
 /** Legacy settings field replaced by `keybindings` (migrated on load). */
@@ -357,6 +361,7 @@ export function loadSettings(): ChatSettings {
         DEFAULT_LONG_COMMAND_NOTIFY_SEC,
       ),
       terminalNotifyBell: normalizePaneAgentBool(stored.terminalNotifyBell, true),
+      terminalOsc52: normalizeOsc52Mode(stored.terminalOsc52),
     };
   } catch {
     return { ...DEFAULTS };

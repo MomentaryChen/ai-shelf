@@ -168,6 +168,11 @@ export interface TerminalClipboardOptions {
   onPaste?: (text: string, term: Terminal) => void;
   /** OSC 133 command-mark actions. Unavailable → shortcut keys pass through to the shell. */
   commandMarks?: TerminalCommandMarkActions;
+  /**
+   * Raw OSC 52 payload (`Pc;Pd`), called synchronously from the parser.
+   * Omitted → every clipboard sequence is swallowed.
+   */
+  onOsc52?: (data: string) => void;
 }
 
 export interface TerminalCommandMarkActions {
@@ -223,10 +228,17 @@ export function bindTerminalClipboard(
   options: TerminalClipboardOptions = {},
 ): () => void {
   const guards = createGuards();
-  // Swallow OSC 52 synchronously. Apps like Claude Code emit clipboard-set sequences
-  // while rendering; letting them through would overwrite user clipboard. User copy/paste
-  // uses our shortcuts instead. Async OSC handlers race with xterm 6.1 write/resize.
-  const osc52Disposable = term.parser.registerOscHandler(52, () => true);
+  // Handle OSC 52 synchronously and always consume it. Apps like Claude Code emit
+  // clipboard-set sequences while rendering, so the receiver applies the user's
+  // off / ask / always policy. Async OSC handlers race with xterm 6.1 write/resize.
+  const osc52Disposable = term.parser.registerOscHandler(52, (data) => {
+    try {
+      options.onOsc52?.(data);
+    } catch (err) {
+      console.warn("[osc52]", err);
+    }
+    return true;
+  });
 
   const deliverPaste = (text: string) => {
     if (options.onPaste) options.onPaste(text, term);

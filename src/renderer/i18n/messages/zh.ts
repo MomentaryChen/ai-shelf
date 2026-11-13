@@ -831,6 +831,18 @@ export const zh: Record<MessageKey, string> = {
   "settings.terminalNotify.bell": "收到提示音與 CLI 通知時通知",
   "settings.terminalNotify.bellHint":
     "程式（例如 AI CLI）發出的 BEL 與 OSC 9 / OSC 777 通知請求。每個窗格各自限制頻率。",
+  // 程式透過 OSC 52 寫入剪貼簿
+  "terminal.osc52.title": "允許寫入剪貼簿？",
+  "terminal.osc52.desc": "這個窗格中的程式想把 {size}（{chars} 個字元）複製到你的剪貼簿。",
+  "terminal.osc52.hint": "程式只能寫入剪貼簿，永遠無法讀取。",
+  "terminal.osc52.allow": "複製到剪貼簿",
+  "terminal.osc52.deny": "拒絕",
+  "settings.osc52": "允許程式複製到剪貼簿（OSC 52）",
+  "settings.osc52Hint":
+    "讓 vim、tmux 或遠端 SSH 工作階段等工具設定你的剪貼簿。永遠不允許讀取剪貼簿。上限 1 MB。",
+  "settings.osc52Off": "關閉",
+  "settings.osc52Ask": "詢問",
+  "settings.osc52Always": "一律允許",
   "terminal.ctx.newConversation": "開始新對話",
   "settings.agentSessions.title": "AI agent 對話",
   "settings.resumeAgentSessions": "接續 AI agent 對話",

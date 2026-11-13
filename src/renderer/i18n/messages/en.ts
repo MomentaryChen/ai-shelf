@@ -860,6 +860,19 @@ export const en = {
   "settings.terminalNotify.bell": "Notify on bell and CLI notifications",
   "settings.terminalNotify.bellHint":
     "BEL and OSC 9 / OSC 777 notification requests from programs such as AI CLIs. Rate-limited per pane.",
+  // OSC 52 clipboard writes from programs
+  "terminal.osc52.title": "Allow clipboard write?",
+  "terminal.osc52.desc":
+    "A program in this pane wants to copy {size} ({chars} characters) to your clipboard.",
+  "terminal.osc52.hint": "Programs can only write the clipboard, never read it.",
+  "terminal.osc52.allow": "Copy to clipboard",
+  "terminal.osc52.deny": "Deny",
+  "settings.osc52": "Programs can copy to the clipboard (OSC 52)",
+  "settings.osc52Hint":
+    "Lets tools such as vim, tmux or remote SSH sessions set your clipboard. Reading the clipboard is never allowed. Up to 1 MB.",
+  "settings.osc52Off": "Off",
+  "settings.osc52Ask": "Ask",
+  "settings.osc52Always": "Always",
   "terminal.ctx.newConversation": "Start new conversation",
   "settings.agentSessions.title": "AI agent conversations",
   "settings.resumeAgentSessions": "Resume agent conversations",

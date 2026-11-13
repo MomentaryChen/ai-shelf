@@ -57,6 +57,8 @@ import { watchDevicePixelRatio } from "../terminal/dpr-watch";
 import { OS_RESUME_EVENT } from "../os-resume";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
+import { Osc52ConfirmDialog, type PendingOsc52 } from "./Osc52ConfirmDialog";
+import { Osc52Gate, parseOsc52, type Osc52Mode } from "../terminal/osc52";
 import { useLocale } from "../i18n/LocaleProvider";
 import { classifySshFailure, isSshPaneShell, SSH_ERROR_EXIT_CODE } from "../utils/ssh-failure";
 
@@ -77,6 +79,8 @@ interface Props {
    * input is on). Defaults to this session only.
    */
   getPasteTargets?: (sessionId: string) => string[];
+  /** OSC 52 clipboard writes from programs: off / ask / always (default off). */
+  osc52Mode?: Osc52Mode;
   active?: boolean;
   focused?: boolean;
   onExit: () => void;
@@ -148,6 +152,7 @@ function EmbeddedTerminalInner({
   copyOnSelect = true,
   pasteConfirm,
   getPasteTargets,
+  osc52Mode = "off",
   active = true,
   focused = true,
   cwd,
@@ -395,6 +400,25 @@ function EmbeddedTerminalInner({
   const requestPasteRef = useRef(requestPaste);
   requestPasteRef.current = requestPaste;
 
+  const osc52ModeRef = useRef(osc52Mode);
+  osc52ModeRef.current = osc52Mode;
+  const osc52GateRef = useRef<Osc52Gate | null>(null);
+  osc52GateRef.current ??= new Osc52Gate();
+  const [pendingOsc52, setPendingOsc52] = useState<PendingOsc52 | null>(null);
+  const closeOsc52Dialog = (allow: boolean) => {
+    const current = pendingOsc52;
+    setPendingOsc52(null);
+    if (current) {
+      if (allow) {
+        osc52GateRef.current!.noteWritten(current.text, Date.now());
+        void writeClipboardText(current.text);
+      } else {
+        osc52GateRef.current!.noteDenied(Date.now());
+      }
+    }
+    requestAnimationFrame(() => termRef.current?.focus());
+  };
+
   const closePasteDialog = (text: string | null) => {
     const current = pendingPaste;
     setPendingPaste(null);
@@ -548,6 +572,22 @@ function EmbeddedTerminalInner({
       getCopyOnSelect: () => copyOnSelectRef.current,
       // Paste confirmation (multi-line / large / broadcast) decides the targets.
       onPaste: (text) => requestPasteRef.current(text),
+      // Programs writing the clipboard (never on replay; reads are never supported).
+      onOsc52: (data) => {
+        if (!commandMarks.isLive()) return;
+        const req = parseOsc52(data);
+        if (req.kind !== "write") return;
+        const gate = osc52GateRef.current!;
+        const now = Date.now();
+        const decision = gate.decide(req.text, osc52ModeRef.current, now);
+        if (decision === "write") {
+          gate.noteWritten(req.text, now);
+          void writeClipboardText(req.text);
+        } else if (decision === "ask") {
+          // One pending request per pane: the newest replaces an unanswered one.
+          setPendingOsc52({ text: req.text, bytes: req.bytes });
+        }
+      },
       commandMarks: {
         hasMarks: commandMarks.hasMarks,
         canJump: commandMarks.canJump,
@@ -1015,6 +1055,11 @@ function EmbeddedTerminalInner({
           onPasteSingleLine={() =>
             closePasteDialog(pendingPaste ? toSingleLinePaste(pendingPaste.text) : null)
           }
+        />
+        <Osc52ConfirmDialog
+          pending={pendingOsc52}
+          onDeny={() => closeOsc52Dialog(false)}
+          onAllow={() => closeOsc52Dialog(true)}
         />
         {hasNewOutput && (
           <button

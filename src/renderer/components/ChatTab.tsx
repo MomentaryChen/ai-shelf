@@ -2042,6 +2042,7 @@ function ChatTabInner({
             copyOnSelect={settings.terminalCopyOnSelect}
             pasteConfirm={pasteConfirm}
             getPasteTargets={getPasteTargets}
+            osc52Mode={settings.terminalOsc52}
             // Hidden behind a maximized pane: becoming active again refits xterm.
             active={active && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)}
             focused={paneFocused}
