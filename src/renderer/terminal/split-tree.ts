@@ -361,3 +361,170 @@ export function toggleMaximizedPaneId(
   if (current === paneId) return null;
   return effectiveMaximizedPaneId(root, paneId, paneId);
 }
+
+// ---------------------------------------------------------------------------
+// Keyboard pane management (swap / resize / equalize)
+// ---------------------------------------------------------------------------
+
+export type PaneDirection = "left" | "right" | "up" | "down";
+
+/** Pane rectangle in a unit square (x, y = top-left). */
+export interface PaneRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Each pane's rectangle: horizontal splits put `first` left, vertical splits put `first` on top. */
+export function paneRects(root: LayoutNode): Map<string, PaneRect> {
+  const out = new Map<string, PaneRect>();
+  function walk(node: LayoutNode, r: PaneRect) {
+    if (node.kind === "pane") {
+      out.set(node.pane.id, r);
+      return;
+    }
+    if (node.direction === "horizontal") {
+      const w1 = r.w * node.ratio;
+      walk(node.first, { x: r.x, y: r.y, w: w1, h: r.h });
+      walk(node.second, { x: r.x + w1, y: r.y, w: r.w - w1, h: r.h });
+    } else {
+      const h1 = r.h * node.ratio;
+      walk(node.first, { x: r.x, y: r.y, w: r.w, h: h1 });
+      walk(node.second, { x: r.x, y: r.y + h1, w: r.w, h: r.h - h1 });
+    }
+  }
+  walk(root, { x: 0, y: 0, w: 1, h: 1 });
+  return out;
+}
+
+const EPS = 1e-6;
+
+/**
+ * Nearest pane on the given side of `paneId`: it must touch that edge and
+ * overlap along the other axis. Ties go to the larger overlap, then the
+ * closest centre. Null when there is none.
+ */
+export function findPaneInDirection(
+  root: LayoutNode,
+  paneId: string,
+  direction: PaneDirection,
+): string | null {
+  const rects = paneRects(root);
+  const from = rects.get(paneId);
+  if (!from) return null;
+  const horizontal = direction === "left" || direction === "right";
+  let best: { id: string; gap: number; overlap: number; centre: number } | null = null;
+  for (const [id, r] of rects) {
+    if (id === paneId) continue;
+    let gap: number;
+    switch (direction) {
+      case "right":
+        gap = r.x - (from.x + from.w);
+        break;
+      case "left":
+        gap = from.x - (r.x + r.w);
+        break;
+      case "down":
+        gap = r.y - (from.y + from.h);
+        break;
+      case "up":
+        gap = from.y - (r.y + r.h);
+        break;
+    }
+    if (gap < -EPS) continue;
+    const [a0, a1, b0, b1] = horizontal
+      ? [from.y, from.y + from.h, r.y, r.y + r.h]
+      : [from.x, from.x + from.w, r.x, r.x + r.w];
+    const overlap = Math.min(a1, b1) - Math.max(a0, b0);
+    if (overlap <= EPS) continue;
+    const centre = Math.abs((a0 + a1) / 2 - (b0 + b1) / 2);
+    if (
+      !best ||
+      gap < best.gap - EPS ||
+      (Math.abs(gap - best.gap) <= EPS &&
+        (overlap > best.overlap + EPS ||
+          // Equal centres keep the earlier (top / left) pane.
+          (Math.abs(overlap - best.overlap) <= EPS && centre < best.centre - EPS)))
+    ) {
+      best = { id, gap, overlap, centre };
+    }
+  }
+  return best?.id ?? null;
+}
+
+/** Exchange two panes' positions; each PaneInfo (id, session, title) moves whole, so focus follows. */
+export function swapPaneLeaves(root: LayoutNode, paneIdA: string, paneIdB: string): LayoutNode {
+  if (paneIdA === paneIdB) return root;
+  const a = findPane(root, paneIdA);
+  const b = findPane(root, paneIdB);
+  if (!a || !b) return root;
+  return mapPanesInTree(root, (p) => (p.id === paneIdA ? b : p.id === paneIdB ? a : p));
+}
+
+/** Every split sized so each pane in a row / column gets the same share. */
+export function equalizeAllSplits(root: LayoutNode): LayoutNode {
+  if (root.kind === "pane") return root;
+  const first = runSlotCount(root.first, root.direction);
+  const second = runSlotCount(root.second, root.direction);
+  return {
+    ...root,
+    ratio: first / (first + second),
+    first: equalizeAllSplits(root.first),
+    second: equalizeAllSplits(root.second),
+  };
+}
+
+/**
+ * Move the divider nearest to `paneId` along the direction's axis by `step`
+ * (right / down → ratio grows). Returns `root` itself when nothing changes.
+ */
+export function resizePaneInDirection(
+  root: LayoutNode,
+  paneId: string,
+  direction: PaneDirection,
+  step = 0.05,
+): LayoutNode {
+  const path = splitPathToPane(root, paneId);
+  if (!path) return root;
+  const axis: SplitDirection = direction === "left" || direction === "right" ? "horizontal" : "vertical";
+  let split: Extract<LayoutNode, { kind: "split" }> | undefined;
+  for (let i = path.length - 1; i >= 0; i--) {
+    if (path[i]!.direction === axis) {
+      split = path[i];
+      break;
+    }
+  }
+  if (!split) return root;
+  const delta = direction === "right" || direction === "down" ? step : -step;
+  const ratio = Math.min(0.9, Math.max(0.1, split.ratio + delta));
+  if (Math.abs(ratio - split.ratio) < EPS) return root;
+  return updateSplitRatio(root, split.id, ratio);
+}
+
+/**
+ * Copy split ratios from `source` onto splits with the same id in `target`
+ * (apply a change computed on the display tree to the full layout).
+ */
+export function copySplitRatios(target: LayoutNode, source: LayoutNode): LayoutNode {
+  const ratios = new Map<string, number>();
+  (function collect(node: LayoutNode) {
+    if (node.kind === "pane") return;
+    ratios.set(node.id, node.ratio);
+    collect(node.first);
+    collect(node.second);
+  })(source);
+  let changed = false;
+  function walk(node: LayoutNode): LayoutNode {
+    if (node.kind === "pane") return node;
+    const first = walk(node.first);
+    const second = walk(node.second);
+    const r = ratios.get(node.id);
+    const ratio = r === undefined ? node.ratio : r;
+    if (ratio === node.ratio && first === node.first && second === node.second) return node;
+    changed = true;
+    return { ...node, ratio, first, second };
+  }
+  const out = walk(target);
+  return changed ? out : target;
+}

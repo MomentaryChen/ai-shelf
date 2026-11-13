@@ -50,6 +50,13 @@ import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
 import { CommandHistoryPanel, type SaveCommandResult } from "./CommandHistoryPanel";
 import { savedCommandNameFor } from "../terminal/command-history";
+import {
+  copySplitRatios,
+  equalizeAllSplits,
+  findPaneInDirection,
+  resizePaneInDirection,
+  swapPaneLeaves,
+} from "../terminal/split-tree";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useSlideDirection } from "../hooks/useSlideDirection";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
@@ -1502,6 +1509,25 @@ function ChatTabInner({
       if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
     },
     onOpenCommandHistory: () => setCommandHistoryOpen(true),
+    // Neighbours and dividers come from the visible tree (minimized panes excluded);
+    // the change lands in `layout`, which persists like a mouse drag.
+    onSwapPane: (paneId, direction) => {
+      if (!displayLayout) return;
+      const other = findPaneInDirection(displayLayout, paneId, direction);
+      if (!other) return;
+      setLayout((prev) => (prev ? swapPaneLeaves(prev, paneId, other) : prev));
+    },
+    onResizePane: (paneId, direction) => {
+      if (!displayLayout) return;
+      const next = resizePaneInDirection(displayLayout, paneId, direction);
+      if (next === displayLayout) return;
+      setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+    },
+    onEqualizePanes: () => {
+      if (!displayLayout) return;
+      const next = equalizeAllSplits(displayLayout);
+      setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+    },
   });
 
   // --- Pane pop-out windows -------------------------------------------------
