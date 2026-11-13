@@ -184,7 +184,7 @@ export function ProfileCreateDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="max-h-[90vh] max-w-sm overflow-y-auto"
+        className="flex max-w-sm flex-col overflow-hidden"
         onOpenAutoFocus={(e) => {
           // Radix focuses the first tabbable (the "start from" select) by default;
           // land the caret in the name field instead, like the pre-shadcn dialog.
@@ -195,7 +195,8 @@ export function ProfileCreateDialog({
         <DialogHeader>
           <DialogTitle className="text-[15px]">{t("profile.dialog.createTitle")}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <div className="-mx-5 min-h-0 flex-1 overflow-y-auto px-5 py-0.5">
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">
             {t("profile.dialog.startFromLegend")}
@@ -367,6 +368,7 @@ export function ProfileCreateDialog({
           <Checkbox checked={broadcastInput} onCheckedChange={(v) => setBroadcastInput(v === true)} />
           {t("profile.syncBroadcast")}
         </Label>
+        </div>
 
         <DialogFooter className="mt-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
