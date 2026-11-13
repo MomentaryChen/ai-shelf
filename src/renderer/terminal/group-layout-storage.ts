@@ -8,7 +8,7 @@ export const MAX_GROUP_PANES = 8;
 export interface GroupLayoutSnapshot {
   defaultCwd: string;
   defaultTool?: string;
-  panes: { tool: string; cwd: string; title?: string; agentSessionId?: string }[];
+  panes: { tool: string; cwd: string; title?: string; agentSessionId?: string; taskId?: string }[];
   layout: SerializedLayoutNode | null;
   broadcastInput?: boolean;
   accentColor?: string | null;

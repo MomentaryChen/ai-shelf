@@ -395,7 +395,8 @@ Dual-pane Tools layouts adapt with container queries on narrower windows.
 What you can do:
 
 - Create a task from scratch or from a **built-in template**: a name, a prompt, and optionally a profile and an agent tool
-- Press **Run**: AI Shelf switches to that profile, opens a new pane with the agent CLI (the profile's default tool unless the task overrides it), and sends the prompt once the agent is ready
+- Click a task card: AI Shelf switches to that profile, opens a new pane with the agent CLI (the profile's default tool unless the task overrides it), and sends the prompt once the agent is ready
+- A task keeps one terminal: while it is open the card shows **Terminal open**, and a click switches to it instead of sending the prompt again
 - The session is an ordinary interactive terminal, so you can answer questions, approve tools, or take over at any point
 - Edit, duplicate, or delete tasks; **Open tasks folder** shows the files
 

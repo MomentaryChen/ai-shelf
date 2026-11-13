@@ -9,6 +9,7 @@ import {
   Play,
   Plus,
   Search,
+  SquareTerminal,
   Trash2,
   User,
   X,
@@ -142,16 +143,20 @@ function toInput(state: EditorState): TaskInput {
 }
 
 /**
- * Tasks mode: saved prompts. Running one opens a terminal pane in the task's profile with
- * its agent CLI and types the prompt once the agent is ready.
+ * Tasks mode: saved prompts as cards. Clicking a card opens a terminal pane in the task's
+ * profile with its agent CLI and types the prompt once the agent is ready. A task keeps one
+ * terminal: while it is open, the card switches to it instead of running again.
  */
 export function TasksTab({
   active,
   onRunTask,
+  openTaskIds,
   availableTools,
 }: {
   active: boolean;
   onRunTask: (req: RunTaskRequest) => Promise<RunTaskResult>;
+  /** Tasks that have a live terminal. */
+  openTaskIds?: readonly string[];
   /** Installed agent tool ids from the inventory scan; defaults to every known agent CLI. */
   availableTools?: string[];
 }) {
@@ -172,6 +177,7 @@ export function TasksTab({
   const [reloadTick, setReloadTick] = useState(0);
 
   const reload = useCallback(() => setReloadTick((n) => n + 1), []);
+  const openIds = useMemo(() => new Set(openTaskIds ?? []), [openTaskIds]);
 
   // Reload tasks and profiles each time the page becomes visible (profiles change in Terminal mode).
   useEffect(() => {
@@ -298,7 +304,9 @@ export function TasksTab({
     setActionError(null);
     // Only explicit profiles are pre-checked: the runner's "active profile" is the terminal
     // workspace's, which may differ from the forest's last-active id. No forest = defer to the runner.
-    const problem = forestLoaded ? precheckTaskRun(task, groups, null) : null;
+    // A task whose terminal is open only switches to it, whatever its settings say now.
+    const problem =
+      forestLoaded && !openIds.has(task.id) ? precheckTaskRun(task, groups, null) : null;
     if (problem) {
       setRunError({ taskId: task.id, taskName: task.name, reason: problem });
       return;
@@ -306,6 +314,7 @@ export function TasksTab({
     setRunningId(task.id);
     try {
       const res = await onRunTask({
+        taskId: task.id,
         prompt: task.prompt,
         ...(task.profileId?.trim() ? { profileId: task.profileId.trim() } : {}),
         ...(task.tool?.trim() ? { tool: task.tool.trim() } : {}),
@@ -458,6 +467,7 @@ export function TasksTab({
                     task={task}
                     resolution={resolutions.get(task.id) ?? { kind: "active" }}
                     running={runningId === task.id}
+                    open={openIds.has(task.id)}
                     runDisabled={runningId !== null}
                     onRun={() => void run(task)}
                     onEdit={() => openEdit(task)}
@@ -510,6 +520,7 @@ function TaskCard({
   task,
   resolution,
   running,
+  open,
   runDisabled,
   onRun,
   onEdit,
@@ -519,6 +530,8 @@ function TaskCard({
   task: TaskDef;
   resolution: TaskProfileResolution<ProfileInfo>;
   running: boolean;
+  /** The task's terminal is open: the card switches to it. */
+  open: boolean;
   runDisabled: boolean;
   onRun: () => void;
   onEdit: () => void;
@@ -531,8 +544,39 @@ function TaskCard({
   const iconBtn =
     "inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-accent-soft hover:text-text-primary";
 
+  const hint = open ? t("tasks.action.openHint") : t("tasks.action.runHint");
+  /** Buttons inside the card act alone; only a click on the card itself runs the task. */
+  const alone = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+
   return (
-    <Card dense hoverable className="flex flex-col">
+    <Card
+      dense
+      hoverable
+      className={cn(
+        "flex flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        runDisabled ? "cursor-default" : "cursor-pointer",
+        open && "ring-1 ring-ok/50",
+      )}
+      rootProps={{
+        role: "button",
+        tabIndex: 0,
+        title: hint,
+        "aria-disabled": runDisabled,
+        onClick: () => {
+          if (!runDisabled) onRun();
+        },
+        onKeyDown: (e) => {
+          if (e.target !== e.currentTarget || runDisabled) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onRun();
+          }
+        },
+      }}
+    >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[15px] font-semibold text-text-primary" title={task.name}>
@@ -542,9 +586,19 @@ function TaskCard({
             <p className="mt-0.5 line-clamp-2 text-[13px] text-text-secondary">{task.description}</p>
           )}
         </div>
-        <Button size="sm" onClick={onRun} disabled={runDisabled} title={t("tasks.action.runHint")}>
-          <Play className="fill-current" />
-          {running ? t("tasks.action.running") : t("tasks.action.run")}
+        <Button
+          size="sm"
+          variant={open ? "outline" : "default"}
+          onClick={alone(onRun)}
+          disabled={runDisabled}
+          title={hint}
+        >
+          {open ? <SquareTerminal /> : <Play className="fill-current" />}
+          {running
+            ? t("tasks.action.running")
+            : open
+              ? t("tasks.action.open")
+              : t("tasks.action.run")}
         </Button>
       </div>
 
@@ -561,6 +615,12 @@ function TaskCard({
           </span>
         )}
         {tool && <Badge variant="info" text={toolDisplayName(tool)} />}
+        {open && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-ok/15 px-2 py-0.5 text-ok">
+            <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
+            {t("tasks.card.open")}
+          </span>
+        )}
       </div>
 
       <pre
@@ -575,13 +635,13 @@ function TaskCard({
       </pre>
 
       <div className="mt-2 flex items-center justify-end gap-0.5">
-        <button type="button" className={iconBtn} onClick={onEdit} title={t("tasks.action.edit")} aria-label={t("tasks.action.edit")}>
+        <button type="button" className={iconBtn} onClick={alone(onEdit)} title={t("tasks.action.edit")} aria-label={t("tasks.action.edit")}>
           <Pencil className="h-4 w-4" />
         </button>
         <button
           type="button"
           className={iconBtn}
-          onClick={onDuplicate}
+          onClick={alone(onDuplicate)}
           title={t("tasks.action.duplicate")}
           aria-label={t("tasks.action.duplicate")}
         >
@@ -590,7 +650,7 @@ function TaskCard({
         <button
           type="button"
           className={cn(iconBtn, "hover:bg-fail/10 hover:text-fail")}
-          onClick={onDelete}
+          onClick={alone(onDelete)}
           title={t("tasks.action.delete")}
           aria-label={t("tasks.action.delete")}
         >

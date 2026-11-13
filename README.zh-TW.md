@@ -52,7 +52,7 @@
 - **Terminal** — Profile 側欄、內嵌多窗格 xterm.js + node-pty、廣播輸入、外部啟動
 - **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage**（花費／預算）
 - **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL
-- **Tasks（任務）** — 存好的 prompt：選一個 Profile 按執行，就會開新 pane 啟動代理 CLI 並送出 prompt（附內建範本）
+- **Tasks（任務）** — 存好的 prompt：選一個 Profile、點一下卡片，就會開新 pane 啟動代理 CLI 並送出 prompt；每個任務只有一個終端機，再點一次會切換過去（附內建範本）
 - **Profile 側欄** — 建立 / 重新命名 / 刪除 Profile；每個 Profile 的分割版面存入 SQLite
 - **外部啟動** — Windows 上為 Windows Terminal / PowerShell / CMD；macOS／Linux 依 `$SHELL`（bash / zsh / fish / sh）
 - **雲端備份** — 可選 Google 登入備份 Profile（手動同步；見 App 內帳戶設定）

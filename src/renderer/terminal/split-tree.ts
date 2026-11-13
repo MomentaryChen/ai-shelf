@@ -16,6 +16,8 @@ export interface PaneInfo {
   autoTitle?: string;
   /** AI agent conversation id (Claude Code `--session-id`), resumed on restore. */
   agentSessionId?: string;
+  /** Task this pane was opened for (Tasks mode); a task with a live pane is not run again. */
+  taskId?: string;
 }
 
 export type SplitDirection = "horizontal" | "vertical";

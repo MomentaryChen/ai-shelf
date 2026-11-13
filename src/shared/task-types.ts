@@ -23,6 +23,8 @@ export type TaskInput = Omit<TaskDef, "id" | "updatedAt"> & { id?: string };
 export type TaskSaveResult = { ok: true; task: TaskDef } | { ok: false; error: string };
 
 export interface RunTaskRequest {
+  /** The task's id. A task that already has a live terminal is shown, not started again. */
+  taskId?: string;
   prompt: string;
   profileId?: string;
   tool?: string;

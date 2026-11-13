@@ -36,6 +36,7 @@ import {
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
 import { removePaneFromCachedLayout, splitNextToPane } from "../terminal/popout-panes";
+import { keepTaskLink } from "../tasks/task-utils";
 
 export interface SpawnPaneOptions {
   /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
@@ -118,7 +119,13 @@ async function reconcileLayoutPtys(
 
     next = mapPanesInTree(next, (p) =>
       p.id === pane.id
-        ? { ...replacement, id: pane.id, cwd: pane.cwd || replacement.cwd, title: pane.title }
+        ? {
+            ...replacement,
+            id: pane.id,
+            cwd: pane.cwd || replacement.cwd,
+            title: pane.title,
+            ...keepTaskLink(pane, replacement),
+          }
         : p,
     );
   }
@@ -307,7 +314,11 @@ export function useProfileWorkspace(
         }
         if (pane) {
           const title = normalizePaneTitle(slot.title ?? "");
-          const restored = title ? { ...pane, title } : pane;
+          const restored: PaneInfo = {
+            ...pane,
+            ...(title ? { title } : {}),
+            ...keepTaskLink(slot, pane),
+          };
           spawned.push(restored);
           slotPanes.push(restored);
         } else {

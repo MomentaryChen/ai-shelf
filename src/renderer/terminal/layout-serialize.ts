@@ -7,6 +7,8 @@ export interface SavedPaneSlot {
   title?: string;
   /** AI agent conversation id to resume when the pane is restored (optional; older layouts omit it). */
   agentSessionId?: string;
+  /** Task the pane was opened for; kept so a restored pane still counts as that task's terminal. */
+  taskId?: string;
 }
 
 export type SerializedLayoutNode =
@@ -33,6 +35,7 @@ export function serializeLayout(root: LayoutNode): {
       const title = node.pane.title?.trim();
       if (title) slot.title = title;
       if (node.pane.agentSessionId) slot.agentSessionId = node.pane.agentSessionId;
+      if (node.pane.taskId) slot.taskId = node.pane.taskId;
       panes.push(slot);
       return { kind: "pane", index };
     }

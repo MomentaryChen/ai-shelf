@@ -117,6 +117,7 @@ import {
   paneToolLabel,
 } from "../utils/pane-label";
 import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
+import { collectTaskPanes, keepTaskLink } from "../tasks/task-utils";
 import { slideClassName } from "../utils/workspace-slide";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -244,6 +245,7 @@ function ChatTabInner({
   onRegisterCommands,
   onRequestTerminalMode,
   onRegisterTaskRunner,
+  onTaskPanesChange,
 }: {
   data: ProviderEntry[];
   active?: boolean;
@@ -251,6 +253,8 @@ function ChatTabInner({
   onRegisterCommands?: (commands: Command[]) => void;
   onRequestTerminalMode?: () => void;
   onRegisterTaskRunner?: (runner: TaskRunner | null) => void;
+  /** Ids of the tasks that have a live terminal (in any loaded profile). */
+  onTaskPanesChange?: (taskIds: string[]) => void;
 }) {
   const { t } = useLocale();
   const [layout, setLayout] = useState<LayoutNode | null>(null);
@@ -556,6 +560,24 @@ function ChatTabInner({
   }, [backgroundProfilePanes, sidebarForest]);
   const backgroundAgentPanesRef = useRef(backgroundAgentPanes);
   backgroundAgentPanesRef.current = backgroundAgentPanes;
+
+  /** Live terminal per task, across the active profile and the stashed ones. */
+  const taskPanes = useMemo(
+    () =>
+      collectTaskPanes([
+        { profileId: activeProfile?.id ?? "", panes: layout ? collectPanes(layout) : [] },
+        ...backgroundProfilePanes.map((b) => ({ profileId: b.profileId, panes: [b.pane] })),
+      ]),
+    [activeProfile?.id, layout, backgroundProfilePanes],
+  );
+  const taskPanesRef = useRef(taskPanes);
+  const taskRunInFlightRef = useRef(false);
+  taskPanesRef.current = taskPanes;
+  // Task ids are file-safe (no spaces), so a space-joined key is a stable change signal.
+  const taskPaneIdsKey = [...taskPanes.keys()].sort().join(" ");
+  useEffect(() => {
+    onTaskPanesChange?.(taskPaneIdsKey ? taskPaneIdsKey.split(" ") : []);
+  }, [taskPaneIdsKey, onTaskPanesChange]);
 
   const [backgroundToasts, setBackgroundToasts] = useState<BackgroundAgentToast[]>([]);
   const backgroundToastSeqRef = useRef(0);
@@ -871,7 +893,7 @@ function ChatTabInner({
       cwd?: string,
       splitTargetId?: string,
       direction: SplitDirection = "horizontal",
-      opts?: { keepOthersVisible?: boolean; initialInput?: string },
+      opts?: { keepOthersVisible?: boolean; initialInput?: string; taskId?: string },
     ): Promise<PaneInfo | null> => {
       if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
@@ -886,13 +908,16 @@ function ChatTabInner({
         return null;
       }
 
-      const pane = await spawnPaneResilient(
+      const spawned = await spawnPaneResilient(
         tool || "shell",
         resolveCwd(cwd),
         activeRemoteRef.current,
         opts?.initialInput ? { initialInput: opts.initialInput } : undefined,
       );
-      if (!pane) return null;
+      if (!spawned) return null;
+      // A shell fallback never got the prompt, so it is not the task's terminal.
+      const pane =
+        opts?.taskId && spawned.tool === tool ? { ...spawned, taskId: opts.taskId } : spawned;
 
       setLayout((prev) => {
         if (!prev) return { kind: "pane", pane };
@@ -951,7 +976,7 @@ function ChatTabInner({
           prev
             ? mapPanesInTree(prev, (p) =>
                 p.id === paneId
-                  ? { ...next, id: paneId, cwd, title }
+                  ? { ...next, id: paneId, cwd, title, ...keepTaskLink(victim, next) }
                   : p,
               )
             : prev,
@@ -996,7 +1021,7 @@ function ChatTabInner({
           prev
             ? mapPanesInTree(prev, (p) =>
                 p.id === paneId
-                  ? { ...next, id: paneId, cwd: cwd || next.cwd, title }
+                  ? { ...next, id: paneId, cwd: cwd || next.cwd, title, ...keepTaskLink(victim, next) }
                   : p,
               )
             : prev,
@@ -1358,8 +1383,32 @@ function ChatTabInner({
    * Tasks: activate the task's profile (by id, or by name for hand-written files), open a
    * pane with its agent tool, and have main type the prompt in once the agent is ready.
    */
-  async function runTask({ prompt, profileId, tool }: RunTaskRequest): Promise<RunTaskResult> {
+  async function runTask(request: RunTaskRequest): Promise<RunTaskResult> {
+    // Synchronous guard: state flags lag a render, so a double click could start two runs.
+    if (taskRunInFlightRef.current) return { ok: false, reason: "busy" };
+    taskRunInFlightRef.current = true;
+    try {
+      return await startOrShowTask(request);
+    } finally {
+      taskRunInFlightRef.current = false;
+    }
+  }
+
+  async function startOrShowTask({
+    taskId,
+    prompt,
+    profileId,
+    tool,
+  }: RunTaskRequest): Promise<RunTaskResult> {
     if (addingTerminal || profileBusy || isRestoring()) return { ok: false, reason: "busy" };
+    const id = taskId?.trim() || undefined;
+    // One terminal per task: show the one it already has instead of running it again.
+    const existing = id ? taskPanesRef.current.get(id) : undefined;
+    if (existing) {
+      if (existing.profileId) await restorePaneToDisplayById(existing.profileId, existing.paneId);
+      else setFocusedPaneId(existing.paneId);
+      return { ok: true };
+    }
     let profile: ProfileInfo | null = activeProfile ?? null;
     const wanted = profileId?.trim();
     if (wanted) {
@@ -1376,10 +1425,19 @@ function ChatTabInner({
     try {
       if (profile && activeProfile?.id !== profile.id) {
         await handleActivateProfile(profile);
+        // Opening the profile may have restored the task's terminal from its saved layout.
+        const restored = id
+          ? getProfilePanes(profile.id).find((p) => p.taskId === id)
+          : undefined;
+        if (restored) {
+          focusPaneInDisplay(profile.id, restored.id);
+          return { ok: true };
+        }
       }
       const cwd = profile?.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(launchTool, cwd, undefined, "horizontal", {
         initialInput: prompt,
+        ...(id ? { taskId: id } : {}),
       });
       return created ? { ok: true } : { ok: false, reason: "spawn-failed" };
     } catch (err) {
@@ -2799,6 +2857,7 @@ export const ChatTab = memo(ChatTabInner, (prev, next) => {
     prev.onRegisterCommands === next.onRegisterCommands &&
     prev.onRequestTerminalMode === next.onRequestTerminalMode &&
     prev.onRegisterTaskRunner === next.onRegisterTaskRunner &&
+    prev.onTaskPanesChange === next.onTaskPanesChange &&
     inventoryTerminalFingerprint(prev.data) === inventoryTerminalFingerprint(next.data)
   );
 });

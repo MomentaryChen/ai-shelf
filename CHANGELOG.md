@@ -9,6 +9,10 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+### Changed
+
+- **Task cards** — Click a task card to run it. A task keeps one terminal: while it is open the card shows **Terminal open**, and a click switches to that terminal instead of sending the prompt again. Close the terminal to run the task again.
+
 ## [5.1.0] - 2026-11-13
 
 Tasks replace AI Flow, profile view windows gain a terminal sidebar, and terminal chrome is sharper across themes.

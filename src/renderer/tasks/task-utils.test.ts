@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  collectTaskPanes,
+  keepTaskLink,
   duplicateTaskName,
   filterTasks,
   precheckTaskRun,
@@ -119,5 +121,52 @@ describe("TASK_TEMPLATES", () => {
         assert.ok(l.prompt.trim(), `${tpl.id} ${locale} prompt`);
       }
     }
+  });
+});
+
+describe("collectTaskPanes", () => {
+  it("maps each task to its pane across profiles and skips plain panes", () => {
+    const map = collectTaskPanes([
+      { profileId: "p1", panes: [{ id: "a" }, { id: "b", taskId: "review" }] },
+      { profileId: "p2", panes: [{ id: "c", taskId: "standup" }] },
+    ]);
+    assert.deepEqual([...map.keys()], ["review", "standup"]);
+    assert.deepEqual(map.get("review"), { profileId: "p1", paneId: "b" });
+    assert.deepEqual(map.get("standup"), { profileId: "p2", paneId: "c" });
+  });
+
+  it("keeps the first pane when two carry the same task", () => {
+    const map = collectTaskPanes([
+      { profileId: "p1", panes: [{ id: "a", taskId: "review" }] },
+      { profileId: "p2", panes: [{ id: "b", taskId: "review" }] },
+    ]);
+    assert.deepEqual(map.get("review"), { profileId: "p1", paneId: "a" });
+  });
+});
+
+describe("keepTaskLink", () => {
+  const prev = { tool: "claude", taskId: "review", agentSessionId: "s1" };
+
+  it("keeps the link when the same tool resumed the same conversation", () => {
+    assert.deepEqual(keepTaskLink(prev, { tool: "claude", agentSessionId: "s1" }), {
+      taskId: "review",
+    });
+  });
+
+  it("drops it for a new conversation, a tool without resume, or a shell fallback", () => {
+    assert.deepEqual(keepTaskLink(prev, { tool: "claude", agentSessionId: "s2" }), {});
+    assert.deepEqual(keepTaskLink(prev, { tool: "claude" }), {});
+    assert.deepEqual(keepTaskLink(prev, { tool: "shell", agentSessionId: "s1" }), {});
+    assert.deepEqual(
+      keepTaskLink({ tool: "codex", taskId: "review" }, { tool: "codex" }),
+      {},
+    );
+  });
+
+  it("returns nothing for a pane that is not a task's", () => {
+    assert.deepEqual(
+      keepTaskLink({ tool: "claude", agentSessionId: "s1" }, { tool: "claude", agentSessionId: "s1" }),
+      {},
+    );
   });
 });

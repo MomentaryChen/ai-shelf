@@ -22,6 +22,7 @@ export function Card({
   collapsible = false,
   defaultCollapsed = false,
   dense = false,
+  rootProps,
 }: {
   title?: React.ReactNode;
   trailing?: React.ReactNode;
@@ -32,6 +33,8 @@ export function Card({
   defaultCollapsed?: boolean;
   /** Tighter padding/radius/margin for per-item cards in long lists (MCP, Doctor…). */
   dense?: boolean;
+  /** Extra attributes for the card element (a clickable card); not used when `collapsible`. */
+  rootProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
   const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed);
   const hasHeader = title || trailing;
@@ -49,7 +52,7 @@ export function Card({
 
   if (!collapsible) {
     return (
-      <UiCard className={cn(gap, pad, cardClass, className)}>
+      <UiCard {...rootProps} className={cn(gap, pad, cardClass, className)}>
         {hasHeader && (
           <CardHeader className={headerGap}>
             {title && <CardTitle>{title}</CardTitle>}

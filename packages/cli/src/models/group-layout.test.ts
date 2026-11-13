@@ -14,6 +14,14 @@ describe("GroupLayoutSnapshotSchema panes", () => {
     assert.equal(parsed.panes[0]?.agentSessionId, id);
   });
 
+  it("keeps a pane's task id", () => {
+    const parsed = GroupLayoutSnapshotSchema.parse({
+      ...base,
+      panes: [{ tool: "claude", cwd: "/repo", taskId: "review-branch" }],
+    });
+    assert.equal(parsed.panes[0]?.taskId, "review-branch");
+  });
+
   it("still accepts panes saved before agent session ids existed", () => {
     const parsed = GroupLayoutSnapshotSchema.parse({
       ...base,

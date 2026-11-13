@@ -367,6 +367,8 @@ export function App() {
   const registerTaskRunner = useCallback((runner: TaskRunner | null) => {
     taskRunnerRef.current = runner;
   }, []);
+  /** Tasks that have a live terminal; their cards switch to it instead of running again. */
+  const [openTaskIds, setOpenTaskIds] = useState<string[]>([]);
   const [, startTransition] = useTransition();
 
   const openPalette = useCallback(() => {
@@ -855,6 +857,7 @@ export function App() {
               onRegisterCommands={registerTerminalCommands}
               onRequestTerminalMode={requestTerminalMode}
               onRegisterTaskRunner={registerTaskRunner}
+              onTaskPanesChange={setOpenTaskIds}
             />
           </Suspense>
         </main>
@@ -956,6 +959,7 @@ export function App() {
             <TasksTab
               active={appMode === "tasks"}
               onRunTask={runTask}
+              openTaskIds={openTaskIds}
               availableTools={taskTools}
             />
           </Suspense>
