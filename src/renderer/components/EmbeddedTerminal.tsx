@@ -447,7 +447,12 @@ function EmbeddedTerminalInner({
     // OSC 133 prompt / output marks. Not live until the replayed backlog is parsed.
     const commandMarks = bindTerminalCommandMarks(term, {
       onStatus: (status, live) => {
-        if (!live && getCommandStatus(sessionId)) return;
+        if (!live) {
+          // Replayed backlog has no timings; keep a stored result unless the replay
+          // shows a different one (a command finished while this pane was unmounted).
+          const prev = getCommandStatus(sessionId);
+          if (!status || (prev && prev.exitCode === status.exitCode)) return;
+        }
         setCommandStatus(sessionId, status);
       },
     });

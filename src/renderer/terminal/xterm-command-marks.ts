@@ -24,7 +24,10 @@ export interface TerminalCommandMarks {
 }
 
 export interface TerminalCommandMarksOptions {
-  /** Last finished command changed. `live` is false while replaying the backlog. */
+  /**
+   * Last finished command changed (`live`), or — once, when the replayed backlog
+   * has been parsed — the status it contained (`live` false, durations unknown).
+   */
   onStatus?: (status: LastCommandStatus | null, live: boolean) => void;
   now?: () => number;
 }
@@ -72,8 +75,8 @@ export function bindTerminalCommandMarks(
       // Full-screen apps own the alternate buffer; markers there are meaningless.
       const marker = isNormalBuffer(term) ? term.registerMarker(0) : undefined;
       const point = marker ? { marker, col: term.buffer.active.cursorX } : null;
-      if (tracker.apply(mark, point, live ? now() : null)) {
-        options.onStatus?.(tracker.lastStatus(), live);
+      if (tracker.apply(mark, point, live ? now() : null) && live) {
+        options.onStatus?.(tracker.lastStatus(), true);
       }
     } catch (err) {
       console.warn("[osc133]", err);
@@ -108,7 +111,9 @@ export function bindTerminalCommandMarks(
       return range ? readRange(term, range) : null;
     },
     setLive: (next) => {
+      const wasReplaying = !live;
       live = next;
+      if (next && wasReplaying) options.onStatus?.(tracker.lastStatus(), false);
     },
     dispose: () => {
       osc133.dispose();
