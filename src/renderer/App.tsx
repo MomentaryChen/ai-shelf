@@ -769,6 +769,7 @@ export function App() {
         {/* Terminal mode's profile chip and pane actions portal in here (see ChatTab). */}
         <div
           id={TITLE_BAR_TERMINAL_SLOT_ID}
+          data-surface="chrome"
           className={appMode === "terminal" ? "flex min-w-0 flex-1 items-center" : "hidden"}
         />
 

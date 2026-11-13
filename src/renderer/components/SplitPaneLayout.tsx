@@ -67,6 +67,8 @@ interface Props {
   onResizeSplit: (splitId: string, ratio: number) => void;
   onRenamePane?: (paneId: string, title: string) => void;
   onPaneCwdClick?: (paneId: string) => void;
+  /** Click on a pane header's git branch (main window: worktree dialog). */
+  onPaneBranchClick?: (paneId: string) => void;
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   /** True while dragging a tab from the profile sidebar (enables drop overlay over xterm). */
@@ -170,6 +172,7 @@ function SplitPaneLayoutInner({
   onResizeSplit,
   onRenamePane,
   onPaneCwdClick,
+  onPaneBranchClick,
   renderTerminal,
   sidebarPaneDragActive = false,
   profileAccentColor = null,
@@ -205,6 +208,9 @@ function SplitPaneLayoutInner({
             onRenamePane ? (title) => onRenamePane(node.pane.id, title) : undefined
           }
           onCwdClick={onPaneCwdClick ? () => onPaneCwdClick(node.pane.id) : undefined}
+          onBranchClick={
+            onPaneBranchClick ? () => onPaneBranchClick(node.pane.id) : undefined
+          }
           sidebarPaneDragActive={sidebarPaneDragActive}
           maximized={maximizedPaneId === node.pane.id}
           onToggleMaximize={
@@ -252,6 +258,7 @@ function SplitPaneLayoutInner({
           onResizeSplit={onResizeSplit}
           onRenamePane={onRenamePane}
           onPaneCwdClick={onPaneCwdClick}
+          onPaneBranchClick={onPaneBranchClick}
           renderTerminal={renderTerminal}
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
@@ -298,6 +305,7 @@ function SplitPaneLayoutInner({
           onResizeSplit={onResizeSplit}
           onRenamePane={onRenamePane}
           onPaneCwdClick={onPaneCwdClick}
+          onPaneBranchClick={onPaneBranchClick}
           renderTerminal={renderTerminal}
           sidebarPaneDragActive={sidebarPaneDragActive}
           profileAccentColor={profileAccentColor}
@@ -331,6 +339,7 @@ function WarpPaneShell({
   onSplit,
   onRename,
   onCwdClick,
+  onBranchClick,
   sidebarPaneDragActive = false,
   maximized = false,
   onToggleMaximize,
@@ -353,6 +362,7 @@ function WarpPaneShell({
   onSplit: (dir: SplitDirection) => void;
   onRename?: (title: string) => void;
   onCwdClick?: () => void;
+  onBranchClick?: () => void;
   maximized?: boolean;
   onToggleMaximize?: () => void;
   maximizeShortcutKeys?: string;
@@ -403,18 +413,24 @@ function WarpPaneShell({
   useEffect(() => {
     if (broadcastActive && !prevBroadcastRef.current) {
       setBroadcastEnter(true);
-      setBroadcastHint(true);
       const timer = window.setTimeout(() => setBroadcastEnter(false), 520);
-      const hintTimer = window.setTimeout(() => setBroadcastHint(false), BROADCAST_HINT_MS);
       prevBroadcastRef.current = broadcastActive;
-      return () => {
-        window.clearTimeout(timer);
-        window.clearTimeout(hintTimer);
-      };
+      return () => window.clearTimeout(timer);
     }
-    if (!broadcastActive) setBroadcastHint(false);
     prevBroadcastRef.current = broadcastActive;
     return undefined;
+  }, [broadcastActive]);
+
+  // Also runs for a pane that mounts while broadcast is already on (a new split,
+  // or switching to a broadcast profile), which the enter animation above skips.
+  useEffect(() => {
+    if (!broadcastActive) {
+      setBroadcastHint(false);
+      return undefined;
+    }
+    setBroadcastHint(true);
+    const timer = window.setTimeout(() => setBroadcastHint(false), BROADCAST_HINT_MS);
+    return () => window.clearTimeout(timer);
   }, [broadcastActive]);
 
   function clearDrag() {
@@ -601,7 +617,7 @@ function WarpPaneShell({
             {t("pane.maximizedBadge")}
           </button>
         )}
-        <PaneGitBranch cwd={pane.cwd} />
+        <PaneGitBranch cwd={pane.cwd} onClick={onBranchClick} />
         {onCwdClick ? (
           <button
             type="button"

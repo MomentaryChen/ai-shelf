@@ -4,7 +4,6 @@ import type { PaneInfo } from "../terminal/split-tree";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 import { TerminalCommandStatus } from "./TerminalCommandStatus";
-import { TerminalGitStatus } from "./TerminalGitStatus";
 
 type SessionStatus = "live" | "exited" | "stale";
 
@@ -44,18 +43,11 @@ function formatSize(cols: number | null, rows: number | null): string | null {
 const COPIED_FLASH_MS = 1400;
 
 /**
- * Bottom status strip for the focused pane — session state, cwd (click to copy),
- * git branch (click for the worktree dialog), last command, shell, exit code.
- * Pid and grid size are diagnostics, so they live in the shell tooltip.
+ * Bottom status strip for the focused pane — session state, full cwd (click to
+ * copy), last command, shell, exit code. The branch is in the pane header, and
+ * pid / grid size are diagnostics, so those two live in the shell tooltip.
  */
-export function TerminalStatusBar({
-  pane,
-  onOpenWorktree,
-}: {
-  pane: PaneInfo | null;
-  /** Makes the branch segment a button that opens the worktree dialog for this pane. */
-  onOpenWorktree?: (paneId: string) => void;
-}) {
+export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
   const { t } = useLocale();
   const [status, setStatus] = useState<SessionStatus>("live");
   const [meta, setMeta] = useState<PtyMetaView>(EMPTY_META);
@@ -151,7 +143,6 @@ export function TerminalStatusBar({
       copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_FLASH_MS);
     });
   };
-  const paneId = pane.id;
 
   return (
     <div
@@ -183,10 +174,6 @@ export function TerminalStatusBar({
       ) : (
         <span className="font-mono">—</span>
       )}
-      <TerminalGitStatus
-        cwd={pane.cwd}
-        onClick={onOpenWorktree ? () => onOpenWorktree(paneId) : undefined}
-      />
       <span className="ml-auto flex shrink-0 items-center gap-3 font-mono tabular-nums text-chrome-text-subtle">
         <TerminalCommandStatus sessionId={pane.sessionId} />
         <span title={shellTitle}>{shell}</span>

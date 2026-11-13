@@ -2114,6 +2114,7 @@ function ChatTabInner({
         onRenamePane={renamePane}
         onSplitPane={(id, dir) => void splitPane(id, dir)}
         onPaneCwdClick={(paneId) => void changePaneCwd(paneId)}
+        onPaneBranchClick={openWorktreeDialog}
         onResizeSplit={(splitId, ratio) =>
           setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
         }
@@ -2393,10 +2394,7 @@ function ChatTabInner({
             </div>
           )}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
-          <TerminalStatusBar
-            pane={displayLayout ? focusedPane : null}
-            onOpenWorktree={openWorktreeDialog}
-          />
+          <TerminalStatusBar pane={displayLayout ? focusedPane : null} />
         </div>
       </div>
     </TooltipProvider>
@@ -2499,7 +2497,7 @@ function WarpTopBar({
             }
             className={`inline-flex items-center gap-1.5 text-[11px] tabular-nums ${
               canAddPane ? "text-chrome-text-subtle" : "text-chrome-accent-text"
-            }`}
+            } ${embedded ? "max-lg:hidden" : ""}`}
           >
             <span
               aria-hidden
@@ -2522,7 +2520,8 @@ function WarpTopBar({
             title={canAddPane ? t("chat.pickFolderPane") : undefined}
           >
             <FolderOpen />
-            {t("chat.folderBtn")}
+            {/* Narrow title bar: icon only, so "+ Pane" never slides under the caption buttons. */}
+            <span className={embedded ? "max-lg:hidden" : undefined}>{t("chat.folderBtn")}</span>
           </Button>
         </span>
         <DropdownMenu>
