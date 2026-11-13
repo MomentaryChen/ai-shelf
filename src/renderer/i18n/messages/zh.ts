@@ -723,6 +723,10 @@ export const zh: Record<MessageKey, string> = {
   "terminal.ctx.restart": "重啟 session",
   "terminal.ctx.exportOutput": "匯出輸出…",
   "terminal.ctx.copyOutputForIssue": "複製輸出（貼 issue）",
+  "terminal.ctx.newConversation": "開始新對話",
+  "settings.resumeAgentSessions": "接續 AI agent 對話",
+  "settings.resumeAgentSessionsHint":
+    "重新啟動後，Claude Code 窗格會接回上次的對話（對話紀錄還在時）。WSL 窗格不支援。執行 /clear 後會接回清除前的對話；要重來請用窗格選單的「開始新對話」。",
   "chat.emptyPanes.title": "「{profile}」還沒有開啟的終端機",
   "chat.emptyPanes.desc": "開啟後會自動記住配置，下次切回來直接還原（最多 {max} 個窗格）。",
   "chat.emptyPanes.openShell": "開啟終端機",

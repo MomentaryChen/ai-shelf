@@ -748,6 +748,10 @@ export const en = {
   "terminal.ctx.restart": "Restart session",
   "terminal.ctx.exportOutput": "Export output…",
   "terminal.ctx.copyOutputForIssue": "Copy output for issue",
+  "terminal.ctx.newConversation": "Start new conversation",
+  "settings.resumeAgentSessions": "Resume agent conversations",
+  "settings.resumeAgentSessionsHint":
+    "Claude Code panes reopen their previous conversation after a restart (if its transcript still exists). Not available in WSL panes. After /clear, the conversation before the clear is resumed; use “Start new conversation” in the pane menu to reset.",
   "chat.emptyPanes.title": "No terminals open in “{profile}”",
   "chat.emptyPanes.desc":
     "The layout is saved automatically and restored when you come back (up to {max} panes).",

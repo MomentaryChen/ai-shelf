@@ -13,6 +13,8 @@ export const SavedPaneSlotSchema = z.object({
   tool: z.string().min(1),
   cwd: z.string(),
   title: z.string().max(64).optional(),
+  /** AI agent conversation id (desktop resumes it on restore); validated at launch. */
+  agentSessionId: z.string().max(128).optional(),
 });
 
 export type SerializedLayoutNode =
