@@ -769,7 +769,6 @@ export const en = {
   "pane.popout.newTerminal": "New terminal",
   "pane.popout.newFailed": "Could not open a new terminal.",
   "pane.popout.sidebarLabel": "Terminals in this window",
-  "pane.popout.dismiss": "Dismiss",
   "pane.maximize": "Maximize pane",
   "pane.restoreLayout": "Restore split layout",
   "pane.maximizedBadge": "Maximized",

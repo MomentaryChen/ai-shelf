@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Plus, Undo2, X } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmbeddedTerminal } from "./components/EmbeddedTerminal";
 import { BusyPaneCloseDialog } from "./components/BusyPaneCloseDialog";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SplitPaneLayout } from "./components/SplitPaneLayout";
 import { TerminalStatusBar } from "./components/TerminalStatusBar";
+import { ToolLogo } from "./components/ToolLogo";
 import { applyAppTheme, useAppThemeRevision } from "./app-theme";
 import {
   getAppBg,
@@ -21,6 +22,17 @@ import { collectPanes, findPane, updateSplitRatio, type LayoutNode } from "./ter
 import type { PaneViewDecl } from "./types";
 
 const NOTICE_MS = 4000;
+/** "New terminal" stays disabled until the pane shows up, a notice arrives, or this long. */
+const NEW_PANE_WAIT_MS = 30_000;
+const SIDEBAR_COLLAPSED_KEY = "aishelf.view.sidebarCollapsed";
+
+function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 /** Divider drags send the ratio on a trailing timer, not on every mouse move. */
 const RESIZE_SEND_MS = 150;
 
@@ -42,6 +54,11 @@ export function PopoutWindowApp() {
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [windowFocused, setWindowFocused] = useState(() => document.hasFocus());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
+  const [adding, setAdding] = useState(false);
+  /** Pane ids present when "new terminal" was pressed: the id that appears next gets focus. */
+  const pendingNewRef = useRef<Set<string> | null>(null);
+  const addingTimerRef = useRef(0);
   useAppThemeRevision();
 
   useEffect(() => {
@@ -71,6 +88,17 @@ export function PopoutWindowApp() {
     // Mid divider drag an older echo would snap the divider back.
     if (!pendingResizeRef.current) setLayout(next?.layout ?? null);
     if (next) {
+      // The terminal just created here takes focus (otherwise the current one keeps it).
+      const before = pendingNewRef.current;
+      const created = before ? collectPanes(next.layout).find((p) => !before.has(p.id)) : null;
+      if (created) {
+        pendingNewRef.current = null;
+        window.clearTimeout(addingTimerRef.current);
+        setAdding(false);
+        setFocusedPaneId(created.id);
+        window.api.paneViewAction({ type: "focus", paneId: created.id });
+        return;
+      }
       setFocusedPaneId((prev) =>
         prev && findPane(next.layout, prev) ? prev : (next.focusedPaneId ?? null),
       );
@@ -103,14 +131,23 @@ export function PopoutWindowApp() {
   useEffect(() => window.api.onPaneViewConfirmClose(() => setConfirmCloseView(true)), []);
   useEffect(() => window.api.onPaneViewFocusPane((paneId) => setFocusedPaneId(paneId)), []);
 
-  // A pane of another profile was dropped here: refuse and say why.
+  // A pane of another profile was dropped here (refused), or the origin has something
+  // to say, e.g. why a new terminal could not be opened.
   useEffect(
     () =>
-      window.api.onPaneViewNotice(() => {
-        setNotice(t("pane.view.rejectOtherProfile", { profile: view?.profileName || "?" }));
+      window.api.onPaneViewNotice((incoming) => {
+        pendingNewRef.current = null;
+        window.clearTimeout(addingTimerRef.current);
+        setAdding(false);
+        setNotice(
+          incoming.kind === "message"
+            ? incoming.text
+            : t("pane.view.rejectOtherProfile", { profile: view?.profileName || "?" }),
+        );
       }),
     [t, view?.profileName],
   );
+  useEffect(() => () => window.clearTimeout(addingTimerRef.current), []);
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), NOTICE_MS);
@@ -167,6 +204,32 @@ export function PopoutWindowApp() {
     [view],
   );
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* storage unavailable: the choice just does not persist */
+      }
+      return next;
+    });
+  };
+
+  /** The origin window spawns it (same profile, next to `anchorPaneId`) and updates this view. */
+  const newTerminal = (anchorPaneId: string, paneIds: string[]) => {
+    if (adding) return;
+    pendingNewRef.current = new Set(paneIds);
+    setAdding(true);
+    window.clearTimeout(addingTimerRef.current);
+    addingTimerRef.current = window.setTimeout(() => {
+      pendingNewRef.current = null;
+      setAdding(false);
+      setNotice(t("pane.popout.newFailed"));
+    }, NEW_PANE_WAIT_MS);
+    window.api.paneViewAction({ type: "new-pane", anchorPaneId });
+  };
+
   const reportCwd = useCallback((sessionId: string, cwd: string) => {
     const trimmed = cwd.trim();
     if (trimmed) window.api.paneViewAction({ type: "cwd", sessionId, cwd: trimmed });
@@ -215,7 +278,21 @@ export function PopoutWindowApp() {
         className="flex h-screen flex-col overflow-hidden bg-chrome-bg text-chrome-text"
         data-surface="chrome"
       >
-        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-chrome-border px-3">
+        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-chrome-border px-2">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-chrome-text-muted transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
+            title={t(sidebarCollapsed ? "sidebar.expand" : "sidebar.collapse")}
+            aria-label={t(sidebarCollapsed ? "sidebar.expand" : "sidebar.collapse")}
+            aria-expanded={!sidebarCollapsed}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="h-3.5 w-3.5" aria-hidden />
+            ) : (
+              <PanelLeftClose className="h-3.5 w-3.5" aria-hidden />
+            )}
+          </button>
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full bg-chrome-ui-accent"
             style={view.accentColor ? profileAccentMarkerStyle(view.accentColor, "sm") : undefined}
@@ -233,7 +310,7 @@ export function PopoutWindowApp() {
             onClick={() => window.api.paneViewAction({ type: "dock-all" })}
             className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] text-chrome-text-muted transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
           >
-            <PanelLeftOpen className="h-3.5 w-3.5" aria-hidden />
+            <Undo2 className="h-3.5 w-3.5" aria-hidden />
             {t("pane.view.dockAll")}
           </button>
         </div>
@@ -245,7 +322,80 @@ export function PopoutWindowApp() {
             {notice}
           </div>
         )}
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-1.5">
+        <div className="flex min-h-0 flex-1">
+          <nav
+            aria-label={t("pane.popout.sidebarLabel")}
+            className={`flex shrink-0 flex-col border-r border-chrome-border-subtle bg-chrome-surface ${
+              sidebarCollapsed ? "w-10" : "w-44"
+            }`}
+          >
+            <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1">
+              {panes.map((pane) => {
+                const label = view.labels[pane.id] ?? pane.title ?? pane.tool;
+                const isFocused = pane.id === focusedPane?.id;
+                return (
+                  <li key={pane.id} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => focusPane(pane.id)}
+                      title={sidebarCollapsed ? label : pane.cwd || label}
+                      aria-current={isFocused ? "true" : undefined}
+                      className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-md text-left text-[12px] transition-colors ${
+                        sidebarCollapsed ? "justify-center px-0" : "px-2 pr-7"
+                      } ${
+                        isFocused
+                          ? "bg-chrome-hover text-chrome-text"
+                          : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
+                      }`}
+                    >
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                        <ToolLogo tool={pane.tool} size={14} />
+                      </span>
+                      {!sidebarCollapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
+                    </button>
+                    {!sidebarCollapsed && (
+                      <button
+                        type="button"
+                        onClick={() => closePane(pane.id)}
+                        title={t("pane.close")}
+                        aria-label={`${t("pane.close")}: ${label}`}
+                        className="absolute right-1 top-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-chrome-text-muted opacity-0 transition-opacity hover:bg-chrome-hover-strong hover:text-chrome-text focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <X className="h-3 w-3" aria-hidden />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="shrink-0 border-t border-chrome-border-subtle p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (focusedPane) {
+                    newTerminal(
+                      focusedPane.id,
+                      panes.map((p) => p.id),
+                    );
+                  }
+                }}
+                disabled={adding || !focusedPane}
+                title={t("pane.popout.newTerminal")}
+                aria-label={t("pane.popout.newTerminal")}
+                className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-md text-[12px] text-chrome-text-muted transition-colors hover:bg-chrome-hover hover:text-chrome-text disabled:cursor-default disabled:opacity-50 ${
+                  sidebarCollapsed ? "justify-center px-0" : "px-2"
+                }`}
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                </span>
+                {!sidebarCollapsed && (
+                  <span className="min-w-0 truncate">{t("pane.popout.newTerminal")}</span>
+                )}
+              </button>
+            </div>
+          </nav>
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-1.5">
           <SplitPaneLayout
             node={layout}
             focusedPaneId={focusedPane?.id ?? null}
@@ -257,6 +407,10 @@ export function PopoutWindowApp() {
             onResizeSplit={resizeSplit}
             onMovePane={(dragPaneId, targetPaneId, zone) =>
               window.api.paneViewAction({ type: "move-in-view", dragPaneId, targetPaneId, zone })
+            }
+            // A terminal dragged from the origin window's sidebar onto a pane here.
+            onProfilePaneDrop={(paneId, targetPaneId, zone) =>
+              window.api.paneViewAction({ type: "adopt-pane", paneId, targetPaneId, zone })
             }
             onPopOutPane={(paneId, trigger, size) =>
               void window.api.paneViewDragEnd({
@@ -296,6 +450,7 @@ export function PopoutWindowApp() {
               />
             )}
           />
+          </div>
         </div>
         <TerminalStatusBar pane={focusedPane} />
       </div>

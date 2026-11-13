@@ -6,6 +6,7 @@ import {
   deserializeViews,
   findViewOfPane,
   hiddenPaneIds,
+  placePaneInView,
   removePaneFromViews,
   resolveViews,
   serializeViews,
@@ -156,3 +157,30 @@ function collectIndices(node: unknown): number[] {
   if (n.kind === "pane") return [n.index!];
   return [...collectIndices(n.first), ...collectIndices(n.second)];
 }
+
+describe("placePaneInView", () => {
+  it("adds a pane on the dropped side of the target and focuses it", () => {
+    const v = view("v1", "ws:p", [a, b]);
+    assert.deepEqual(ids(placePaneInView(v, c, "a", "left").layout), ["c", "a", "b"]);
+    assert.deepEqual(ids(placePaneInView(v, c, "a", "right").layout), ["a", "c", "b"]);
+    assert.equal(placePaneInView(v, c, "a", "below").focusedPaneId, "c");
+  });
+
+  it("treats the centre zone on a new pane as beside the target", () => {
+    const v = view("v1", "ws:p", [a, b]);
+    assert.deepEqual(ids(placePaneInView(v, c, "b", "swap").layout), ["a", "b", "c"]);
+  });
+
+  it("moves a pane that is already in the view", () => {
+    const v = view("v1", "ws:p", [a, b, c]);
+    const moved = placePaneInView(v, c, "a", "left");
+    assert.deepEqual(ids(moved.layout), ["c", "a", "b"]);
+    assert.equal(moved.focusedPaneId, "c");
+  });
+
+  it("falls back to adding beside the focused pane when the target is gone", () => {
+    const v = view("v1", "ws:p", [a]);
+    assert.deepEqual(ids(placePaneInView(v, b, "zzz", "left").layout), ["a", "b"]);
+    assert.equal(placePaneInView(v, a, "a", "left"), v);
+  });
+});

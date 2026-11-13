@@ -35,7 +35,7 @@ import {
   parseProfileCacheKey,
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
-import { removePaneFromCachedLayout } from "../terminal/popout-panes";
+import { removePaneFromCachedLayout, splitNextToPane } from "../terminal/popout-panes";
 
 export interface SpawnPaneOptions {
   /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
@@ -857,6 +857,34 @@ export function useProfileWorkspace(
     [cacheKey, persistProfile],
   );
 
+  /**
+   * Add a pane next to `anchorPaneId` in a stashed (non-active) profile's live
+   * layout: a terminal created in a view window of that profile. Saves the
+   * profile. False when no stashed profile holds the anchor or it is full.
+   */
+  const insertPaneInStashedProfile = useCallback(
+    (
+      anchorPaneId: string,
+      pane: PaneInfo,
+      resolveProfile: (workspaceId: string, profileId: string) => ProfileInfo | null,
+    ): boolean => {
+      const active = activeProfileRef.current;
+      const activeKey = active ? cacheKey(active.workspaceId, active.id) : null;
+      for (const [key, entry] of profileLiveCacheRef.current.entries()) {
+        if (key === activeKey || !findPane(entry.layout, anchorPaneId)) continue;
+        const layoutNext = splitNextToPane(entry.layout, anchorPaneId, pane, MAX_GROUP_PANES);
+        if (!layoutNext) return false;
+        profileLiveCacheRef.current.set(key, { ...entry, layout: layoutNext });
+        const { workspaceId, profileId } = parseProfileCacheKey(key);
+        const profile = resolveProfile(workspaceId, profileId);
+        if (profile) void persistProfile(profile, layoutNext);
+        return true;
+      }
+      return false;
+    },
+    [cacheKey, persistProfile],
+  );
+
   // Memoized so it only rebuilds when layout / minimized / focus actually change
   // references — a fresh tree every render would remount-reconcile every pane.
   const displayLayout = useMemo(
@@ -908,5 +936,6 @@ export function useProfileWorkspace(
     forgetMinimizedPane,
     closePaneInStashedProfile,
     getProfileLayoutByKey,
+    insertPaneInStashedProfile,
   };
 }

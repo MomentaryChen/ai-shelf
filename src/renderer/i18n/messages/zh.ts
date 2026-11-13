@@ -743,7 +743,6 @@ export const zh: Record<MessageKey, string> = {
   "pane.popout.newTerminal": "新增終端機",
   "pane.popout.newFailed": "無法開啟新的終端機。",
   "pane.popout.sidebarLabel": "此視窗中的終端機",
-  "pane.popout.dismiss": "關閉訊息",
   "pane.maximize": "最大化窗格",
   "pane.restoreLayout": "還原分割版面",
   "pane.maximizedBadge": "最大化",

@@ -48,6 +48,8 @@ export type PaneViewIntent =
   | {
       type: "move";
       paneId: string;
+      /** Profile the pane belongs to (a sidebar drag can be a pane of a non-active profile). */
+      profileKey: string;
       /** View the pane came from; null = the origin's own display. */
       fromViewId: string | null;
       target:
@@ -421,6 +423,7 @@ function handleDragEnd(sender: WebContents, req: DragEndRequest): DragEndResult 
     const ok = sendIntent(originId, {
       type: "move",
       paneId: req.paneId,
+      profileKey,
       fromViewId,
       target: { kind: "new-view", bounds },
     });
@@ -453,6 +456,7 @@ function handleDragEnd(sender: WebContents, req: DragEndRequest): DragEndResult 
       const ok = sendIntent(originId, {
         type: "move",
         paneId: req.paneId,
+        profileKey,
         fromViewId,
         target: { kind: "new-view", bounds },
       });
@@ -462,6 +466,7 @@ function handleDragEnd(sender: WebContents, req: DragEndRequest): DragEndResult 
       const ok = sendIntent(originId, {
         type: "move",
         paneId: req.paneId,
+        profileKey,
         fromViewId,
         target: { kind: "into-view", viewId: target.viewId },
       });
@@ -474,6 +479,7 @@ function handleDragEnd(sender: WebContents, req: DragEndRequest): DragEndResult 
       const ok = sendIntent(originId, {
         type: "move",
         paneId: req.paneId,
+        profileKey,
         fromViewId,
         target: { kind: "dock" },
       });
@@ -563,6 +569,15 @@ export function initPaneViews(d: PaneViewDeps): void {
       viewId: entry.decl.viewId,
       action: { ...action, type },
     });
+  });
+
+  // Origin → one of its views: a localized message to show there (e.g. "new terminal" failed).
+  ipcMain.on("pane-view-notify", (event, viewId: unknown, text: unknown) => {
+    const id = str(viewId);
+    const message = str(text);
+    const entry = id ? registry.byView(id) : null;
+    if (!entry || !message || entry.originId !== event.sender.id) return;
+    sendToView(entry, "pane-view-notice", { kind: "message", text: message.slice(0, 500) });
   });
 
   ipcMain.handle("pane-view-store-get", (_event, key: unknown) => {

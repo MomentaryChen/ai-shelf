@@ -226,6 +226,7 @@ contextBridge.exposeInMainWorld("api", {
   paneViewFocus: (paneId) => ipcRenderer.invoke("pane-view-focus", paneId),
   paneViewGetState: () => ipcRenderer.invoke("pane-view-get-state"),
   paneViewAction: (action) => ipcRenderer.send("pane-view-action", action),
+  paneViewNotify: (viewId, text) => ipcRenderer.send("pane-view-notify", viewId, text),
   paneViewStoreGet: (key) => ipcRenderer.invoke("pane-view-store-get", key),
   paneViewStoreSave: (key, views) => ipcRenderer.invoke("pane-view-store-save", key, views),
   onPaneViewIntent: (cb) => {
