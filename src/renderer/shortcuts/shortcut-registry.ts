@@ -48,6 +48,9 @@ export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
   jumpPrevPrompt: "terminal.marks.jumpPrev",
   jumpNextPrompt: "terminal.marks.jumpNext",
   copyLastCommandOutput: "terminal.marks.copyLastOutput",
+  fontZoomIn: "shortcuts.terminal.fontZoomIn",
+  fontZoomOut: "shortcuts.terminal.fontZoomOut",
+  fontZoomReset: "shortcuts.terminal.fontZoomReset",
 };
 
 export const SHORTCUT_SECTION_TITLE_KEYS: Record<ShortcutSectionId, MessageKey> = {

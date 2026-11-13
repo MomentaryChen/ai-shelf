@@ -1549,6 +1549,9 @@ export const en = {
   "shortcuts.terminal.paste": "Paste",
   "shortcuts.terminal.pasteAlt": "Paste (alternate)",
   "shortcuts.terminal.selectAll": "Select all scrollback",
+  "shortcuts.terminal.fontZoomIn": "Increase terminal font size",
+  "shortcuts.terminal.fontZoomOut": "Decrease terminal font size",
+  "shortcuts.terminal.fontZoomReset": "Reset terminal font size",
 
   // Tools mode — Codec
   "tools.tab.codec": "Codec",

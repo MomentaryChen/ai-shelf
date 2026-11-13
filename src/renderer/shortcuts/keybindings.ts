@@ -57,6 +57,9 @@ export const SHORTCUT_IDS = [
   "jumpPrevPrompt",
   "jumpNextPrompt",
   "copyLastCommandOutput",
+  "fontZoomIn",
+  "fontZoomOut",
+  "fontZoomReset",
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_IDS)[number];
@@ -100,6 +103,9 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "jumpPrevPrompt", section: "terminal" },
   { id: "jumpNextPrompt", section: "terminal" },
   { id: "copyLastCommandOutput", section: "terminal" },
+  { id: "fontZoomIn", section: "terminal" },
+  { id: "fontZoomOut", section: "terminal" },
+  { id: "fontZoomReset", section: "terminal" },
 ];
 
 const DEF_BY_ID = new Map(SHORTCUT_DEFS.map((d) => [d.id, d]));
@@ -154,6 +160,10 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
     jumpPrevPrompt: { key: "arrowup", mod: true, shift: true },
     jumpNextPrompt: { key: "arrowdown", mod: true, shift: true },
     copyLastCommandOutput: { key: "o", mod: true, shift: true },
+    // Terminal font zoom (global). Digit-family shortcuts use 1–9 only, so 0 is free.
+    fontZoomIn: { key: "=", mod: true },
+    fontZoomOut: { key: "-", mod: true },
+    fontZoomReset: { key: "0", mod: true },
   };
 }
 

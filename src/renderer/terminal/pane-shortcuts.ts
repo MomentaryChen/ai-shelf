@@ -1,7 +1,9 @@
 import type { PaneInfo } from "./split-tree";
 import { shouldIgnoreShortcutForIme } from "./ime-keys";
+import type { FontZoomDirection } from "./font-zoom";
 import { getActiveKeybindings } from "../shortcuts/active-keybindings";
 import {
+  combosEqual,
   matchShortcut,
   type KeybindingMap,
   type KeyEventLike,
@@ -15,7 +17,8 @@ export type PaneShortcutAction =
   | { type: "close" }
   | { type: "clear-screen" }
   | { type: "restart-session" }
-  | { type: "split"; direction: "horizontal" | "vertical" };
+  | { type: "split"; direction: "horizontal" | "vertical" }
+  | { type: "font-zoom"; direction: FontZoomDirection };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -45,6 +48,7 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     onSplitPane,
     onClearPane,
     onRestartPane,
+    onFontZoom,
   } = h;
 
   // Ctrl+Tab MRU must work with zero local panes (e.g. empty workspace after a
@@ -86,6 +90,9 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     case "split":
       onSplitPane(focusId, action.direction);
       break;
+    case "font-zoom":
+      onFontZoom?.(action.direction);
+      break;
   }
 }
 
@@ -100,6 +107,8 @@ export interface PaneShortcutHandlers {
   onClearPane?: (paneId: string) => void;
   onRestartPane?: (paneId: string) => void;
   onSplitPane: (paneId: string, direction: "horizontal" | "vertical") => void;
+  /** Ctrl/Cmd + = / - / 0 — global terminal font size. */
+  onFontZoom?: (direction: FontZoomDirection) => void;
 }
 
 let getHandlers: (() => PaneShortcutHandlers | null) | null = null;
@@ -119,6 +128,9 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "closePane",
   "clearScreen",
   "restartSession",
+  "fontZoomIn",
+  "fontZoomOut",
+  "fontZoomReset",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -158,6 +170,16 @@ function isCtrlShiftW(ev: KeyEventLike): boolean {
 }
 
 /**
+ * With the default Ctrl/Cmd+= zoom-in, also accept Ctrl/Cmd++ (Shift+= on US
+ * layouts, or the numpad +) — what most people press to "zoom in".
+ */
+function isDefaultZoomInPlus(ev: KeyEventLike, map: KeybindingMap): boolean {
+  const zoomIn = map.fontZoomIn;
+  if (!zoomIn || !combosEqual(zoomIn, { key: "=", mod: true })) return false;
+  return ev.type !== "keyup" && (ev.ctrlKey || ev.metaKey) && !ev.altKey && ev.key === "+";
+}
+
+/**
  * Map a key event to a pane action using the given keybindings (pure; unit tested).
  *
  * While close is still the default Ctrl/Cmd+W:
@@ -178,6 +200,8 @@ export function matchPaneShortcutWithBindings(
     return null;
   }
 
+  if (isDefaultZoomInPlus(ev, map)) return { type: "font-zoom", direction: "in" };
+
   const m = matchShortcut(ev, map, PANE_SHORTCUT_IDS);
   if (!m) return null;
   switch (m.id) {
@@ -197,6 +221,12 @@ export function matchPaneShortcutWithBindings(
       return { type: "clear-screen" };
     case "restartSession":
       return { type: "restart-session" };
+    case "fontZoomIn":
+      return { type: "font-zoom", direction: "in" };
+    case "fontZoomOut":
+      return { type: "font-zoom", direction: "out" };
+    case "fontZoomReset":
+      return { type: "font-zoom", direction: "reset" };
     default:
       return null;
   }
@@ -231,13 +261,14 @@ export function tryConsumePaneShortcut(ev: KeyboardEvent): boolean {
 /** Whether a matched action should run (and consume the key) for the current handlers. */
 export function shouldConsumePaneShortcut(
   action: PaneShortcutAction,
-  h: Pick<PaneShortcutHandlers, "panes" | "onFocusRecentTerminal">,
+  h: Pick<PaneShortcutHandlers, "panes" | "onFocusRecentTerminal" | "onFontZoom">,
 ): boolean {
   // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
   // split keys — those may belong to profile quick-switch or should no-op cleanly.
   if (h.panes.length === 0) {
     return action.type === "focus-next" && Boolean(h.onFocusRecentTerminal);
   }
+  if (action.type === "font-zoom") return Boolean(h.onFontZoom);
   return true;
 }
 

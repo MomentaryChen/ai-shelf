@@ -453,9 +453,12 @@ function setupAppMenu() {
       },
     },
     { type: "separator" },
-    { role: "resetZoom" },
-    { role: "zoomIn" },
-    { role: "zoomOut" },
+    // Ctrl/Cmd + 0 / = / - zoom the terminal font in the renderer (see
+    // font-zoom.ts). Keep page zoom in the menu but do not register its keys,
+    // or the accelerator could fire alongside the terminal shortcut.
+    { role: "resetZoom", registerAccelerator: false },
+    { role: "zoomIn", registerAccelerator: false },
+    { role: "zoomOut", registerAccelerator: false },
     { type: "separator" },
     { role: "togglefullscreen" },
   ];

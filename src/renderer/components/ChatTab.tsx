@@ -101,6 +101,7 @@ import {
   profileTopBarLabelStyle,
 } from "../utils/profile-colors";
 import {
+  DEFAULT_TERMINAL_FONT_SIZE,
   getAppBg,
   isAppThemeTerminalBg,
   bumpDirHistory,
@@ -122,6 +123,7 @@ import {
 } from "../utils/available-tools";
 import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
+import { zoomFontSize } from "../terminal/font-zoom";
 import type { Command } from "./CommandPalette";
 import { useTerminalCommands } from "../hooks/useTerminalCommands";
 import {
@@ -1448,6 +1450,10 @@ function ChatTabInner({
     onClearPane: clearPaneScreen,
     onRestartPane: (id) => void respawnPane(id),
     onSplitPane: (id, dir) => void splitPane(id, dir),
+    onFontZoom: (direction) => {
+      const next = zoomFontSize(settings.terminalFontSize, direction, DEFAULT_TERMINAL_FONT_SIZE);
+      if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
+    },
   });
 
   // --- Pane pop-out windows -------------------------------------------------

@@ -1490,6 +1490,9 @@ export const zh: Record<MessageKey, string> = {
   "shortcuts.terminal.paste": "貼上",
   "shortcuts.terminal.pasteAlt": "貼上（替代鍵）",
   "shortcuts.terminal.selectAll": "全選捲動緩衝",
+  "shortcuts.terminal.fontZoomIn": "放大終端機字型",
+  "shortcuts.terminal.fontZoomOut": "縮小終端機字型",
+  "shortcuts.terminal.fontZoomReset": "重設終端機字型大小",
 
   // Tools 模式 — 編解碼
   "tools.tab.codec": "編解碼",
