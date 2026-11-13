@@ -47,6 +47,16 @@ import {
 import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
 import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
+import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
+import { CommandHistoryPanel, type SaveCommandResult } from "./CommandHistoryPanel";
+import { savedCommandNameFor } from "../terminal/command-history";
+import {
+  copySplitRatios,
+  equalizeAllSplits,
+  findPaneInDirection,
+  resizePaneInDirection,
+  swapPaneLeaves,
+} from "../terminal/split-tree";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useSlideDirection } from "../hooks/useSlideDirection";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
@@ -210,6 +220,7 @@ function ChatTabInner({
   const [poppedOutPaneIds, setPoppedOutPaneIds] = useState<ReadonlySet<string>>(() => new Set());
   const poppedOutPaneIdsRef = useRef(poppedOutPaneIds);
   poppedOutPaneIdsRef.current = poppedOutPaneIds;
+  const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
   /** Pane the "new pane in a git worktree" dialog splits from. */
   const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
@@ -464,6 +475,15 @@ function ChatTabInner({
       windowFocused,
       backgroundAgentOptions,
     );
+
+  const handleTerminalNotify = useTerminalNotifications({
+    panes,
+    focusedPaneId,
+    windowFocused,
+    viewActive: active,
+    settings,
+    t,
+  });
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -1301,6 +1321,10 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         openWorktreeDialog();
       },
+      openCommandHistory: () => {
+        onRequestTerminalMode?.();
+        setCommandHistoryOpen(true);
+      },
     }),
     [
       addPane,
@@ -1484,6 +1508,26 @@ function ChatTabInner({
       const next = zoomFontSize(settings.terminalFontSize, direction, DEFAULT_TERMINAL_FONT_SIZE);
       if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
     },
+    onOpenCommandHistory: () => setCommandHistoryOpen(true),
+    // Neighbours and dividers come from the visible tree (minimized / popped-out panes excluded);
+    // the change lands in `layout`, which persists like a mouse drag.
+    onSwapPane: (paneId, direction) => {
+      if (!shownLayout) return;
+      const other = findPaneInDirection(shownLayout, paneId, direction);
+      if (!other) return;
+      setLayout((prev) => (prev ? swapPaneLeaves(prev, paneId, other) : prev));
+    },
+    onResizePane: (paneId, direction) => {
+      if (!shownLayout) return;
+      const next = resizePaneInDirection(shownLayout, paneId, direction);
+      if (next === shownLayout) return;
+      setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+    },
+    onEqualizePanes: () => {
+      if (!shownLayout) return;
+      const next = equalizeAllSplits(shownLayout);
+      setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+    },
   });
 
   // --- Pane pop-out windows -------------------------------------------------
@@ -1582,6 +1626,24 @@ function ChatTabInner({
       if (!poppedOutPaneIds.has(paneId)) reported.delete(paneId);
     }
   }, [poppedOutPaneIds, paneAgentStates]);
+  /** History panel "save": append to the active profile's saved commands. */
+  const saveCommandToProfile = async (command: string): Promise<SaveCommandResult> => {
+    const profile = activeProfile;
+    if (!profile) return "error";
+    const existing = profile.savedCommands ?? [];
+    const text = command.trim();
+    if (existing.some((s) => s.command.trim() === text)) return "exists";
+    const snippet = {
+      id: `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: savedCommandNameFor(text),
+      command: text,
+    };
+    const r = await window.api.profileUpdate(profile.id, { savedCommands: [...existing, snippet] });
+    if (!r.success) return "error";
+    if (r.profile) syncActiveProfile(r.profile);
+    await refreshSidebarForest();
+    return "saved";
+  };
 
   const sidebarColumnStyle: CSSProperties = {
     width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidth,
@@ -1895,6 +1957,19 @@ function ChatTabInner({
         onClose={() => setWorktreePaneId(null)}
         onCreated={openWorktreePane}
       />
+      <CommandHistoryPanel
+        open={commandHistoryOpen}
+        onClose={() => setCommandHistoryOpen(false)}
+        panes={panes}
+        focusedPaneId={focusedPaneId}
+        broadcastCount={broadcastActive ? panes.length : 1}
+        onFocusPane={(paneId) => {
+          if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+          else setFocusedPaneId(paneId);
+        }}
+        onRerun={(sessionId, command) => handlePtyWrite(`${command}\r`, sessionId)}
+        onSave={activeProfile ? saveCommandToProfile : undefined}
+      />
       <BusyPaneCloseDialog
         open={busyClosePaneId !== null}
         onCancel={() => setBusyClosePaneId(null)}
@@ -2032,12 +2107,14 @@ function ChatTabInner({
             copyOnSelect={settings.terminalCopyOnSelect}
             pasteConfirm={pasteConfirm}
             getPasteTargets={getPasteTargets}
+            osc52Mode={settings.terminalOsc52}
             // Hidden behind a maximized pane: becoming active again refits xterm.
             active={active && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)}
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onCwdReport={reportPaneCwd}
             cwd={pane.cwd}
+            onTerminalNotify={handleTerminalNotify}
             onSessionLost={() => {
               if (respawningPaneIdsRef.current.has(pane.id)) return;
               void respawnPane(pane.id);

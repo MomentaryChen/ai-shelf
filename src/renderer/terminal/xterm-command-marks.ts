@@ -6,6 +6,7 @@ import {
   type LastCommandStatus,
   type LineRange,
 } from "./command-marks";
+import type { CommandHistoryItem } from "./command-history";
 
 export interface TerminalCommandMarks {
   /** Any OSC 133 mark received in this terminal (shell integration active). */
@@ -20,6 +21,14 @@ export interface TerminalCommandMarks {
   lastOutputText: () => string | null;
   /** Marks parsed while not live (replayed backlog) carry no timestamps. */
   setLive: (live: boolean) => void;
+  /** False while the replayed backlog is parsed (side effects must not re-fire). */
+  isLive: () => boolean;
+  /** Finished commands with a readable command line, newest first (history panel). */
+  listCommands: () => CommandHistoryItem[];
+  /** Scroll to a command's prompt. False when it left the scrollback. */
+  jumpToCommand: (id: number) => boolean;
+  /** Output text of a command, or null when unavailable. */
+  commandOutputText: (id: number) => string | null;
   dispose: () => void;
 }
 
@@ -30,7 +39,23 @@ export interface TerminalCommandMarksOptions {
    */
   onStatus?: (status: LastCommandStatus | null, live: boolean) => void;
   now?: () => number;
+  /** Current working directory (latest OSC 7), stamped on each command when it starts. */
+  getCwd?: () => string | undefined;
+  /** A command finished while live (not from the replayed backlog). */
+  onCommandFinished?: (info: FinishedCommandInfo) => void;
 }
+
+export interface FinishedCommandInfo {
+  id: number;
+  /** Command line as typed (empty when it could not be read). */
+  command: string;
+  exitCode: number | null;
+  durationMs: number | null;
+  cwd?: string;
+}
+
+/** Longest command line kept per entry. */
+const MAX_COMMAND_CHARS = 2000;
 
 const lineOf = (m: IMarker) => (m.isDisposed ? -1 : m.line);
 
@@ -47,10 +72,11 @@ function readRange(term: Terminal, range: LineRange): string {
     const line = buf.getLine(y);
     if (!line) continue;
     const endCol = y === range.endLine ? range.endCol : undefined;
+    const startCol = y === range.startLine ? (range.startCol ?? 0) : 0;
     const next = y < last ? buf.getLine(y + 1) : undefined;
     const joined = Boolean(next?.isWrapped);
     // Keep trailing cells of wrapped rows — they are part of the logical line.
-    out += line.translateToString(!joined, 0, endCol);
+    out += line.translateToString(!joined, startCol, endCol);
     if (y < last && !joined) out += "\n";
   }
   return out.replace(/\s+$/, "");
@@ -75,8 +101,29 @@ export function bindTerminalCommandMarks(
       // Full-screen apps own the alternate buffer; markers there are meaningless.
       const marker = isNormalBuffer(term) ? term.registerMarker(0) : undefined;
       const point = marker ? { marker, col: term.buffer.active.cursorX } : null;
-      if (tracker.apply(mark, point, live ? now() : null) && live) {
+      const changed = tracker.apply(mark, point, live ? now() : null);
+      const entry = tracker.latest();
+      if (mark.kind === "C" && entry) {
+        // The typed line sits between B and C; read it now, before output can scroll it away.
+        const range = tracker.inputRange(entry, lineOf);
+        const text = range ? readRange(term, range).trim() : "";
+        if (text) entry.command = text.slice(0, MAX_COMMAND_CHARS);
+        entry.cwd = options.getCwd?.();
+      }
+      if (changed && live) {
         options.onStatus?.(tracker.lastStatus(), true);
+        if (entry?.ran) {
+          options.onCommandFinished?.({
+            id: entry.id,
+            command: entry.command ?? "",
+            exitCode: entry.exitCode,
+            durationMs:
+              entry.startedAt !== null && entry.endedAt !== null
+                ? Math.max(0, entry.endedAt - entry.startedAt)
+                : null,
+            cwd: entry.cwd,
+          });
+        }
       }
     } catch (err) {
       console.warn("[osc133]", err);
@@ -114,6 +161,39 @@ export function bindTerminalCommandMarks(
       const wasReplaying = !live;
       live = next;
       if (next && wasReplaying) options.onStatus?.(tracker.lastStatus(), false);
+    },
+    isLive: () => live,
+    listCommands: () => {
+      const out: CommandHistoryItem[] = [];
+      for (let i = tracker.commands.length - 1; i >= 0; i--) {
+        const e = tracker.commands[i]!;
+        if (!e.finished || !e.ran || !e.command) continue;
+        out.push({
+          id: e.id,
+          command: e.command,
+          cwd: e.cwd,
+          exitCode: e.exitCode,
+          durationMs:
+            e.startedAt !== null && e.endedAt !== null ? Math.max(0, e.endedAt - e.startedAt) : null,
+          endedAt: e.endedAt,
+          canJump: tracker.entryLine(e, lineOf) >= 0,
+          hasOutput: tracker.outputRange(e, lineOf) !== null,
+        });
+      }
+      return out;
+    },
+    jumpToCommand: (id) => {
+      const e = tracker.byId(id);
+      if (!e || !isNormalBuffer(term)) return false;
+      const line = tracker.entryLine(e, lineOf);
+      if (line < 0) return false;
+      term.scrollToLine(line);
+      return true;
+    },
+    commandOutputText: (id) => {
+      const e = tracker.byId(id);
+      const range = e ? tracker.outputRange(e, lineOf) : null;
+      return range ? readRange(term, range) : null;
     },
     dispose: () => {
       osc133.dispose();

@@ -177,6 +177,55 @@ describe("matchPaneShortcutWithBindings", () => {
       type: "clear-screen",
     });
   });
+
+  it("opens command history with Ctrl+Shift+H only when a handler is registered", () => {
+    const map = resolveKeybindings({}, "win");
+    const action = matchPaneShortcutWithBindings(key("H", { ctrlKey: true, shiftKey: true }), map, xterm());
+    assert.deepEqual(action, { type: "command-history" });
+    assert.equal(shouldConsumePaneShortcut(action!, { panes: [pane("a")] }), false);
+    let opened = 0;
+    const h = handlers({ panes: [pane("a")], onOpenCommandHistory: () => (opened += 1) });
+    assert.equal(shouldConsumePaneShortcut(action!, h), true);
+    applyPaneShortcutAction(action!, h);
+    assert.equal(opened, 1);
+  });
+
+  it("maps swap / resize / equalize defaults and needs several panes", () => {
+    const map = resolveKeybindings({}, "win");
+    const swap = matchPaneShortcutWithBindings(
+      key("ArrowLeft", { ctrlKey: true, altKey: true, shiftKey: true }),
+      map,
+      xterm(),
+    );
+    assert.deepEqual(swap, { type: "swap-pane", direction: "left" });
+    const resize = matchPaneShortcutWithBindings(
+      key("ArrowDown", { altKey: true, shiftKey: true }),
+      map,
+      xterm(),
+    );
+    assert.deepEqual(resize, { type: "resize-pane", direction: "down" });
+    const equalize = matchPaneShortcutWithBindings(
+      key("+", { altKey: true, shiftKey: true, code: "Equal" }),
+      map,
+      xterm(),
+    );
+    assert.deepEqual(equalize, { type: "equalize-panes" });
+
+    const calls: string[] = [];
+    const multi = handlers({
+      panes: [pane("a"), pane("b")],
+      focusedPaneId: "b",
+      onSwapPane: (id, d) => calls.push(`swap ${id} ${d}`),
+      onResizePane: (id, d) => calls.push(`resize ${id} ${d}`),
+      onEqualizePanes: () => calls.push("equalize"),
+    });
+    for (const a of [swap!, resize!, equalize!]) {
+      assert.equal(shouldConsumePaneShortcut(a, multi), true);
+      assert.equal(shouldConsumePaneShortcut(a, { ...multi, panes: [pane("a")] }), false);
+      applyPaneShortcutAction(a, multi);
+    }
+    assert.deepEqual(calls, ["swap b left", "resize b down", "equalize"]);
+  });
 });
 
 describe("font zoom shortcuts", () => {

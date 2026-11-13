@@ -2,6 +2,7 @@ import { createElement, useMemo } from "react";
 import {
   AppWindow,
   FolderGit2,
+  History,
   Monitor,
   Radio,
   Terminal,
@@ -12,7 +13,7 @@ import {
 import type { Command } from "../components/CommandPalette";
 import type { ProfileForest, ProviderEntry, SavedCommandSnippet } from "../types";
 import { findProviderEntry } from "../utils/claude-cursor-diff";
-import { digitShortcutKeys } from "../shortcuts/shortcut-registry";
+import { digitShortcutKeys, shortcutKeys } from "../shortcuts/shortcut-registry";
 import { toolLabel } from "../utils";
 
 export interface TerminalCommandActions {
@@ -25,6 +26,8 @@ export interface TerminalCommandActions {
   runSavedCommand: (profileId: string, command: string, broadcast: boolean) => void | Promise<void>;
   /** Create a git worktree from the focused pane's repo and open a pane there. */
   newWorktreePane: () => void;
+  /** Open the OSC 133 command history panel. */
+  openCommandHistory?: () => void;
 }
 
 export interface TerminalCommandOptions {
@@ -49,6 +52,7 @@ export function useTerminalCommands(
 ): Command[] {
   const { addPane, openExternal, activateProfile, broadcastCommand, runSavedCommand, newWorktreePane } =
     actions;
+  const { openCommandHistory } = actions;
   const { currentGroupId, paneCount, savedCommands } = options;
 
   return useMemo(() => {
@@ -79,6 +83,18 @@ export function useTerminalCommands(
         icon: icon(FolderGit2),
         keywords: "git worktree branch new pane split parallel agent",
         run: () => newWorktreePane(),
+      });
+    }
+
+    if (paneCount > 0 && openCommandHistory) {
+      cmds.push({
+        id: "command-history",
+        title: t("terminal.history.open"),
+        group: t("cmd.group.agents"),
+        icon: icon(History),
+        keywords: "command history recent commands rerun search osc 133 shell",
+        shortcut: shortcutKeys("commandHistory"),
+        run: () => openCommandHistory(),
       });
     }
 
@@ -190,5 +206,6 @@ export function useTerminalCommands(
     broadcastCommand,
     runSavedCommand,
     newWorktreePane,
+    openCommandHistory,
   ]);
 }

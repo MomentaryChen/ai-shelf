@@ -1,4 +1,4 @@
-import type { PaneInfo } from "./split-tree";
+import type { PaneDirection, PaneInfo } from "./split-tree";
 import { shouldIgnoreShortcutForIme } from "./ime-keys";
 import type { FontZoomDirection } from "./font-zoom";
 import { getActiveKeybindings } from "../shortcuts/active-keybindings";
@@ -19,7 +19,11 @@ export type PaneShortcutAction =
   | { type: "restart-session" }
   | { type: "split"; direction: "horizontal" | "vertical" }
   | { type: "font-zoom"; direction: FontZoomDirection }
-  | { type: "toggle-maximize" };
+  | { type: "toggle-maximize" }
+  | { type: "command-history" }
+  | { type: "swap-pane"; direction: PaneDirection }
+  | { type: "resize-pane"; direction: PaneDirection }
+  | { type: "equalize-panes" };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -98,6 +102,18 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     case "toggle-maximize":
       onToggleMaximizePane?.(focusId);
       break;
+    case "command-history":
+      h.onOpenCommandHistory?.();
+      break;
+    case "swap-pane":
+      h.onSwapPane?.(focusId, action.direction);
+      break;
+    case "resize-pane":
+      h.onResizePane?.(focusId, action.direction);
+      break;
+    case "equalize-panes":
+      h.onEqualizePanes?.();
+      break;
   }
 }
 
@@ -116,6 +132,14 @@ export interface PaneShortcutHandlers {
   onFontZoom?: (direction: FontZoomDirection) => void;
   /** Show only this pane (or restore the split view); the layout is not changed. */
   onToggleMaximizePane?: (paneId: string) => void;
+  /** Open the OSC 133 command history panel. */
+  onOpenCommandHistory?: () => void;
+  /** Swap the pane with its neighbour in `direction`. */
+  onSwapPane?: (paneId: string, direction: PaneDirection) => void;
+  /** Move the divider next to the pane one step in `direction`. */
+  onResizePane?: (paneId: string, direction: PaneDirection) => void;
+  /** Give every pane in each row / column the same size. */
+  onEqualizePanes?: () => void;
 }
 
 let getHandlers: (() => PaneShortcutHandlers | null) | null = null;
@@ -139,6 +163,16 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "fontZoomOut",
   "fontZoomReset",
   "toggleMaximizePane",
+  "commandHistory",
+  "swapPaneLeft",
+  "swapPaneRight",
+  "swapPaneUp",
+  "swapPaneDown",
+  "resizePaneLeft",
+  "resizePaneRight",
+  "resizePaneUp",
+  "resizePaneDown",
+  "equalizePanes",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -237,6 +271,26 @@ export function matchPaneShortcutWithBindings(
       return { type: "font-zoom", direction: "reset" };
     case "toggleMaximizePane":
       return { type: "toggle-maximize" };
+    case "commandHistory":
+      return { type: "command-history" };
+    case "swapPaneLeft":
+      return { type: "swap-pane", direction: "left" };
+    case "swapPaneRight":
+      return { type: "swap-pane", direction: "right" };
+    case "swapPaneUp":
+      return { type: "swap-pane", direction: "up" };
+    case "swapPaneDown":
+      return { type: "swap-pane", direction: "down" };
+    case "resizePaneLeft":
+      return { type: "resize-pane", direction: "left" };
+    case "resizePaneRight":
+      return { type: "resize-pane", direction: "right" };
+    case "resizePaneUp":
+      return { type: "resize-pane", direction: "up" };
+    case "resizePaneDown":
+      return { type: "resize-pane", direction: "down" };
+    case "equalizePanes":
+      return { type: "equalize-panes" };
     default:
       return null;
   }
@@ -274,7 +328,13 @@ export function shouldConsumePaneShortcut(
   h: Pick<
     PaneShortcutHandlers,
     "panes" | "onFocusRecentTerminal" | "onFontZoom" | "onToggleMaximizePane"
-  >,
+  > &
+    Partial<
+      Pick<
+        PaneShortcutHandlers,
+        "onOpenCommandHistory" | "onSwapPane" | "onResizePane" | "onEqualizePanes"
+      >
+    >,
 ): boolean {
   // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
   // split keys — those may belong to profile quick-switch or should no-op cleanly.
@@ -283,6 +343,11 @@ export function shouldConsumePaneShortcut(
   }
   if (action.type === "font-zoom") return Boolean(h.onFontZoom);
   if (action.type === "toggle-maximize") return Boolean(h.onToggleMaximizePane);
+  if (action.type === "command-history") return Boolean(h.onOpenCommandHistory);
+  // Layout keys only mean something with several panes; otherwise the shell / TUI gets them.
+  if (action.type === "swap-pane") return h.panes.length > 1 && Boolean(h.onSwapPane);
+  if (action.type === "resize-pane") return h.panes.length > 1 && Boolean(h.onResizePane);
+  if (action.type === "equalize-panes") return h.panes.length > 1 && Boolean(h.onEqualizePanes);
   return true;
 }
 

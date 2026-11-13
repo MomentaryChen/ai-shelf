@@ -61,6 +61,16 @@ export const SHORTCUT_IDS = [
   "fontZoomOut",
   "fontZoomReset",
   "toggleMaximizePane",
+  "commandHistory",
+  "swapPaneLeft",
+  "swapPaneRight",
+  "swapPaneUp",
+  "swapPaneDown",
+  "resizePaneLeft",
+  "resizePaneRight",
+  "resizePaneUp",
+  "resizePaneDown",
+  "equalizePanes",
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_IDS)[number];
@@ -108,6 +118,16 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "fontZoomOut", section: "terminal" },
   { id: "fontZoomReset", section: "terminal" },
   { id: "toggleMaximizePane", section: "pane" },
+  { id: "commandHistory", section: "terminal" },
+  { id: "swapPaneLeft", section: "pane" },
+  { id: "swapPaneRight", section: "pane" },
+  { id: "swapPaneUp", section: "pane" },
+  { id: "swapPaneDown", section: "pane" },
+  { id: "resizePaneLeft", section: "pane" },
+  { id: "resizePaneRight", section: "pane" },
+  { id: "resizePaneUp", section: "pane" },
+  { id: "resizePaneDown", section: "pane" },
+  { id: "equalizePanes", section: "pane" },
 ];
 
 const DEF_BY_ID = new Map(SHORTCUT_DEFS.map((d) => [d.id, d]));
@@ -168,6 +188,19 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
     fontZoomReset: { key: "0", mod: true },
     // Show only the focused pane (iTerm2 uses Cmd+Shift+Enter for the same thing).
     toggleMaximizePane: { key: "enter", mod: true, shift: true },
+    // Searchable OSC 133 command history (focused pane / all panes).
+    commandHistory: { key: "h", mod: true, shift: true },
+    // Keyboard pane management (multi-pane layouts only; single panes pass the keys through).
+    // Resize matches Windows Terminal (Alt+Shift+Arrow); swap adds Ctrl/Cmd. No Ctrl+Alt+letter (AltGr).
+    swapPaneLeft: { key: "arrowleft", mod: true, alt: true, shift: true },
+    swapPaneRight: { key: "arrowright", mod: true, alt: true, shift: true },
+    swapPaneUp: { key: "arrowup", mod: true, alt: true, shift: true },
+    swapPaneDown: { key: "arrowdown", mod: true, alt: true, shift: true },
+    resizePaneLeft: { key: "arrowleft", alt: true, shift: true },
+    resizePaneRight: { key: "arrowright", alt: true, shift: true },
+    resizePaneUp: { key: "arrowup", alt: true, shift: true },
+    resizePaneDown: { key: "arrowdown", alt: true, shift: true },
+    equalizePanes: { key: "=", alt: true, shift: true },
   };
 }
 

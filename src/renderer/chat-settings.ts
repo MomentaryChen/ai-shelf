@@ -20,6 +20,7 @@ import {
   normalizePasteConfirmMaxChars,
   normalizePasteConfirmMaxLines,
 } from "./terminal/paste-confirm";
+import { DEFAULT_OSC52_MODE, normalizeOsc52Mode, type Osc52Mode } from "./terminal/osc52";
 
 export type { AppColorTheme, AppLocale, LocalePreference };
 
@@ -106,6 +107,14 @@ export interface ChatSettings {
   paneAgentStallTimeoutSec: number;
   /** Extra CLI flags appended when launching each AI tool (e.g. `--model opus`). */
   toolLaunchArgs: ToolLaunchArgs;
+  /** Desktop notification when a shell command (OSC 133) runs longer than the threshold in an unattended pane. */
+  terminalNotifyLongCommand: boolean;
+  /** Seconds a command must run before its completion notifies. */
+  terminalNotifyLongCommandSec: number;
+  /** Desktop notification for BEL and OSC 9 / OSC 777 requests from unattended panes. */
+  terminalNotifyBell: boolean;
+  /** OSC 52 clipboard writes from programs (never reads): off / ask / always. */
+  terminalOsc52: Osc52Mode;
 }
 
 export type { KeybindingOverrides, ToolLaunchArgs };
@@ -244,6 +253,10 @@ function normalizePaneAgentStallSec(raw: unknown): number {
   return Math.min(MAX_PANE_AGENT_STALL_SEC, Math.max(MIN_PANE_AGENT_STALL_SEC, Math.round(v)));
 }
 
+export const MIN_LONG_COMMAND_NOTIFY_SEC = 1;
+export const MAX_LONG_COMMAND_NOTIFY_SEC = 3_600;
+export const DEFAULT_LONG_COMMAND_NOTIFY_SEC = 10;
+
 function normalizeSystemTrayEnabled(raw: unknown): boolean {
   if (typeof raw === "boolean") return raw;
   return true;
@@ -279,6 +292,10 @@ const DEFAULTS: ChatSettings = {
   paneAgentNotifyUnfocusedOnly: true,
   paneAgentStallTimeoutSec: DEFAULT_PANE_AGENT_STALL_SEC,
   toolLaunchArgs: {},
+  terminalNotifyLongCommand: true,
+  terminalNotifyLongCommandSec: DEFAULT_LONG_COMMAND_NOTIFY_SEC,
+  terminalNotifyBell: true,
+  terminalOsc52: DEFAULT_OSC52_MODE,
 };
 
 /** Legacy settings field replaced by `keybindings` (migrated on load). */
@@ -336,6 +353,15 @@ export function loadSettings(): ChatSettings {
       paneAgentNotifyUnfocusedOnly: normalizePaneAgentBool(stored.paneAgentNotifyUnfocusedOnly, true),
       paneAgentStallTimeoutSec: normalizePaneAgentStallSec(stored.paneAgentStallTimeoutSec),
       toolLaunchArgs: normalizeToolLaunchArgs(stored.toolLaunchArgs),
+      terminalNotifyLongCommand: normalizePaneAgentBool(stored.terminalNotifyLongCommand, true),
+      terminalNotifyLongCommandSec: clampInt(
+        stored.terminalNotifyLongCommandSec,
+        MIN_LONG_COMMAND_NOTIFY_SEC,
+        MAX_LONG_COMMAND_NOTIFY_SEC,
+        DEFAULT_LONG_COMMAND_NOTIFY_SEC,
+      ),
+      terminalNotifyBell: normalizePaneAgentBool(stored.terminalNotifyBell, true),
+      terminalOsc52: normalizeOsc52Mode(stored.terminalOsc52),
     };
   } catch {
     return { ...DEFAULTS };
