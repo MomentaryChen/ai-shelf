@@ -29,6 +29,7 @@ import {
 import { InventoryNav, type NavItem } from "./components/InventoryNav";
 import type { Command } from "./components/CommandPalette";
 import { ViewTransition } from "./components/ViewTransition";
+import { UsageBillingAlertToast } from "./components/UsageBillingAlertToast";
 import { useInventoryScan } from "./hooks/useInventoryScan";
 import { useHealthMonitor } from "./hooks/useHealthMonitor";
 import { useLocale } from "./i18n/LocaleProvider";
@@ -701,6 +702,7 @@ export function App() {
       <Suspense fallback={null}>
         <AppUpdateModal />
       </Suspense>
+      <UsageBillingAlertToast onOpenUsage={() => goTo("usage")} />
       {onboardingOpen && (
         <Suspense fallback={null}>
           <OnboardingModal

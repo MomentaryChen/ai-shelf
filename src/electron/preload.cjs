@@ -313,4 +313,6 @@ contextBridge.exposeInMainWorld("api", {
   portsHostStats: () => ipcRenderer.invoke("ports-host-stats"),
   wslListDistros: () => ipcRenderer.invoke("wsl-list-distros"),
   wslDistroIp: (distro) => ipcRenderer.invoke("wsl-distro-ip", distro),
+  gitCwdInfo: (cwd) => ipcRenderer.invoke("git-cwd-info", cwd),
+  gitWorktreeAdd: (req) => ipcRenderer.invoke("git-worktree-add", req),
 });

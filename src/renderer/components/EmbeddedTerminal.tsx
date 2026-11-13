@@ -77,6 +77,8 @@ interface Props {
   onSessionLost?: (sessionId: string) => void;
   onWrite?: (data: string, sessionId: string) => void;
   onRestart?: () => void;
+  /** Context menu: open a new pane in a git worktree of this pane's repo. */
+  onNewWorktreePane?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
   onCwdReport?: (sessionId: string, cwd: string) => void;
 }
@@ -84,7 +86,7 @@ interface Props {
 /** Callback props — routed through a ref so they never force an xterm re-render. */
 type TerminalCallbacks = Pick<
   Props,
-  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onCwdReport"
+  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onCwdReport" | "onNewWorktreePane"
 >;
 
 type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
@@ -477,6 +479,7 @@ function EmbeddedTerminalInner({
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
       onRestart: () => callbacksRef.current.onRestart?.(),
+      onNewWorktreePane: () => callbacksRef.current.onNewWorktreePane?.(),
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
@@ -954,6 +957,7 @@ export function EmbeddedTerminal({
   onWrite,
   onRestart,
   onCwdReport,
+  onNewWorktreePane,
   ...dataProps
 }: Props) {
   const callbacksRef = useRef<TerminalCallbacks>({
@@ -962,9 +966,17 @@ export function EmbeddedTerminal({
     onWrite,
     onRestart,
     onCwdReport,
+    onNewWorktreePane,
   });
   useLayoutEffect(() => {
-    callbacksRef.current = { onExit, onSessionLost, onWrite, onRestart, onCwdReport };
+    callbacksRef.current = {
+      onExit,
+      onSessionLost,
+      onWrite,
+      onRestart,
+      onCwdReport,
+      onNewWorktreePane,
+    };
   });
   return <EmbeddedTerminalMemo {...dataProps} callbacksRef={callbacksRef} />;
 }

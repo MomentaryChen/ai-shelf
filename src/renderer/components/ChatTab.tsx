@@ -20,6 +20,7 @@ import { EmbeddedTerminal } from "./EmbeddedTerminal";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
 import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
+import { GitWorktreeDialog } from "./GitWorktreeDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
@@ -190,6 +191,8 @@ function ChatTabInner({
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
+  /** Pane the "new pane in a git worktree" dialog splits from. */
+  const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -920,6 +923,46 @@ function ChatTabInner({
     [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
 
+  const openWorktreeDialog = useCallback(
+    (paneId?: string) => {
+      const id = paneId ?? focusedPaneId;
+      const pane = id && layout ? collectPanes(layout).find((p) => p.id === id) : null;
+      if (!pane?.cwd) {
+        setTerminalError(t("git.worktree.err.noPane"));
+        return;
+      }
+      // Worktrees are created with the local git; a remote (SSH) pane's repo lives elsewhere.
+      if (isRemotePaneCwd(pane.cwd)) {
+        setTerminalError(t("git.worktree.err.remotePane"));
+        return;
+      }
+      if (isRestoring()) {
+        setTerminalError(t("chat.err.restoringWait"));
+        return;
+      }
+      if (!canAddPane) {
+        setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
+        return;
+      }
+      setWorktreePaneId(pane.id);
+    },
+    [focusedPaneId, layout, isRestoring, canAddPane, maxPanes, t],
+  );
+
+  /** Split the source pane and start the same tool in the new worktree. */
+  const openWorktreePane = useCallback(
+    async (path: string): Promise<string | null> => {
+      const sourceId = worktreePaneId;
+      const parent = sourceId && layout ? collectPanes(layout).find((p) => p.id === sourceId) : null;
+      const tool = resolveLaunchTool(parent?.tool ?? availableTools[0], availableTools);
+      const created = await addPane(tool, path, parent?.id, "horizontal", {
+        keepOthersVisible: true,
+      });
+      return created ? null : t("git.worktree.err.openFailed", { path });
+    },
+    [worktreePaneId, layout, availableTools, addPane, t],
+  );
+
   async function handleActivateProfile(profile: ProfileInfo) {
     lastActiveByGroupRef.current = {
       ...lastActiveByGroupRef.current,
@@ -1157,8 +1200,20 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         void runSavedCommand(profileId, command, broadcast);
       },
+      newWorktreePane: () => {
+        onRequestTerminalMode?.();
+        openWorktreeDialog();
+      },
     }),
-    [addPane, openExternal, sidebarForest, broadcastCommandToPanes, runSavedCommand, onRequestTerminalMode],
+    [
+      addPane,
+      openExternal,
+      sidebarForest,
+      broadcastCommandToPanes,
+      runSavedCommand,
+      onRequestTerminalMode,
+      openWorktreeDialog,
+    ],
   );
 
   // Skip the default Profiles mirror workspace so Ctrl+1–9 follows the sidebar.
@@ -1633,6 +1688,12 @@ function ChatTabInner({
           setPendingDeleteProfile(profile);
         }}
       />
+      <GitWorktreeDialog
+        open={worktreePaneId !== null}
+        cwd={(worktreePaneId ? panes.find((p) => p.id === worktreePaneId)?.cwd : null) ?? ""}
+        onClose={() => setWorktreePaneId(null)}
+        onCreated={openWorktreePane}
+      />
       <BusyPaneCloseDialog
         open={busyClosePaneId !== null}
         onCancel={() => setBusyClosePaneId(null)}
@@ -1775,6 +1836,7 @@ function ChatTabInner({
               void respawnPane(pane.id);
             }}
             onRestart={() => void respawnPane(pane.id)}
+            onNewWorktreePane={() => openWorktreeDialog(pane.id)}
             onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
