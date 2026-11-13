@@ -172,6 +172,10 @@ export function PopoutWindowApp() {
     if (trimmed) window.api.paneViewAction({ type: "cwd", sessionId, cwd: trimmed });
   }, []);
 
+  const reportTitle = useCallback((sessionId: string, title: string) => {
+    window.api.paneViewAction({ type: "title", sessionId, title: title.trim() });
+  }, []);
+
   // Long-command / bell notifications for the terminals shown here (the origin
   // window does not mount them, so it cannot raise these).
   const viewPanes = useMemo(() => (layout ? collectPanes(layout) : []), [layout]);
@@ -281,6 +285,7 @@ export function PopoutWindowApp() {
                 active
                 focused={paneFocused}
                 onCwdReport={reportCwd}
+                onTitleReport={reportTitle}
                 // Same as a pane in the main window: exited + key press closes it.
                 onExit={() => closePane(pane.id, { skipConfirm: true })}
                 // Session vanished entirely: hand it back so the origin can respawn it.

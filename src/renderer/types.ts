@@ -1429,6 +1429,7 @@ export type PaneViewAction =
   | { type: "move-in-view"; dragPaneId: string; targetPaneId: string; zone: import("./terminal/pane-drop-zone").PaneDropZone }
   | { type: "resize"; splitId: string; ratio: number }
   | { type: "cwd"; sessionId: string; cwd: string }
+  | { type: "title"; sessionId: string; title: string }
   | { type: "bounds"; bounds: PaneViewRect };
 
 /** Main → origin window. */

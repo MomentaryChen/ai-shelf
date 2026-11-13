@@ -9,6 +9,11 @@ export interface PaneInfo {
   cwd: string;
   /** User-defined tab label; falls back to tool name when empty. */
   title?: string;
+  /**
+   * Live title the program set via OSC 0 / 2 (e.g. Claude Code's task summary).
+   * Shown when `title` is empty; never persisted, cleared on respawn.
+   */
+  autoTitle?: string;
   /** AI agent conversation id (Claude Code `--session-id`), resumed on restore. */
   agentSessionId?: string;
 }
