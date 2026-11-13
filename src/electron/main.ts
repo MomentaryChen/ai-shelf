@@ -192,11 +192,10 @@ import {
 import { ptyWakeResizeSteps } from "../shared/system-resume.js";
 import {
   canControlPty,
-  getPopoutWindowForPane,
+  focusPaneInPopout,
   getPopoutWindows,
-  initPanePopouts,
-  onPtySessionKilled,
-} from "./popout-window.js";
+  initPaneViews,
+} from "./pane-view-windows.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
 app.commandLine.appendSwitch(
@@ -309,7 +308,7 @@ function getTrayDeps(): TrayDeps {
     getChatWindow: () => chatWindow,
     createChatWindow,
     getPopoutWindows,
-    getPopoutWindowForPane,
+    focusPaneInPopout,
   };
 }
 
@@ -636,11 +635,12 @@ function createSettingsWindow(opener?: BrowserWindow | null) {
   });
 }
 
-initPanePopouts({
+initPaneViews({
   webPreferences: sharedWebPreferences,
   icon: APP_ICON,
   pageUrl: () => getRendererPageUrl("popout"),
   attachWindow,
+  isOriginWindow: (win) => win === mainWindow || win === chatWindow,
   killPtySession,
 });
 
@@ -2284,8 +2284,6 @@ function killPtySession(sessionId: string): void {
 
 ipcMain.on("pty-kill", (_e, sessionId: string) => {
   killPtySession(sessionId);
-  // Pane closed / restarted from its origin window while popped out.
-  onPtySessionKilled(sessionId);
 });
 
 // --- Launch in Terminal ---
@@ -3400,7 +3398,7 @@ let profileLayoutFlushInProgress = false;
 function isTerminalRendererWindow(win: BrowserWindow): boolean {
   if (win.webContents.isDestroyed()) return false;
   const url = win.webContents.getURL();
-  // Pop-outs hold no layout of their own (their pane lives in the origin window's).
+  // View windows hold no layout of their own (their panes live in the origin window's).
   return !url.includes("#settings") && !url.includes("#popout");
 }
 
