@@ -928,7 +928,7 @@ export const en = {
   "appUpdate.downloadingHint": "Keep working — restart whenever the download finishes.",
   "appUpdate.downloadComplete": "Download complete",
   "appUpdate.whatsNew": "What's new",
-  "appUpdate.silentInstallNote": "Installs silently in the background — no Windows setup wizard.",
+  "appUpdate.silentInstallNote": "Installs silently in the background — no setup wizard to click through.",
   "appUpdate.restartFinish": "Restarting installs the update and reopens AI Shelf.",
   "appUpdate.restartLater": "Restart later",
   "appUpdate.restartNow": "Restart now",
@@ -945,6 +945,13 @@ export const en = {
   "appUpdate.errorDetail": "Technical details",
   "appUpdate.close": "Close",
   "appUpdate.retry": "Retry",
+  "appUpdate.manualDownload": "Download manually",
+  "appUpdate.impactTerminals":
+    "{terminals} open terminal session(s) will close when AI Shelf restarts. Claude Code conversations resume when panes are restored.",
+  "appUpdate.impactTerminalsFlows":
+    "{terminals} open terminal session(s) and {flows} running Flow(s) will be stopped when AI Shelf restarts.",
+  "appUpdate.updatedTo": "Updated to v{version}",
+  "appUpdate.viewWhatsNew": "See what's new",
 
   // Config file editor
   "configEditor.title": "Edit config file",

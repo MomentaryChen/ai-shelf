@@ -4,6 +4,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Download,
+  ExternalLink,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -22,6 +23,7 @@ import {
   shortenAppUpdateErrorDetail,
 } from "../utils/formatAppUpdateError";
 import { useLocale } from "../i18n/LocaleProvider";
+import { RELEASES_URL } from "../app-updated-notice";
 
 type Phase = "hidden" | "confirm" | "downloading" | "ready" | "installing" | "error";
 
@@ -48,6 +50,7 @@ export function AppUpdateModal() {
   const [total, setTotal] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [installStalled, setInstallStalled] = useState(false);
+  const [impact, setImpact] = useState<{ terminals: number; flows: number } | null>(null);
 
   const releaseNotesHtml = useMemo(
     () => (releaseNotes ? sanitizeReleaseNotesHtml(releaseNotes) : null),
@@ -73,6 +76,31 @@ export function AppUpdateModal() {
     }
     const timer = setTimeout(() => setInstallStalled(true), INSTALL_STALLED_MS);
     return () => clearTimeout(timer);
+  }, [phase]);
+
+  /** While "ready" is showing, keep the "restart will close N terminals" line live. */
+  useEffect(() => {
+    if (phase !== "ready") {
+      setImpact(null);
+      return;
+    }
+    let cancelled = false;
+    const refresh = () => {
+      void window.api
+        .getAppUpdateImpact()
+        .then((next) => {
+          if (!cancelled) setImpact(next);
+        })
+        .catch(() => {
+          /* best-effort warning */
+        });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 3_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [phase]);
 
   const dismiss = useCallback(() => {
@@ -322,10 +350,25 @@ export function AppUpdateModal() {
           )}
 
           {phase === "ready" && (
-            <p className="text-sm leading-relaxed text-text-secondary">
-              {t("appUpdate.downloadComplete")}
-              {version ? ` (v${version})` : ""}. {t("appUpdate.silentInstallNote")}
-            </p>
+            <>
+              <p className="text-sm leading-relaxed text-text-secondary">
+                {t("appUpdate.downloadComplete")}
+                {version ? ` (v${version})` : ""}. {t("appUpdate.silentInstallNote")}
+              </p>
+              {impact && (impact.terminals > 0 || impact.flows > 0) && (
+                <div className="mt-4 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/8 px-3 py-2.5 text-xs leading-relaxed text-text-primary">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+                  <span>
+                    {impact.flows > 0
+                      ? t("appUpdate.impactTerminalsFlows", {
+                          terminals: impact.terminals,
+                          flows: impact.flows,
+                        })
+                      : t("appUpdate.impactTerminals", { terminals: impact.terminals })}
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
           {phase === "installing" && (
@@ -390,6 +433,14 @@ export function AppUpdateModal() {
           <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
             <Button type="button" variant="outline" onClick={dismiss}>
               {t("appUpdate.close")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void window.api.openExternal(`${RELEASES_URL}/latest`)}
+            >
+              <ExternalLink className="size-4" />
+              {t("appUpdate.manualDownload")}
             </Button>
             <Button type="button" onClick={retryCheck}>
               <RefreshCw className="size-4" />

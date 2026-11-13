@@ -893,7 +893,7 @@ export const zh: Record<MessageKey, string> = {
   "appUpdate.downloadingHint": "可以繼續使用 AI Shelf，下載完成後再重啟即可。",
   "appUpdate.downloadComplete": "下載完成",
   "appUpdate.whatsNew": "更新內容",
-  "appUpdate.silentInstallNote": "安裝會在背景自動完成，不會出現 Windows 安裝精靈。",
+  "appUpdate.silentInstallNote": "安裝會在背景自動完成，不需要再操作安裝精靈。",
   "appUpdate.restartFinish": "重啟後將自動完成安裝並重新開啟。",
   "appUpdate.restartLater": "稍後重啟",
   "appUpdate.restartNow": "立即重啟",
@@ -909,6 +909,13 @@ export const zh: Record<MessageKey, string> = {
   "appUpdate.errorDetail": "技術細節",
   "appUpdate.close": "關閉",
   "appUpdate.retry": "重試",
+  "appUpdate.manualDownload": "手動下載",
+  "appUpdate.impactTerminals":
+    "目前有 {terminals} 個終端機工作階段，重新啟動時會關閉；Claude Code 對話會在窗格還原時接續。",
+  "appUpdate.impactTerminalsFlows":
+    "目前有 {terminals} 個終端機工作階段、{flows} 個 Flow 正在執行，重新啟動時會被中斷。",
+  "appUpdate.updatedTo": "已更新至 v{version}",
+  "appUpdate.viewWhatsNew": "查看更新內容",
 
   // 設定檔編輯器
   "configEditor.title": "編輯設定檔",

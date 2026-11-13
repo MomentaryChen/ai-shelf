@@ -1097,6 +1097,17 @@ ipcMain.handle("quit-and-install-app-update", () => {
   return { ok: true };
 });
 
+/** What a restart-to-install would interrupt, so the update modal can warn first. */
+ipcMain.handle("get-app-update-impact", () => {
+  let flows = 0;
+  try {
+    flows = listActiveFlowRuns().length;
+  } catch {
+    /* best-effort */
+  }
+  return { terminals: PTY_SESSIONS.size, flows };
+});
+
 // --- MCP Sync ---
 
 ipcMain.handle("get-mcp-raw", async () => {

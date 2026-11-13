@@ -759,6 +759,8 @@ export interface ElectronAPI {
   getAppUpdateState: () => Promise<AppUpdateStatePayload>;
   confirmAppUpdateDownload: () => Promise<{ ok: boolean }>;
   quitAndInstallAppUpdate: () => Promise<{ ok: boolean }>;
+  /** Open terminals / running flows that a restart-to-install would close. */
+  getAppUpdateImpact: () => Promise<{ terminals: number; flows: number }>;
   onAppUpdateAvailable: (cb: (payload: AppUpdateAvailablePayload) => void) => () => void;
   onAppUpdateNotAvailable: (cb: (payload: { version: string | null }) => void) => () => void;
   onAppUpdateProgress: (cb: (payload: AppUpdateProgressPayload) => void) => () => void;
