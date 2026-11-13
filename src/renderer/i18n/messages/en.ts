@@ -843,6 +843,23 @@ export const en = {
   "terminal.marks.status.failed": "Last command failed (exit {code})",
   "terminal.marks.status.unknown": "Last command finished",
   "terminal.marks.status.duration": "took {duration}",
+  // Terminal notifications (long commands, BEL, OSC 9 / 777)
+  "terminal.notify.commandDoneTitle": "Command finished in {pane}",
+  "terminal.notify.commandFailedTitle": "Command failed in {pane} (exit {code})",
+  "terminal.notify.commandBody": "{command} · {duration}",
+  "terminal.notify.commandBodyNoText": "Took {duration}",
+  "terminal.notify.bellTitle": "{pane} rang the bell",
+  "terminal.notify.bellBody": "A program in this pane wants your attention.",
+  "settings.terminalNotify.title": "Terminal notifications",
+  "settings.terminalNotify.hint":
+    "Desktop notifications from shell panes you are not looking at (another pane is focused, or the app is in the background). Clicking one brings you to the pane.",
+  "settings.terminalNotify.longCommand": "Notify when a long command finishes",
+  "settings.terminalNotify.longCommandHint":
+    "Needs shell integration (OSC 133). Shows the command, its exit status and how long it took.",
+  "settings.terminalNotify.longCommandSec": "Minimum duration (seconds)",
+  "settings.terminalNotify.bell": "Notify on bell and CLI notifications",
+  "settings.terminalNotify.bellHint":
+    "BEL and OSC 9 / OSC 777 notification requests from programs such as AI CLIs. Rate-limited per pane.",
   "terminal.ctx.newConversation": "Start new conversation",
   "settings.agentSessions.title": "AI agent conversations",
   "settings.resumeAgentSessions": "Resume agent conversations",

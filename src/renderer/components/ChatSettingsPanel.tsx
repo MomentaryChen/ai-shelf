@@ -28,6 +28,10 @@ import {
   type ExternalTerminal,
   type PreferredShell,
 } from "../chat-settings";
+import {
+  MAX_LONG_COMMAND_NOTIFY_SEC,
+  MIN_LONG_COMMAND_NOTIFY_SEC,
+} from "../chat-settings";
 import { useLocale } from "../i18n/LocaleProvider";
 import {
   MAX_PASTE_CONFIRM_MAX_CHARS,
@@ -1191,6 +1195,57 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
               </div>
             </>
           )}
+        </div>
+      </div>
+
+      {/* Terminal notifications: long commands, BEL, OSC 9 / 777 */}
+      <div>
+        <p className={sectionTitle}>{t("settings.terminalNotify.title")}</p>
+        <p className="mb-3 text-[11px] leading-snug text-text-tertiary">
+          {t("settings.terminalNotify.hint")}
+        </p>
+        <div className="flex flex-col gap-2">
+          <div className="rounded-lg border border-border px-3.5 py-3">
+            <Label className="flex cursor-pointer items-start gap-3 font-normal">
+              <Checkbox
+                checked={settings.terminalNotifyLongCommand}
+                onCheckedChange={(v) => updateSettings({ terminalNotifyLongCommand: v === true })}
+                className="mt-0.5"
+              />
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[13px] text-text-primary">
+                  {t("settings.terminalNotify.longCommand")}
+                </span>
+                <span className="text-[11px] leading-snug text-text-tertiary">
+                  {t("settings.terminalNotify.longCommandHint")}
+                </span>
+              </span>
+            </Label>
+            <label className="mt-2.5 flex items-center gap-2 pl-7 text-[12px] text-text-secondary">
+              {t("settings.terminalNotify.longCommandSec")}
+              <CommitNumberInput
+                value={settings.terminalNotifyLongCommandSec}
+                min={MIN_LONG_COMMAND_NOTIFY_SEC}
+                max={MAX_LONG_COMMAND_NOTIFY_SEC}
+                step={1}
+                disabled={!settings.terminalNotifyLongCommand}
+                onCommit={(n) => updateSettings({ terminalNotifyLongCommandSec: n })}
+              />
+            </label>
+          </div>
+          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+            <Checkbox
+              checked={settings.terminalNotifyBell}
+              onCheckedChange={(v) => updateSettings({ terminalNotifyBell: v === true })}
+              className="mt-0.5"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[13px] text-text-primary">{t("settings.terminalNotify.bell")}</span>
+              <span className="text-[11px] leading-snug text-text-tertiary">
+                {t("settings.terminalNotify.bellHint")}
+              </span>
+            </span>
+          </Label>
         </div>
       </div>
         </>

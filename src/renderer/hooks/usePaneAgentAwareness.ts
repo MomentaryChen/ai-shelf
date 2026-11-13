@@ -20,6 +20,7 @@ import {
   type BackgroundAttentionMap,
 } from "../../shared/background-agent-attention.js";
 import { paneDisplayLabel } from "../utils/pane-label";
+import { paneNotifyDedupe } from "../terminal/terminal-notify";
 import type { MessageKey } from "../i18n/messages/en";
 
 export type PaneAgentStateMap = Record<string, PaneAgentStatus>;
@@ -214,6 +215,8 @@ export function usePaneAgentAwareness(
         return;
       }
       if (settings.paneAgentNotifySystem) {
+        // A terminal notification (long command, OSC 9, bell) just covered this pane.
+        if (!paneNotifyDedupe.claim(pane.id, "agent", Date.now())) return;
         await window.api.showPaneAgentNotification({
           title,
           body,

@@ -20,6 +20,8 @@ import {
 import { bindTerminalLinks } from "../terminal/xterm-links";
 import { attachUnicode11 } from "../terminal/xterm-unicode";
 import { bindTerminalCwd } from "../terminal/xterm-cwd";
+import { bindTerminalNotifications } from "../terminal/xterm-notify";
+import type { TerminalNotifyEvent } from "../terminal/terminal-notify";
 import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
 import { recordImeAnchor } from "../terminal/ime-anchor-log";
 import { attachImeCommitGuard } from "../terminal/ime-commit-guard";
@@ -91,6 +93,8 @@ interface Props {
   onCwdReport?: (sessionId: string, cwd: string) => void;
   /** Pane cwd; relative path links in the output resolve against it. */
   cwd?: string;
+  /** Long command finished, BEL, or OSC 9 / 777 — live output only, unfiltered. */
+  onTerminalNotify?: (sessionId: string, event: TerminalNotifyEvent) => void;
 }
 
 /** Callback props — routed through a ref so they never force an xterm re-render. */
@@ -104,6 +108,7 @@ type TerminalCallbacks = Pick<
   | "onCwdReport"
   | "onNewWorktreePane"
   | "onOpenInNewWindow"
+  | "onTerminalNotify"
 >;
 
 type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
@@ -497,8 +502,19 @@ function EmbeddedTerminalInner({
     };
     const unregisterClear = registerTerminalClear(sessionId, doClear);
     let pasteToThisPaneOnly = false;
+    // Latest OSC 7 cwd, stamped on each command as it starts.
+    let currentCwd: string | undefined;
     // OSC 133 prompt / output marks. Not live until the replayed backlog is parsed.
     const commandMarks = bindTerminalCommandMarks(term, {
+      getCwd: () => currentCwd,
+      onCommandFinished: (info) => {
+        callbacksRef.current.onTerminalNotify?.(sessionId, {
+          kind: "command",
+          command: info.command,
+          exitCode: info.exitCode,
+          durationMs: info.durationMs,
+        });
+      },
       onStatus: (status, live) => {
         if (!live) {
           // Replayed backlog has no timings; keep a stored result unless the replay
@@ -567,7 +583,11 @@ function EmbeddedTerminalInner({
     const unbindImeTrace = attachImeInputTrace(term, sessionId);
     const unbindLinks = bindTerminalLinks(term, { getCwd: () => cwdRef.current });
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
+      currentCwd = cwd;
       callbacksRef.current.onCwdReport?.(sessionId, cwd);
+    });
+    const unbindNotify = bindTerminalNotifications(term, commandMarks.isLive, (event) => {
+      callbacksRef.current.onTerminalNotify?.(sessionId, event);
     });
 
     let opened = true;
@@ -871,6 +891,7 @@ function EmbeddedTerminalInner({
       unbindImeTrace();
       unbindLinks();
       unbindCwd();
+      unbindNotify();
       commandMarks.dispose();
       webgl?.dispose();
       ro.disconnect();
@@ -1031,6 +1052,7 @@ export function EmbeddedTerminal({
   onCwdReport,
   onNewWorktreePane,
   onOpenInNewWindow,
+  onTerminalNotify,
   ...dataProps
 }: Props) {
   const callbacksRef = useRef<TerminalCallbacks>({
@@ -1042,6 +1064,7 @@ export function EmbeddedTerminal({
     onCwdReport,
     onNewWorktreePane,
     onOpenInNewWindow,
+    onTerminalNotify,
   });
   useLayoutEffect(() => {
     callbacksRef.current = {
@@ -1053,6 +1076,7 @@ export function EmbeddedTerminal({
       onCwdReport,
       onNewWorktreePane,
       onOpenInNewWindow,
+      onTerminalNotify,
     };
   });
   return <EmbeddedTerminalMemo {...dataProps} callbacksRef={callbacksRef} />;

@@ -38,6 +38,8 @@ export interface MarkPoint<M> {
 }
 
 export interface CommandEntry<M> {
+  /** Stable per-tracker sequence id (array positions shift once the cap is hit). */
+  id: number;
   prompt?: MarkPoint<M>;
   input?: MarkPoint<M>;
   output?: MarkPoint<M>;
@@ -51,6 +53,10 @@ export interface CommandEntry<M> {
   finished: boolean;
   /** Finished after actually running (C seen or an exit code reported). */
   ran: boolean;
+  /** Command line read from the buffer between B and C (set by the xterm wiring). */
+  command?: string;
+  /** Working directory (last OSC 7 report) when the command started. */
+  cwd?: string;
 }
 
 export interface LastCommandStatus {
@@ -65,6 +71,8 @@ export type LineOf<M> = (marker: M) => number;
 
 export interface LineRange {
   startLine: number;
+  /** Start column on `startLine`; undefined = 0. */
+  startCol?: number;
   /** Inclusive last line. */
   endLine: number;
   /** Exclusive end column on `endLine`; undefined = whole line. */
@@ -83,8 +91,9 @@ function pointsOf<M>(e: CommandEntry<M>): MarkPoint<M>[] {
   return [e.prompt, e.input, e.output, e.end].filter((p): p is MarkPoint<M> => Boolean(p));
 }
 
-function newEntry<M>(): CommandEntry<M> {
+function newEntry<M>(id: number): CommandEntry<M> {
   return {
+    id,
     startedAt: null,
     endedAt: null,
     exitCode: null,
@@ -100,6 +109,7 @@ export class CommandMarkTracker<M> {
   seen = false;
   private readonly dispose: (marker: M) => void;
   private readonly max: number;
+  private seq = 0;
 
   constructor(opts: CommandMarkTrackerOptions<M>) {
     this.dispose = opts.dispose;
@@ -108,6 +118,21 @@ export class CommandMarkTracker<M> {
 
   private get current(): CommandEntry<M> | undefined {
     return this.commands[this.commands.length - 1];
+  }
+
+  /** Most recent entry (the one the last mark applied to), or undefined. */
+  latest(): CommandEntry<M> | undefined {
+    return this.current;
+  }
+
+  /** Entry with sequence id `id`, or undefined once it was dropped. */
+  byId(id: number): CommandEntry<M> | undefined {
+    for (let i = this.commands.length - 1; i >= 0; i--) {
+      const e = this.commands[i]!;
+      if (e.id === id) return e;
+      if (e.id < id) break;
+    }
+    return undefined;
   }
 
   private replacePoint(e: CommandEntry<M>, key: "prompt" | "input" | "output" | "end", p: MarkPoint<M> | null) {
@@ -151,7 +176,7 @@ export class CommandMarkTracker<M> {
         }
         // Output started but no D arrived: close it without a code.
         if (c && !c.finished) c.finished = true;
-        const e = this.push(newEntry<M>());
+        const e = this.push(newEntry<M>(++this.seq));
         if (point) e.prompt = point;
         return false;
       }
@@ -163,7 +188,7 @@ export class CommandMarkTracker<M> {
         }
         const c = this.current;
         if (c && !c.finished) c.finished = true;
-        const e = this.push(newEntry<M>());
+        const e = this.push(newEntry<M>(++this.seq));
         if (point) e.input = point;
         return false;
       }
@@ -172,7 +197,7 @@ export class CommandMarkTracker<M> {
         if (!e) {
           const c = this.current;
           if (c && !c.finished) c.finished = true;
-          e = this.push(newEntry<M>());
+          e = this.push(newEntry<M>(++this.seq));
         }
         if (point) e.output = point;
         e.started = true;
@@ -185,7 +210,7 @@ export class CommandMarkTracker<M> {
         if (c && !c.finished) {
           e = c;
         } else {
-          e = this.push(newEntry<M>());
+          e = this.push(newEntry<M>(++this.seq));
         }
         // `D` without C or a code (e.g. after Ctrl+C at the prompt): nothing ran.
         e.ran = e.started || mark.exitCode !== null;
@@ -227,25 +252,54 @@ export class CommandMarkTracker<M> {
     for (let i = this.commands.length - 1; i >= 0; i--) {
       const e = this.commands[i]!;
       if (!e.finished || !e.started) continue;
-      if (!e.output) return null;
-      const outLine = lineOf(e.output.marker);
-      if (outLine < 0) return null;
-      // C emitted at the end of the input line → output begins on the next line.
-      const startLine = e.output.col > 0 ? outLine + 1 : outLine;
-      const endLine = e.end ? lineOf(e.end.marker) : -1;
-      if (e.end && endLine >= 0) {
-        return e.end.col > 0
-          ? { startLine, endLine, endCol: e.end.col }
-          : { startLine, endLine: endLine - 1 };
-      }
-      // No D marker: stop before the next prompt.
-      const next = this.commands[i + 1];
-      const np = next?.prompt ?? next?.input;
-      const nextLine = np ? lineOf(np.marker) : -1;
-      if (nextLine < 0) return null;
-      return { startLine, endLine: nextLine - 1 };
+      return this.outputRange(e, lineOf);
     }
     return null;
+  }
+
+  /** Line range of `e`'s output, or null when unknown / scrolled away / still running. */
+  outputRange(e: CommandEntry<M>, lineOf: LineOf<M>): LineRange | null {
+    if (!e.finished || !e.started || !e.output) return null;
+    const outLine = lineOf(e.output.marker);
+    if (outLine < 0) return null;
+    // C emitted at the end of the input line → output begins on the next line.
+    const startLine = e.output.col > 0 ? outLine + 1 : outLine;
+    const endLine = e.end ? lineOf(e.end.marker) : -1;
+    if (e.end && endLine >= 0) {
+      return e.end.col > 0
+        ? { startLine, endLine, endCol: e.end.col }
+        : { startLine, endLine: endLine - 1 };
+    }
+    // No D marker: stop before the next prompt.
+    const i = this.commands.indexOf(e);
+    const next = i >= 0 ? this.commands[i + 1] : undefined;
+    const np = next?.prompt ?? next?.input;
+    const nextLine = np ? lineOf(np.marker) : -1;
+    if (nextLine < 0) return null;
+    return { startLine, endLine: nextLine - 1 };
+  }
+
+  /** Range of the typed command line (B → C), or null when either mark is missing. */
+  inputRange(e: CommandEntry<M>, lineOf: LineOf<M>): LineRange | null {
+    if (!e.input || !e.output) return null;
+    const startLine = lineOf(e.input.marker);
+    const outLine = lineOf(e.output.marker);
+    if (startLine < 0 || outLine < startLine) return null;
+    if (e.output.col > 0) {
+      return { startLine, startCol: e.input.col, endLine: outLine, endCol: e.output.col };
+    }
+    if (outLine === startLine) return null;
+    return { startLine, startCol: e.input.col, endLine: outLine - 1 };
+  }
+
+  /** First live line of `e` (prompt, else input, else output), or -1. */
+  entryLine(e: CommandEntry<M>, lineOf: LineOf<M>): number {
+    for (const p of [e.prompt, e.input, e.output]) {
+      if (!p) continue;
+      const line = lineOf(p.marker);
+      if (line >= 0) return line;
+    }
+    return -1;
   }
 
   /** Dispose every marker and forget all commands. */

@@ -47,6 +47,7 @@ import {
 import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
 import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
+import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useSlideDirection } from "../hooks/useSlideDirection";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
@@ -464,6 +465,15 @@ function ChatTabInner({
       windowFocused,
       backgroundAgentOptions,
     );
+
+  const handleTerminalNotify = useTerminalNotifications({
+    panes,
+    focusedPaneId,
+    windowFocused,
+    viewActive: active,
+    settings,
+    t,
+  });
 
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
@@ -2038,6 +2048,7 @@ function ChatTabInner({
             onWrite={handlePtyWrite}
             onCwdReport={reportPaneCwd}
             cwd={pane.cwd}
+            onTerminalNotify={handleTerminalNotify}
             onSessionLost={() => {
               if (respawningPaneIdsRef.current.has(pane.id)) return;
               void respawnPane(pane.id);

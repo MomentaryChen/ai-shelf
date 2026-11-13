@@ -814,6 +814,23 @@ export const zh: Record<MessageKey, string> = {
   "terminal.marks.status.failed": "上一個指令失敗（exit {code}）",
   "terminal.marks.status.unknown": "上一個指令已結束",
   "terminal.marks.status.duration": "耗時 {duration}",
+  // 終端機通知（長時間指令、BEL、OSC 9 / 777）
+  "terminal.notify.commandDoneTitle": "{pane} 的指令已完成",
+  "terminal.notify.commandFailedTitle": "{pane} 的指令失敗（exit {code}）",
+  "terminal.notify.commandBody": "{command} · {duration}",
+  "terminal.notify.commandBodyNoText": "耗時 {duration}",
+  "terminal.notify.bellTitle": "{pane} 發出提示音",
+  "terminal.notify.bellBody": "這個窗格中的程式需要你的注意。",
+  "settings.terminalNotify.title": "終端機通知",
+  "settings.terminalNotify.hint":
+    "當你沒在看某個 shell 窗格時（聚焦在其他窗格，或 App 在背景）發出桌面通知。點擊通知會帶你回到該窗格。",
+  "settings.terminalNotify.longCommand": "長時間指令完成時通知",
+  "settings.terminalNotify.longCommandHint":
+    "需要 shell 整合（OSC 133）。顯示指令、結束狀態與耗時。",
+  "settings.terminalNotify.longCommandSec": "最短時間（秒）",
+  "settings.terminalNotify.bell": "收到提示音與 CLI 通知時通知",
+  "settings.terminalNotify.bellHint":
+    "程式（例如 AI CLI）發出的 BEL 與 OSC 9 / OSC 777 通知請求。每個窗格各自限制頻率。",
   "terminal.ctx.newConversation": "開始新對話",
   "settings.agentSessions.title": "AI agent 對話",
   "settings.resumeAgentSessions": "接續 AI agent 對話",

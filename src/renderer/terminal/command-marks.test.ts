@@ -235,3 +235,81 @@ describe("command status store", () => {
     setCommandStatus("s1", null);
   });
 });
+
+describe("CommandMarkTracker ids and ranges", () => {
+  it("assigns increasing ids that survive the cap", () => {
+    const { tracker, at, mark } = setup(2);
+    for (let i = 0; i < 4; i++) {
+      mark("A", at(i * 3));
+      mark("B", at(i * 3, 2));
+      mark("C", at(i * 3 + 1));
+      mark("D;0", at(i * 3 + 2));
+    }
+    assert.deepEqual(
+      tracker.commands.map((e) => e.id),
+      [3, 4],
+    );
+    assert.equal(tracker.byId(4)?.id, 4);
+    assert.equal(tracker.byId(1), undefined);
+    assert.equal(tracker.latest()?.id, 4);
+  });
+
+  it("inputRange spans B to C (C at column 0 → previous line)", () => {
+    const { tracker, at, mark } = setup();
+    mark("A", at(0));
+    mark("B", at(0, 4));
+    mark("C", at(1, 0));
+    const e = tracker.latest()!;
+    assert.deepEqual(tracker.inputRange(e, lineOf), { startLine: 0, startCol: 4, endLine: 0 });
+  });
+
+  it("inputRange ends at C's column when C is mid-line", () => {
+    const { tracker, at, mark } = setup();
+    mark("A", at(5));
+    mark("B", at(5, 2));
+    mark("C", at(6, 7));
+    const e = tracker.latest()!;
+    assert.deepEqual(tracker.inputRange(e, lineOf), {
+      startLine: 5,
+      startCol: 2,
+      endLine: 6,
+      endCol: 7,
+    });
+  });
+
+  it("inputRange is null without B or with an empty line", () => {
+    const { tracker, at, mark } = setup();
+    mark("A", at(0));
+    mark("C", at(1));
+    assert.equal(tracker.inputRange(tracker.latest()!, lineOf), null);
+    const t2 = setup();
+    t2.mark("B", t2.at(3, 2));
+    t2.mark("C", t2.at(3, 0));
+    assert.equal(t2.tracker.inputRange(t2.tracker.latest()!, lineOf), null);
+  });
+
+  it("outputRange works for any finished entry and lastOutputRange delegates", () => {
+    const { tracker, at, mark } = setup();
+    mark("A", at(0));
+    mark("B", at(0, 2));
+    mark("C", at(1));
+    mark("D;0", at(4));
+    mark("A", at(4));
+    mark("B", at(4, 2));
+    mark("C", at(5));
+    mark("D;1", at(7));
+    const [first, second] = tracker.commands;
+    assert.deepEqual(tracker.outputRange(first!, lineOf), { startLine: 1, endLine: 3 });
+    assert.deepEqual(tracker.outputRange(second!, lineOf), { startLine: 5, endLine: 6 });
+    assert.deepEqual(tracker.lastOutputRange(lineOf), { startLine: 5, endLine: 6 });
+    assert.equal(tracker.entryLine(first!, lineOf), 0);
+  });
+
+  it("outputRange is null while the command is still running", () => {
+    const { tracker, at, mark } = setup();
+    mark("A", at(0));
+    mark("B", at(0, 2));
+    mark("C", at(1));
+    assert.equal(tracker.outputRange(tracker.latest()!, lineOf), null);
+  });
+});
