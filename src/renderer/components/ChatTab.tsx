@@ -101,6 +101,7 @@ import {
   displayLayoutWithoutPoppedOut,
   focusAfterPopOut,
   withoutPoppedOut,
+  splitNextToPane,
 } from "../terminal/popout-panes";
 import {
   addPaneToView,
@@ -108,6 +109,7 @@ import {
   findViewOfPane,
   hiddenPaneIds,
   newViewId,
+  placePaneInView,
   removePaneFromViews,
   resolveViews,
   serializeViews,
@@ -447,6 +449,7 @@ function ChatTabInner({
     flushPersistCurrentProfile,
     closePaneInStashedProfile,
     getProfileLayoutByKey,
+    insertPaneInStashedProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -1772,13 +1775,65 @@ function ChatTabInner({
     });
   }
 
+  /**
+   * "New terminal" pressed in a view window. This window owns spawning and the
+   * layouts: the pane joins the view's profile (active or stashed) next to
+   * `anchorPaneId` and is shown in that view, never here.
+   * Returns a localized error, or null on success.
+   */
+  async function spawnPaneForView(viewId: string, anchorPaneId: string): Promise<string | null> {
+    if (isRestoring()) return t("chat.err.restoringWait");
+    const view = viewsRef.current.find((v) => v.id === viewId);
+    if (!view) return t("pane.popout.missing");
+    const profileKey = view.profileKey;
+    const inView = viewPaneIds(view);
+    const anchorId = inView.includes(anchorPaneId) ? anchorPaneId : inView[0];
+    const tree = getProfileLayoutByKey(profileKey);
+    const anchor = anchorId ? findPane(tree, anchorId) : null;
+    if (!tree || !anchor) return t("pane.popout.missing");
+    if (collectPanes(tree).length >= maxPanes) return t("chat.err.maxPanes", { max: maxPanes });
+    // Spawn on the view profile's target (remote / default cwd), not the active one's.
+    const isActive = activeProfileKey === profileKey;
+    const profile = profileByKey(profileKey);
+    if (!isActive && !profile) return t("pane.popout.missing");
+    const remote = isActive ? activeRemoteRef.current : (profile?.remote ?? null);
+    const cwd = anchor.cwd || (isActive ? resolveCwd() : (profile?.defaultCwd?.trim() ?? ""));
+    const pane = await spawnPaneResilient(
+      resolveLaunchTool(anchor.tool, availableTools),
+      cwd,
+      remote,
+    );
+    if (!pane) return t("chat.err.cannotOpen");
+
+    // The profile may have been switched while spawning: find the anchor again. The
+    // profile layout and the view change in the same tick, so the view never holds a
+    // pane its profile lacks and this window never mounts the new terminal.
+    if (layoutRef.current && findPane(layoutRef.current, anchor.id)) {
+      setLayout((prev) => splitNextToPane(prev, anchor.id, pane, Infinity) ?? prev);
+    } else if (
+      !insertPaneInStashedProfile(anchor.id, pane, (workspaceId, profileId) =>
+        profileByKey(`${workspaceId}:${profileId}`),
+      )
+    ) {
+      window.api.ptyKill(pane.sessionId);
+      return t("pane.popout.missing");
+    }
+    setViews((prev) =>
+      prev.map((v) =>
+        v.id === viewId ? addPaneToView({ ...v, focusedPaneId: anchor.id }, pane) : v,
+      ),
+    );
+    return null;
+  }
+
   const handleViewIntentRef = useRef((_intent: PaneViewIntent) => {});
   handleViewIntentRef.current = (intent: PaneViewIntent) => {
     if (intent.type === "move") {
       const { paneId, fromViewId, target } = intent;
       const fromView = fromViewId ? viewsRef.current.find((v) => v.id === fromViewId) : null;
       if (fromViewId && !fromView) return;
-      const profileKey = fromView ? fromView.profileKey : activeProfileKey;
+      // A sidebar drag can be a pane of a non-active profile: main passes its profile along.
+      const profileKey = fromView ? fromView.profileKey : intent.profileKey || activeProfileKey;
       if (!profileKey) return;
       const pane = lookupProfilePane(profileKey, paneId);
       if (!pane) return;
@@ -1790,6 +1845,13 @@ function ChatTabInner({
         const into = viewsRef.current.find((v) => v.id === target.viewId);
         // Main checks this too: a view only ever holds panes of its own profile.
         if (!into || into.profileKey !== profileKey) return;
+        // Dragged from the sidebar onto the view that already shows it: just focus it there.
+        if (findViewOfPane(viewsRef.current, paneId)?.id === into.id) {
+          updateView(into.id, (v) =>
+            v.focusedPaneId === paneId ? v : { ...v, focusedPaneId: paneId },
+          );
+          return;
+        }
         setViews((prev) =>
           removePaneFromViews(prev, paneId).map((v) =>
             v.id === into.id ? addPaneToView(v, pane) : v,
@@ -1819,6 +1881,34 @@ function ChatTabInner({
           v.focusedPaneId === action.paneId ? v : { ...v, focusedPaneId: action.paneId },
         );
         return;
+      case "new-pane": {
+        const viewId = view.id;
+        void spawnPaneForView(viewId, action.anchorPaneId)
+          .catch((err: unknown) => (err instanceof Error ? err.message : String(err)))
+          .then((error) => {
+            if (error) window.api.paneViewNotify(viewId, error);
+          });
+        return;
+      }
+      case "adopt-pane": {
+        // A sidebar terminal dropped on a pane of this view.
+        const pane = lookupProfilePane(view.profileKey, action.paneId);
+        if (!pane) {
+          window.api.paneViewNotify(
+            view.id,
+            t("pane.view.rejectOtherProfile", {
+              profile: profileByKey(view.profileKey)?.name || "?",
+            }),
+          );
+          return;
+        }
+        setViews((prev) =>
+          (findPane(view.layout, pane.id) ? prev : removePaneFromViews(prev, pane.id)).map((v) =>
+            v.id === view.id ? placePaneInView(v, pane, action.targetPaneId, action.zone) : v,
+          ),
+        );
+        return;
+      }
       case "close-pane":
         closeProfilePane(view.profileKey, action.paneId);
         return;
@@ -2006,6 +2096,21 @@ function ChatTabInner({
           })();
         }}
         onProfilePaneDragChange={setProfileSidebarDrag}
+        onTerminalDragOut={(profileId, paneId) => {
+          // Released where nothing in this window took it: main checks what is under the
+          // cursor (a view window of that profile, or empty desktop for a new view).
+          const profile =
+            activeProfile?.id === profileId
+              ? activeProfile
+              : allProfiles.find((p) => p.id === profileId);
+          if (!profile) return;
+          void window.api.paneViewDragEnd({
+            paneId,
+            profileKey: profileKeyOf(profile),
+            profileName: profile.name,
+            trigger: "drag",
+          });
+        }}
         onTerminalRename={(profileId, terminalId, title) => {
           if (activeProfile?.id !== profileId) return;
           renamePane(terminalId, title);

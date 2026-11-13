@@ -2,11 +2,13 @@ import {
   collectPanes,
   equalizeRunAroundPane,
   findPane,
+  movePaneInTree,
   removePaneFromTree,
   splitPaneInTree,
   type LayoutNode,
   type PaneInfo,
 } from "./split-tree";
+import type { PaneDropZone } from "./pane-drop-zone";
 import type { SerializedLayoutNode } from "./layout-serialize";
 
 /**
@@ -96,6 +98,31 @@ export function addPaneToView(view: PaneView, pane: PaneInfo): PaneView {
     splitPaneInTree(view.layout, anchor.id, "horizontal", pane),
     pane.id,
   );
+  return { ...view, layout, focusedPaneId: pane.id };
+}
+
+/**
+ * Put a pane on `zone` of `targetPaneId` in the view (a sidebar terminal dropped
+ * there) and focus it. A pane already in the view is moved; the centre zone on
+ * a new pane means "beside the target". Unknown target: same as addPaneToView.
+ */
+export function placePaneInView(
+  view: PaneView,
+  pane: PaneInfo,
+  targetPaneId: string,
+  zone: PaneDropZone,
+): PaneView {
+  if (pane.id === targetPaneId) return view;
+  if (!findPane(view.layout, targetPaneId)) return addPaneToView(view, pane);
+  if (findPane(view.layout, pane.id)) {
+    const layout = movePaneInTree(view.layout, pane.id, targetPaneId, zone);
+    return { ...view, layout, focusedPaneId: pane.id };
+  }
+  const beside = splitPaneInTree(view.layout, targetPaneId, "horizontal", pane);
+  const layout =
+    zone === "swap" || zone === "right"
+      ? equalizeRunAroundPane(beside, pane.id)
+      : movePaneInTree(beside, pane.id, targetPaneId, zone);
   return { ...view, layout, focusedPaneId: pane.id };
 }
 

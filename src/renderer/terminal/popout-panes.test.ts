@@ -6,6 +6,7 @@ import {
   displayLayoutWithoutPoppedOut,
   focusAfterPopOut,
   removePaneFromCachedLayout,
+  splitNextToPane,
   withoutPoppedOut,
 } from "./popout-panes.js";
 
@@ -89,6 +90,19 @@ describe("focusAfterPopOut", () => {
 
   it("is null when nothing is left on screen", () => {
     assert.equal(focusAfterPopOut(leaf("a"), new Set(["a"]), "a", "a"), null);
+  });
+});
+
+describe("splitNextToPane", () => {
+  it("puts the new pane right after its anchor", () => {
+    const next = splitNextToPane(tree, "b", pane("n"), 8);
+    assert.deepEqual(ids(next), ["a", "b", "n", "c"]);
+  });
+
+  it("refuses when the anchor is gone or the profile is full", () => {
+    assert.equal(splitNextToPane(tree, "zzz", pane("n"), 8), null);
+    assert.equal(splitNextToPane(tree, "b", pane("n"), 3), null);
+    assert.equal(splitNextToPane(null, "b", pane("n"), 8), null);
   });
 });
 

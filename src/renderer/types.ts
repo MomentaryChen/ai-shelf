@@ -1135,13 +1135,15 @@ export interface ElectronAPI {
   paneViewGetState: () => Promise<PaneViewDecl | null>;
   /** View window: ask the origin to change the view (forwarded as an intent). */
   paneViewAction: (action: PaneViewAction) => void;
+  /** Origin window: show a (localized) message in one of its view windows. */
+  paneViewNotify: (viewId: string, text: string) => void;
   /** Per-machine saved views, keyed by `${originKind}|${workspaceId}:${profileId}`. */
   paneViewStoreGet: (key: string) => Promise<unknown[]>;
   paneViewStoreSave: (key: string, views: unknown[]) => Promise<{ ok: boolean }>;
   onPaneViewIntent: (cb: (intent: PaneViewIntent) => void) => () => void;
   onPaneViewState: (cb: (state: PaneViewDecl) => void) => () => void;
   onPaneViewConfirmClose: (cb: () => void) => () => void;
-  onPaneViewNotice: (cb: (notice: { kind: "other-profile"; profileName: string }) => void) => () => void;
+  onPaneViewNotice: (cb: (notice: PaneViewNotice) => void) => () => void;
   onPaneViewFocusPane: (cb: (paneId: string) => void) => () => void;
   usageGetProviders: () => Promise<{
     providers: UsageProviderMeta[];
@@ -1419,9 +1421,18 @@ export interface PaneViewDragEndRequest {
   height?: number;
 }
 
+/** Shown in a view window: a refused drop (from main) or a message from its origin. */
+export type PaneViewNotice =
+  | { kind: "other-profile"; profileName: string }
+  | { kind: "message"; text: string };
+
 /** View window → origin, forwarded by main. */
 export type PaneViewAction =
   | { type: "focus"; paneId: string }
+  /** New terminal in this view, beside `anchorPaneId` (the origin spawns it in the view's profile). */
+  | { type: "new-pane"; anchorPaneId: string }
+  /** A sidebar terminal of the origin window was dropped on `targetPaneId` here. */
+  | { type: "adopt-pane"; paneId: string; targetPaneId: string; zone: import("./terminal/pane-drop-zone").PaneDropZone }
   | { type: "close-pane"; paneId: string }
   | { type: "dock-pane"; paneId: string }
   | { type: "dock-all" }
@@ -1437,6 +1448,7 @@ export type PaneViewIntent =
   | {
       type: "move";
       paneId: string;
+      profileKey: string;
       fromViewId: string | null;
       target:
         | { kind: "new-view"; bounds: PaneViewRect }

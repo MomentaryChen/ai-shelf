@@ -149,6 +149,8 @@ interface SidebarProps {
     broadcast: boolean,
   ) => void;
   onProfilePaneDragChange?: (active: boolean) => void;
+  /** A live terminal row was dragged and released where nothing in this window took it. */
+  onTerminalDragOut?: (profileId: string, terminalId: string) => void;
   onNavChange?: (itemId: string) => void;
 }
 
@@ -183,6 +185,7 @@ export function Sidebar({
   onTerminalReorder,
   onSavedCommandRun,
   onProfilePaneDragChange,
+  onTerminalDragOut,
   onNavChange,
 }: SidebarProps) {
   const { t } = useLocale();
@@ -365,7 +368,12 @@ export function Sidebar({
                     });
                     onProfilePaneDragChange?.(true);
                   }}
-                  onDragEnd={() => onProfilePaneDragChange?.(false)}
+                  onDragEnd={(e) => {
+                    onProfilePaneDragChange?.(false);
+                    if (e.dataTransfer.dropEffect === "none") {
+                      onTerminalDragOut?.(terminal.profileId, terminal.id);
+                    }
+                  }}
                   title={
                     canMiddleClose
                       ? `${collapsedTitle} · ${t("profile.middleClickClose")}`
@@ -764,10 +772,13 @@ export function Sidebar({
                                   terminalId: terminal.id,
                                 });
                               }}
-                              onDragEnd={() => {
+                              onDragEnd={(e) => {
                                 onProfilePaneDragChange?.(false);
                                 setDraggingTerminal(null);
                                 setDragOverTerminal(null);
+                                if (e.dataTransfer.dropEffect === "none") {
+                                  onTerminalDragOut?.(terminal.profileId, terminal.id);
+                                }
                               }}
                               onDragOver={(e) => {
                                 if (

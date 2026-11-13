@@ -479,7 +479,11 @@ function WarpPaneShell({
       onDropCapture={(e) => {
         if (hasProfilePaneDrag(e.dataTransfer) && onProfilePaneDrop) {
           const payload = readProfilePaneDrag(e.dataTransfer);
-          if (!payload || payload.paneId === pane.id) return;
+          if (!payload || payload.paneId === pane.id) {
+            // Nothing to move, but the drop highlight must not stay on.
+            setProfileDragOver(null);
+            return;
+          }
           e.preventDefault();
           e.stopPropagation();
           const rect = shellRef.current?.getBoundingClientRect();

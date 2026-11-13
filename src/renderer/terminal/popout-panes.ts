@@ -1,4 +1,11 @@
-import { collectPanes, findPane, removePaneFromTree, type LayoutNode, type PaneInfo } from "./split-tree";
+import {
+  collectPanes,
+  findPane,
+  removePaneFromTree,
+  splitPaneInTree,
+  type LayoutNode,
+  type PaneInfo,
+} from "./split-tree";
 import { buildDisplayLayout } from "./profile-pane-display";
 
 /**
@@ -39,6 +46,22 @@ export interface CachedProfileLayout {
   layout: LayoutNode;
   focusedPaneId: string | null;
   minimizedPaneIds: string[];
+}
+
+/**
+ * Layout with `pane` split off `anchorPaneId` — a terminal created inside a
+ * pop-out window sits next to the pane it was created from, so docking it back
+ * lands beside it. `null` when the anchor is gone or the profile is full.
+ */
+export function splitNextToPane(
+  layout: LayoutNode | null,
+  anchorPaneId: string,
+  pane: PaneInfo,
+  maxPanes: number,
+): LayoutNode | null {
+  if (!layout || !findPane(layout, anchorPaneId)) return null;
+  if (collectPanes(layout).length >= maxPanes) return null;
+  return splitPaneInTree(layout, anchorPaneId, "horizontal", pane);
 }
 
 /**
