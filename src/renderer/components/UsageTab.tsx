@@ -478,7 +478,11 @@ function ToolUsageDetail({ snapshot }: { snapshot: UsageToolSnapshot }) {
       {showCostGrid && (
         <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
           <div className="rounded-[16px] bg-secondary/50 px-3 py-2">
-            <div className="text-[10px] text-text-secondary">{t("usage.table.cost")}</div>
+            <div className="text-[10px] text-text-secondary">
+              {snapshot.costScope === "billingCycle"
+                ? t("usage.summary.billingCycleCost")
+                : t("usage.table.cost")}
+            </div>
             <div className="text-[18px] font-medium tabular-nums text-accent">
               {formatUsd(snapshot.totalCostUsd ?? 0)}
             </div>
@@ -949,6 +953,11 @@ function UsageComparisonTable({
             </Td>
             <Td className="tabular-nums">
               {snap.status === "ok" ? formatUsd(snap.totalCostUsd ?? 0) : "—"}
+              {snap.status === "ok" && snap.costScope === "billingCycle" && (
+                <span className="ml-1 text-[11px] text-text-secondary">
+                  {t("usage.table.billingCycleSuffix")}
+                </span>
+              )}
             </Td>
             <Td className="tabular-nums">
               {snap.status === "ok" ? formatTokens(snap.totalInputTokens) : "—"}
@@ -1094,12 +1103,18 @@ export function UsageTab() {
               value={formatTokens(dashboard.summary.totalOutputTokens)}
               label={t("usage.summary.totalOutputTokens")}
             />
+            {(dashboard.summary.billingCycleCostUsd ?? 0) > 0 && (
+              <StatCard
+                value={formatUsd(dashboard.summary.billingCycleCostUsd)}
+                label={t("usage.summary.billingCycleCost")}
+              />
+            )}
             <StatCard
-              value={`${dashboard.summary.configuredCount}/${providers.filter((p) => p.fields.length > 0).length}`}
+              value={`${dashboard.summary.configuredCount}/${dashboard.summary.supportedCount}`}
               label={t("usage.summary.configured")}
             />
             <StatCard
-              value={supportedSnapshots.length}
+              value={dashboard.summary.activeCount ?? supportedSnapshots.length}
               label={t("usage.summary.active")}
             />
           </div>

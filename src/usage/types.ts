@@ -108,6 +108,12 @@ export interface UsageToolSnapshot {
    * Used when daily rows have tokens but no dollars (Cursor included usage).
    */
   weekCostUsd?: number;
+  /**
+   * What `totalCostUsd` covers. "period" (default) = the selected date range.
+   * "billingCycle" = the provider's current billing cycle (e.g. claude.ai extra-usage
+   * credits); kept out of the period total so different windows are not mixed.
+   */
+  costScope?: "period" | "billingCycle";
   daily: UsageDayBucket[];
   byModel?: UsageModelBreakdown[];
   quotas?: UsageQuotaWindow[];
@@ -174,11 +180,18 @@ export interface UsageDashboardResult {
   encryptionAvailable: boolean;
   tools: UsageToolSnapshot[];
   summary: {
+    /** Sum of period-scoped tool costs for the selected range. */
     totalCostUsd: number;
+    /** Billing-cycle spend reported by tools without a per-period figure (not in totalCostUsd). */
+    billingCycleCostUsd: number;
     totalInputTokens: number;
     totalOutputTokens: number;
+    /** Supported tools that are connected: API credentials saved, or local session data found. */
     configuredCount: number;
+    /** Every tool AI Shelf can read usage for (API + local). */
     supportedCount: number;
+    /** Connected tools that returned cost, tokens or a quota snapshot for this period. */
+    activeCount: number;
     dailyUnified: UsageDailyUnifiedRow[];
   };
   insights: UsageCostInsights;

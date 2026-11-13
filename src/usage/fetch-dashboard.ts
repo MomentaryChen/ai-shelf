@@ -13,7 +13,6 @@ import {
   getUsageCredential,
   isUsageEncryptionAvailable,
   isUsageToolConfigured,
-  listUsageCredentialStatus,
 } from "./credential-store.js";
 import { scanFlowGenerateCostsForAttribution } from "./flow-generate-scan.js";
 import { scanRecentFlowRunsForAttribution } from "./flow-run-scan.js";
@@ -189,21 +188,17 @@ export async function fetchUsageDashboard(
   opts: UsageFetchOptions = {},
 ): Promise<UsageDashboardResult> {
   const days = Math.min(Math.max(opts.days ?? 30, 1), 90);
-  const statuses = listUsageCredentialStatus();
 
   const tools = await Promise.all(
     USAGE_PROVIDERS.map((provider) => fetchToolSnapshot(provider, days)),
   );
-
-  const supported = USAGE_PROVIDERS.filter((p) => p.supported);
-  const configuredCount = statuses.filter((s) => s.configured).length;
 
   return {
     rangeDays: days,
     fetchedAt: new Date().toISOString(),
     encryptionAvailable: isUsageEncryptionAvailable(),
     tools,
-    summary: aggregateUsageDashboard(tools, configuredCount, supported.length),
+    summary: aggregateUsageDashboard(tools),
     insights: buildCostInsights(tools, days),
   };
 }
