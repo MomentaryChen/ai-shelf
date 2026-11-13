@@ -6,6 +6,22 @@ import {
   type GroupLayoutSnapshot,
 } from "../../models/group-layout.js";
 import { DatabaseError } from "../../core/errors/app-error.js";
+import { normalizeRemoteSshConfig, type RemoteSshConfig } from "../../runtime/ssh-remote.js";
+
+/** Parse a stored `remote_json` column; corrupt or invalid → local (null). */
+export function parseRemoteJson(raw: string | null | undefined): RemoteSshConfig | null {
+  if (!raw) return null;
+  try {
+    return normalizeRemoteSshConfig(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+export function serializeRemoteJson(remote: RemoteSshConfig | null | undefined): string | null {
+  const safe = remote ? normalizeRemoteSshConfig(remote) : null;
+  return safe ? JSON.stringify(safe) : null;
+}
 
 const PREF_LAST_ACTIVE_GROUP = "last_active_group";
 /** JSON map: profileGroupId → last active profileId within that group. */
@@ -17,7 +33,7 @@ export class GroupLayoutRepository {
   findByGroupId(groupId: string): GroupLayoutSnapshot | null {
     const row = this.db
       .prepare(
-        `SELECT default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at
+        `SELECT default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, remote_json, updated_at
          FROM group_layouts WHERE group_id = ?`,
       )
       .get(groupId) as
@@ -29,6 +45,7 @@ export class GroupLayoutRepository {
           broadcast_input: number;
           accent_color: string | null;
           saved_commands_json: string | null;
+          remote_json: string | null;
           updated_at: string;
         }
       | undefined;
@@ -66,6 +83,7 @@ export class GroupLayoutRepository {
       broadcastInput: Boolean(row.broadcast_input),
       accentColor: row.accent_color ?? null,
       savedCommands,
+      remote: parseRemoteJson(row.remote_json),
       updatedAt: row.updated_at,
     });
   }
@@ -77,13 +95,14 @@ export class GroupLayoutRepository {
       parsed.accentColor !== undefined ? parsed.accentColor : (existing?.accentColor ?? null);
     const savedCommands =
       parsed.savedCommands !== undefined ? parsed.savedCommands : (existing?.savedCommands ?? []);
+    const remote = parsed.remote !== undefined ? parsed.remote : (existing?.remote ?? null);
     const now = parsed.updatedAt || new Date().toISOString();
-    const stored = { ...parsed, accentColor, savedCommands, updatedAt: now };
+    const stored = { ...parsed, accentColor, savedCommands, remote, updatedAt: now };
 
     this.db
       .prepare(
-        `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at)
-         VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @saved_commands_json, @updated_at)
+        `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, remote_json, updated_at)
+         VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @saved_commands_json, @remote_json, @updated_at)
          ON CONFLICT(group_id) DO UPDATE SET
            workspace_id = excluded.workspace_id,
            default_cwd = excluded.default_cwd,
@@ -93,6 +112,7 @@ export class GroupLayoutRepository {
            broadcast_input = excluded.broadcast_input,
            accent_color = excluded.accent_color,
            saved_commands_json = excluded.saved_commands_json,
+           remote_json = excluded.remote_json,
            updated_at = excluded.updated_at`,
       )
       .run({
@@ -105,6 +125,7 @@ export class GroupLayoutRepository {
         broadcast_input: parsed.broadcastInput ? 1 : 0,
         accent_color: accentColor,
         saved_commands_json: JSON.stringify(stored.savedCommands),
+        remote_json: serializeRemoteJson(remote),
         updated_at: now,
       });
 
