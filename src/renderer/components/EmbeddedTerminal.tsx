@@ -18,6 +18,7 @@ import {
   SEARCH_DEBOUNCE_MS,
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
+import { attachUnicode11 } from "../terminal/xterm-unicode";
 import { bindTerminalCwd } from "../terminal/xterm-cwd";
 import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
 import { recordImeAnchor } from "../terminal/ime-anchor-log";
@@ -413,12 +414,14 @@ function EmbeddedTerminalInner({
       scrollback,
       scrollOnUserInput: false,
       smoothScrollDuration: 0,
-      allowProposedApi: false,
+      // Proposed API is needed for term.unicode (Unicode 11 widths).
+      allowProposedApi: true,
       rightClickSelectsWord: !rightClickPasteRef.current,
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+    attachUnicode11(term);
     term.open(el);
     termRef.current = term;
     // Assigned once fit() exists. WebGL loads async, so the callback runs later.
