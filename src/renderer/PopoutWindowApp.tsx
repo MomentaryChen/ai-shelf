@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeftOpen } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmbeddedTerminal } from "./components/EmbeddedTerminal";
 import { BusyPaneCloseDialog } from "./components/BusyPaneCloseDialog";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SplitPaneLayout } from "./components/SplitPaneLayout";
 import { TerminalStatusBar } from "./components/TerminalStatusBar";
 import { applyAppTheme, useAppThemeRevision } from "./app-theme";
@@ -20,6 +21,8 @@ import { collectPanes, findPane, updateSplitRatio, type LayoutNode } from "./ter
 import type { PaneViewDecl } from "./types";
 
 const NOTICE_MS = 4000;
+/** Divider drags send the ratio on a trailing timer, not on every mouse move. */
+const RESIZE_SEND_MS = 150;
 
 /**
  * A profile view window: some panes of one profile, on their own window
@@ -59,9 +62,14 @@ export function PopoutWindowApp() {
     };
   }, []);
 
+  /** Divider ratio not yet sent to the origin; incoming layouts wait until it is. */
+  const pendingResizeRef = useRef<{ splitId: string; ratio: number } | null>(null);
+  const resizeTimerRef = useRef(0);
+
   const applyState = useCallback((next: PaneViewDecl | null) => {
     setView(next);
-    setLayout(next?.layout ?? null);
+    // Mid divider drag an older echo would snap the divider back.
+    if (!pendingResizeRef.current) setLayout(next?.layout ?? null);
     if (next) {
       setFocusedPaneId((prev) =>
         prev && findPane(next.layout, prev) ? prev : (next.focusedPaneId ?? null),
@@ -128,10 +136,25 @@ export function PopoutWindowApp() {
     ],
   );
 
+  const focusedPaneIdRef = useRef(focusedPaneId);
+  focusedPaneIdRef.current = focusedPaneId;
   const focusPane = useCallback((paneId: string) => {
+    if (focusedPaneIdRef.current === paneId) return;
     setFocusedPaneId(paneId);
     window.api.paneViewAction({ type: "focus", paneId });
   }, []);
+
+  const resizeSplit = useCallback((splitId: string, ratio: number) => {
+    setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev));
+    pendingResizeRef.current = { splitId, ratio };
+    window.clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = window.setTimeout(() => {
+      const pending = pendingResizeRef.current;
+      pendingResizeRef.current = null;
+      if (pending) window.api.paneViewAction({ type: "resize", ...pending });
+    }, RESIZE_SEND_MS);
+  }, []);
+  useEffect(() => () => window.clearTimeout(resizeTimerRef.current), []);
 
   const closePane = useCallback(
     (paneId: string, opts?: { skipConfirm?: boolean }) => {
@@ -227,10 +250,7 @@ export function PopoutWindowApp() {
             paneLabels={view.labels}
             onFocusPane={focusPane}
             onClosePane={(paneId) => closePane(paneId)}
-            onResizeSplit={(splitId, ratio) => {
-              setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev));
-              window.api.paneViewAction({ type: "resize", splitId, ratio });
-            }}
+            onResizeSplit={resizeSplit}
             onMovePane={(dragPaneId, targetPaneId, zone) =>
               window.api.paneViewAction({ type: "move-in-view", dragPaneId, targetPaneId, zone })
             }
@@ -275,18 +295,26 @@ export function PopoutWindowApp() {
         <TerminalStatusBar pane={focusedPane} />
       </div>
       <BusyPaneCloseDialog
-        open={confirmCloseView || busyClosePaneId !== null}
-        onCancel={() => {
-          setConfirmCloseView(false);
-          setBusyClosePaneId(null);
-        }}
+        open={busyClosePaneId !== null}
+        onCancel={() => setBusyClosePaneId(null)}
         onConfirm={() => {
           const paneId = busyClosePaneId;
-          const wholeView = confirmCloseView;
-          setConfirmCloseView(false);
           setBusyClosePaneId(null);
-          if (wholeView) window.api.paneViewAction({ type: "close-view" });
-          else if (paneId) closePane(paneId, { skipConfirm: true });
+          if (paneId) closePane(paneId, { skipConfirm: true });
+        }}
+      />
+      {/* Window X closes every terminal here, not one pane. */}
+      <ConfirmDialog
+        open={confirmCloseView}
+        title={t("pane.view.closeBusyTitle")}
+        description={t("pane.view.closeBusyConfirm", { count: panes.length })}
+        confirmLabel={t("pane.closeBusyAction")}
+        confirmVariant="destructive"
+        defaultFocus="cancel"
+        onCancel={() => setConfirmCloseView(false)}
+        onConfirm={() => {
+          setConfirmCloseView(false);
+          window.api.paneViewAction({ type: "close-view" });
         }}
       />
     </TooltipProvider>

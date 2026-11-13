@@ -1639,19 +1639,22 @@ function ChatTabInner({
   }, [views, layout, backgroundProfilePanes, restoring, profileBusy, lookupProfilePane, setViews]);
 
   // Keep the per-machine view store in step with every view change (any profile).
+  // Deduped per key: focus / re-resolve churn must not rewrite the file.
   const savedViewKeysRef = useRef(new Set<string>());
+  const lastSavedViewsRef = useRef(new Map<string, string>());
   useEffect(() => {
     const keys = new Set([...savedViewKeysRef.current, ...views.map((v) => v.profileKey)]);
     for (const key of keys) {
       const tree = getProfileLayoutByKey(key);
       if (!tree) continue;
-      void window.api.paneViewStoreSave(
-        viewStoreKey(key),
-        serializeViews(
-          views.filter((v) => v.profileKey === key),
-          tree,
-        ),
+      const saved = serializeViews(
+        views.filter((v) => v.profileKey === key),
+        tree,
       );
+      const json = JSON.stringify(saved);
+      if (lastSavedViewsRef.current.get(key) === json) continue;
+      lastSavedViewsRef.current.set(key, json);
+      void window.api.paneViewStoreSave(viewStoreKey(key), saved);
     }
     savedViewKeysRef.current = new Set(views.map((v) => v.profileKey));
   }, [views, getProfileLayoutByKey]);
@@ -1742,8 +1745,18 @@ function ChatTabInner({
     );
   }
 
+  /** Same array back when `fn` changes nothing (keeps syncs / store writes quiet). */
   function updateView(viewId: string, fn: (view: PaneView) => PaneView) {
-    setViews((prev) => prev.map((v) => (v.id === viewId ? fn(v) : v)));
+    setViews((prev) => {
+      let changed = false;
+      const next = prev.map((v) => {
+        if (v.id !== viewId) return v;
+        const updated = fn(v);
+        if (updated !== v) changed = true;
+        return updated;
+      });
+      return changed ? next : prev;
+    });
   }
 
   const handleViewIntentRef = useRef((_intent: PaneViewIntent) => {});
@@ -1789,7 +1802,9 @@ function ChatTabInner({
     const { action } = intent;
     switch (action.type) {
       case "focus":
-        updateView(view.id, (v) => ({ ...v, focusedPaneId: action.paneId }));
+        updateView(view.id, (v) =>
+          v.focusedPaneId === action.paneId ? v : { ...v, focusedPaneId: action.paneId },
+        );
         return;
       case "close-pane":
         closeProfilePane(view.profileKey, action.paneId);

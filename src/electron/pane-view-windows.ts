@@ -287,8 +287,9 @@ function createViewWindow(decl: PaneViewDecl, origin: WebContents): void {
       });
     }, 400);
   };
-  win.on("moved", reportBounds);
-  win.on("resized", reportBounds);
+  // move / resize (debounced) — moved / resized do not fire on Linux.
+  win.on("move", reportBounds);
+  win.on("resize", reportBounds);
 
   d.attachWindow(win, title);
   void win.loadURL(d.pageUrl());

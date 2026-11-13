@@ -772,6 +772,9 @@ export const en = {
   "pane.maximizedHint": "Other panes are hidden but still running. Click or press {keys} to restore the split layout.",
   "pane.view.dockAll": "Return all to original window",
   "pane.view.paneCount": "{count} terminals",
+  "pane.view.closeBusyTitle": "Close this window?",
+  "pane.view.closeBusyConfirm":
+    "This closes all {count} terminals in this window. An agent here is still running or waiting for input and will be stopped.",
   "pane.view.rejectOtherProfile":
     "This window only holds terminals from {profile}. Drag terminals of another profile outside any window to open them in their own window.",
   "pane.dropAbove": "Place above",
