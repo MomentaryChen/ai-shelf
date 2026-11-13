@@ -33,6 +33,8 @@ import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
+import { planAgentSessionLaunch } from "../shared/agent-session-resume.js";
+import { claudeConfigDirForEnv, claudeTranscriptExists } from "./agent-session.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import {
@@ -1806,7 +1808,7 @@ ipcMain.handle(
     cwd?: string,
     extraArgs?: string,
     shell?: string,
-    spawnOptions?: { wslDistro?: unknown },
+    spawnOptions?: { wslDistro?: unknown; agentSession?: { resumeId?: unknown } },
   ) => {
     let pty: PtyModule;
     try {
@@ -1815,16 +1817,37 @@ ipcMain.handle(
       return { success: false, error: (err as Error).message };
     }
     const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
-    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
-    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
-
-    // Date.now() alone collides when the same tool spawns twice in one ms.
-    const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
     const workDirResult = resolvePtyWorkDir(cwd);
     if (!workDirResult.ok) {
       return { success: false, error: workDirResult.error };
     }
     const workDir = workDirResult.dir;
+
+    // Agent conversation resume (the renderer opts in via `agentSession`). Skipped
+    // under WSL: the transcript lives in the distro's home, not visible from here.
+    let launchArgs = extraArgs;
+    let agentSessionId: string | undefined;
+    let agentSessionResumed = false;
+    if (!shellOnly && spawnOptions?.agentSession && shell !== "wsl") {
+      const resumeId = spawnOptions.agentSession.resumeId;
+      const configDir = claudeConfigDirForEnv(process.env);
+      const sessionPlan = planAgentSessionLaunch({
+        tool,
+        extraArgs,
+        resumeId: typeof resumeId === "string" ? resumeId : undefined,
+        transcriptExists: (id) => claudeTranscriptExists(configDir, workDir, id),
+        newId: randomUUID,
+      });
+      launchArgs = sessionPlan.extraArgs;
+      agentSessionId = sessionPlan.sessionId;
+      agentSessionResumed = sessionPlan.resumed;
+    }
+
+    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, launchArgs) ?? "");
+    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
+
+    // Date.now() alone collides when the same tool spawns twice in one ms.
+    const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
     // OSC 7 hooks so `cd` updates the status bar without respawning the PTY.
     // If script install fails, still spawn — cwd just won't track until restart succeeds.
@@ -1914,7 +1937,7 @@ ipcMain.handle(
       });
 
       broadcastPtyMeta(sessionId);
-      return { success: true, sessionId, cwd: workDir };
+      return { success: true, sessionId, cwd: workDir, agentSessionId, agentSessionResumed };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }

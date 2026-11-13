@@ -35,6 +35,13 @@ import {
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
 
+export interface SpawnPaneOptions {
+  /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
+  resumeAgentSessionId?: string;
+}
+
+type SpawnPaneFn = (tool: string, cwd: string, opts?: SpawnPaneOptions) => Promise<PaneInfo | null>;
+
 interface ProfileLiveState {
   layout: LayoutNode;
   focusedPaneId: string | null;
@@ -62,7 +69,7 @@ function applyLayout(
 /** Respawn panes whose PTY no longer exists in the main process (e.g. after crash or rebuild). */
 async function reconcileLayoutPtys(
   node: LayoutNode,
-  spawnPane: (tool: string, cwd: string) => Promise<PaneInfo | null>,
+  spawnPane: SpawnPaneFn,
 ): Promise<LayoutNode> {
   let next = node;
   for (const pane of collectPanes(node)) {
@@ -70,7 +77,9 @@ async function reconcileLayoutPtys(
     if (attached.alive) continue;
 
     window.api.ptyKill(pane.sessionId);
-    let replacement = await spawnPane(pane.tool, pane.cwd);
+    let replacement = await spawnPane(pane.tool, pane.cwd, {
+      resumeAgentSessionId: pane.agentSessionId,
+    });
     if (!replacement && pane.tool !== "shell") {
       replacement = await spawnPane("shell", pane.cwd);
     }
@@ -92,7 +101,7 @@ export function useProfileWorkspace(
   setLayout: Dispatch<SetStateAction<LayoutNode | null>>,
   focusedPaneId: string | null,
   setFocusedPaneId: Dispatch<SetStateAction<string | null>>,
-  spawnPane: (tool: string, cwd: string) => Promise<PaneInfo | null>,
+  spawnPane: SpawnPaneFn,
   workingDir: string,
   broadcastInput: boolean,
 ) {
@@ -255,7 +264,9 @@ export function useProfileWorkspace(
           };
         }
         const paneCwd = slot.cwd?.trim() || cwdDefault;
-        let pane = await spawnPane(slot.tool, paneCwd);
+        let pane = await spawnPane(slot.tool, paneCwd, {
+          resumeAgentSessionId: slot.agentSessionId,
+        });
         if (!pane && slot.tool !== "shell") {
           pane = await spawnPane("shell", paneCwd);
         }
