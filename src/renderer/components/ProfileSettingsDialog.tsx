@@ -269,7 +269,7 @@ export function ProfileSettingsDialog({
               setRemoteDraft(next);
               setRemoteTouched(true);
             }}
-            invalidField={remoteTouched ? remoteInvalid : null}
+            invalid={remoteTouched ? remoteInvalid : null}
             disabled={busy}
           />
         )}

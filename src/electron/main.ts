@@ -98,6 +98,7 @@ import {
   describeRemoteSsh,
   isValidWslDistroName,
   normalizeRemoteSshConfig,
+  prepareSshJumpConfig,
   resolvePtySpawnPlan,
   resolveSshExecutable,
   type GroupLayoutSnapshot,
@@ -1839,8 +1840,21 @@ ipcMain.handle(
       }
     }
 
+    // Jump hosts with their own key need a generated ssh_config; ssh then starts in its dir
+    // (ssh truncates long -F paths when forwarding them to jump processes).
+    let jumpConfig: { dir: string; fileName: string } | null = null;
+    if (remote) {
+      try {
+        jumpConfig = prepareSshJumpConfig(remote, join(app.getPath("userData"), "ssh"));
+      } catch (err) {
+        return { success: false, error: `SSH jump host config: ${(err as Error).message}` };
+      }
+    }
+
     // The pane cwd of a remote profile is a remote path (remote.cwd); the local ssh process starts in home.
-    const workDirResult = remote ? { ok: true as const, dir: homedir() } : resolvePtyWorkDir(cwd);
+    const workDirResult = remote
+      ? { ok: true as const, dir: jumpConfig?.dir ?? homedir() }
+      : resolvePtyWorkDir(cwd);
     if (!workDirResult.ok) {
       return { success: false, error: workDirResult.error };
     }
@@ -1867,7 +1881,10 @@ ipcMain.handle(
       shell,
       shellIntegration,
       wsl: { distro: wslDistro, cwd: workDir },
-      ssh: remote && sshExecutable ? { executable: sshExecutable, config: remote } : undefined,
+      ssh:
+        remote && sshExecutable
+          ? { executable: sshExecutable, config: remote, jumpConfigFile: jumpConfig?.fileName }
+          : undefined,
     });
 
     const ptyOpts = {

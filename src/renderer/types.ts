@@ -464,19 +464,23 @@ export interface SavedCommandSnippet {
   broadcast?: boolean;
 }
 
-/** SSH remote for a profile (mirrors RemoteSshConfig in packages/cli runtime/ssh-remote). */
-export interface RemoteSshConfig {
-  kind: "ssh";
+/** One SSH endpoint (jump host or target); mirrors SshHop in packages/cli runtime/ssh-remote. */
+export interface SshHop {
   /** Hostname, IP, or a Host alias from ~/.ssh/config. */
   host: string;
   user?: string;
   port?: number;
-  /** ProxyJump hops: `[user@]host[:port]`, comma-separated. */
-  jump?: string;
+  /** Local private key path; never key material. */
+  identityFile?: string;
+}
+
+/** SSH remote for a profile (mirrors RemoteSshConfig in packages/cli runtime/ssh-remote). */
+export interface RemoteSshConfig extends SshHop {
+  kind: "ssh";
+  /** Jump hosts in connection order (this computer → [0] → … → target); empty = direct. */
+  jumpHosts?: SshHop[];
   /** Remote start directory; empty = remote login directory. */
   cwd?: string;
-  /** Local private key path (`ssh -i`); never key material. */
-  identityFile?: string;
 }
 
 export interface ProfileTerminal {

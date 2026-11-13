@@ -3,40 +3,52 @@
  *
  * Profiles sync through the cloud, so a remote config is untrusted input that
  * ends up as `ssh` arguments on this machine. Only structured fields are
- * accepted (host / user / port / jump / cwd) and each is checked against a
- * strict charset — no free-form ssh options, no `ProxyCommand`, no secrets.
- * Keys, agents and per-host options belong in the user's `~/.ssh/config`.
+ * accepted (target + ordered jump hosts: host / user / port / key path, plus a
+ * remote dir) and each is checked against a strict charset — no free-form ssh
+ * options, no `ProxyCommand`, no secrets. Agents and other per-host options
+ * stay in the user's `~/.ssh/config`.
  */
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 
-export interface RemoteSshConfig {
-  kind: "ssh";
+/** One SSH endpoint: a jump host (gateway) or the target. */
+export interface SshHop {
   /** Hostname, IP, or a `Host` alias from ~/.ssh/config. */
   host: string;
   user?: string;
   port?: number;
-  /** ProxyJump: `[user@]host[:port]`, comma-separated for multiple hops. */
-  jump?: string;
-  /** Remote start directory; empty = remote login directory. `~` / `~/…` allowed. */
-  cwd?: string;
   /**
-   * Local private key (`ssh -i`). Only the path is stored, never key material;
-   * ssh also loads `<key>-cert.pub` next to it for certificate login. A path
-   * missing on this machine just falls back to agent / ~/.ssh/config keys.
+   * Local private key. Only the path is stored, never key material; ssh also
+   * loads `<key>-cert.pub` next to it for certificate login. A path missing on
+   * this machine just falls back to agent / ~/.ssh/config keys.
    */
   identityFile?: string;
 }
 
+export interface RemoteSshConfig extends SshHop {
+  kind: "ssh";
+  /**
+   * Jump hosts in connection order (this computer → jumpHosts[0] → … → target).
+   * Empty / omitted = direct connection.
+   */
+  jumpHosts?: SshHop[];
+  /** Remote start directory; empty = remote login directory. `~` / `~/…` allowed. */
+  cwd?: string;
+}
+
 export const SSH_CLIENT_NOT_FOUND_ERROR = "SSH client not found";
+export const MAX_SSH_JUMP_HOSTS = 4;
 
 const HOST_RE = /^[A-Za-z0-9_][A-Za-z0-9._:-]{0,252}$/u;
 const USER_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/u;
-const JUMP_HOP_RE =
-  /^(?:[A-Za-z0-9_][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9_][A-Za-z0-9._-]{0,252}(?::\d{1,5})?$/u;
-const MAX_JUMP_HOPS = 4;
+/** Legacy `jump` string hop: `[user@]host[:port]`. */
+const LEGACY_HOP_RE =
+  /^(?:([A-Za-z0-9_][A-Za-z0-9._-]{0,63})@)?([A-Za-z0-9_][A-Za-z0-9._-]{0,252})(?::(\d{1,5}))?$/u;
 const MAX_REMOTE_CWD = 1024;
 const MAX_IDENTITY_PATH = 1024;
+// eslint-disable-next-line no-control-regex
+const CONTROL_RE = /[\u0000-\u001f\u007f]/u;
 /** Seconds before an unreachable host / gateway fails instead of hanging. */
 export const SSH_CONNECT_TIMEOUT_SECONDS = 10;
 
@@ -52,19 +64,8 @@ export function isValidSshPort(value: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= 65535;
 }
 
-export function isValidSshJump(value: string): boolean {
-  const hops = value.split(",");
-  if (hops.length === 0 || hops.length > MAX_JUMP_HOPS) return false;
-  return hops.every((hop) => {
-    if (!JUMP_HOP_RE.test(hop)) return false;
-    const port = hop.match(/:(\d+)$/u)?.[1];
-    return port === undefined || isValidSshPort(Number(port));
-  });
-}
-
 export function isValidRemoteCwd(value: string): boolean {
-  // eslint-disable-next-line no-control-regex
-  return value.length <= MAX_REMOTE_CWD && !/[\u0000-\u001f\u007f]/u.test(value);
+  return value.length <= MAX_REMOTE_CWD && !CONTROL_RE.test(value);
 }
 
 export function isValidIdentityFile(value: string): boolean {
@@ -75,47 +76,33 @@ export function isValidIdentityFile(value: string): boolean {
     // ssh stat()s the literal -i path, then %-expands it: a `%` can never work
     // (escaping as %% fails the stat, raw % is mis-expanded), so reject it.
     !value.includes("%") &&
-    // eslint-disable-next-line no-control-regex
-    !/[\u0000-\u001f\u007f]/u.test(value)
+    // Written as a quoted value in the generated jump-host ssh_config.
+    !value.includes('"') &&
+    !CONTROL_RE.test(value)
   );
 }
 
-/**
- * Normalize untrusted input (IPC, sync bundle, DB row) into a config, or `null`
- * when it is absent or any field is invalid. Never partially accepts a config —
- * a half-valid remote must not degrade into a different host.
- */
-export function normalizeRemoteSshConfig(raw: unknown): RemoteSshConfig | null {
+function isBlank(value: unknown): boolean {
+  return value === undefined || value === null || value === "";
+}
+
+/** Validate one endpoint; `null` when any provided field is invalid. */
+function normalizeHop(raw: unknown): SshHop | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  if (r.kind !== "ssh") return null;
-
   const host = typeof r.host === "string" ? r.host.trim() : "";
   if (!isValidSshHost(host)) return null;
-  const out: RemoteSshConfig = { kind: "ssh", host };
-
-  if (r.user !== undefined && r.user !== null && r.user !== "") {
+  const out: SshHop = { host };
+  if (!isBlank(r.user)) {
     if (typeof r.user !== "string" || !isValidSshUser(r.user.trim())) return null;
     out.user = r.user.trim();
   }
-  if (r.port !== undefined && r.port !== null && r.port !== "") {
+  if (!isBlank(r.port)) {
     const port = typeof r.port === "string" ? Number(r.port) : r.port;
     if (typeof port !== "number" || !isValidSshPort(port)) return null;
     out.port = port;
   }
-  if (r.jump !== undefined && r.jump !== null && r.jump !== "") {
-    if (typeof r.jump !== "string") return null;
-    const jump = r.jump.replace(/\s+/gu, "");
-    if (!isValidSshJump(jump)) return null;
-    out.jump = jump;
-  }
-  if (r.cwd !== undefined && r.cwd !== null && r.cwd !== "") {
-    if (typeof r.cwd !== "string") return null;
-    const cwd = r.cwd.trim();
-    if (!isValidRemoteCwd(cwd)) return null;
-    if (cwd) out.cwd = cwd;
-  }
-  if (r.identityFile !== undefined && r.identityFile !== null && r.identityFile !== "") {
+  if (!isBlank(r.identityFile)) {
     if (typeof r.identityFile !== "string") return null;
     const identityFile = r.identityFile.trim();
     if (!isValidIdentityFile(identityFile)) return null;
@@ -124,9 +111,66 @@ export function normalizeRemoteSshConfig(raw: unknown): RemoteSshConfig | null {
   return out;
 }
 
+/** Earlier builds stored jump hosts as `[user@]host[:port],…`. */
+function parseLegacyJump(value: string): SshHop[] | null {
+  const hops: SshHop[] = [];
+  for (const part of value.replace(/\s+/gu, "").split(",")) {
+    const m = LEGACY_HOP_RE.exec(part);
+    if (!m) return null;
+    const hop = normalizeHop({ host: m[2], user: m[1], port: m[3] });
+    if (!hop) return null;
+    hops.push(hop);
+  }
+  return hops;
+}
+
+/**
+ * Normalize untrusted input (IPC, sync bundle, DB row) into a config, or `null`
+ * when it is absent or any field is invalid. Never partially accepts a config —
+ * a half-valid remote must not degrade into a different host or route.
+ */
+export function normalizeRemoteSshConfig(raw: unknown): RemoteSshConfig | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  if (r.kind !== "ssh") return null;
+
+  const target = normalizeHop(r);
+  if (!target) return null;
+  const out: RemoteSshConfig = { kind: "ssh", ...target };
+
+  let jumpHosts: SshHop[] = [];
+  if (!isBlank(r.jumpHosts)) {
+    if (!Array.isArray(r.jumpHosts)) return null;
+    for (const hop of r.jumpHosts) {
+      const safe = normalizeHop(hop);
+      if (!safe) return null;
+      jumpHosts.push(safe);
+    }
+  } else if (!isBlank(r.jump)) {
+    if (typeof r.jump !== "string") return null;
+    const legacy = parseLegacyJump(r.jump);
+    if (!legacy) return null;
+    jumpHosts = legacy;
+  }
+  if (jumpHosts.length > MAX_SSH_JUMP_HOSTS) return null;
+  if (jumpHosts.length > 0) out.jumpHosts = jumpHosts;
+
+  if (!isBlank(r.cwd)) {
+    if (typeof r.cwd !== "string") return null;
+    const cwd = r.cwd.trim();
+    if (!isValidRemoteCwd(cwd)) return null;
+    if (cwd) out.cwd = cwd;
+  }
+  return out;
+}
+
+function hopLabel(hop: SshHop): string {
+  return `${hop.user ? `${hop.user}@` : ""}${hop.host}`;
+}
+
 /** Short label for pane meta / UI, e.g. `ssh:me@box`. */
 export function describeRemoteSsh(config: RemoteSshConfig): string {
-  return `ssh:${config.user ? `${config.user}@` : ""}${config.host}`;
+  return `ssh:${hopLabel(config)}`;
 }
 
 function posixQuote(value: string): string {
@@ -161,10 +205,80 @@ export function buildRemoteSshCommand(options: { cwd?: string; command?: string 
 }
 
 /**
+ * ProxyJump cannot carry a per-hop key, so jump hosts with a private key get a
+ * generated `Host` alias in a small ssh_config. ssh passes `-F` to the jump
+ * processes it spawns, so each hop uses its own key. The file ends with
+ * `Include ~/.ssh/config`, keeping the user's own settings (agent, defaults,
+ * aliases of the other hops) in effect. Hops without a key stay plain `-J`
+ * entries, so ~/.ssh/config aliases keep working for them.
+ *
+ * `fileName` is content-addressed: identical routes share one file.
+ */
+export function buildSshJumpConfig(
+  config: RemoteSshConfig,
+): { fileName: string; text: string; jump: string } | null {
+  const hops = config.jumpHosts ?? [];
+  if (!hops.some((hop) => hop.identityFile)) return null;
+  const blocks: string[] = [];
+  const route: string[] = [];
+  const id = createHash("sha256").update(JSON.stringify(hops)).digest("hex").slice(0, 12);
+  hops.forEach((hop, index) => {
+    if (!hop.identityFile) {
+      route.push(`${hopLabel(hop)}${hop.port ? `:${String(hop.port)}` : ""}`);
+      return;
+    }
+    const alias = `aishelf-${id}-hop${String(index + 1)}`;
+    route.push(alias);
+    const lines = [`Host ${alias}`, `  HostName ${hop.host}`];
+    if (hop.user) lines.push(`  User ${hop.user}`);
+    if (hop.port) lines.push(`  Port ${String(hop.port)}`);
+    lines.push(`  IdentityFile "${hop.identityFile}"`);
+    blocks.push(lines.join("\n"));
+  });
+  blocks.push("Match all\n  Include ~/.ssh/config");
+  const text = `# Generated by AI Shelf for an SSH profile route. Safe to delete.\n${blocks.join("\n\n")}\n`;
+  return { fileName: `aishelf-${id}.conf`, text, jump: route.join(",") };
+}
+
+/** `-J` value without a generated config (no jump host has a key). */
+function plainJump(hops: SshHop[]): string {
+  return hops.map((hop) => `${hopLabel(hop)}${hop.port ? `:${String(hop.port)}` : ""}`).join(",");
+}
+
+/**
+ * Write the generated jump-host config (if the route needs one) into `dir`.
+ * ssh truncates long `-F` paths when it forwards them to jump processes, so the
+ * caller must start ssh with `cwd = dir` and pass only the bare file name.
+ */
+export function prepareSshJumpConfig(
+  config: RemoteSshConfig,
+  dir: string,
+): { dir: string; fileName: string } | null {
+  const generated = buildSshJumpConfig(config);
+  if (!generated) return null;
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, generated.fileName);
+  let current: string | null = null;
+  try {
+    current = readFileSync(path, "utf8");
+  } catch {
+    /* not written yet */
+  }
+  if (current !== generated.text) writeFileSync(path, generated.text, "utf8");
+  return { dir, fileName: generated.fileName };
+}
+
+/**
  * Argv for the local `ssh` executable. Re-validates the config so callers can
  * pass a value straight from IPC. `--` ends option parsing before the host.
+ * `jumpConfigFile` is the bare name from {@link prepareSshJumpConfig}; it is
+ * required when a jump host has a private key.
  */
-export function buildSshArgs(config: RemoteSshConfig, command?: string): string[] {
+export function buildSshArgs(
+  config: RemoteSshConfig,
+  command?: string,
+  options?: { jumpConfigFile?: string },
+): string[] {
   const safe = normalizeRemoteSshConfig(config);
   if (!safe) throw new Error("Invalid SSH remote configuration");
   const args = [
@@ -176,10 +290,18 @@ export function buildSshArgs(config: RemoteSshConfig, command?: string): string[
     "-o",
     "ServerAliveCountMax=3",
   ];
+  const generated = buildSshJumpConfig(safe);
+  if (generated) {
+    if (options?.jumpConfigFile !== generated.fileName) {
+      throw new Error("SSH jump host config was not prepared");
+    }
+    args.push("-F", generated.fileName);
+  }
   if (safe.port) args.push("-p", String(safe.port));
   if (safe.user) args.push("-l", safe.user);
   if (safe.identityFile) args.push("-i", safe.identityFile);
-  if (safe.jump) args.push("-J", safe.jump);
+  const hops = safe.jumpHosts ?? [];
+  if (hops.length > 0) args.push("-J", generated ? generated.jump : plainJump(hops));
   args.push("--", safe.host);
   const remote = buildRemoteSshCommand({ cwd: safe.cwd, command });
   if (remote) args.push(remote);

@@ -36,11 +36,14 @@ export {
   SSH_CLIENT_NOT_FOUND_ERROR,
   buildRemoteSshCommand,
   buildSshArgs,
+  buildSshJumpConfig,
+  prepareSshJumpConfig,
   describeRemoteSsh,
   normalizeRemoteSshConfig,
   resolveSshExecutable,
   sshExecutableCandidates,
   type RemoteSshConfig,
+  type SshHop,
 } from "./runtime/ssh-remote.js";
 export { parseRemoteJson, serializeRemoteJson } from "./database/repositories/group-layout-repository.js";
 export type { WorkspaceModel } from "./models/workspace.js";

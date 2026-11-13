@@ -421,7 +421,7 @@ export function ProfileCreateDialog({
               setRemoteDraft(next);
               setRemoteTouched(true);
             }}
-            invalidField={remoteTouched ? remoteInvalid : null}
+            invalid={remoteTouched ? remoteInvalid : null}
           />
         )}
         </div>

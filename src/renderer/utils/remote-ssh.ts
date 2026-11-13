@@ -1,4 +1,4 @@
-import type { RemoteSshConfig } from "../types";
+import type { RemoteSshConfig, SshHop } from "../types";
 
 /**
  * Form-side mirror of packages/cli/src/runtime/ssh-remote.ts validation.
@@ -6,33 +6,64 @@ import type { RemoteSshConfig } from "../types";
  */
 const HOST_RE = /^[A-Za-z0-9_][A-Za-z0-9._:-]{0,252}$/u;
 const USER_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/u;
-const JUMP_HOP_RE =
-  /^(?:[A-Za-z0-9_][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9_][A-Za-z0-9._-]{0,252}(?::\d{1,5})?$/u;
+// eslint-disable-next-line no-control-regex
+const CONTROL_RE = /[\u0000-\u001f\u007f]/u;
 
-export interface RemoteSshDraft {
-  enabled: boolean;
+export const MAX_SSH_JUMP_HOSTS = 4;
+
+/** One endpoint as typed in the form (all strings). */
+export interface SshHopDraft {
+  /** Stable React key; not persisted. */
+  key: string;
   host: string;
   user: string;
   port: string;
-  jump: string;
-  cwd: string;
   identityFile: string;
 }
 
-export type RemoteSshField = "host" | "user" | "port" | "jump" | "cwd" | "identityFile";
+export interface RemoteSshDraft {
+  enabled: boolean;
+  target: SshHopDraft;
+  /** Connection order: this computer → jumpHosts[0] → … → target. */
+  jumpHosts: SshHopDraft[];
+  cwd: string;
+}
 
-// eslint-disable-next-line no-control-regex
-const CONTROL_RE = /[\u0000-\u001f\u007f]/u;
+export type SshHopField = "host" | "user" | "port" | "identityFile";
+export type RemoteSshField = SshHopField | "cwd";
+
+/** Where the first invalid value is: the target, a jump host (index), or the remote dir. */
+export interface RemoteSshInvalid {
+  hop: "target" | number;
+  field: RemoteSshField;
+}
+
+let hopKeySeq = 0;
+function nextHopKey(): string {
+  hopKeySeq += 1;
+  return `hop-${String(hopKeySeq)}`;
+}
+
+export function hopToDraft(hop: SshHop | null | undefined): SshHopDraft {
+  return {
+    key: nextHopKey(),
+    host: hop?.host ?? "",
+    user: hop?.user ?? "",
+    port: hop?.port ? String(hop.port) : "",
+    identityFile: hop?.identityFile ?? "",
+  };
+}
+
+export function emptyHopDraft(): SshHopDraft {
+  return hopToDraft(null);
+}
 
 export function remoteToDraft(remote: RemoteSshConfig | null | undefined): RemoteSshDraft {
   return {
     enabled: Boolean(remote),
-    host: remote?.host ?? "",
-    user: remote?.user ?? "",
-    port: remote?.port ? String(remote.port) : "",
-    jump: remote?.jump ?? "",
+    target: hopToDraft(remote),
+    jumpHosts: (remote?.jumpHosts ?? []).map((hop) => hopToDraft(hop)),
     cwd: remote?.cwd ?? "",
-    identityFile: remote?.identityFile ?? "",
   };
 }
 
@@ -42,52 +73,66 @@ function validPort(value: string): boolean {
   return n >= 1 && n <= 65535;
 }
 
-/** First invalid field, or null when the draft is OK (disabled drafts are always OK). */
-export function invalidRemoteField(draft: RemoteSshDraft): RemoteSshField | null {
-  if (!draft.enabled) return null;
-  if (!HOST_RE.test(draft.host.trim())) return "host";
-  const user = draft.user.trim();
+function invalidHopField(hop: SshHopDraft): SshHopField | null {
+  if (!HOST_RE.test(hop.host.trim())) return "host";
+  const user = hop.user.trim();
   if (user && !USER_RE.test(user)) return "user";
-  const port = draft.port.trim();
+  const port = hop.port.trim();
   if (port && !validPort(port)) return "port";
-  const jump = draft.jump.replace(/\s+/gu, "");
-  if (jump) {
-    const hops = jump.split(",");
-    const ok =
-      hops.length <= 4 &&
-      hops.every((hop) => {
-        if (!JUMP_HOP_RE.test(hop)) return false;
-        const p = hop.match(/:(\d+)$/u)?.[1];
-        return p === undefined || validPort(p);
-      });
-    if (!ok) return "jump";
-  }
-  if (draft.cwd.length > 1024 || CONTROL_RE.test(draft.cwd)) return "cwd";
-  const key = draft.identityFile.trim();
+  const key = hop.identityFile.trim();
   if (
     key &&
-    (key.length > 1024 || key.startsWith("-") || key.includes("%") || CONTROL_RE.test(key))
+    (key.length > 1024 ||
+      key.startsWith("-") ||
+      key.includes("%") ||
+      key.includes('"') ||
+      CONTROL_RE.test(key))
   ) {
     return "identityFile";
   }
   return null;
 }
 
-/** Draft → config for profileUpdate (null = local profile). Call after validation. */
-export function draftToRemote(draft: RemoteSshDraft): RemoteSshConfig | null {
+/** First invalid value, or null when the draft is OK (disabled drafts are always OK). */
+export function invalidRemoteField(draft: RemoteSshDraft): RemoteSshInvalid | null {
   if (!draft.enabled) return null;
-  const out: RemoteSshConfig = { kind: "ssh", host: draft.host.trim() };
-  const user = draft.user.trim();
+  for (let i = 0; i < draft.jumpHosts.length; i++) {
+    const field = invalidHopField(draft.jumpHosts[i]!);
+    if (field) return { hop: i, field };
+  }
+  const targetField = invalidHopField(draft.target);
+  if (targetField) return { hop: "target", field: targetField };
+  if (draft.cwd.length > 1024 || CONTROL_RE.test(draft.cwd)) return { hop: "target", field: "cwd" };
+  return null;
+}
+
+function draftToHop(hop: SshHopDraft): SshHop {
+  const out: SshHop = { host: hop.host.trim() };
+  const user = hop.user.trim();
   if (user) out.user = user;
-  const port = draft.port.trim();
+  const port = hop.port.trim();
   if (port) out.port = Number(port);
-  const jump = draft.jump.replace(/\s+/gu, "");
-  if (jump) out.jump = jump;
-  const cwd = draft.cwd.trim();
-  if (cwd) out.cwd = cwd;
-  const identityFile = draft.identityFile.trim();
+  const identityFile = hop.identityFile.trim();
   if (identityFile) out.identityFile = identityFile;
   return out;
+}
+
+/** Draft → config for profileCreate / profileUpdate (null = local profile). Call after validation. */
+export function draftToRemote(draft: RemoteSshDraft): RemoteSshConfig | null {
+  if (!draft.enabled) return null;
+  const out: RemoteSshConfig = { kind: "ssh", ...draftToHop(draft.target) };
+  if (draft.jumpHosts.length > 0) out.jumpHosts = draft.jumpHosts.map(draftToHop);
+  const cwd = draft.cwd.trim();
+  if (cwd) out.cwd = cwd;
+  return out;
+}
+
+/** `me@box` / `box` (or a placeholder while the host is still empty). */
+export function hopDraftLabel(hop: SshHopDraft, placeholder: string): string {
+  const host = hop.host.trim();
+  if (!host) return placeholder;
+  const user = hop.user.trim();
+  return `${user ? `${user}@` : ""}${host}`;
 }
 
 /**

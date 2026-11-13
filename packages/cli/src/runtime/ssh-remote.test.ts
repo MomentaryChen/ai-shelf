@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildRemoteSshCommand,
   buildSshArgs,
+  buildSshJumpConfig,
   normalizeRemoteSshConfig,
+  prepareSshJumpConfig,
   resolveSshExecutable,
   sshExecutableCandidates,
 } from "./ssh-remote.js";
@@ -17,7 +22,10 @@ describe("normalizeRemoteSshConfig", () => {
         host: " box.internal ",
         user: "dev",
         port: "2222",
-        jump: "ops@gw.example.com:22, gw2",
+        jumpHosts: [
+          { host: "gw.example.com", user: "ops", port: 22, identityFile: " ~/.ssh/gw " },
+          { host: "gw2" },
+        ],
         cwd: " ~/work/app ",
       }),
       {
@@ -25,9 +33,50 @@ describe("normalizeRemoteSshConfig", () => {
         host: "box.internal",
         user: "dev",
         port: 2222,
-        jump: "ops@gw.example.com:22,gw2",
+        jumpHosts: [
+          { host: "gw.example.com", user: "ops", port: 22, identityFile: "~/.ssh/gw" },
+          { host: "gw2" },
+        ],
         cwd: "~/work/app",
       },
+    );
+  });
+
+  it("migrates the legacy `jump` string into jumpHosts", () => {
+    assert.deepEqual(
+      normalizeRemoteSshConfig({ kind: "ssh", host: "box", jump: "ops@gw:2200, gw2" }),
+      {
+        kind: "ssh",
+        host: "box",
+        jumpHosts: [{ host: "gw", user: "ops", port: 2200 }, { host: "gw2" }],
+      },
+    );
+  });
+
+  it("rejects an invalid hop or too many hops as a whole", () => {
+    assert.equal(
+      normalizeRemoteSshConfig({
+        kind: "ssh",
+        host: "box",
+        jumpHosts: [{ host: "gw" }, { host: "-oX" }],
+      }),
+      null,
+    );
+    assert.equal(
+      normalizeRemoteSshConfig({
+        kind: "ssh",
+        host: "box",
+        jumpHosts: [1, 2, 3, 4, 5].map((n) => ({ host: `gw${String(n)}` })),
+      }),
+      null,
+    );
+    assert.equal(
+      normalizeRemoteSshConfig({
+        kind: "ssh",
+        host: "box",
+        jumpHosts: [{ host: "gw", identityFile: 'a"b' }],
+      }),
+      null,
     );
   });
 
@@ -105,7 +154,7 @@ describe("buildSshArgs", () => {
         host: "box",
         user: "dev",
         port: 2222,
-        jump: "gw",
+        jumpHosts: [{ host: "gw" }],
         identityFile: "C:\\Users\\me\\.ssh\\id_ed25519",
       },
       "codex",
@@ -159,6 +208,61 @@ describe("buildSshArgs", () => {
         identityFile: "~/.ssh/k",
       },
     );
+  });
+
+  it("chains keyless jump hosts with -J and no generated config", () => {
+    const args = buildSshArgs({
+      kind: "ssh",
+      host: "box",
+      jumpHosts: [{ host: "gw1", user: "ops", port: 2200 }, { host: "my-gw-alias" }],
+    });
+    assert.equal(args.includes("-F"), false);
+    assert.equal(args[args.indexOf("-J") + 1], "ops@gw1:2200,my-gw-alias");
+  });
+
+  it("gives jump hosts with a key their own Host block via a generated -F config", () => {
+    const config = {
+      kind: "ssh" as const,
+      host: "box",
+      jumpHosts: [
+        { host: "gw1", user: "ops", port: 2200, identityFile: "C:\\keys\\gw one" },
+        { host: "my-gw-alias" },
+      ],
+    };
+    const generated = buildSshJumpConfig(config);
+    assert.ok(generated);
+    assert.match(generated.fileName, /^aishelf-[0-9a-f]{12}\.conf$/);
+    assert.match(
+      generated.text,
+      /Host aishelf-[0-9a-f]{12}-hop1\n {2}HostName gw1\n {2}User ops\n {2}Port 2200\n {2}IdentityFile "C:\\keys\\gw one"/,
+    );
+    assert.match(generated.text, /Match all\n {2}Include ~\/\.ssh\/config\n$/);
+    assert.match(generated.jump, /^aishelf-[0-9a-f]{12}-hop1,my-gw-alias$/);
+
+    assert.throws(() => buildSshArgs(config), /not prepared/);
+    const args = buildSshArgs(config, undefined, { jumpConfigFile: generated.fileName });
+    assert.deepEqual(args.slice(args.indexOf("-F"), args.indexOf("-F") + 2), [
+      "-F",
+      generated.fileName,
+    ]);
+    assert.equal(args[args.indexOf("-J") + 1], generated.jump);
+  });
+
+  it("writes the jump config once, into the given dir", () => {
+    const dir = mkdtempSync(join(tmpdir(), "aishelf-ssh-test-"));
+    const config = {
+      kind: "ssh" as const,
+      host: "box",
+      jumpHosts: [{ host: "gw", identityFile: "~/.ssh/gw" }],
+    };
+    const prepared = prepareSshJumpConfig(config, dir);
+    assert.ok(prepared);
+    assert.equal(prepared.dir, dir);
+    assert.equal(
+      readFileSync(join(dir, prepared.fileName), "utf8"),
+      buildSshJumpConfig(config)?.text,
+    );
+    assert.equal(prepareSshJumpConfig({ kind: "ssh", host: "box" }, dir), null);
   });
 
   it("omits the remote command for a plain shell", () => {

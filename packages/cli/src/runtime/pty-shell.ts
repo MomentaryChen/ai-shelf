@@ -396,6 +396,8 @@ export function resolvePtySpawnPlan(options: {
   ssh?: {
     executable: string;
     config: RemoteSshConfig;
+    /** Bare file name from prepareSshJumpConfig (ssh must start in that dir). */
+    jumpConfigFile?: string;
   };
 }): ResolvedPtySpawnPlan {
   const platform = options.platform ?? process.platform;
@@ -406,7 +408,9 @@ export function resolvePtySpawnPlan(options: {
   if (options.ssh) {
     const candidate: PtyShellCandidate = [
       options.ssh.executable,
-      buildSshArgs(options.ssh.config, options.command),
+      buildSshArgs(options.ssh.config, options.command, {
+        jumpConfigFile: options.ssh.jumpConfigFile,
+      }),
     ];
     const isWin = platform === "win32";
     return {

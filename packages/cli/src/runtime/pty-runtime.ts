@@ -1,9 +1,11 @@
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
 import type { IPty } from "node-pty";
 import { RuntimeError } from "../core/errors/app-error.js";
 import type { OutputBuffer } from "./output-buffer.js";
 import {
   SSH_CLIENT_NOT_FOUND_ERROR,
+  prepareSshJumpConfig,
   resolveSshExecutable,
   type RemoteSshConfig,
 } from "./ssh-remote.js";
@@ -71,13 +73,18 @@ export class PtyRuntime {
       sshExecutable = resolveSshExecutable();
       if (!sshExecutable) throw new RuntimeError(SSH_CLIENT_NOT_FOUND_ERROR);
     }
+    // Per-hop keys need a generated ssh_config; ssh starts in its dir (see prepareSshJumpConfig).
+    const jumpConfig = remote ? prepareSshJumpConfig(remote, join(tmpdir(), "ai-shelf-ssh")) : null;
     // A remote session's cwd is a remote path (remote.cwd); ssh itself starts in home.
-    const workDir = remote ? homedir() : options.cwd || homedir();
+    const workDir = remote ? (jumpConfig?.dir ?? homedir()) : options.cwd || homedir();
     const cmd = options.command ?? resolveLaunchCommand(options.tool);
     const plan = resolvePtySpawnPlan({
       command: cmd,
       shell: options.shell,
-      ssh: remote && sshExecutable ? { executable: sshExecutable, config: remote } : undefined,
+      ssh:
+        remote && sshExecutable
+          ? { executable: sshExecutable, config: remote, jumpConfigFile: jumpConfig?.fileName }
+          : undefined,
     });
 
     const ptyOpts = {
