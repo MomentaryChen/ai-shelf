@@ -958,6 +958,8 @@ export interface ElectronAPI {
   ptyWrite:  (sessionId: string, data: string)             => void;
   ptyResize: (sessionId: string, cols: number, rows: number) => Promise<{ success: boolean; error?: string }>;
   ptyKill:   (sessionId: string)                           => void;
+  /** OSC 133 command state per live session (true running, false at prompt, null unknown). */
+  ptyCommandStates: (sessionIds: string[]) => Promise<Record<string, boolean | null>>;
   onPtyData: (
     cb: (p: { sessionId: string; data: string; endSeq?: number }) => void,
   ) => () => void;
@@ -971,6 +973,8 @@ export interface ElectronAPI {
       cols: number;
       rows: number;
       exitCode: number | null;
+      /** OSC 133: true while a shell command executes, null when unknown. */
+      commandRunning?: boolean | null;
     }) => void,
   ) => (() => void);
   /** Main process recovered from sleep, unlock, a stuck window, or a GPU reset. */

@@ -108,6 +108,11 @@ import {
 } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
 import {
+  INITIAL_OSC133_STREAM,
+  scanOsc133Running,
+  type Osc133StreamState,
+} from "../shared/osc133-stream.js";
+import {
   ensureShellIntegrationScripts,
   psSingleQuote,
 } from "./shell-integration.js";
@@ -1468,6 +1473,8 @@ type PtySessionMeta = {
   cols: number;
   rows: number;
   exitCode: number | null;
+  /** OSC 133 command state (true = command executing, null = never reported). */
+  osc133: Osc133StreamState;
 };
 const PTY_META = new Map<string, PtySessionMeta>();
 
@@ -1777,6 +1784,7 @@ function ptyMetaPayload(sessionId: string) {
     cols: meta.cols,
     rows: meta.rows,
     exitCode: meta.exitCode,
+    commandRunning: meta.osc133.running,
   };
 }
 
@@ -2007,10 +2015,18 @@ ipcMain.handle(
         cols: ptyOpts.cols,
         rows: ptyOpts.rows,
         exitCode: null,
+        osc133: INITIAL_OSC133_STREAM,
       });
 
       proc.onData((data) => {
         broadcastPtyData(sessionId, data);
+        const meta = PTY_META.get(sessionId);
+        if (!meta) return;
+        const next = scanOsc133Running(meta.osc133, data);
+        if (next === meta.osc133) return;
+        const changed = next.running !== meta.osc133.running;
+        meta.osc133 = next;
+        if (changed) broadcastPtyMeta(sessionId);
       });
 
       // Kick the shell to emit a prompt after attach (some shells wait for first resize).
@@ -2224,6 +2240,18 @@ ipcMain.handle("pty-resize", (e, sessionId: string, cols: number, rows: number) 
     markPtySessionDead(sessionId, -1);
     return { success: false as const, error: (err as Error).message || "PTY resize failed" };
   }
+});
+
+/** OSC 133 command state for live sessions (seeds a fresh renderer-side tracker). */
+ipcMain.handle("pty-command-states", (_event, sessionIds: unknown) => {
+  const out: Record<string, boolean | null> = {};
+  if (!Array.isArray(sessionIds)) return out;
+  for (const id of sessionIds) {
+    if (typeof id !== "string" || !PTY_SESSIONS.has(id)) continue;
+    const meta = PTY_META.get(id);
+    if (meta) out[id] = meta.osc133.running;
+  }
+  return out;
 });
 
 function killPtySession(sessionId: string): void {
