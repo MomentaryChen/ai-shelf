@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { SplitSquareHorizontal, SplitSquareVertical, Minus, X } from "lucide-react";
+import { SplitSquareHorizontal, SplitSquareVertical, Minus, X, ExternalLink } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
@@ -60,7 +60,15 @@ interface Props {
   paneAgentStates?: Record<string, PaneAgentStatus>;
   /** Pane id → title (numbered when several panes share a tool). */
   paneLabels?: Record<string, string>;
+  /**
+   * Open a pane in its own window. "drag" = the header drag ended outside the
+   * page (the main process then checks the cursor is outside every app window).
+   */
+  onPopOutPane?: (paneId: string, trigger: PanePopOutTrigger, size: PanePopOutSize) => void;
 }
+
+export type PanePopOutTrigger = "drag" | "menu";
+export type PanePopOutSize = { width: number; height: number };
 
 type ProfileDragOver = { targetPaneId: string; zone: PaneDropZone };
 
@@ -76,6 +84,7 @@ type PaneDragState = {
   setProfileDragOver: (over: ProfileDragOver | null) => void;
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
+  onPopOutPane?: Props["onPopOutPane"];
 };
 
 export function SplitPaneLayout(props: Props) {
@@ -102,6 +111,7 @@ export function SplitPaneLayout(props: Props) {
     setProfileDragOver,
     onMovePane: props.onMovePane,
     onProfilePaneDrop: props.onProfilePaneDrop,
+    onPopOutPane: props.onPopOutPane,
   };
 
   return <SplitPaneLayoutInner {...props} drag={drag} />;
@@ -288,7 +298,16 @@ function WarpPaneShell({
     setProfileDragOver,
     onMovePane,
     onProfilePaneDrop,
+    onPopOutPane,
   } = drag;
+  const popOut = (trigger: PanePopOutTrigger) => {
+    if (!onPopOutPane) return;
+    const rect = shellRef.current?.getBoundingClientRect();
+    onPopOutPane(pane.id, trigger, {
+      width: rect?.width ?? 0,
+      height: rect?.height ?? 0,
+    });
+  };
   const isDragOver = dragOverPaneId === pane.id && draggingPaneId !== pane.id;
   const isProfileDragOver = profileDragOver?.targetPaneId === pane.id;
   const activeDropZone = isProfileDragOver ? profileDragOver.zone : dropZone;
@@ -317,6 +336,7 @@ function WarpPaneShell({
   return (
     <div
       ref={shellRef}
+      data-pane-id={pane.id}
       className={`group/pane relative flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
         broadcastActive ? "broadcast-pane-sync" : ""
       } ${broadcastEnter ? "broadcast-pane-sync-enter" : ""} ${
@@ -403,7 +423,7 @@ function WarpPaneShell({
         className="relative z-20 flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
         style={headerStyle}
       >
-        {canReorder && (
+        {(canReorder || onPopOutPane) && (
           <span
             draggable
             onMouseDown={(e) => e.stopPropagation()}
@@ -412,10 +432,22 @@ function WarpPaneShell({
               setDraggingPaneId(pane.id);
               e.dataTransfer.effectAllowed = "move";
             }}
-            onDragEnd={clearDrag}
+            onDragEnd={(e) => {
+              // No drop target took it: released outside the page, Esc, or a dead spot.
+              // Main decides whether the cursor really is outside every app window.
+              const tearOff = e.dataTransfer.dropEffect === "none";
+              clearDrag();
+              if (tearOff) popOut("drag");
+            }}
             className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded opacity-60 transition-opacity hover:bg-chrome-hover group-hover/pane:opacity-100 active:cursor-grabbing"
-            title={t("pane.dragHint")}
-            aria-label={t("pane.dragHint")}
+            title={
+              canReorder
+                ? onPopOutPane
+                  ? `${t("pane.dragHint")}\n${t("pane.popout.dragHint")}`
+                  : t("pane.dragHint")
+                : t("pane.popout.dragHint")
+            }
+            aria-label={canReorder ? t("pane.dragHint") : t("pane.popout.dragHint")}
 
           >
             <DragHandle />
@@ -476,6 +508,11 @@ function WarpPaneShell({
           {onMinimize && (
             <IconBtn title={t("pane.minimize")} onClick={onMinimize}>
               <Minus className="h-3.5 w-3.5" />
+            </IconBtn>
+          )}
+          {onPopOutPane && (
+            <IconBtn title={t("pane.popout.open")} onClick={() => popOut("menu")}>
+              <ExternalLink className="h-3.5 w-3.5" />
             </IconBtn>
           )}
         </div>

@@ -1106,6 +1106,21 @@ export interface ElectronAPI {
   onPaneAgentFocus: (cb: (paneId: string) => void) => () => void;
   onProfileLayoutFlush: (cb: () => void) => () => void;
   sendProfileLayoutFlushDone: () => void;
+  /** Open a pane in its own window ("drag" = tear-off; main checks the cursor is outside every window). */
+  panePopoutOpen: (req: PanePopoutOpenRequest) => Promise<PanePopoutOpenResult>;
+  /** Pop-out window: the pane it shows (null when this window is not a pop-out). */
+  panePopoutInfo: () => Promise<PanePopoutInfo | null>;
+  /** Dock a popped-out pane back into its origin window (no id = this pop-out's own pane). */
+  panePopoutDock: (paneId?: string) => Promise<{ ok: boolean }>;
+  panePopoutFocus: (paneId: string) => Promise<{ ok: boolean }>;
+  /** Pop-out window: close it and its pane (kills the PTY). */
+  panePopoutClose: () => Promise<{ ok: boolean }>;
+  /** Origin window: whether a popped-out pane's agent is busy (drives the close prompt). */
+  panePopoutReportBusy: (paneId: string, busy: boolean) => void;
+  /** Pop-out window: OSC 7 cwd, forwarded to the origin's layout. */
+  panePopoutReportCwd: (cwd: string) => void;
+  onPanePopoutEvent: (cb: (event: PanePopoutEvent) => void) => () => void;
+  onPanePopoutConfirmClose: (cb: () => void) => () => void;
   usageGetProviders: () => Promise<{
     providers: UsageProviderMeta[];
     encryptionAvailable: boolean;
@@ -1348,3 +1363,36 @@ declare global {
     api: ElectronAPI;
   }
 }
+
+export interface PanePopoutPane {
+  id: string;
+  tool: string;
+  sessionId: string;
+  cwd: string;
+  title?: string;
+  agentSessionId?: string;
+}
+
+export interface PanePopoutOpenRequest {
+  pane: PanePopoutPane;
+  label: string;
+  accentColor: string | null;
+  /** Current pane size in CSS px (pop-out opens at about this size). */
+  width?: number;
+  height?: number;
+  trigger: "drag" | "menu";
+}
+
+export type PanePopoutOpenResult =
+  | { ok: true }
+  | { ok: false; reason: "inside-window" | "invalid" | "no-origin" };
+
+export interface PanePopoutInfo {
+  pane: PanePopoutPane;
+  label: string;
+  accentColor: string | null;
+}
+
+export type PanePopoutEvent =
+  | { type: "ended"; paneId: string; reason: "docked" | "closed" | "gone" }
+  | { type: "cwd"; paneId: string; sessionId: string; cwd: string };

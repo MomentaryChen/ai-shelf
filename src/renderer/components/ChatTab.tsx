@@ -10,7 +10,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ProfileForest, ProviderEntry, ProfileInfo, RemoteSshConfig } from "../types";
+import type {
+  PanePopoutEvent,
+  ProfileForest,
+  ProviderEntry,
+  ProfileInfo,
+  RemoteSshConfig,
+} from "../types";
 import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import { EmptyState } from "./EmptyState";
@@ -25,7 +31,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
-import { SplitPaneLayout } from "./SplitPaneLayout";
+import { SplitPaneLayout, type PanePopOutSize, type PanePopOutTrigger } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace, type SpawnPaneOptions } from "../hooks/useProfileWorkspace";
 import {
@@ -76,6 +82,11 @@ import {
 import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
 import { slideClassName } from "../utils/workspace-slide";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
+import {
+  displayLayoutWithoutPoppedOut,
+  focusAfterPopOut,
+  withoutPoppedOut,
+} from "../terminal/popout-panes";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   hasProfilePaneDrag,
@@ -192,6 +203,10 @@ function ChatTabInner({
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
+  /** Panes shown in their own pop-out window: still in `layout` (saved / restored here), just not displayed. */
+  const [poppedOutPaneIds, setPoppedOutPaneIds] = useState<ReadonlySet<string>>(() => new Set());
+  const poppedOutPaneIdsRef = useRef(poppedOutPaneIds);
+  poppedOutPaneIdsRef.current = poppedOutPaneIds;
   /** Pane the "new pane in a git worktree" dialog splits from. */
   const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
@@ -218,6 +233,12 @@ function ChatTabInner({
     [layout],
   );
   const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
+  /** Panes on screen in this window (popped-out ones take input only from their own window). */
+  const dockedPanes = useMemo(
+    () => withoutPoppedOut(panes, poppedOutPaneIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, poppedOutPaneIds],
+  );
 
   useEffect(() => {
     const onFocus = () => setWindowFocused(true);
@@ -358,6 +379,7 @@ function ChatTabInner({
     forgetMinimizedPane,
     persistCurrentProfile,
     flushPersistCurrentProfile,
+    closePaneInStashedProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -437,8 +459,10 @@ function ChatTabInner({
     [],
   );
 
-  const panesRef = useRef(panes);
-  panesRef.current = panes;
+  // Broadcast input / paste targets: docked panes only (main ignores writes to a
+  // popped-out session from any window but its pop-out).
+  const panesRef = useRef(dockedPanes);
+  panesRef.current = dockedPanes;
 
   const handlePtyWrite = useCallback(
     (data: string, sessionId: string) => {
@@ -456,7 +480,7 @@ function ChatTabInner({
     [broadcastInput, recordPaneAgentInput],
   );
 
-  const broadcastActive = broadcastInput && panes.length > 1;
+  const broadcastActive = broadcastInput && dockedPanes.length > 1;
 
   const broadcastInputRef = useRef(broadcastInput);
   broadcastInputRef.current = broadcastInput;
@@ -1033,6 +1057,10 @@ function ChatTabInner({
 
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
+      if (poppedOutPaneIdsRef.current.has(paneId)) {
+        void window.api.panePopoutFocus(paneId);
+        return;
+      }
       const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
       if (bg) {
         void openBackgroundPaneRef.current(bg.profileId, paneId);
@@ -1045,6 +1073,10 @@ function ChatTabInner({
   }, [activeProfile, focusPaneInDisplay]);
 
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
+    if (poppedOutPaneIdsRef.current.has(paneId)) {
+      void window.api.panePopoutFocus(paneId);
+      return;
+    }
     if (activeProfile?.id !== profile.id) {
       await handleActivateProfile(profile);
     }
@@ -1056,6 +1088,10 @@ function ChatTabInner({
     paneId: string,
     opts?: { targetPaneId?: string; zone?: PaneDropZone },
   ) {
+    if (poppedOutPaneIdsRef.current.has(paneId)) {
+      void window.api.panePopoutFocus(paneId);
+      return;
+    }
     if (activeProfile?.id !== profileId) {
       const r = await window.api.profileGroupGetForest();
       if (!r.success || !r.forest) return;
@@ -1159,10 +1195,12 @@ function ChatTabInner({
         await handleActivateProfileRef.current(profile);
       }
 
-      let targetPanes = getProfilePanes(profileId);
+      // Popped-out panes take input only from their own window.
+      const docked = () => withoutPoppedOut(getProfilePanes(profileId), poppedOutPaneIdsRef.current);
+      let targetPanes = docked();
       if (targetPanes.length === 0) {
         await handleNewTerminalRef.current(profile);
-        targetPanes = getProfilePanes(profileId);
+        targetPanes = docked();
       }
       if (targetPanes.length === 0) return;
 
@@ -1394,7 +1432,7 @@ function ChatTabInner({
   });
 
   usePaneShortcuts({
-    panes,
+    panes: dockedPanes,
     focusedPaneId,
     // layout may be null on an empty workspace — Ctrl+Tab MRU must still run
     // so focus can return to a live terminal in another workspace/profile.
@@ -1411,6 +1449,107 @@ function ChatTabInner({
     onRestartPane: (id) => void respawnPane(id),
     onSplitPane: (id, dir) => void splitPane(id, dir),
   });
+
+  // --- Pane pop-out windows -------------------------------------------------
+  const shownLayout = useMemo(
+    () => displayLayoutWithoutPoppedOut(displayLayout, poppedOutPaneIds, focusedPaneId),
+    [displayLayout, poppedOutPaneIds, focusedPaneId],
+  );
+  /** Popped-out panes of the active profile (listed when nothing else is on screen). */
+  const poppedOutShown = useMemo(
+    () => (poppedOutPaneIds.size === 0 ? [] : panes.filter((p) => poppedOutPaneIds.has(p.id))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, poppedOutPaneIds],
+  );
+
+  async function popOutPane(paneId: string, trigger: PanePopOutTrigger, size?: PanePopOutSize) {
+    const pane = layoutRef.current ? findPane(layoutRef.current, paneId) : null;
+    if (!pane || poppedOutPaneIdsRef.current.has(paneId)) return;
+    let paneSize = size;
+    if (!paneSize) {
+      const rect = document
+        .querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(paneId)}"]`)
+        ?.getBoundingClientRect();
+      if (rect) paneSize = { width: rect.width, height: rect.height };
+    }
+    const result = await window.api.panePopoutOpen({
+      pane: {
+        id: pane.id,
+        tool: pane.tool,
+        sessionId: pane.sessionId,
+        cwd: pane.cwd,
+        ...(pane.title ? { title: pane.title } : {}),
+        ...(pane.agentSessionId ? { agentSessionId: pane.agentSessionId } : {}),
+      },
+      label: paneLabels[paneId] ?? paneDisplayLabel(pane),
+      accentColor: activeProfile?.accentColor ?? null,
+      width: paneSize?.width,
+      height: paneSize?.height,
+      trigger,
+    });
+    if (!result.ok) return;
+    const nextPopped = new Set(poppedOutPaneIdsRef.current);
+    nextPopped.add(paneId);
+    poppedOutPaneIdsRef.current = nextPopped;
+    setPoppedOutPaneIds(nextPopped);
+    const hidden = new Set([...minimizedPaneIds, ...nextPopped]);
+    setFocusedPaneId((prev) => focusAfterPopOut(layoutRef.current, hidden, paneId, prev));
+  }
+
+  /** Pane came back from its pop-out window (dock / close / window gone). */
+  const handlePopoutEventRef = useRef((_event: PanePopoutEvent) => {});
+  handlePopoutEventRef.current = (event: PanePopoutEvent) => {
+    if (event.type === "cwd") {
+      reportPaneCwd(event.sessionId, event.cwd);
+      return;
+    }
+    const { paneId, reason } = event;
+    if (poppedOutPaneIdsRef.current.has(paneId)) {
+      const next = new Set(poppedOutPaneIdsRef.current);
+      next.delete(paneId);
+      poppedOutPaneIdsRef.current = next;
+      setPoppedOutPaneIds(next);
+    }
+    const inActiveLayout = Boolean(layoutRef.current && findPane(layoutRef.current, paneId));
+    if (reason === "closed") {
+      // Closing the pop-out closes the pane (PTY already killed by main).
+      if (inActiveLayout) performClosePane(paneId);
+      else
+        closePaneInStashedProfile(paneId, (workspaceId, profileId) =>
+          allProfiles.find((p) => p.id === profileId && p.workspaceId === workspaceId) ??
+          allProfiles.find((p) => p.id === profileId) ??
+          null,
+        );
+      return;
+    }
+    if (reason === "docked") {
+      if (inActiveLayout) {
+        if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+        else setFocusedPaneId(paneId);
+        return;
+      }
+      const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
+      if (bg) void openBackgroundPaneRef.current(bg.profileId, paneId);
+    }
+  };
+  useEffect(() => window.api.onPanePopoutEvent((event) => handlePopoutEventRef.current(event)), []);
+
+  // The pop-out asks for a confirm on close only while its agent is busy — this
+  // window tracks agent state for the pane, so report it to main.
+  const reportedPopoutBusyRef = useRef(new Map<string, boolean>());
+  useEffect(() => {
+    const reported = reportedPopoutBusyRef.current;
+    for (const paneId of poppedOutPaneIds) {
+      const status = paneAgentStates[paneId];
+      const busy = Boolean(status && isPaneAgentBusy(status));
+      if (reported.get(paneId) === busy) continue;
+      reported.set(paneId, busy);
+      window.api.panePopoutReportBusy(paneId, busy);
+    }
+    for (const paneId of [...reported.keys()]) {
+      if (!poppedOutPaneIds.has(paneId)) reported.delete(paneId);
+    }
+  }, [poppedOutPaneIds, paneAgentStates]);
 
   const sidebarColumnStyle: CSSProperties = {
     width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidth,
@@ -1812,15 +1951,15 @@ function ChatTabInner({
       onDrop={handleDisplayDrop}
     >
       <div className="flex min-h-0 flex-1 flex-col">
-      {displayLayout ? (
+      {shownLayout ? (
       <SplitPaneLayout
-        node={displayLayout}
+        node={shownLayout}
         focusedPaneId={focusedPaneId}
         bg={bg}
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
         broadcastActive={broadcastActive}
-        broadcastPaneCount={panes.length}
+        broadcastPaneCount={dockedPanes.length}
         paneAgentStates={paneAgentStates}
         paneLabels={paneLabels}
         onFocusPane={(paneId) => {
@@ -1844,6 +1983,7 @@ function ChatTabInner({
           if (!activeProfile) return;
           placePaneInDisplay(activeProfile.id, dragPaneId, targetPaneId, zone);
         }}
+        onPopOutPane={(paneId, trigger, size) => void popOutPane(paneId, trigger, size)}
         renderTerminal={(pane, paneFocused) => (
           <EmbeddedTerminal
             key={pane.sessionId}
@@ -1872,14 +2012,50 @@ function ChatTabInner({
                 : undefined
             }
             onNewWorktreePane={() => openWorktreeDialog(pane.id)}
+            onOpenInNewWindow={() => void popOutPane(pane.id, "menu")}
             onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
       />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-chrome-border-subtle px-4 py-6 text-center text-[12px] text-chrome-text-dim">
-          <p>{t("chat.allTerminalsMinimized")}</p>
-          <p className="text-[11px]">{t("chat.selectTerminalFromSidebar")}</p>
+          {poppedOutShown.length > 0 ? (
+            <>
+              <p>{t("pane.popout.allPoppedOut")}</p>
+              <div className="flex max-w-md flex-col gap-1.5">
+                {poppedOutShown.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 rounded-lg border border-chrome-border-subtle bg-chrome-surface px-3 py-2 text-left text-[12px] text-chrome-text-secondary"
+                  >
+                    <ToolLogo tool={p.tool} size={14} />
+                    <span className="min-w-0 truncate">{paneLabels[p.id] ?? paneDisplayLabel(p)}</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void window.api.panePopoutFocus(p.id)}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
+                      >
+                        {t("pane.popout.show")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void window.api.panePopoutDock(p.id)}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
+                      >
+                        {t("pane.popout.dockHere")}
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p>{t("chat.allTerminalsMinimized")}</p>
+              <p className="text-[11px]">{t("chat.selectTerminalFromSidebar")}</p>
+            </>
+          )}
           {activeProfile && panes.some((p) => minimizedPaneIds.has(p.id)) && (
             <div className="flex max-w-md flex-col gap-1.5">
               {panes

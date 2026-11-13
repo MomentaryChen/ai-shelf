@@ -184,6 +184,13 @@ import {
   trackWindowState,
 } from "./window-state.js";
 import { ptyWakeResizeSteps } from "../shared/system-resume.js";
+import {
+  canControlPty,
+  getPopoutWindowForPane,
+  getPopoutWindows,
+  initPanePopouts,
+  onPtySessionKilled,
+} from "./popout-window.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
 app.commandLine.appendSwitch(
@@ -294,6 +301,8 @@ function getTrayDeps(): TrayDeps {
     getMainWindow: () => mainWindow,
     getChatWindow: () => chatWindow,
     createChatWindow,
+    getPopoutWindows,
+    getPopoutWindowForPane,
   };
 }
 
@@ -616,6 +625,14 @@ function createSettingsWindow(opener?: BrowserWindow | null) {
     settingsWindow = null;
   });
 }
+
+initPanePopouts({
+  webPreferences: sharedWebPreferences,
+  icon: APP_ICON,
+  pageUrl: () => getRendererPageUrl("popout"),
+  attachWindow,
+  killPtySession,
+});
 
 ipcMain.handle("open-chat-window", (event) => {
   createChatWindow(BrowserWindow.fromWebContents(event.sender));
@@ -2168,7 +2185,9 @@ function markPtySessionDead(sessionId: string, exitCode: number) {
   broadcastPtyMeta(sessionId);
 }
 
-ipcMain.on("pty-write", (_e, sessionId: string, data: string) => {
+ipcMain.on("pty-write", (e, sessionId: string, data: string) => {
+  // A popped-out pane takes input only from its pop-out window.
+  if (!canControlPty(sessionId, e.sender.id)) return;
   const proc = PTY_SESSIONS.get(sessionId);
   if (!proc) {
     notifyPtySessionGone(sessionId);
@@ -2181,7 +2200,10 @@ ipcMain.on("pty-write", (_e, sessionId: string, data: string) => {
   }
 });
 
-ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number) => {
+ipcMain.handle("pty-resize", (e, sessionId: string, cols: number, rows: number) => {
+  // Ignore (but report success — failure marks the pane dead) resizes from a
+  // window that no longer owns the session, e.g. the origin of a popped-out pane.
+  if (!canControlPty(sessionId, e.sender.id)) return { success: true as const };
   const proc = PTY_SESSIONS.get(sessionId);
   if (!proc) return ptySessionGoneResult(sessionId);
   try {
@@ -2199,7 +2221,7 @@ ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number)
   }
 });
 
-ipcMain.on("pty-kill", (_e, sessionId: string) => {
+function killPtySession(sessionId: string): void {
   try {
     PTY_SESSIONS.get(sessionId)?.kill();
   } catch {
@@ -2214,6 +2236,12 @@ ipcMain.on("pty-kill", (_e, sessionId: string) => {
   if (meta && meta.exitCode == null) meta.exitCode = -1;
   broadcastPtyExit(sessionId, meta?.exitCode ?? -1);
   broadcastPtyMeta(sessionId);
+}
+
+ipcMain.on("pty-kill", (_e, sessionId: string) => {
+  killPtySession(sessionId);
+  // Pane closed / restarted from its origin window while popped out.
+  onPtySessionKilled(sessionId);
 });
 
 // --- Launch in Terminal ---
@@ -3328,7 +3356,8 @@ let profileLayoutFlushInProgress = false;
 function isTerminalRendererWindow(win: BrowserWindow): boolean {
   if (win.webContents.isDestroyed()) return false;
   const url = win.webContents.getURL();
-  return !url.includes("#settings");
+  // Pop-outs hold no layout of their own (their pane lives in the origin window's).
+  return !url.includes("#settings") && !url.includes("#popout");
 }
 
 function flushProfileLayoutsFromRenderer(): Promise<void> {

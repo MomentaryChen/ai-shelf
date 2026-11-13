@@ -32,8 +32,10 @@ import {
 import {
   collectBackgroundProfilePanes,
   LayoutChangeNotifyingMap,
+  parseProfileCacheKey,
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
+import { removePaneFromCachedLayout } from "../terminal/popout-panes";
 
 export interface SpawnPaneOptions {
   /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
@@ -777,6 +779,34 @@ export function useProfileWorkspace(
     [applyMinimizedPaneIds],
   );
 
+  /**
+   * Close a pane that lives in a stashed (non-active) profile — its pop-out window
+   * was closed after the origin switched profiles. Kills the PTY, drops the pane
+   * from the live cache and saves that profile so it does not come back on restart.
+   * Returns false when no stashed profile holds the pane.
+   */
+  const closePaneInStashedProfile = useCallback(
+    (paneId: string, resolveProfile: (workspaceId: string, profileId: string) => ProfileInfo | null) => {
+      const active = activeProfileRef.current;
+      const activeKey = active ? cacheKey(active.workspaceId, active.id) : null;
+      for (const [key, entry] of profileLiveCacheRef.current.entries()) {
+        if (key === activeKey) continue;
+        const victim = findPane(entry.layout, paneId);
+        if (!victim) continue;
+        window.api.ptyKill(victim.sessionId);
+        const next = removePaneFromCachedLayout(entry, paneId);
+        if (next) profileLiveCacheRef.current.set(key, next);
+        else profileLiveCacheRef.current.delete(key);
+        const { workspaceId, profileId } = parseProfileCacheKey(key);
+        const profile = resolveProfile(workspaceId, profileId);
+        if (profile) void persistProfile(profile, next?.layout ?? null);
+        return true;
+      }
+      return false;
+    },
+    [cacheKey, persistProfile],
+  );
+
   // Memoized so it only rebuilds when layout / minimized / focus actually change
   // references — a fresh tree every render would remount-reconcile every pane.
   const displayLayout = useMemo(
@@ -826,5 +856,6 @@ export function useProfileWorkspace(
     minimizePane,
     unminimizePanes,
     forgetMinimizedPane,
+    closePaneInStashedProfile,
   };
 }
