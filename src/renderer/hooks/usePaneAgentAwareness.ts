@@ -534,6 +534,53 @@ export function usePaneAgentAwareness(
     });
   }, [trackedPanes]);
 
+  /**
+   * Seed OSC 133 command state for newly tracked panes. Live pty-meta broadcasts
+   * only report changes, so a fresh tracker (reload, awareness re-enabled, a
+   * restored pane) would otherwise miss a command that is already running.
+   */
+  const seededSessionsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!settings.paneAgentAwarenessEnabled) {
+      seededSessionsRef.current.clear();
+      return;
+    }
+    const live = new Set(trackedPanes.map((p) => p.sessionId));
+    for (const id of seededSessionsRef.current) {
+      if (!live.has(id)) seededSessionsRef.current.delete(id);
+    }
+    const fresh = [...live].filter((id) => !seededSessionsRef.current.has(id));
+    if (fresh.length === 0) return;
+    for (const id of fresh) seededSessionsRef.current.add(id);
+    let cancelled = false;
+    let settled = false;
+    void window.api
+      .ptyCommandStates(fresh)
+      .then((states) => {
+        settled = true;
+        if (cancelled) return;
+        const now = Date.now();
+        for (const [sessionId, running] of Object.entries(states)) {
+          if (running === null) continue;
+          // A pty-meta broadcast that arrived first is newer — keep it.
+          updateSession(sessionId, (prev) =>
+            prev.commandRunning !== null
+              ? prev
+              : applyPaneCommandRunning(prev, running, now, stateOptions(settings)),
+          );
+        }
+      })
+      .catch(() => {
+        settled = true;
+        for (const id of fresh) seededSessionsRef.current.delete(id);
+      });
+    return () => {
+      cancelled = true;
+      // Reply not in yet: let the next run query these sessions again.
+      if (!settled) for (const id of fresh) seededSessionsRef.current.delete(id);
+    };
+  }, [settings, trackedPanes, updateSession]);
+
   const recordUserInput = useCallback(
     (sessionId: string) => {
       if (!settings.paneAgentAwarenessEnabled) return;

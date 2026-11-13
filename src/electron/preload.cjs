@@ -112,6 +112,7 @@ contextBridge.exposeInMainWorld("api", {
   ptyWrite:  (sessionId, data)          => ipcRenderer.send("pty-write",  sessionId, data),
   ptyResize: (sessionId, cols, rows)    => ipcRenderer.invoke("pty-resize", sessionId, cols, rows),
   ptyKill:   (sessionId)                => ipcRenderer.send("pty-kill",   sessionId),
+  ptyCommandStates: (sessionIds)        => ipcRenderer.invoke("pty-command-states", sessionIds),
   onPtyData: (cb) => {
     const handler = (_e, p) => cb(p);
     ipcRenderer.on("pty-data", handler);

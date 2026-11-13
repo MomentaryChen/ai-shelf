@@ -2129,6 +2129,18 @@ ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number)
   }
 });
 
+/** OSC 133 command state for live sessions (seeds a fresh renderer-side tracker). */
+ipcMain.handle("pty-command-states", (_event, sessionIds: unknown) => {
+  const out: Record<string, boolean | null> = {};
+  if (!Array.isArray(sessionIds)) return out;
+  for (const id of sessionIds) {
+    if (typeof id !== "string" || !PTY_SESSIONS.has(id)) continue;
+    const meta = PTY_META.get(id);
+    if (meta) out[id] = meta.osc133.running;
+  }
+  return out;
+});
+
 ipcMain.on("pty-kill", (_e, sessionId: string) => {
   try {
     PTY_SESSIONS.get(sessionId)?.kill();
