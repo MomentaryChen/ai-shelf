@@ -83,6 +83,8 @@ interface Props {
   onNewConversation?: () => void;
   /** Context menu: open a new pane in a git worktree of this pane's repo. */
   onNewWorktreePane?: () => void;
+  /** Context menu: open this pane in its own window. */
+  onOpenInNewWindow?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
   onCwdReport?: (sessionId: string, cwd: string) => void;
 }
@@ -90,7 +92,14 @@ interface Props {
 /** Callback props — routed through a ref so they never force an xterm re-render. */
 type TerminalCallbacks = Pick<
   Props,
-  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onNewConversation" | "onCwdReport" | "onNewWorktreePane"
+  | "onExit"
+  | "onSessionLost"
+  | "onWrite"
+  | "onRestart"
+  | "onNewConversation"
+  | "onCwdReport"
+  | "onNewWorktreePane"
+  | "onOpenInNewWindow"
 >;
 
 type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
@@ -465,10 +474,19 @@ function EmbeddedTerminalInner({
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
-      onRestart: () => callbacksRef.current.onRestart?.(),
+      // Menu items appear only when the host supplied the action (a pop-out window has
+      // no layout to restart into or split, so it leaves these out).
+      onRestart: callbacksRef.current.onRestart
+        ? () => callbacksRef.current.onRestart?.()
+        : undefined,
       onNewConversation: () => callbacksRef.current.onNewConversation?.(),
       canStartNewConversation: () => Boolean(callbacksRef.current.onNewConversation),
-      onNewWorktreePane: () => callbacksRef.current.onNewWorktreePane?.(),
+      onNewWorktreePane: callbacksRef.current.onNewWorktreePane
+        ? () => callbacksRef.current.onNewWorktreePane?.()
+        : undefined,
+      onOpenInNewWindow: callbacksRef.current.onOpenInNewWindow
+        ? () => callbacksRef.current.onOpenInNewWindow?.()
+        : undefined,
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
@@ -972,6 +990,7 @@ export function EmbeddedTerminal({
   onNewConversation,
   onCwdReport,
   onNewWorktreePane,
+  onOpenInNewWindow,
   ...dataProps
 }: Props) {
   const callbacksRef = useRef<TerminalCallbacks>({
@@ -982,6 +1001,7 @@ export function EmbeddedTerminal({
     onNewConversation,
     onCwdReport,
     onNewWorktreePane,
+    onOpenInNewWindow,
   });
   useLayoutEffect(() => {
     callbacksRef.current = {
@@ -992,6 +1012,7 @@ export function EmbeddedTerminal({
       onNewConversation,
       onCwdReport,
       onNewWorktreePane,
+      onOpenInNewWindow,
     };
   });
   return <EmbeddedTerminalMemo {...dataProps} callbacksRef={callbacksRef} />;
