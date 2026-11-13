@@ -56,6 +56,9 @@ input:focus-visible,
 .xterm {
   height: 100%;
   width: 100%;
+  /* Breathing room so the prompt does not hug the pane edge. FitAddon subtracts
+     this padding when it proposes cols/rows; the gap shows the pane background. */
+  padding: 6px 2px 4px 10px;
 }
 
 /* Find bar and other pane overlays sit above xterm's canvas/textarea */
@@ -717,11 +720,12 @@ input:focus-visible,
   --color-chrome-border-hover: #b5a99a;
   --color-chrome-border-focus: #c97b5a;
   --color-chrome-text: #4a4039;
-  --color-chrome-text-secondary: #7a6f66;
-  --color-chrome-text-muted: #9b8e80;
-  --color-chrome-text-subtle: #9b8e80;
+  /* Three readable steps on the warm chrome bg (#f1e8da): 5.5 / 4.8 / 4.5 : 1, then dim 3.5. */
+  --color-chrome-text-secondary: #655a52;
+  --color-chrome-text-muted: #6f6359;
+  --color-chrome-text-subtle: #73675c;
   --color-chrome-text-faint: #b5a99a;
-  --color-chrome-text-dim: #9b8e80;
+  --color-chrome-text-dim: #85786b;
   --color-chrome-accent-text: #b26544;
   --color-chrome-ui-accent: #c97b5a;
   --color-chrome-ui-accent-soft: rgb(201 123 90 / 0.18);
