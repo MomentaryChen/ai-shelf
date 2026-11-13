@@ -17,7 +17,8 @@ export interface Osc133StreamState {
 export const INITIAL_OSC133_STREAM: Osc133StreamState = { carry: "", running: null };
 
 // eslint-disable-next-line no-control-regex
-const MARK_RE =/\x1b\]133;([ABCD])[^\x07\x1b]*(?:\x07|\x1b\\)/g;
+const MARK_RE = /\x1b\]133;([ABCD])[^\x07\x1b]*(?:\x07|\x1b\\)/g;
+const MARK_PREFIX = "\x1b]133;";
 /** Longest incomplete OSC we bother carrying (`ESC ] 133 ; D ; <exit> ; …`). */
 const MAX_CARRY = 128;
 
@@ -35,15 +36,19 @@ export function scanOsc133Running(prev: Osc133StreamState, chunk: string): Osc13
     else if (running !== null) running = false;
   }
 
-  // Carry a trailing ESC that may begin an unfinished `ESC ] 133 ;` sequence.
+  // Carry an unfinished `ESC ] 133 ;` sequence (its ST may be split as ESC | `\`),
+  // or a trailing fragment that could still grow into one.
   let carry = "";
-  const lastEsc = text.lastIndexOf("\x1b");
-  if (lastEsc >= end && text.length - lastEsc <= MAX_CARRY) {
-    const rest = text.slice(lastEsc);
-    const prefix = "\x1b]133;";
-    const couldBeMark =
-      rest.length <= prefix.length ? prefix.startsWith(rest) : rest.startsWith(prefix);
-    if (couldBeMark && !rest.includes("\x07")) carry = rest;
+  const lastStart = text.lastIndexOf(MARK_PREFIX);
+  if (lastStart >= end && text.length - lastStart <= MAX_CARRY) {
+    const rest = text.slice(lastStart);
+    if (!rest.includes("\x07")) carry = rest;
+  } else {
+    const lastEsc = text.lastIndexOf("\x1b");
+    if (lastEsc >= end && text.length - lastEsc < MARK_PREFIX.length) {
+      const rest = text.slice(lastEsc);
+      if (MARK_PREFIX.startsWith(rest)) carry = rest;
+    }
   }
 
   if (running === prev.running && carry === prev.carry) return prev;

@@ -19,7 +19,10 @@ describe("strongestPaneAgentStatus", () => {
   it("prefers waiting_input over stalled over running", () => {
     assert.equal(strongestPaneAgentStatus(["idle", "running"]), "running");
     assert.equal(strongestPaneAgentStatus(["running", "stalled", "running"]), "stalled");
-    assert.equal(strongestPaneAgentStatus(["stalled", "waiting_input", "running"]), "waiting_input");
+    assert.equal(
+      strongestPaneAgentStatus(["stalled", "waiting_input", "running"]),
+      "waiting_input",
+    );
   });
 });
 

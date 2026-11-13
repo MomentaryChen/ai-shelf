@@ -38,6 +38,12 @@ describe("scanOsc133Running", () => {
     assert.equal(s3.running, false);
   });
 
+  it("joins an ST terminator split between ESC and backslash", () => {
+    const s1 = feed("out\x1b]133;C\x1b");
+    assert.equal(s1.running, null);
+    assert.equal(scanOsc133Running(s1, "\\more").running, true);
+  });
+
   it("does not carry unrelated escape sequences", () => {
     assert.equal(feed("\x1b[31mred\x1b[0m").carry, "");
     assert.equal(feed("\x1b]7;file://h/tmp\x07").carry, "");
