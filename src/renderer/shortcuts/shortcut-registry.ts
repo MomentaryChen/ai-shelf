@@ -52,6 +52,7 @@ export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
   fontZoomOut: "shortcuts.terminal.fontZoomOut",
   fontZoomReset: "shortcuts.terminal.fontZoomReset",
   toggleMaximizePane: "shortcuts.pane.toggleMaximize",
+  commandHistory: "terminal.history.open",
 };
 
 export const SHORTCUT_SECTION_TITLE_KEYS: Record<ShortcutSectionId, MessageKey> = {

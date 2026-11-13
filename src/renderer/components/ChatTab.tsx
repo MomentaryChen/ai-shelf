@@ -48,6 +48,8 @@ import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAg
 import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
+import { CommandHistoryPanel, type SaveCommandResult } from "./CommandHistoryPanel";
+import { savedCommandNameFor } from "../terminal/command-history";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useSlideDirection } from "../hooks/useSlideDirection";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
@@ -211,6 +213,7 @@ function ChatTabInner({
   const [poppedOutPaneIds, setPoppedOutPaneIds] = useState<ReadonlySet<string>>(() => new Set());
   const poppedOutPaneIdsRef = useRef(poppedOutPaneIds);
   poppedOutPaneIdsRef.current = poppedOutPaneIds;
+  const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
   /** Pane the "new pane in a git worktree" dialog splits from. */
   const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
@@ -1311,6 +1314,10 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         openWorktreeDialog();
       },
+      openCommandHistory: () => {
+        onRequestTerminalMode?.();
+        setCommandHistoryOpen(true);
+      },
     }),
     [
       addPane,
@@ -1494,6 +1501,7 @@ function ChatTabInner({
       const next = zoomFontSize(settings.terminalFontSize, direction, DEFAULT_TERMINAL_FONT_SIZE);
       if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
     },
+    onOpenCommandHistory: () => setCommandHistoryOpen(true),
   });
 
   // --- Pane pop-out windows -------------------------------------------------
@@ -1592,6 +1600,24 @@ function ChatTabInner({
       if (!poppedOutPaneIds.has(paneId)) reported.delete(paneId);
     }
   }, [poppedOutPaneIds, paneAgentStates]);
+  /** History panel "save": append to the active profile's saved commands. */
+  const saveCommandToProfile = async (command: string): Promise<SaveCommandResult> => {
+    const profile = activeProfile;
+    if (!profile) return "error";
+    const existing = profile.savedCommands ?? [];
+    const text = command.trim();
+    if (existing.some((s) => s.command.trim() === text)) return "exists";
+    const snippet = {
+      id: `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: savedCommandNameFor(text),
+      command: text,
+    };
+    const r = await window.api.profileUpdate(profile.id, { savedCommands: [...existing, snippet] });
+    if (!r.success) return "error";
+    if (r.profile) syncActiveProfile(r.profile);
+    await refreshSidebarForest();
+    return "saved";
+  };
 
   const sidebarColumnStyle: CSSProperties = {
     width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidth,
@@ -1904,6 +1930,19 @@ function ChatTabInner({
         cwd={(worktreePaneId ? panes.find((p) => p.id === worktreePaneId)?.cwd : null) ?? ""}
         onClose={() => setWorktreePaneId(null)}
         onCreated={openWorktreePane}
+      />
+      <CommandHistoryPanel
+        open={commandHistoryOpen}
+        onClose={() => setCommandHistoryOpen(false)}
+        panes={panes}
+        focusedPaneId={focusedPaneId}
+        broadcastCount={broadcastActive ? panes.length : 1}
+        onFocusPane={(paneId) => {
+          if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+          else setFocusedPaneId(paneId);
+        }}
+        onRerun={(sessionId, command) => handlePtyWrite(`${command}\r`, sessionId)}
+        onSave={activeProfile ? saveCommandToProfile : undefined}
       />
       <BusyPaneCloseDialog
         open={busyClosePaneId !== null}

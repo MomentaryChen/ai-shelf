@@ -19,7 +19,8 @@ export type PaneShortcutAction =
   | { type: "restart-session" }
   | { type: "split"; direction: "horizontal" | "vertical" }
   | { type: "font-zoom"; direction: FontZoomDirection }
-  | { type: "toggle-maximize" };
+  | { type: "toggle-maximize" }
+  | { type: "command-history" };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -98,6 +99,9 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     case "toggle-maximize":
       onToggleMaximizePane?.(focusId);
       break;
+    case "command-history":
+      h.onOpenCommandHistory?.();
+      break;
   }
 }
 
@@ -116,6 +120,8 @@ export interface PaneShortcutHandlers {
   onFontZoom?: (direction: FontZoomDirection) => void;
   /** Show only this pane (or restore the split view); the layout is not changed. */
   onToggleMaximizePane?: (paneId: string) => void;
+  /** Open the OSC 133 command history panel. */
+  onOpenCommandHistory?: () => void;
 }
 
 let getHandlers: (() => PaneShortcutHandlers | null) | null = null;
@@ -139,6 +145,7 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "fontZoomOut",
   "fontZoomReset",
   "toggleMaximizePane",
+  "commandHistory",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -237,6 +244,8 @@ export function matchPaneShortcutWithBindings(
       return { type: "font-zoom", direction: "reset" };
     case "toggleMaximizePane":
       return { type: "toggle-maximize" };
+    case "commandHistory":
+      return { type: "command-history" };
     default:
       return null;
   }
@@ -274,7 +283,8 @@ export function shouldConsumePaneShortcut(
   h: Pick<
     PaneShortcutHandlers,
     "panes" | "onFocusRecentTerminal" | "onFontZoom" | "onToggleMaximizePane"
-  >,
+  > &
+    Partial<Pick<PaneShortcutHandlers, "onOpenCommandHistory">>,
 ): boolean {
   // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
   // split keys — those may belong to profile quick-switch or should no-op cleanly.
@@ -283,6 +293,7 @@ export function shouldConsumePaneShortcut(
   }
   if (action.type === "font-zoom") return Boolean(h.onFontZoom);
   if (action.type === "toggle-maximize") return Boolean(h.onToggleMaximizePane);
+  if (action.type === "command-history") return Boolean(h.onOpenCommandHistory);
   return true;
 }
 

@@ -177,6 +177,18 @@ describe("matchPaneShortcutWithBindings", () => {
       type: "clear-screen",
     });
   });
+
+  it("opens command history with Ctrl+Shift+H only when a handler is registered", () => {
+    const map = resolveKeybindings({}, "win");
+    const action = matchPaneShortcutWithBindings(key("H", { ctrlKey: true, shiftKey: true }), map, xterm());
+    assert.deepEqual(action, { type: "command-history" });
+    assert.equal(shouldConsumePaneShortcut(action!, { panes: [pane("a")] }), false);
+    let opened = 0;
+    const h = handlers({ panes: [pane("a")], onOpenCommandHistory: () => (opened += 1) });
+    assert.equal(shouldConsumePaneShortcut(action!, h), true);
+    applyPaneShortcutAction(action!, h);
+    assert.equal(opened, 1);
+  });
 });
 
 describe("font zoom shortcuts", () => {

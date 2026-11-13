@@ -6,6 +6,7 @@ import {
   type LastCommandStatus,
   type LineRange,
 } from "./command-marks";
+import type { CommandHistoryItem } from "./command-history";
 
 export interface TerminalCommandMarks {
   /** Any OSC 133 mark received in this terminal (shell integration active). */
@@ -22,6 +23,12 @@ export interface TerminalCommandMarks {
   setLive: (live: boolean) => void;
   /** False while the replayed backlog is parsed (side effects must not re-fire). */
   isLive: () => boolean;
+  /** Finished commands with a readable command line, newest first (history panel). */
+  listCommands: () => CommandHistoryItem[];
+  /** Scroll to a command's prompt. False when it left the scrollback. */
+  jumpToCommand: (id: number) => boolean;
+  /** Output text of a command, or null when unavailable. */
+  commandOutputText: (id: number) => string | null;
   dispose: () => void;
 }
 
@@ -156,6 +163,38 @@ export function bindTerminalCommandMarks(
       if (next && wasReplaying) options.onStatus?.(tracker.lastStatus(), false);
     },
     isLive: () => live,
+    listCommands: () => {
+      const out: CommandHistoryItem[] = [];
+      for (let i = tracker.commands.length - 1; i >= 0; i--) {
+        const e = tracker.commands[i]!;
+        if (!e.finished || !e.ran || !e.command) continue;
+        out.push({
+          id: e.id,
+          command: e.command,
+          cwd: e.cwd,
+          exitCode: e.exitCode,
+          durationMs:
+            e.startedAt !== null && e.endedAt !== null ? Math.max(0, e.endedAt - e.startedAt) : null,
+          endedAt: e.endedAt,
+          canJump: tracker.entryLine(e, lineOf) >= 0,
+          hasOutput: tracker.outputRange(e, lineOf) !== null,
+        });
+      }
+      return out;
+    },
+    jumpToCommand: (id) => {
+      const e = tracker.byId(id);
+      if (!e || !isNormalBuffer(term)) return false;
+      const line = tracker.entryLine(e, lineOf);
+      if (line < 0) return false;
+      term.scrollToLine(line);
+      return true;
+    },
+    commandOutputText: (id) => {
+      const e = tracker.byId(id);
+      const range = e ? tracker.outputRange(e, lineOf) : null;
+      return range ? readRange(term, range) : null;
+    },
     dispose: () => {
       osc133.dispose();
       tracker.reset();

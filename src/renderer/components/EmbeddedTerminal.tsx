@@ -9,6 +9,10 @@ import { bindTerminalClipboard, writeClipboardText } from "../terminal/xterm-cli
 import { bindTerminalCommandMarks } from "../terminal/xterm-command-marks";
 import { getCommandStatus, setCommandStatus } from "../terminal/command-marks";
 import {
+  notifyCommandHistoryChanged,
+  registerCommandHistorySource,
+} from "../terminal/command-history";
+import {
   attachTerminalSearch,
   buildSearchSnapshot,
   clearTerminalSearch,
@@ -540,6 +544,8 @@ function EmbeddedTerminalInner({
         });
       },
       onStatus: (status, live) => {
+        // A command finished, or the replayed backlog was parsed.
+        notifyCommandHistoryChanged();
         if (!live) {
           // Replayed backlog has no timings; keep a stored result unless the replay
           // shows a different one (a command finished while this pane was unmounted).
@@ -550,6 +556,11 @@ function EmbeddedTerminalInner({
       },
     });
     commandMarks.setLive(false);
+    const unregisterHistory = registerCommandHistorySource(sessionId, {
+      list: commandMarks.listCommands,
+      jump: commandMarks.jumpToCommand,
+      outputText: commandMarks.commandOutputText,
+    });
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
@@ -932,6 +943,7 @@ function EmbeddedTerminalInner({
       unbindLinks();
       unbindCwd();
       unbindNotify();
+      unregisterHistory();
       commandMarks.dispose();
       webgl?.dispose();
       ro.disconnect();
