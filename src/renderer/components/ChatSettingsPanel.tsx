@@ -562,6 +562,26 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
         )}
       </div>
 
+      {/* Resume AI agent conversations (global) */}
+      <div>
+        <p className={sectionTitle}>{t("settings.agentSessions.title")}</p>
+        <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
+          <Checkbox
+            checked={settings.terminalResumeAgentSessions}
+            onCheckedChange={(v) => updateSettings({ terminalResumeAgentSessions: v === true })}
+            className="mt-0.5"
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[13px] text-text-primary">
+              {t("settings.resumeAgentSessions")}
+            </span>
+            <span className="text-[11px] leading-snug text-text-tertiary">
+              {t("settings.resumeAgentSessionsHint")}
+            </span>
+          </span>
+        </Label>
+      </div>
+
       {/* Tool launch arguments */}
       <div>
         <p className={sectionTitle}>{t("settings.toolLaunchArgs.title")}</p>
@@ -958,22 +978,6 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
               <span className="text-[13px] text-text-primary">{t("settings.webgl")}</span>
               <span className="text-[11px] leading-snug text-text-tertiary">
                 {t("settings.webglHint")}
-              </span>
-            </span>
-          </Label>
-
-          <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3.5 py-3 font-normal transition-colors hover:border-accent/40">
-            <Checkbox
-              checked={settings.terminalResumeAgentSessions}
-              onCheckedChange={(v) => updateSettings({ terminalResumeAgentSessions: v === true })}
-              className="mt-0.5"
-            />
-            <span className="flex flex-col gap-0.5">
-              <span className="text-[13px] text-text-primary">
-                {t("settings.resumeAgentSessions")}
-              </span>
-              <span className="text-[11px] leading-snug text-text-tertiary">
-                {t("settings.resumeAgentSessionsHint")}
               </span>
             </span>
           </Label>
