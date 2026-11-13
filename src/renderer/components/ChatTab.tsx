@@ -1509,23 +1509,23 @@ function ChatTabInner({
       if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
     },
     onOpenCommandHistory: () => setCommandHistoryOpen(true),
-    // Neighbours and dividers come from the visible tree (minimized panes excluded);
+    // Neighbours and dividers come from the visible tree (minimized / popped-out panes excluded);
     // the change lands in `layout`, which persists like a mouse drag.
     onSwapPane: (paneId, direction) => {
-      if (!displayLayout) return;
-      const other = findPaneInDirection(displayLayout, paneId, direction);
+      if (!shownLayout) return;
+      const other = findPaneInDirection(shownLayout, paneId, direction);
       if (!other) return;
       setLayout((prev) => (prev ? swapPaneLeaves(prev, paneId, other) : prev));
     },
     onResizePane: (paneId, direction) => {
-      if (!displayLayout) return;
-      const next = resizePaneInDirection(displayLayout, paneId, direction);
-      if (next === displayLayout) return;
+      if (!shownLayout) return;
+      const next = resizePaneInDirection(shownLayout, paneId, direction);
+      if (next === shownLayout) return;
       setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
     },
     onEqualizePanes: () => {
-      if (!displayLayout) return;
-      const next = equalizeAllSplits(displayLayout);
+      if (!shownLayout) return;
+      const next = equalizeAllSplits(shownLayout);
       setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
     },
   });
