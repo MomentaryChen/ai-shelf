@@ -24,6 +24,10 @@ export interface TrayDeps {
   getMainWindow: () => BrowserWindow | null;
   getChatWindow: () => BrowserWindow | null;
   createChatWindow: () => void;
+  /** Terminal pane pop-out windows (independent of close-to-tray). */
+  getPopoutWindows?: () => BrowserWindow[];
+  /** Bring up the view window showing this pane and focus the pane; false when not popped out. */
+  focusPaneInPopout?: (paneId: string) => boolean;
 }
 
 export function setAppQuitting(quitting: boolean): void {
@@ -90,6 +94,7 @@ function showTerminalWindow(deps: TrayDeps): void {
 
 /** Focus terminal when user clicks a pane-agent notification. */
 export function showTerminalFromNotification(deps: TrayDeps, paneId?: string): void {
+  if (paneId && deps.focusPaneInPopout?.(paneId)) return;
   const chat = deps.getChatWindow();
   if (chat && !chat.isDestroyed()) {
     if (!chat.isVisible()) chat.show();
@@ -270,6 +275,9 @@ function showHiddenAppWindows(deps: TrayDeps): void {
   for (const getter of [deps.getMainWindow, deps.getChatWindow]) {
     const win = getter();
     if (win && !win.isDestroyed() && !win.isVisible()) win.show();
+  }
+  for (const win of deps.getPopoutWindows?.() ?? []) {
+    if (!win.isDestroyed() && !win.isVisible()) win.show();
   }
 }
 

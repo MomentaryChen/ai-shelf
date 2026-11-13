@@ -45,6 +45,23 @@ export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
   paste: "shortcuts.terminal.paste",
   pasteAlt: "shortcuts.terminal.pasteAlt",
   selectAll: "shortcuts.terminal.selectAll",
+  jumpPrevPrompt: "terminal.marks.jumpPrev",
+  jumpNextPrompt: "terminal.marks.jumpNext",
+  copyLastCommandOutput: "terminal.marks.copyLastOutput",
+  fontZoomIn: "shortcuts.terminal.fontZoomIn",
+  fontZoomOut: "shortcuts.terminal.fontZoomOut",
+  fontZoomReset: "shortcuts.terminal.fontZoomReset",
+  toggleMaximizePane: "shortcuts.pane.toggleMaximize",
+  commandHistory: "terminal.history.open",
+  swapPaneLeft: "shortcuts.pane.swapLeft",
+  swapPaneRight: "shortcuts.pane.swapRight",
+  swapPaneUp: "shortcuts.pane.swapUp",
+  swapPaneDown: "shortcuts.pane.swapDown",
+  resizePaneLeft: "shortcuts.pane.resizeLeft",
+  resizePaneRight: "shortcuts.pane.resizeRight",
+  resizePaneUp: "shortcuts.pane.resizeUp",
+  resizePaneDown: "shortcuts.pane.resizeDown",
+  equalizePanes: "shortcuts.pane.equalize",
 };
 
 export const SHORTCUT_SECTION_TITLE_KEYS: Record<ShortcutSectionId, MessageKey> = {

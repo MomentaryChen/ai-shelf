@@ -1,9 +1,10 @@
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { ILink, ILinkProvider, Terminal } from "@xterm/xterm";
-
-/** Windows drive / UNC, Unix absolute, and file:// URLs in shell output. */
-const PATH_PATTERN =
-  /(?:file:\/\/[^\s"'<>|`]+|(?:[A-Za-z]:[\\/]|\\\\)(?:[^\s"'<>|`\\]+[\\/])*[^\s"'<>|`\\.,;:!?)]*|\/(?:[^\s/\\]+(?:\/[^\s/\\]+)*))/gi;
+import {
+  findPathLinks,
+  resolveRelativePath,
+  type PathLinkMatch,
+} from "../../shared/path-links.js";
 
 function linkModifierPressed(event: MouseEvent): boolean {
   return event.ctrlKey || event.metaKey;
@@ -42,8 +43,62 @@ function isPlausiblePath(path: string): boolean {
   return false;
 }
 
+/** Open a file, at a line when one was given (VS Code `-g` in main), else the OS handler. */
+function openPathTarget(path: string, line?: number, col?: number): void {
+  if (line && window.api.openPathAt) {
+    void window.api.openPathAt({ path, line, col });
+    return;
+  }
+  void window.api.openPath(path);
+}
+
+// ---------------------------------------------------------------------------
+// Existence cache for relative links (one batched IPC per line)
+// ---------------------------------------------------------------------------
+
+const EXISTS_TTL_MS = 10_000;
+const EXISTS_CACHE_MAX = 500;
+/** Relative candidates checked per line; `paths-exist` caps the same. */
+const MAX_RELATIVE_PER_LINE = 16;
+const existsCache = new Map<string, { ok: boolean; at: number }>();
+
+async function pathsExist(paths: string[]): Promise<Map<string, boolean>> {
+  const now = Date.now();
+  const result = new Map<string, boolean>();
+  const missing: string[] = [];
+  for (const p of paths) {
+    const hit = existsCache.get(p);
+    if (hit && now - hit.at < EXISTS_TTL_MS) result.set(p, hit.ok);
+    else if (!missing.includes(p)) missing.push(p);
+  }
+  if (missing.length > 0 && window.api.pathsExist) {
+    let flags: boolean[] = [];
+    try {
+      flags = await window.api.pathsExist(missing);
+    } catch {
+      flags = [];
+    }
+    if (existsCache.size > EXISTS_CACHE_MAX) existsCache.clear();
+    missing.forEach((p, i) => {
+      const ok = flags[i] === true;
+      existsCache.set(p, { ok, at: now });
+      result.set(p, ok);
+    });
+  }
+  return result;
+}
+
+interface ResolvedLink {
+  match: PathLinkMatch;
+  /** Absolute path to open. */
+  path: string;
+}
+
 class PathLinkProvider implements ILinkProvider {
-  constructor(private readonly terminal: Terminal) {}
+  constructor(
+    private readonly terminal: Terminal,
+    private readonly getCwd: () => string | undefined,
+  ) {}
 
   provideLinks(
     bufferLineNumber: number,
@@ -56,41 +111,59 @@ class PathLinkProvider implements ILinkProvider {
     }
 
     const text = line.translateToString(false);
-    const links: ILink[] = [];
-    const re = new RegExp(PATH_PATTERN.source, PATH_PATTERN.flags);
-    let match: RegExpExecArray | null;
-
-    while ((match = re.exec(text)) !== null) {
-      const raw = match[0];
-      const normalized = normalizePathForOpen(raw);
-      if (!isPlausiblePath(normalized)) continue;
-
-      const start = match.index;
-      const end = start + raw.length;
-      const y = bufferLineNumber + 1;
-
-      links.push({
-        text: raw,
-        range: {
-          start: { x: start + 1, y },
-          end: { x: end + 1, y },
-        },
-        activate: (event, linkText) => {
-          if (!linkModifierPressed(event)) return;
-          void window.api.openPath(normalizePathForOpen(linkText));
-        },
-      });
+    const absolute: ResolvedLink[] = [];
+    const relative: ResolvedLink[] = [];
+    const cwd = this.getCwd();
+    for (const match of findPathLinks(text)) {
+      if (match.absolute) {
+        if (isPlausiblePath(match.path)) absolute.push({ match, path: match.path });
+        continue;
+      }
+      if (relative.length >= MAX_RELATIVE_PER_LINE) continue;
+      const resolved = resolveRelativePath(cwd, match.path);
+      if (resolved) relative.push({ match, path: resolved });
     }
 
-    callback(links.length > 0 ? links : undefined);
+    const toLinks = (items: ResolvedLink[]): ILink[] | undefined => {
+      if (items.length === 0) return undefined;
+      const y = bufferLineNumber + 1;
+      return items
+        .sort((a, b) => a.match.start - b.match.start)
+        .map(({ match, path }) => ({
+          text: text.slice(match.start, match.end),
+          range: {
+            start: { x: match.start + 1, y },
+            end: { x: match.end, y },
+          },
+          activate: (event: MouseEvent) => {
+            if (!linkModifierPressed(event)) return;
+            openPathTarget(path, match.line, match.col);
+          },
+        }));
+    };
+
+    if (relative.length === 0) {
+      callback(toLinks(absolute));
+      return;
+    }
+    // Only link relative paths that exist, so ordinary words are not underlined.
+    void pathsExist(relative.map((r) => r.path)).then((exists) => {
+      callback(toLinks([...absolute, ...relative.filter((r) => exists.get(r.path))]));
+    });
   }
 }
 
+export interface TerminalLinkOptions {
+  /** Pane cwd for relative paths (`src/foo.ts:42`); none = absolute paths only. */
+  getCwd?: () => string | undefined;
+}
+
 /**
- * Clickable paths (Ctrl/Cmd+click → openPath) and URLs (→ openExternal).
- * OSC 8 hyperlinks use the same handlers via terminal.options.linkHandler.
+ * Clickable paths (Ctrl/Cmd+click → open, at `:line:col` in VS Code when given)
+ * and URLs (→ openExternal). OSC 8 hyperlinks use the same handlers via
+ * terminal.options.linkHandler.
  */
-export function bindTerminalLinks(term: Terminal): () => void {
+export function bindTerminalLinks(term: Terminal, options: TerminalLinkOptions = {}): () => void {
   const openHttp = (event: MouseEvent, uri: string) => {
     if (!linkModifierPressed(event)) return;
     void window.api.openExternal(uri);
@@ -107,7 +180,9 @@ export function bindTerminalLinks(term: Terminal): () => void {
     if (isPlausiblePath(path)) void window.api.openPath(path);
   };
 
-  const pathLinks = term.registerLinkProvider(new PathLinkProvider(term));
+  const pathLinks = term.registerLinkProvider(
+    new PathLinkProvider(term, options.getCwd ?? (() => undefined)),
+  );
   const webLinks = new WebLinksAddon(openHttp);
   term.loadAddon(webLinks);
 

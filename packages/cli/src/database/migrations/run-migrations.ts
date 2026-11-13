@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 const MIGRATION_V2 = `
 ALTER TABLE sessions ADD COLUMN tool TEXT;
@@ -65,6 +65,11 @@ ALTER TABLE group_layouts ADD COLUMN saved_commands_json TEXT NOT NULL DEFAULT '
  */
 const MIGRATION_V11 = `
 ALTER TABLE sessions ADD COLUMN owner_pid INTEGER;
+`;
+
+/** SSH remote config (JSON) for a profile; NULL = local. Additive for older builds. */
+const MIGRATION_V12 = `
+ALTER TABLE group_layouts ADD COLUMN remote_json TEXT;
 `;
 
 const INITIAL_SCHEMA = `
@@ -210,6 +215,15 @@ export function runMigrations(db: Database.Database): void {
       /* column may exist */
     }
     db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(11);
+  }
+
+  if (current < 12) {
+    try {
+      db.exec(MIGRATION_V12);
+    } catch {
+      /* column may exist */
+    }
+    db.prepare("INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)").run(12);
   }
 }
 

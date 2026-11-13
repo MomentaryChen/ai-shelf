@@ -19,6 +19,9 @@ const ChatWindowApp = lazy(() =>
 const SettingsWindowApp = lazy(() =>
   import("./SettingsWindowApp").then((m) => ({ default: m.SettingsWindowApp })),
 );
+const PopoutWindowApp = lazy(() =>
+  import("./PopoutWindowApp").then((m) => ({ default: m.PopoutWindowApp })),
+);
 const AuthGoogleWindow = lazy(() =>
   import("./AuthGoogleWindow").then((m) => ({ default: m.AuthGoogleWindow })),
 );
@@ -58,6 +61,13 @@ function Root() {
     return (
       <Suspense fallback={null}>
         <AuthGoogleWindow />
+      </Suspense>
+    );
+  }
+  if (route === "popout") {
+    return (
+      <Suspense fallback={null}>
+        <PopoutWindowApp />
       </Suspense>
     );
   }

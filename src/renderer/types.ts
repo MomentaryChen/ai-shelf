@@ -1,6 +1,11 @@
 /** Types mirroring the inventory data from the main process. */
 
 import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
+import type {
+  GitCwdInfo,
+  GitWorktreeAddRequest,
+  GitWorktreeAddResult,
+} from "../shared/git-worktree.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
@@ -459,6 +464,25 @@ export interface SavedCommandSnippet {
   broadcast?: boolean;
 }
 
+/** One SSH endpoint (jump host or target); mirrors SshHop in packages/cli runtime/ssh-remote. */
+export interface SshHop {
+  /** Hostname, IP, or a Host alias from ~/.ssh/config. */
+  host: string;
+  user?: string;
+  port?: number;
+  /** Local private key path; never key material. */
+  identityFile?: string;
+}
+
+/** SSH remote for a profile (mirrors RemoteSshConfig in packages/cli runtime/ssh-remote). */
+export interface RemoteSshConfig extends SshHop {
+  kind: "ssh";
+  /** Jump hosts in connection order (this computer → [0] → … → target); empty = direct. */
+  jumpHosts?: SshHop[];
+  /** Remote start directory; empty = remote login directory. */
+  cwd?: string;
+}
+
 export interface ProfileTerminal {
   tool: string;
   cwd: string;
@@ -473,6 +497,8 @@ export interface ProfileInfo {
   defaultTool: string;
   broadcastInput: boolean;
   accentColor: string | null;
+  /** SSH remote every pane connects to; null = local. */
+  remote: RemoteSshConfig | null;
   paneCount: number;
   terminals: ProfileTerminal[];
   savedCommands: SavedCommandSnippet[];
@@ -511,6 +537,7 @@ export interface ProfileCreateInput {
   defaultTool?: string;
   accentColor?: string | null;
   broadcastInput?: boolean;
+  remote?: RemoteSshConfig | null;
   copyFromProfileId?: string;
 }
 
@@ -634,6 +661,8 @@ export interface UsageToolSnapshot {
   totalOutputTokens?: number;
   /** Provider-measured spend for the last 7 UTC days, when daily rows have no dollars. */
   weekCostUsd?: number;
+  /** "billingCycle" = totalCostUsd covers the provider billing cycle, not the selected range. */
+  costScope?: "period" | "billingCycle";
   daily: UsageDayBucket[];
   byModel?: UsageModelBreakdown[];
   quotas?: UsageQuotaWindow[];
@@ -695,10 +724,12 @@ export interface UsageDashboardResult {
   tools: UsageToolSnapshot[];
   summary: {
     totalCostUsd: number;
+    billingCycleCostUsd: number;
     totalInputTokens: number;
     totalOutputTokens: number;
     configuredCount: number;
     supportedCount: number;
+    activeCount: number;
     dailyUnified: UsageDailyUnifiedRow[];
   };
   insights: UsageCostInsights;
@@ -723,15 +754,20 @@ export interface ElectronAPI {
     commitShort: string | null;
     dirty: boolean;
   }>;
+  /** Recolor the native window caption buttons (Windows/Linux); no-op on macOS. */
+  setTitleBarOverlay?: (opts: { color?: string; symbolColor?: string }) => void;
   getAppUpdateChannel: () => Promise<AppUpdateChannelInfo>;
   checkAppUpdate: () => Promise<AppUpdateStatePayload>;
   getAppUpdateState: () => Promise<AppUpdateStatePayload>;
   confirmAppUpdateDownload: () => Promise<{ ok: boolean }>;
   quitAndInstallAppUpdate: () => Promise<{ ok: boolean }>;
+  /** Open terminals / running flows that a restart-to-install would close. */
+  getAppUpdateImpact: () => Promise<{ terminals: number; flows: number }>;
   onAppUpdateAvailable: (cb: (payload: AppUpdateAvailablePayload) => void) => () => void;
   onAppUpdateNotAvailable: (cb: (payload: { version: string | null }) => void) => () => void;
   onAppUpdateProgress: (cb: (payload: AppUpdateProgressPayload) => void) => () => void;
   onAppUpdateDownloaded: (cb: (payload: { version: string | null }) => void) => () => void;
+  onAppUpdateInstalling: (cb: (payload: { version: string | null }) => void) => () => void;
   onAppUpdateError: (cb: (payload: { message: string }) => void) => () => void;
   getToolsList: () => Promise<UpdateCheckResult>;
   checkToolLatest: (tool: string) => Promise<ToolUpdateInfo | null>;
@@ -831,6 +867,12 @@ export interface ElectronAPI {
   mcpPingTool: (tool: string) => Promise<McpPingToolResult>;
   openPath: (filePath: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
+  /** Open a file at a line (VS Code when available, else the OS handler). */
+  openPathAt?: (req: { path: string; line?: number; col?: number }) => Promise<void>;
+  /** Which absolute paths exist (terminal relative-path link filter). */
+  pathsExist?: (paths: string[]) => Promise<boolean[]>;
+  /** Absolute path of a File dropped from the OS ("" when it has none). */
+  getPathForFile?: (file: File) => string;
   launchInTerminal: (
     tool: string,
     terminal?: string,
@@ -843,9 +885,43 @@ export interface ElectronAPI {
     extraArgs?: string,
     /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | wsl | bash | zsh | fish | sh. */
     shell?: string,
-    /** `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro. */
-    options?: { wslDistro?: string },
-  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
+    /**
+     * `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro.
+     * `remote` runs the pane over ssh (no local fallback); `code: "SSH_NOT_FOUND"` when no client.
+     * `agentSession` opts into agent conversation resume (Claude Code): resume
+     * `resumeId` when its transcript exists, else start with a new session id.
+     */
+    options?: {
+      wslDistro?: string;
+      remote?: RemoteSshConfig | null;
+      agentSession?: { resumeId?: string };
+    },
+  ) => Promise<{
+    success: boolean;
+    sessionId?: string;
+    cwd?: string;
+    error?: string;
+    code?: string;
+    /** Agent conversation id the pane now holds (resume on next launch). */
+    agentSessionId?: string;
+    agentSessionResumed?: boolean;
+  }>;
+  /** Local ssh client used by remote (SSH) profiles; `path` null when none is installed. */
+  sshClientStatus: () => Promise<{ found: boolean; path: string | null }>;
+  /** File picker for an SSH private key (opens in ~/.ssh); null when canceled. */
+  pickSshKey: (defaultPath?: string) => Promise<string | null>;
+  /** Connect through the route non-interactively and run `exit 0`. */
+  sshTestConnection: (remote: RemoteSshConfig) => Promise<
+    | { ok: true; durationMs: number; client: string }
+    | {
+        ok: false;
+        reason: "invalid" | "no-client" | "failed" | "timeout";
+        exitCode: number | null;
+        output: string;
+        durationMs: number;
+        client: string | null;
+      }
+  >;
   ptyAttach: (
     sessionId: string,
     opts?: { includeBuffer?: boolean },
@@ -887,6 +963,8 @@ export interface ElectronAPI {
   ptyWrite:  (sessionId: string, data: string)             => void;
   ptyResize: (sessionId: string, cols: number, rows: number) => Promise<{ success: boolean; error?: string }>;
   ptyKill:   (sessionId: string)                           => void;
+  /** OSC 133 command state per live session (true running, false at prompt, null unknown). */
+  ptyCommandStates: (sessionIds: string[]) => Promise<Record<string, boolean | null>>;
   onPtyData: (
     cb: (p: { sessionId: string; data: string; endSeq?: number }) => void,
   ) => () => void;
@@ -900,6 +978,8 @@ export interface ElectronAPI {
       cols: number;
       rows: number;
       exitCode: number | null;
+      /** OSC 133: true while a shell command executes, null when unknown. */
+      commandRunning?: boolean | null;
     }) => void,
   ) => (() => void);
   /** Main process recovered from sleep, unlock, a stuck window, or a GPU reset. */
@@ -961,6 +1041,8 @@ export interface ElectronAPI {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      /** null clears (local); omitted keeps the stored remote. */
+      remote?: RemoteSshConfig | null;
       groupId?: string;
     },
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;
@@ -1039,6 +1121,28 @@ export interface ElectronAPI {
   onPaneAgentFocus: (cb: (paneId: string) => void) => () => void;
   onProfileLayoutFlush: (cb: () => void) => () => void;
   sendProfileLayoutFlushDone: () => void;
+  /** Origin window: declare every view window it owns (main opens / updates / closes windows to match). */
+  paneViewSync: (views: PaneViewDecl[]) => void;
+  /**
+   * A pane header drag ended outside any drop target ("drag"), or "Open in new window" ("menu").
+   * Main resolves where it landed and sends the origin a `move` intent (or a notice to a
+   * rejecting window). Works from the origin window and from view windows.
+   */
+  paneViewDragEnd: (req: PaneViewDragEndRequest) => Promise<{ ok: boolean; result: string }>;
+  /** Bring up the view window showing this pane and focus the pane there. */
+  paneViewFocus: (paneId: string) => Promise<{ ok: boolean }>;
+  /** View window: its current declaration (null when this window is not a view). */
+  paneViewGetState: () => Promise<PaneViewDecl | null>;
+  /** View window: ask the origin to change the view (forwarded as an intent). */
+  paneViewAction: (action: PaneViewAction) => void;
+  /** Per-machine saved views, keyed by `${originKind}|${workspaceId}:${profileId}`. */
+  paneViewStoreGet: (key: string) => Promise<unknown[]>;
+  paneViewStoreSave: (key: string, views: unknown[]) => Promise<{ ok: boolean }>;
+  onPaneViewIntent: (cb: (intent: PaneViewIntent) => void) => () => void;
+  onPaneViewState: (cb: (state: PaneViewDecl) => void) => () => void;
+  onPaneViewConfirmClose: (cb: () => void) => () => void;
+  onPaneViewNotice: (cb: (notice: { kind: "other-profile"; profileName: string }) => void) => () => void;
+  onPaneViewFocusPane: (cb: (paneId: string) => void) => () => void;
   usageGetProviders: () => Promise<{
     providers: UsageProviderMeta[];
     encryptionAvailable: boolean;
@@ -1263,6 +1367,10 @@ export interface ElectronAPI {
     | { ok: true; ip: string; distro: string }
     | { ok: false; error: string; code?: "unsupported" | "missing" | "failed" | "invalid" }
   >;
+  /** Branch / worktree / dirty state for a pane cwd; null when not a repo or git is unavailable. */
+  gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
+  /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
+  gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
 }
 
 export type WslDistroRow = {
@@ -1277,3 +1385,62 @@ declare global {
     api: ElectronAPI;
   }
 }
+
+export interface PaneViewRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** One extra view window of a profile, as declared by its origin window. */
+export interface PaneViewDecl {
+  viewId: string;
+  /** `${workspaceId}:${profileId}` */
+  profileKey: string;
+  profileName: string;
+  accentColor: string | null;
+  /** Split tree of the view's panes (full pane info, resolved from the profile layout). */
+  layout: import("./terminal/split-tree").LayoutNode;
+  focusedPaneId: string | null;
+  labels: Record<string, string>;
+  busy: Record<string, boolean>;
+  bounds: PaneViewRect | null;
+}
+
+export interface PaneViewDragEndRequest {
+  paneId: string;
+  /** Origin window only (a view window's profile is known to main). */
+  profileKey?: string;
+  profileName?: string;
+  trigger: "drag" | "menu";
+  /** Pane size in CSS px — a new view opens at about this size. */
+  width?: number;
+  height?: number;
+}
+
+/** View window → origin, forwarded by main. */
+export type PaneViewAction =
+  | { type: "focus"; paneId: string }
+  | { type: "close-pane"; paneId: string }
+  | { type: "dock-pane"; paneId: string }
+  | { type: "dock-all" }
+  | { type: "close-view" }
+  | { type: "move-in-view"; dragPaneId: string; targetPaneId: string; zone: import("./terminal/pane-drop-zone").PaneDropZone }
+  | { type: "resize"; splitId: string; ratio: number }
+  | { type: "cwd"; sessionId: string; cwd: string }
+  | { type: "title"; sessionId: string; title: string }
+  | { type: "bounds"; bounds: PaneViewRect };
+
+/** Main → origin window. */
+export type PaneViewIntent =
+  | {
+      type: "move";
+      paneId: string;
+      fromViewId: string | null;
+      target:
+        | { kind: "new-view"; bounds: PaneViewRect }
+        | { kind: "into-view"; viewId: string }
+        | { kind: "dock" };
+    }
+  | { type: "action"; viewId: string; action: PaneViewAction };

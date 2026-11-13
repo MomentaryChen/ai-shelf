@@ -1,4 +1,4 @@
-import { openDatabase } from "ai-shelf";
+import { openDatabase, parseRemoteJson } from "ai-shelf";
 import type { GroupLayoutSnapshot } from "ai-shelf";
 import { SYNC_BUNDLE_VERSION, type SyncBundle, type SyncLayout, type SyncPreferences, type SyncProfile, type SyncProfileGroup } from "../shared/sync-types.js";
 import { closeWorkspaceContext, getWorkspaceContext } from "./workspace-host.js";
@@ -36,7 +36,7 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
 
     const layoutRows = db
       .prepare(
-        `SELECT group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at
+        `SELECT group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, remote_json, updated_at
          FROM group_layouts`,
       )
       .all() as {
@@ -49,6 +49,7 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
       broadcast_input: number;
       accent_color: string | null;
       saved_commands_json: string;
+      remote_json: string | null;
       updated_at: string;
     }[];
 
@@ -87,6 +88,7 @@ export function exportLocalSyncBundle(deviceId: string): SyncBundle {
           broadcastInput: Boolean(row.broadcast_input),
           accentColor: row.accent_color ?? null,
           savedCommands,
+          remote: parseRemoteJson(row.remote_json),
           updatedAt: row.updated_at,
         },
       });

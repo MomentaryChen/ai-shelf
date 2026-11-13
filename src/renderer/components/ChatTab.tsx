@@ -10,7 +10,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
+import type {
+  PaneViewDecl,
+  PaneViewIntent,
+  ProfileForest,
+  ProviderEntry,
+  ProfileInfo,
+  RemoteSshConfig,
+} from "../types";
+import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import { EmptyState } from "./EmptyState";
 import { toolLabel } from "../utils";
@@ -19,13 +27,18 @@ import { EmbeddedTerminal } from "./EmbeddedTerminal";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
 import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
+import { GitWorktreeDialog } from "./GitWorktreeDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
-import { SplitPaneLayout } from "./SplitPaneLayout";
+import { SplitPaneLayout, type PanePopOutSize, type PanePopOutTrigger } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
-import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
+import {
+  useProfileWorkspace,
+  type ProfileWorkspaceViewHooks,
+  type SpawnPaneOptions,
+} from "../hooks/useProfileWorkspace";
 import {
   usePaneAgentAwareness,
   type BackgroundAgentNotice,
@@ -37,8 +50,18 @@ import {
   strongestAttention,
 } from "../../shared/background-agent-attention.js";
 import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
-import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
+import { isPaneAgentBusy, strongestPaneAgentStatus } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
+import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
+import { CommandHistoryPanel, type SaveCommandResult } from "./CommandHistoryPanel";
+import { savedCommandNameFor } from "../terminal/command-history";
+import {
+  copySplitRatios,
+  equalizeAllSplits,
+  findPaneInDirection,
+  resizePaneInDirection,
+  swapPaneLeaves,
+} from "../terminal/split-tree";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useSlideDirection } from "../hooks/useSlideDirection";
 import { useTerminalFocusMru } from "../hooks/useTerminalFocusMru";
@@ -74,6 +97,23 @@ import {
 import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
 import { slideClassName } from "../utils/workspace-slide";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
+import {
+  displayLayoutWithoutPoppedOut,
+  focusAfterPopOut,
+  withoutPoppedOut,
+} from "../terminal/popout-panes";
+import {
+  addPaneToView,
+  deserializeViews,
+  findViewOfPane,
+  hiddenPaneIds,
+  newViewId,
+  removePaneFromViews,
+  resolveViews,
+  serializeViews,
+  viewPaneIds,
+  type PaneView,
+} from "../terminal/pane-views";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   hasProfilePaneDrag,
@@ -88,6 +128,7 @@ import {
   profileTopBarLabelStyle,
 } from "../utils/profile-colors";
 import {
+  DEFAULT_TERMINAL_FONT_SIZE,
   getAppBg,
   isAppThemeTerminalBg,
   bumpDirHistory,
@@ -97,6 +138,7 @@ import {
   type ChatSettings,
 } from "../chat-settings";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
+import { agentSessionSupported } from "../../shared/agent-session-resume.js";
 import {
   PLAIN_SHELL_TOOL_ID,
   isPlainShellTool,
@@ -108,6 +150,8 @@ import {
 } from "../utils/available-tools";
 import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
+import { zoomFontSize } from "../terminal/font-zoom";
+import { effectiveMaximizedPaneId, toggleMaximizedPaneId } from "../terminal/split-tree";
 import type { Command } from "./CommandPalette";
 import { useTerminalCommands } from "../hooks/useTerminalCommands";
 import {
@@ -156,6 +200,16 @@ function inventoryTerminalFingerprint(data: ProviderEntry[]): string {
   return data.map((e) => `${e.tool}:${e.available ? 1 : 0}`).join("|");
 }
 
+function profileKeyOf(profile: { workspaceId: string; id: string }): string {
+  return `${profile.workspaceId}:${profile.id}`;
+}
+
+/** Main and chat windows restore the same profile independently — keep their views apart. */
+function viewStoreKey(profileKey: string): string {
+  const route = window.location.hash.replace(/^#\/?/, "").split("?")[0];
+  return `${route === "chat" ? "chat" : "main"}|${profileKey}`;
+}
+
 function ChatTabInner({
   data,
   active = true,
@@ -189,6 +243,20 @@ function ChatTabInner({
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
+  /**
+   * Extra view windows of this window's profiles. Their panes stay in the profile
+   * layout (saved / restored / counted there) and are only hidden from this display.
+   */
+  const [views, setViewsState] = useState<PaneView[]>([]);
+  const viewsRef = useRef(views);
+  const setViews = useCallback((next: PaneView[] | ((prev: PaneView[]) => PaneView[])) => {
+    const value = typeof next === "function" ? next(viewsRef.current) : next;
+    viewsRef.current = value;
+    setViewsState(value);
+  }, []);
+  const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
+  /** Pane the "new pane in a git worktree" dialog splits from. */
+  const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -235,6 +303,7 @@ function ChatTabInner({
       splitRight: shortcutKeys("splitHorizontal", keymap),
       splitDown: shortcutKeys("splitVertical", keymap),
       commandPalette: shortcutKeys("commandPalette", keymap),
+      toggleMaximize: shortcutKeys("toggleMaximizePane", keymap),
     }),
     [keymap],
   );
@@ -245,24 +314,48 @@ function ChatTabInner({
   const terminalScrollback = settings.terminalScrollback;
   const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
 
-  const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+  const spawnPane = useCallback(async (
+    tool: string,
+    cwd: string,
+    remote: RemoteSshConfig | null,
+    opts?: SpawnPaneOptions,
+  ): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
     const shell = resolveEmbeddedPtyShell(
       settings.preferredShell,
       settings.externalTerminal,
       tool,
     );
+    // A remote pane's cwd (`host:dir`) is meaningless locally, and vice versa.
+    const localCwd = remote || isRemotePaneCwd(cwd) ? "" : cwd;
+    // Conversation resume reads the local transcript store, so remote panes skip it.
+    const agentSession =
+      !remote && settings.terminalResumeAgentSessions && agentSessionSupported(tool)
+        ? { resumeId: opts?.resumeAgentSessionId }
+        : undefined;
+    const spawnOptions = remote
+      ? { remote }
+      : shell === "wsl" || agentSession
+        ? {
+            ...(shell === "wsl" ? { wslDistro: settings.wslDistro } : {}),
+            ...(agentSession ? { agentSession } : {}),
+          }
+        : undefined;
     const result = await window.api.ptySpawn(
       tool,
-      cwd || undefined,
+      localCwd || undefined,
       extraArgs,
       shell,
-      shell === "wsl" ? { wslDistro: settings.wslDistro } : undefined,
+      spawnOptions,
     );
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
-      setTerminalError(t("chat.err.startFailed", { tool, msg }));
+      setTerminalError(
+        result.code === "SSH_NOT_FOUND"
+          ? t("chat.err.sshNotFound")
+          : t("chat.err.startFailed", { tool, msg }),
+      );
       return null;
     }
     setTerminalError(null);
@@ -271,25 +364,57 @@ function ChatTabInner({
       tool,
       sessionId: result.sessionId,
       cwd: result.cwd || cwd || "",
+      ...(result.agentSessionId ? { agentSessionId: result.agentSessionId } : {}),
     };
   }, [
     settings.externalTerminal,
     settings.preferredShell,
+    settings.terminalResumeAgentSessions,
     settings.toolLaunchArgs,
     settings.wslDistro,
     t,
   ]);
 
   const spawnPaneResilient = useCallback(
-    async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+    async (
+      tool: string,
+      cwd: string,
+      remote: RemoteSshConfig | null,
+      opts?: SpawnPaneOptions,
+    ): Promise<PaneInfo | null> => {
+      // Fallbacks stay on the same target: a remote profile retries over ssh, never locally.
       const order = [tool, ...(tool !== "shell" ? ["shell"] : [])];
       for (const t of order) {
-        const pane = await spawnPane(t, cwd);
+        // The saved conversation id belongs to the agent tool, never the shell fallback.
+        const pane = await spawnPane(t, cwd, remote, t === tool ? opts : undefined);
         if (pane) return pane;
       }
-      return spawnPane("shell", cwd);
+      return spawnPane("shell", cwd, remote);
     },
     [spawnPane],
+  );
+
+  // Views are saved per machine with the profile layout and reopened when the profile restores.
+  const viewHooks = useMemo<ProfileWorkspaceViewHooks>(
+    () => ({
+      onPersist: (profile, tree) => {
+        const key = profileKeyOf(profile);
+        void window.api.paneViewStoreSave(
+          viewStoreKey(key),
+          serializeViews(
+            viewsRef.current.filter((v) => v.profileKey === key),
+            tree,
+          ),
+        );
+      },
+      prepareRestoredViews: async (profile, slotPanes) => {
+        const key = profileKeyOf(profile);
+        const saved = await window.api.paneViewStoreGet(viewStoreKey(key));
+        const restored = deserializeViews(saved, slotPanes, key);
+        return () => setViews((prev) => [...prev.filter((v) => v.profileKey !== key), ...restored]);
+      },
+    }),
+    [setViews],
   );
 
   const {
@@ -320,6 +445,8 @@ function ChatTabInner({
     forgetMinimizedPane,
     persistCurrentProfile,
     flushPersistCurrentProfile,
+    closePaneInStashedProfile,
+    getProfileLayoutByKey,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -328,6 +455,50 @@ function ChatTabInner({
     spawnPaneResilient,
     settings.workingDir,
     broadcastInput,
+    viewHooks,
+  );
+  const activeProfileKey = activeProfile ? profileKeyOf(activeProfile) : null;
+  /** Active-profile panes living in a view window (hidden here). */
+  const poppedOutPaneIds = useMemo(
+    () => hiddenPaneIds(views, activeProfileKey),
+    [views, activeProfileKey],
+  );
+  /** Panes on screen in this window (view panes take input only from their own window). */
+  const dockedPanes = useMemo(
+    () => withoutPoppedOut(panes, poppedOutPaneIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, poppedOutPaneIds],
+  );
+
+  /** Read at call time so add / restart always target the active profile's machine. */
+  const activeRemoteRef = useRef<RemoteSshConfig | null>(null);
+  activeRemoteRef.current = activeProfile?.remote ?? null;
+
+  /** Layout drawn in this window: popped-out panes are left out. */
+  const shownLayout = useMemo(
+    () => displayLayoutWithoutPoppedOut(displayLayout, poppedOutPaneIds, focusedPaneId),
+    [displayLayout, poppedOutPaneIds, focusedPaneId],
+  );
+
+  /**
+   * Maximized pane — view state only, never written to the layout. It lapses on
+   * its own when the pane closes, is minimized, or another pane takes focus.
+   */
+  const [maximizedPaneId, setMaximizedPaneId] = useState<string | null>(null);
+  const shownMaximizedPaneId = effectiveMaximizedPaneId(
+    shownLayout,
+    maximizedPaneId,
+    focusedPaneId,
+  );
+  useEffect(() => {
+    // Drop a lapsed maximize so refocusing that pane later does not re-maximize it.
+    if (maximizedPaneId && !shownMaximizedPaneId) setMaximizedPaneId(null);
+  }, [maximizedPaneId, shownMaximizedPaneId]);
+  const toggleMaximizePane = useCallback(
+    (paneId: string) => {
+      setMaximizedPaneId((prev) => toggleMaximizedPaneId(shownLayout, prev, paneId));
+    },
+    [shownLayout],
   );
 
   /** Live panes of non-active profiles, labelled for notifications. */
@@ -370,6 +541,15 @@ function ChatTabInner({
       backgroundAgentOptions,
     );
 
+  const handleTerminalNotify = useTerminalNotifications({
+    panes,
+    focusedPaneId,
+    windowFocused,
+    viewActive: active,
+    settings,
+    t,
+  });
+
   const updateSettings = useCallback((partial: Partial<ChatSettings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...partial };
@@ -395,8 +575,10 @@ function ChatTabInner({
     [],
   );
 
-  const panesRef = useRef(panes);
-  panesRef.current = panes;
+  // Broadcast input / paste targets: docked panes only (main ignores writes to a
+  // popped-out session from any window but its pop-out).
+  const panesRef = useRef(dockedPanes);
+  panesRef.current = dockedPanes;
 
   const handlePtyWrite = useCallback(
     (data: string, sessionId: string) => {
@@ -414,7 +596,7 @@ function ChatTabInner({
     [broadcastInput, recordPaneAgentInput],
   );
 
-  const broadcastActive = broadcastInput && panes.length > 1;
+  const broadcastActive = broadcastInput && dockedPanes.length > 1;
 
   const broadcastInputRef = useRef(broadcastInput);
   broadcastInputRef.current = broadcastInput;
@@ -664,7 +846,11 @@ function ChatTabInner({
         return null;
       }
 
-      const pane = await spawnPaneResilient(tool || "shell", resolveCwd(cwd));
+      const pane = await spawnPaneResilient(
+        tool || "shell",
+        resolveCwd(cwd),
+        activeRemoteRef.current,
+      );
       if (!pane) return null;
 
       setLayout((prev) => {
@@ -708,7 +894,10 @@ function ChatTabInner({
       const tool = victim.tool;
       try {
         window.api.ptyKill(victim.sessionId);
-        const next = await spawnPaneResilient(tool, cwd);
+        // Main resumes only when the transcript exists for the new cwd, else starts fresh.
+        const next = await spawnPaneResilient(tool, cwd, activeRemoteRef.current, {
+          resumeAgentSessionId: victim.agentSessionId,
+        });
         if (!next) {
           setTerminalError(
             (prev) =>
@@ -735,8 +924,12 @@ function ChatTabInner({
     [spawnPaneResilient, resolveCwd, t],
   );
 
+  /**
+   * Restart a pane's PTY. Agent panes resume their conversation unless
+   * `newConversation` is set ("Start new conversation").
+   */
   const respawnPane = useCallback(
-    async (paneId: string) => {
+    async (paneId: string, opts?: { newConversation?: boolean }) => {
       if (respawningPaneIdsRef.current.has(paneId)) return;
       const layoutNow = layoutRef.current;
       const victim = layoutNow ? findPane(layoutNow, paneId) : null;
@@ -747,7 +940,9 @@ function ChatTabInner({
       const tool = victim.tool;
       try {
         window.api.ptyKill(victim.sessionId);
-        const next = await spawnPaneResilient(tool, cwd);
+        const next = await spawnPaneResilient(tool, cwd, activeRemoteRef.current, {
+          resumeAgentSessionId: opts?.newConversation ? undefined : victim.agentSessionId,
+        });
         if (!next) {
           setTerminalError(
             (prev) =>
@@ -794,6 +989,19 @@ function ChatTabInner({
       if (!hit || hit.cwd === cwd) return prev;
       return mapPanesInTree(prev, (p) =>
         p.sessionId === sessionId ? { ...p, cwd } : p,
+      );
+    });
+  }, []);
+
+  /** Live pane title from OSC 0 / 2 ("" clears); shown only while no user title is set. */
+  const reportPaneTitle = useCallback((sessionId: string, nextTitle: string) => {
+    const autoTitle = nextTitle.trim() || undefined;
+    setLayout((prev) => {
+      if (!prev) return prev;
+      const hit = collectPanes(prev).find((p) => p.sessionId === sessionId);
+      if (!hit || hit.autoTitle === autoTitle) return prev;
+      return mapPanesInTree(prev, (p) =>
+        p.sessionId === sessionId ? { ...p, autoTitle } : p,
       );
     });
   }, []);
@@ -896,6 +1104,46 @@ function ChatTabInner({
     [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
 
+  const openWorktreeDialog = useCallback(
+    (paneId?: string) => {
+      const id = paneId ?? focusedPaneId;
+      const pane = id && layout ? collectPanes(layout).find((p) => p.id === id) : null;
+      if (!pane?.cwd) {
+        setTerminalError(t("git.worktree.err.noPane"));
+        return;
+      }
+      // Worktrees are created with the local git; a remote (SSH) pane's repo lives elsewhere.
+      if (isRemotePaneCwd(pane.cwd)) {
+        setTerminalError(t("git.worktree.err.remotePane"));
+        return;
+      }
+      if (isRestoring()) {
+        setTerminalError(t("chat.err.restoringWait"));
+        return;
+      }
+      if (!canAddPane) {
+        setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
+        return;
+      }
+      setWorktreePaneId(pane.id);
+    },
+    [focusedPaneId, layout, isRestoring, canAddPane, maxPanes, t],
+  );
+
+  /** Split the source pane and start the same tool in the new worktree. */
+  const openWorktreePane = useCallback(
+    async (path: string): Promise<string | null> => {
+      const sourceId = worktreePaneId;
+      const parent = sourceId && layout ? collectPanes(layout).find((p) => p.id === sourceId) : null;
+      const tool = resolveLaunchTool(parent?.tool ?? availableTools[0], availableTools);
+      const created = await addPane(tool, path, parent?.id, "horizontal", {
+        keepOthersVisible: true,
+      });
+      return created ? null : t("git.worktree.err.openFailed", { path });
+    },
+    [worktreePaneId, layout, availableTools, addPane, t],
+  );
+
   async function handleActivateProfile(profile: ProfileInfo) {
     lastActiveByGroupRef.current = {
       ...lastActiveByGroupRef.current,
@@ -938,6 +1186,10 @@ function ChatTabInner({
 
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
+      if (findViewOfPane(viewsRef.current, paneId)) {
+        void window.api.paneViewFocus(paneId);
+        return;
+      }
       const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
       if (bg) {
         void openBackgroundPaneRef.current(bg.profileId, paneId);
@@ -950,6 +1202,10 @@ function ChatTabInner({
   }, [activeProfile, focusPaneInDisplay]);
 
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
+    if (findViewOfPane(viewsRef.current, paneId)) {
+      void window.api.paneViewFocus(paneId);
+      return;
+    }
     if (activeProfile?.id !== profile.id) {
       await handleActivateProfile(profile);
     }
@@ -961,6 +1217,10 @@ function ChatTabInner({
     paneId: string,
     opts?: { targetPaneId?: string; zone?: PaneDropZone },
   ) {
+    if (findViewOfPane(viewsRef.current, paneId)) {
+      void window.api.paneViewFocus(paneId);
+      return;
+    }
     if (activeProfile?.id !== profileId) {
       const r = await window.api.profileGroupGetForest();
       if (!r.success || !r.forest) return;
@@ -1064,10 +1324,16 @@ function ChatTabInner({
         await handleActivateProfileRef.current(profile);
       }
 
-      let targetPanes = getProfilePanes(profileId);
+      // Popped-out panes take input only from their own window.
+      const docked = () =>
+        withoutPoppedOut(
+          getProfilePanes(profileId),
+          hiddenPaneIds(viewsRef.current, profileKeyOf(profile)),
+        );
+      let targetPanes = docked();
       if (targetPanes.length === 0) {
         await handleNewTerminalRef.current(profile);
-        targetPanes = getProfilePanes(profileId);
+        targetPanes = docked();
       }
       if (targetPanes.length === 0) return;
 
@@ -1133,8 +1399,24 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         void runSavedCommand(profileId, command, broadcast);
       },
+      newWorktreePane: () => {
+        onRequestTerminalMode?.();
+        openWorktreeDialog();
+      },
+      openCommandHistory: () => {
+        onRequestTerminalMode?.();
+        setCommandHistoryOpen(true);
+      },
     }),
-    [addPane, openExternal, sidebarForest, broadcastCommandToPanes, runSavedCommand, onRequestTerminalMode],
+    [
+      addPane,
+      openExternal,
+      sidebarForest,
+      broadcastCommandToPanes,
+      runSavedCommand,
+      onRequestTerminalMode,
+      openWorktreeDialog,
+    ],
   );
 
   // Skip the default Profiles mirror workspace so Ctrl+1–9 follows the sidebar.
@@ -1226,6 +1508,7 @@ function ChatTabInner({
                 live: true,
                 minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
                 agentAttention: isActive ? null : (backgroundPaneAttention[pane.id]?.kind ?? null),
+                agentStatus: paneAgentStates[pane.id] ?? null,
               }))
             : shouldShowSavedTerminalPreview(live.length, isActive)
               ? p.terminals.map((terminal, idx) => ({
@@ -1249,9 +1532,11 @@ function ChatTabInner({
           savedCommands: p.savedCommands ?? [],
           terminals,
           agentAttention: isActive ? null : (backgroundAttention[p.id] ?? null),
+          agentStatus: strongestPaneAgentStatus(live.map((pane) => paneAgentStates[pane.id])),
         };
       }),
     [
+      paneAgentStates,
       backgroundAttention,
       backgroundPaneAttention,
       currentGroup?.profiles,
@@ -1287,7 +1572,7 @@ function ChatTabInner({
   });
 
   usePaneShortcuts({
-    panes,
+    panes: dockedPanes,
     focusedPaneId,
     // layout may be null on an empty workspace — Ctrl+Tab MRU must still run
     // so focus can return to a live terminal in another workspace/profile.
@@ -1303,7 +1588,295 @@ function ChatTabInner({
     onClearPane: clearPaneScreen,
     onRestartPane: (id) => void respawnPane(id),
     onSplitPane: (id, dir) => void splitPane(id, dir),
+    onToggleMaximizePane: toggleMaximizePane,
+    onFontZoom: (direction) => {
+      const next = zoomFontSize(settings.terminalFontSize, direction, DEFAULT_TERMINAL_FONT_SIZE);
+      if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
+    },
+    onOpenCommandHistory: () => setCommandHistoryOpen(true),
+    // Neighbours and dividers come from the visible tree (minimized / popped-out panes excluded);
+    // the change lands in `layout`, which persists like a mouse drag.
+    onSwapPane: (paneId, direction) => {
+      if (!shownLayout) return;
+      const other = findPaneInDirection(shownLayout, paneId, direction);
+      if (!other) return;
+      setLayout((prev) => (prev ? swapPaneLeaves(prev, paneId, other) : prev));
+    },
+    onResizePane: (paneId, direction) => {
+      if (!shownLayout) return;
+      const next = resizePaneInDirection(shownLayout, paneId, direction);
+      if (next === shownLayout) return;
+      setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+    },
+    onEqualizePanes: () => {
+      if (!shownLayout) return;
+      const next = equalizeAllSplits(shownLayout);
+      setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+    },
   });
+
+  // --- Profile view windows -------------------------------------------------
+  /** Active-profile panes in view windows (listed when nothing else is on screen). */
+  const poppedOutShown = useMemo(
+    () => (poppedOutPaneIds.size === 0 ? [] : panes.filter((p) => poppedOutPaneIds.has(p.id))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, poppedOutPaneIds],
+  );
+
+  const lookupProfilePane = useCallback(
+    (profileKey: string, paneId: string): PaneInfo | null =>
+      findPane(getProfileLayoutByKey(profileKey), paneId),
+    [getProfileLayoutByKey],
+  );
+
+  const profileByKey = useCallback(
+    (profileKey: string): ProfileInfo | null => {
+      if (activeProfile && profileKeyOf(activeProfile) === profileKey) return activeProfile;
+      const i = profileKey.indexOf(":");
+      const workspaceId = profileKey.slice(0, i);
+      const profileId = profileKey.slice(i + 1);
+      return (
+        allProfiles.find((p) => p.id === profileId && p.workspaceId === workspaceId) ??
+        allProfiles.find((p) => p.id === profileId) ??
+        null
+      );
+    },
+    [activeProfile, allProfiles],
+  );
+
+  // Panes closed / restarted in the profile: drop them from views (or pick up the new session).
+  useEffect(() => {
+    if (restoring || profileBusy) return;
+    const next = resolveViews(views, lookupProfilePane);
+    if (next !== views) setViews(next);
+  }, [views, layout, backgroundProfilePanes, restoring, profileBusy, lookupProfilePane, setViews]);
+
+  // Keep the per-machine view store in step with every view change (any profile).
+  // Deduped per key: focus / re-resolve churn must not rewrite the file.
+  const savedViewKeysRef = useRef(new Set<string>());
+  const lastSavedViewsRef = useRef(new Map<string, string>());
+  useEffect(() => {
+    const keys = new Set([...savedViewKeysRef.current, ...views.map((v) => v.profileKey)]);
+    for (const key of keys) {
+      const tree = getProfileLayoutByKey(key);
+      if (!tree) continue;
+      const saved = serializeViews(
+        views.filter((v) => v.profileKey === key),
+        tree,
+      );
+      const json = JSON.stringify(saved);
+      if (lastSavedViewsRef.current.get(key) === json) continue;
+      lastSavedViewsRef.current.set(key, json);
+      void window.api.paneViewStoreSave(viewStoreKey(key), saved);
+    }
+    savedViewKeysRef.current = new Set(views.map((v) => v.profileKey));
+  }, [views, getProfileLayoutByKey]);
+
+  // A pane moved into a view must not stay focused here.
+  useEffect(() => {
+    if (!focusedPaneId || !poppedOutPaneIds.has(focusedPaneId)) return;
+    const hidden = new Set([...minimizedPaneIds, ...poppedOutPaneIds]);
+    setFocusedPaneId(focusAfterPopOut(layoutRef.current, hidden, focusedPaneId, focusedPaneId));
+  }, [focusedPaneId, poppedOutPaneIds, minimizedPaneIds]);
+
+  // Declare every view to main, which opens / updates / closes the windows to match.
+  const lastViewSyncRef = useRef("");
+  useEffect(() => {
+    const decls: PaneViewDecl[] = views.map((v) => {
+      const profile = profileByKey(v.profileKey);
+      const labels: Record<string, string> = {};
+      const busy: Record<string, boolean> = {};
+      for (const pane of collectPanes(v.layout)) {
+        labels[pane.id] = paneLabels[pane.id] ?? paneDisplayLabel(pane);
+        const status = paneAgentStates[pane.id];
+        busy[pane.id] = Boolean(status && isPaneAgentBusy(status));
+      }
+      return {
+        viewId: v.id,
+        profileKey: v.profileKey,
+        profileName: profile?.name ?? "",
+        accentColor: profile?.accentColor ?? null,
+        layout: v.layout,
+        focusedPaneId: v.focusedPaneId,
+        labels,
+        busy,
+        bounds: v.bounds,
+      };
+    });
+    const serialized = JSON.stringify(decls);
+    if (serialized === lastViewSyncRef.current) return;
+    lastViewSyncRef.current = serialized;
+    window.api.paneViewSync(decls);
+  }, [views, profileByKey, paneLabels, paneAgentStates]);
+
+  /** Drag released off this window, or "Open in new window": main decides, then sends a move intent. */
+  function popOutPane(paneId: string, trigger: PanePopOutTrigger, size?: PanePopOutSize) {
+    if (!activeProfile || !layoutRef.current || !findPane(layoutRef.current, paneId)) return;
+    let paneSize = size;
+    if (!paneSize) {
+      const rect = document
+        .querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(paneId)}"]`)
+        ?.getBoundingClientRect();
+      if (rect) paneSize = { width: rect.width, height: rect.height };
+    }
+    void window.api.paneViewDragEnd({
+      paneId,
+      profileKey: profileKeyOf(activeProfile),
+      profileName: activeProfile.name,
+      trigger,
+      width: paneSize?.width,
+      height: paneSize?.height,
+    });
+  }
+
+  /** Show a pane that just left a view here again (switching profile when needed). */
+  function focusDockedPane(profileKey: string, paneId: string) {
+    if (activeProfileKey === profileKey) {
+      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+      else setFocusedPaneId(paneId);
+      return;
+    }
+    const profile = profileByKey(profileKey);
+    if (profile) void openBackgroundPaneRef.current(profile.id, paneId);
+  }
+
+  function dockPane(paneId: string) {
+    const view = findViewOfPane(viewsRef.current, paneId);
+    if (!view) return;
+    setViews((prev) => removePaneFromViews(prev, paneId));
+    focusDockedPane(view.profileKey, paneId);
+  }
+
+  /** Close a pane wherever its profile is (active layout or stashed). */
+  function closeProfilePane(profileKey: string, paneId: string) {
+    if (activeProfileKey === profileKey && layoutRef.current && findPane(layoutRef.current, paneId)) {
+      performClosePane(paneId);
+      return;
+    }
+    closePaneInStashedProfile(paneId, (workspaceId, profileId) =>
+      profileByKey(`${workspaceId}:${profileId}`),
+    );
+  }
+
+  /** Same array back when `fn` changes nothing (keeps syncs / store writes quiet). */
+  function updateView(viewId: string, fn: (view: PaneView) => PaneView) {
+    setViews((prev) => {
+      let changed = false;
+      const next = prev.map((v) => {
+        if (v.id !== viewId) return v;
+        const updated = fn(v);
+        if (updated !== v) changed = true;
+        return updated;
+      });
+      return changed ? next : prev;
+    });
+  }
+
+  const handleViewIntentRef = useRef((_intent: PaneViewIntent) => {});
+  handleViewIntentRef.current = (intent: PaneViewIntent) => {
+    if (intent.type === "move") {
+      const { paneId, fromViewId, target } = intent;
+      const fromView = fromViewId ? viewsRef.current.find((v) => v.id === fromViewId) : null;
+      if (fromViewId && !fromView) return;
+      const profileKey = fromView ? fromView.profileKey : activeProfileKey;
+      if (!profileKey) return;
+      const pane = lookupProfilePane(profileKey, paneId);
+      if (!pane) return;
+      if (target.kind === "dock") {
+        dockPane(paneId);
+        return;
+      }
+      if (target.kind === "into-view") {
+        const into = viewsRef.current.find((v) => v.id === target.viewId);
+        // Main checks this too: a view only ever holds panes of its own profile.
+        if (!into || into.profileKey !== profileKey) return;
+        setViews((prev) =>
+          removePaneFromViews(prev, paneId).map((v) =>
+            v.id === into.id ? addPaneToView(v, pane) : v,
+          ),
+        );
+        return;
+      }
+      setViews((prev) => [
+        ...removePaneFromViews(prev, paneId),
+        {
+          id: newViewId(),
+          profileKey,
+          layout: { kind: "pane", pane },
+          focusedPaneId: paneId,
+          bounds: target.bounds,
+        },
+      ]);
+      return;
+    }
+
+    const view = viewsRef.current.find((v) => v.id === intent.viewId);
+    if (!view) return;
+    const { action } = intent;
+    switch (action.type) {
+      case "focus":
+        updateView(view.id, (v) =>
+          v.focusedPaneId === action.paneId ? v : { ...v, focusedPaneId: action.paneId },
+        );
+        return;
+      case "close-pane":
+        closeProfilePane(view.profileKey, action.paneId);
+        return;
+      case "dock-pane":
+        dockPane(action.paneId);
+        return;
+      case "dock-all": {
+        const first = viewPaneIds(view)[0];
+        setViews((prev) => prev.filter((v) => v.id !== view.id));
+        if (first) focusDockedPane(view.profileKey, first);
+        return;
+      }
+      case "close-view":
+        for (const paneId of viewPaneIds(view)) closeProfilePane(view.profileKey, paneId);
+        setViews((prev) => prev.filter((v) => v.id !== view.id));
+        return;
+      case "move-in-view":
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: movePaneInTree(v.layout, action.dragPaneId, action.targetPaneId, action.zone),
+        }));
+        return;
+      case "resize":
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: updateSplitRatio(v.layout, action.splitId, action.ratio),
+        }));
+        return;
+      case "cwd":
+        reportPaneCwd(action.sessionId, action.cwd);
+        return;
+      case "title":
+        reportPaneTitle(action.sessionId, action.title);
+        return;
+      case "bounds":
+        updateView(view.id, (v) => ({ ...v, bounds: action.bounds }));
+        return;
+    }
+  };
+  useEffect(() => window.api.onPaneViewIntent((intent) => handleViewIntentRef.current(intent)), []);
+  /** History panel "save": append to the active profile's saved commands. */
+  const saveCommandToProfile = async (command: string): Promise<SaveCommandResult> => {
+    const profile = activeProfile;
+    if (!profile) return "error";
+    const existing = profile.savedCommands ?? [];
+    const text = command.trim();
+    if (existing.some((s) => s.command.trim() === text)) return "exists";
+    const snippet = {
+      id: `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: savedCommandNameFor(text),
+      command: text,
+    };
+    const r = await window.api.profileUpdate(profile.id, { savedCommands: [...existing, snippet] });
+    if (!r.success) return "error";
+    if (r.profile) syncActiveProfile(r.profile);
+    await refreshSidebarForest();
+    return "saved";
+  };
 
   const sidebarColumnStyle: CSSProperties = {
     width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidth,
@@ -1513,19 +2086,22 @@ function ChatTabInner({
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         onClose={() => setCreateProfileOpen(false)}
-        onCreate={(opts) => {
+        onCreate={async (opts) => {
+          const r = await window.api.profileCreate(opts.name, {
+            groupId: opts.groupId,
+            defaultCwd: opts.defaultCwd || undefined,
+            defaultTool: opts.defaultTool,
+            accentColor: opts.accentColor,
+            broadcastInput: opts.broadcastInput,
+            remote: opts.remote,
+            copyFromProfileId: opts.copyFromProfileId,
+          });
+          // Failure keeps the dialog open with the reason (it used to close silently).
+          if (!r.success || !r.profile) return r.error ?? t("profile.failedCreate");
           setCreateProfileOpen(false);
           setSelectedGroupId(opts.groupId);
           void (async () => {
-            const r = await window.api.profileCreate(opts.name, {
-              groupId: opts.groupId,
-              defaultCwd: opts.defaultCwd || undefined,
-              defaultTool: opts.defaultTool,
-              accentColor: opts.accentColor,
-              broadcastInput: opts.broadcastInput,
-              copyFromProfileId: opts.copyFromProfileId,
-            });
-            if (r.success && r.profile) await handleActivateProfile(r.profile);
+            await handleActivateProfile(r.profile!);
             await refreshSidebarForest(opts.groupId);
           })();
         }}
@@ -1607,6 +2183,26 @@ function ChatTabInner({
         onDelete={(profile) => {
           setPendingDeleteProfile(profile);
         }}
+      />
+      <GitWorktreeDialog
+        open={worktreePaneId !== null}
+        cwd={(worktreePaneId ? panes.find((p) => p.id === worktreePaneId)?.cwd : null) ?? ""}
+        onClose={() => setWorktreePaneId(null)}
+        onCreated={openWorktreePane}
+      />
+      <CommandHistoryPanel
+        open={commandHistoryOpen}
+        onClose={() => setCommandHistoryOpen(false)}
+        // Panes in a view window take input only there (re-run would be dropped).
+        panes={dockedPanes}
+        focusedPaneId={focusedPaneId}
+        broadcastCount={broadcastActive ? dockedPanes.length : 1}
+        onFocusPane={(paneId) => {
+          if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+          else setFocusedPaneId(paneId);
+        }}
+        onRerun={(sessionId, command) => handlePtyWrite(`${command}\r`, sessionId)}
+        onSave={activeProfile ? saveCommandToProfile : undefined}
       />
       <BusyPaneCloseDialog
         open={busyClosePaneId !== null}
@@ -1696,17 +2292,20 @@ function ChatTabInner({
       onDrop={handleDisplayDrop}
     >
       <div className="flex min-h-0 flex-1 flex-col">
-      {displayLayout ? (
+      {shownLayout ? (
       <SplitPaneLayout
-        node={displayLayout}
+        node={shownLayout}
         focusedPaneId={focusedPaneId}
         bg={bg}
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
         broadcastActive={broadcastActive}
-        broadcastPaneCount={panes.length}
+        broadcastPaneCount={dockedPanes.length}
         paneAgentStates={paneAgentStates}
         paneLabels={paneLabels}
+        maximizedPaneId={shownMaximizedPaneId}
+        onToggleMaximizePane={toggleMaximizePane}
+        maximizeShortcutKeys={paneShortcutLabels.toggleMaximize}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
           else setFocusedPaneId(paneId);
@@ -1728,6 +2327,7 @@ function ChatTabInner({
           if (!activeProfile) return;
           placePaneInDisplay(activeProfile.id, dragPaneId, targetPaneId, zone);
         }}
+        onPopOutPane={(paneId, trigger, size) => popOutPane(paneId, trigger, size)}
         renderTerminal={(pane, paneFocused) => (
           <EmbeddedTerminal
             key={pane.sessionId}
@@ -1741,23 +2341,70 @@ function ChatTabInner({
             copyOnSelect={settings.terminalCopyOnSelect}
             pasteConfirm={pasteConfirm}
             getPasteTargets={getPasteTargets}
-            active={active}
+            osc52Mode={settings.terminalOsc52}
+            // Hidden behind a maximized pane: becoming active again refits xterm.
+            active={active && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)}
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onCwdReport={reportPaneCwd}
+            onTitleReport={reportPaneTitle}
+            cwd={pane.cwd}
+            onTerminalNotify={handleTerminalNotify}
             onSessionLost={() => {
               if (respawningPaneIdsRef.current.has(pane.id)) return;
               void respawnPane(pane.id);
             }}
             onRestart={() => void respawnPane(pane.id)}
+            onNewConversation={
+              pane.agentSessionId
+                ? () => void respawnPane(pane.id, { newConversation: true })
+                : undefined
+            }
+            onNewWorktreePane={() => openWorktreeDialog(pane.id)}
+            onOpenInNewWindow={() => popOutPane(pane.id, "menu")}
             onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
       />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-chrome-border-subtle px-4 py-6 text-center text-[12px] text-chrome-text-dim">
-          <p>{t("chat.allTerminalsMinimized")}</p>
-          <p className="text-[11px]">{t("chat.selectTerminalFromSidebar")}</p>
+          {poppedOutShown.length > 0 ? (
+            <>
+              <p>{t("pane.popout.allPoppedOut")}</p>
+              <div className="flex max-w-md flex-col gap-1.5">
+                {poppedOutShown.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 rounded-lg border border-chrome-border-subtle bg-chrome-surface px-3 py-2 text-left text-[12px] text-chrome-text-secondary"
+                  >
+                    <ToolLogo tool={p.tool} size={14} />
+                    <span className="min-w-0 truncate">{paneLabels[p.id] ?? paneDisplayLabel(p)}</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void window.api.paneViewFocus(p.id)}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
+                      >
+                        {t("pane.popout.show")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dockPane(p.id)}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
+                      >
+                        {t("pane.popout.dockHere")}
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p>{t("chat.allTerminalsMinimized")}</p>
+              <p className="text-[11px]">{t("chat.selectTerminalFromSidebar")}</p>
+            </>
+          )}
           {activeProfile && panes.some((p) => minimizedPaneIds.has(p.id)) && (
             <div className="flex max-w-md flex-col gap-1.5">
               {panes

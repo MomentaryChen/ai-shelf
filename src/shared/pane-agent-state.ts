@@ -15,6 +15,11 @@ export interface PaneAgentState {
   runningSinceAt: number | null;
   /** Duration of the most recently finished running spell (ms). */
   lastRunningSpellMs: number;
+  /**
+   * Shell command state from OSC 133 marks: true while a command executes,
+   * false at the prompt, null when the shell has never reported a command start.
+   */
+  commandRunning: boolean | null;
 }
 
 export interface PaneAgentStateOptions {
@@ -76,6 +81,7 @@ export function createPaneAgentState(now = Date.now()): PaneAgentState {
     wasRunning: false,
     runningSinceAt: null,
     lastRunningSpellMs: 0,
+    commandRunning: null,
   };
 }
 
@@ -103,13 +109,21 @@ export function detectRunningIndicators(tail: string): boolean {
 }
 
 export function classifyPaneAgentState(
-  state: Pick<PaneAgentState, "tail" | "lastOutputAt" | "wasRunning">,
+  state: Pick<PaneAgentState, "tail" | "lastOutputAt" | "wasRunning"> &
+    Partial<Pick<PaneAgentState, "commandRunning">>,
   now: number,
   opts: PaneAgentStateOptions,
 ): PaneAgentStatus {
   const msSinceOutput = now - state.lastOutputAt;
 
+  // OSC 133 is authoritative when present. A shell at its prompt is idle even
+  // while the user types, output mentions "running", or the prompt is `❯`.
+  if (state.commandRunning === false) return "idle";
+
   if (detectWaitingInput(state.tail)) return "waiting_input";
+
+  // A quiet command (sleep, silent build) is still running and never "stalled".
+  if (state.commandRunning === true) return "running";
 
   const activeOutput = msSinceOutput < opts.runningGraceMs;
   const recentBusyMarkers =
@@ -201,6 +215,18 @@ export function applyPaneAgentUserInput(
   return withStatus(next, status, now);
 }
 
+/** Shell reported a command start (true) or a return to the prompt (false). */
+export function applyPaneCommandRunning(
+  prev: PaneAgentState,
+  commandRunning: boolean | null,
+  now: number,
+  opts: PaneAgentStateOptions = DEFAULT_PANE_AGENT_OPTIONS,
+): PaneAgentState {
+  if (prev.commandRunning === commandRunning) return prev;
+  const next: PaneAgentState = { ...prev, commandRunning };
+  return withStatus(next, classifyPaneAgentState(next, now, opts), now);
+}
+
 export function tickPaneAgentState(
   prev: PaneAgentState,
   now: number,
@@ -225,4 +251,26 @@ export function paneNeedsAttention(status: PaneAgentStatus): boolean {
 /** Agent is still active — closing will kill the process. */
 export function isPaneAgentBusy(status: PaneAgentStatus): boolean {
   return status === "running" || status === "waiting_input" || status === "stalled";
+}
+
+const LIGHT_PRIORITY: Record<PaneAgentStatus, number> = {
+  idle: 0,
+  running: 1,
+  stalled: 2,
+  waiting_input: 3,
+};
+
+/**
+ * Strongest non-idle status across panes (for a profile / sidebar light).
+ * waiting_input > stalled > running; null when every pane is idle or unknown.
+ */
+export function strongestPaneAgentStatus(
+  statuses: Iterable<PaneAgentStatus | null | undefined>,
+): PaneAgentStatus | null {
+  let best: PaneAgentStatus | null = null;
+  for (const s of statuses) {
+    if (!s || s === "idle") continue;
+    if (!best || LIGHT_PRIORITY[s] > LIGHT_PRIORITY[best]) best = s;
+  }
+  return best;
 }

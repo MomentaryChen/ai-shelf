@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
-import type { MenuItemConstructorOptions } from "electron";
+import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions } from "electron";
 import { join, normalize, dirname, basename } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, mkdir, unlink, writeFile } from "node:fs/promises";
@@ -33,6 +33,9 @@ import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
+import { testSshConnection } from "./ssh-test.js";
+import { planAgentSessionLaunch } from "../shared/agent-session-resume.js";
+import { claudeConfigDirForEnv, claudeTranscriptExists } from "./agent-session.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import {
@@ -94,11 +97,21 @@ import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import {
   NO_SUITABLE_UNIX_SHELL_ERROR,
   NO_SUITABLE_WINDOWS_SHELL_ERROR,
+  SSH_CLIENT_NOT_FOUND_ERROR,
+  describeRemoteSsh,
   isValidWslDistroName,
+  normalizeRemoteSshConfig,
+  prepareSshJumpConfig,
   resolvePtySpawnPlan,
+  resolveSshExecutable,
   type GroupLayoutSnapshot,
 } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
+import {
+  INITIAL_OSC133_STREAM,
+  scanOsc133Running,
+  type Osc133StreamState,
+} from "../shared/osc133-stream.js";
 import {
   ensureShellIntegrationScripts,
   psSingleQuote,
@@ -166,9 +179,23 @@ import { getRendererPageUrl, startRendererServer, stopRendererServer } from "./r
 import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 import { registerPortsHandlers } from "./ports-handlers.js";
+import { registerOpenInEditorHandlers } from "./open-in-editor.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
+import { registerGitHandlers } from "./git-handlers.js";
 import { initSystemResume } from "./system-resume.js";
+import {
+  boundsCenteredOnWindow,
+  getInitialWindowBounds,
+  initDisplayWatcher,
+  trackWindowState,
+} from "./window-state.js";
 import { ptyWakeResizeSteps } from "../shared/system-resume.js";
+import {
+  canControlPty,
+  focusPaneInPopout,
+  getPopoutWindows,
+  initPaneViews,
+} from "./pane-view-windows.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
 app.commandLine.appendSwitch(
@@ -253,7 +280,9 @@ registerSettingsHandlers();
 registerSyncHandlers();
 registerUsageHandlers();
 registerPortsHandlers();
+registerOpenInEditorHandlers();
 registerWslHandlers();
+registerGitHandlers();
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =
@@ -278,6 +307,8 @@ function getTrayDeps(): TrayDeps {
     getMainWindow: () => mainWindow,
     getChatWindow: () => chatWindow,
     createChatWindow,
+    getPopoutWindows,
+    focusPaneInPopout,
   };
 }
 
@@ -428,9 +459,12 @@ function setupAppMenu() {
       },
     },
     { type: "separator" },
-    { role: "resetZoom" },
-    { role: "zoomIn" },
-    { role: "zoomOut" },
+    // Ctrl/Cmd + 0 / = / - zoom the terminal font in the renderer (see
+    // font-zoom.ts). Keep page zoom in the menu but do not register its keys,
+    // or the accelerator could fire alongside the terminal shortcut.
+    { role: "resetZoom", registerAccelerator: false },
+    { role: "zoomIn", registerAccelerator: false },
+    { role: "zoomOut", registerAccelerator: false },
     { type: "separator" },
     { role: "togglefullscreen" },
   ];
@@ -509,18 +543,50 @@ function attachWindow(win: BrowserWindow, titleBase: string) {
   bindWindowTitle(win, titleBase);
 }
 
+const TERMINAL_WINDOW_SIZE = { width: 1200, height: 800 };
+
+/** Height of the in-app title bar (renderer header) that replaces the native caption. */
+const MAIN_TITLE_BAR_HEIGHT = 40;
+
+/**
+ * Main window draws its own title bar (mode tabs live there). Windows/Linux keep the
+ * native min/max/close via the Window Controls Overlay; macOS keeps inset traffic lights.
+ */
+function mainTitleBarOptions(): Partial<BrowserWindowConstructorOptions> {
+  if (process.platform === "darwin") {
+    return { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 14, y: 13 } };
+  }
+  return {
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#0a0a0a",
+      symbolColor: "#e8e8ec",
+      height: MAIN_TITLE_BAR_HEIGHT,
+    },
+  };
+}
+const TERMINAL_WINDOW_MIN = { width: 900, height: 600 };
+
 function createWindow() {
+  const { isMaximized, ...bounds } = getInitialWindowBounds(
+    "main",
+    TERMINAL_WINDOW_SIZE,
+    TERMINAL_WINDOW_MIN,
+  );
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    ...bounds,
+    minWidth: TERMINAL_WINDOW_MIN.width,
+    minHeight: TERMINAL_WINDOW_MIN.height,
     title: formatWindowTitle("AI Shelf"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
+    ...mainTitleBarOptions(),
   });
+
+  if (isMaximized) mainWindow.maximize();
+  trackWindowState(mainWindow, "main");
 
   mainWindow.loadURL(getRendererPageUrl());
   attachWindow(mainWindow, "AI Shelf");
@@ -531,22 +597,29 @@ function createWindow() {
   });
 }
 
-function createChatWindow() {
+function createChatWindow(opener?: BrowserWindow | null) {
   if (chatWindow && !chatWindow.isDestroyed()) {
     chatWindow.focus();
     return;
   }
+  const { isMaximized, ...bounds } = getInitialWindowBounds(
+    "chat",
+    TERMINAL_WINDOW_SIZE,
+    TERMINAL_WINDOW_MIN,
+    opener,
+  );
   chatWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    ...bounds,
+    minWidth: TERMINAL_WINDOW_MIN.width,
+    minHeight: TERMINAL_WINDOW_MIN.height,
     title: formatWindowTitle("AI Terminal"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
+  if (isMaximized) chatWindow.maximize();
+  trackWindowState(chatWindow, "chat");
   chatWindow.loadURL(getRendererPageUrl("chat"));
   attachWindow(chatWindow, "AI Terminal");
   bindMinimizeToTray(chatWindow);
@@ -555,14 +628,20 @@ function createChatWindow() {
   });
 }
 
-function createSettingsWindow() {
+/**
+ * Short-lived settings dialog: owned by the window that opened it, so it stays above
+ * that window and opens centered on the same monitor.
+ */
+function createSettingsWindow(opener?: BrowserWindow | null) {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.focus();
     return;
   }
+  const size = { width: 680, height: 760 };
+  const parent = opener && !opener.isDestroyed() ? opener : (mainWindow ?? undefined);
   settingsWindow = new BrowserWindow({
-    width: 680,
-    height: 760,
+    ...(boundsCenteredOnWindow(size, parent) ?? size),
+    parent,
     minWidth: 560,
     minHeight: 560,
     title: formatWindowTitle("Terminal Settings"),
@@ -578,12 +657,21 @@ function createSettingsWindow() {
   });
 }
 
-ipcMain.handle("open-chat-window", () => {
-  createChatWindow();
+initPaneViews({
+  webPreferences: sharedWebPreferences,
+  icon: APP_ICON,
+  pageUrl: () => getRendererPageUrl("popout"),
+  attachWindow,
+  isOriginWindow: (win) => win === mainWindow || win === chatWindow,
+  killPtySession,
 });
 
-ipcMain.handle("open-settings-window", () => {
-  createSettingsWindow();
+ipcMain.handle("open-chat-window", (event) => {
+  createChatWindow(BrowserWindow.fromWebContents(event.sender));
+});
+
+ipcMain.handle("open-settings-window", (event) => {
+  createSettingsWindow(BrowserWindow.fromWebContents(event.sender));
 });
 
 ipcMain.handle("toggle-devtools", (event) => {
@@ -1041,6 +1129,17 @@ ipcMain.handle("quit-and-install-app-update", () => {
   return { ok: true };
 });
 
+/** What a restart-to-install would interrupt, so the update modal can warn first. */
+ipcMain.handle("get-app-update-impact", () => {
+  let flows = 0;
+  try {
+    flows = listActiveFlowRuns().length;
+  } catch {
+    /* best-effort */
+  }
+  return { terminals: PTY_SESSIONS.size, flows };
+});
+
 // --- MCP Sync ---
 
 ipcMain.handle("get-mcp-raw", async () => {
@@ -1407,6 +1506,8 @@ type PtySessionMeta = {
   cols: number;
   rows: number;
   exitCode: number | null;
+  /** OSC 133 command state (true = command executing, null = never reported). */
+  osc133: Osc133StreamState;
 };
 const PTY_META = new Map<string, PtySessionMeta>();
 
@@ -1716,6 +1817,7 @@ function ptyMetaPayload(sessionId: string) {
     cols: meta.cols,
     rows: meta.rows,
     exitCode: meta.exitCode,
+    commandRunning: meta.osc133.running,
   };
 }
 
@@ -1804,7 +1906,11 @@ ipcMain.handle(
     cwd?: string,
     extraArgs?: string,
     shell?: string,
-    spawnOptions?: { wslDistro?: unknown },
+    spawnOptions?: {
+      wslDistro?: unknown;
+      remote?: unknown;
+      agentSession?: { resumeId?: unknown };
+    },
   ) => {
     let pty: PtyModule;
     try {
@@ -1813,16 +1919,65 @@ ipcMain.handle(
       return { success: false, error: (err as Error).message };
     }
     const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
-    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, extraArgs) ?? "");
-    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
+    // SSH remote profile: never fall back to a local shell (see resolvePtySpawnPlan).
+    const hasRemote = spawnOptions?.remote !== undefined && spawnOptions.remote !== null;
+    const remote = hasRemote ? normalizeRemoteSshConfig(spawnOptions?.remote) : null;
+    if (hasRemote && !remote) {
+      return { success: false, error: "Invalid SSH remote configuration" };
+    }
+    let sshExecutable: string | null = null;
+    if (remote) {
+      sshExecutable = resolveSshExecutable();
+      if (!sshExecutable) {
+        return { success: false, error: SSH_CLIENT_NOT_FOUND_ERROR, code: "SSH_NOT_FOUND" };
+      }
+    }
 
-    // Date.now() alone collides when the same tool spawns twice in one ms.
-    const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
-    const workDirResult = resolvePtyWorkDir(cwd);
+    // Jump hosts with their own key need a generated ssh_config; ssh then starts in its dir
+    // (ssh truncates long -F paths when forwarding them to jump processes).
+    let jumpConfig: { dir: string; fileName: string } | null = null;
+    if (remote) {
+      try {
+        jumpConfig = prepareSshJumpConfig(remote, join(app.getPath("userData"), "ssh"));
+      } catch (err) {
+        return { success: false, error: `SSH jump host config: ${(err as Error).message}` };
+      }
+    }
+
+    // The pane cwd of a remote profile is a remote path (remote.cwd); the local ssh process starts in home.
+    const workDirResult = remote
+      ? { ok: true as const, dir: jumpConfig?.dir ?? homedir() }
+      : resolvePtyWorkDir(cwd);
     if (!workDirResult.ok) {
       return { success: false, error: workDirResult.error };
     }
     const workDir = workDirResult.dir;
+
+    // Agent conversation resume (the renderer opts in via `agentSession`). Skipped
+    // under WSL / SSH: the transcript lives on the other machine, not visible from here.
+    let launchArgs = extraArgs;
+    let agentSessionId: string | undefined;
+    let agentSessionResumed = false;
+    if (!shellOnly && !remote && spawnOptions?.agentSession && shell !== "wsl") {
+      const resumeId = spawnOptions.agentSession.resumeId;
+      const configDir = claudeConfigDirForEnv(process.env);
+      const sessionPlan = planAgentSessionLaunch({
+        tool,
+        extraArgs,
+        resumeId: typeof resumeId === "string" ? resumeId : undefined,
+        transcriptExists: (id) => claudeTranscriptExists(configDir, workDir, id),
+        newId: randomUUID,
+      });
+      launchArgs = sessionPlan.extraArgs;
+      agentSessionId = sessionPlan.sessionId;
+      agentSessionResumed = sessionPlan.resumed;
+    }
+
+    const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, launchArgs) ?? "");
+    if (!shellOnly && !cmd) return { success: false, error: `Unknown tool: ${tool}` };
+
+    // Date.now() alone collides when the same tool spawns twice in one ms.
+    const sessionId = `${tool}-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
     // OSC 7 hooks so `cd` updates the status bar without respawning the PTY.
     // If script install fails, still spawn — cwd just won't track until restart succeeds.
@@ -1845,6 +2000,10 @@ ipcMain.handle(
       shell,
       shellIntegration,
       wsl: { distro: wslDistro, cwd: workDir },
+      ssh:
+        remote && sshExecutable
+          ? { executable: sshExecutable, config: remote, jumpConfigFile: jumpConfig?.fileName }
+          : undefined,
     });
 
     const ptyOpts = {
@@ -1881,17 +2040,26 @@ ipcMain.handle(
       PTY_SESSIONS.set(sessionId, proc);
       PTY_META.set(sessionId, {
         pid: typeof proc.pid === "number" ? proc.pid : null,
-        shell:
-          shellPath === "wsl.exe" && wslDistro
+        shell: remote
+          ? describeRemoteSsh(remote)
+          : shellPath === "wsl.exe" && wslDistro
             ? `wsl:${wslDistro}`
             : basename(shellPath) || shellPath,
         cols: ptyOpts.cols,
         rows: ptyOpts.rows,
         exitCode: null,
+        osc133: INITIAL_OSC133_STREAM,
       });
 
       proc.onData((data) => {
         broadcastPtyData(sessionId, data);
+        const meta = PTY_META.get(sessionId);
+        if (!meta) return;
+        const next = scanOsc133Running(meta.osc133, data);
+        if (next === meta.osc133) return;
+        const changed = next.running !== meta.osc133.running;
+        meta.osc133 = next;
+        if (changed) broadcastPtyMeta(sessionId);
       });
 
       // Kick the shell to emit a prompt after attach (some shells wait for first resize).
@@ -1912,12 +2080,55 @@ ipcMain.handle(
       });
 
       broadcastPtyMeta(sessionId);
-      return { success: true, sessionId, cwd: workDir };
+      // Remote panes report `[user@]host:dir` so the status bar shows where the shell really is.
+      const reportedCwd = remote
+        ? `${remote.user ? `${remote.user}@` : ""}${remote.host}:${remote.cwd || "~"}`
+        : workDir;
+      return {
+        success: true,
+        sessionId,
+        cwd: reportedCwd,
+        agentSessionId,
+        agentSessionResumed,
+      };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
   },
 );
+
+/** Private key picker for SSH profiles; starts in ~/.ssh (hidden files shown). */
+ipcMain.handle("pick-ssh-key", async (event, defaultPath?: string) => {
+  const trimmed = defaultPath?.trim().replace(/^~(?=$|[\\/])/, homedir());
+  const sshDir = join(homedir(), ".ssh");
+  const start =
+    trimmed && existsSync(normalize(trimmed))
+      ? normalize(trimmed)
+      : existsSync(sshDir)
+        ? sshDir
+        : homedir();
+  const options: Electron.OpenDialogOptions = {
+    properties: ["openFile", "showHiddenFiles"],
+    defaultPath: start,
+  };
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const { canceled, filePaths } =
+    parent && !parent.isDestroyed()
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+  return canceled ? null : (filePaths[0] ?? null);
+});
+
+/** Probe the profile's full SSH route without a TTY (Profile settings → Test connection). */
+ipcMain.handle("ssh-test-connection", (_event, remote: unknown) =>
+  testSshConnection(remote, join(app.getPath("userData"), "ssh")),
+);
+
+/** Which local ssh client a remote profile would use (null = none installed). */
+ipcMain.handle("ssh-client-status", () => {
+  const path = resolveSshExecutable();
+  return { found: Boolean(path), path };
+});
 
 ipcMain.handle(
   "pty-attach",
@@ -2028,7 +2239,27 @@ function markPtySessionDead(sessionId: string, exitCode: number) {
   broadcastPtyMeta(sessionId);
 }
 
-ipcMain.on("pty-write", (_e, sessionId: string, data: string) => {
+/** Renderer keeps the native caption buttons in step with the in-app title bar colors. */
+ipcMain.on(
+  "set-title-bar-overlay",
+  (e, opts: { color?: unknown; symbolColor?: unknown } | undefined) => {
+    if (process.platform === "darwin") return;
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || win.isDestroyed()) return;
+    const color = typeof opts?.color === "string" ? opts.color : undefined;
+    const symbolColor = typeof opts?.symbolColor === "string" ? opts.symbolColor : undefined;
+    if (!color && !symbolColor) return;
+    try {
+      win.setTitleBarOverlay({ color, symbolColor, height: MAIN_TITLE_BAR_HEIGHT });
+    } catch {
+      /* window was created without an overlay */
+    }
+  },
+);
+
+ipcMain.on("pty-write", (e, sessionId: string, data: string) => {
+  // A popped-out pane takes input only from its pop-out window.
+  if (!canControlPty(sessionId, e.sender.id)) return;
   const proc = PTY_SESSIONS.get(sessionId);
   if (!proc) {
     notifyPtySessionGone(sessionId);
@@ -2041,7 +2272,10 @@ ipcMain.on("pty-write", (_e, sessionId: string, data: string) => {
   }
 });
 
-ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number) => {
+ipcMain.handle("pty-resize", (e, sessionId: string, cols: number, rows: number) => {
+  // Ignore (but report success — failure marks the pane dead) resizes from a
+  // window that no longer owns the session, e.g. the origin of a popped-out pane.
+  if (!canControlPty(sessionId, e.sender.id)) return { success: true as const };
   const proc = PTY_SESSIONS.get(sessionId);
   if (!proc) return ptySessionGoneResult(sessionId);
   try {
@@ -2059,7 +2293,19 @@ ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number)
   }
 });
 
-ipcMain.on("pty-kill", (_e, sessionId: string) => {
+/** OSC 133 command state for live sessions (seeds a fresh renderer-side tracker). */
+ipcMain.handle("pty-command-states", (_event, sessionIds: unknown) => {
+  const out: Record<string, boolean | null> = {};
+  if (!Array.isArray(sessionIds)) return out;
+  for (const id of sessionIds) {
+    if (typeof id !== "string" || !PTY_SESSIONS.has(id)) continue;
+    const meta = PTY_META.get(id);
+    if (meta) out[id] = meta.osc133.running;
+  }
+  return out;
+});
+
+function killPtySession(sessionId: string): void {
   try {
     PTY_SESSIONS.get(sessionId)?.kill();
   } catch {
@@ -2074,6 +2320,10 @@ ipcMain.on("pty-kill", (_e, sessionId: string) => {
   if (meta && meta.exitCode == null) meta.exitCode = -1;
   broadcastPtyExit(sessionId, meta?.exitCode ?? -1);
   broadcastPtyMeta(sessionId);
+}
+
+ipcMain.on("pty-kill", (_e, sessionId: string) => {
+  killPtySession(sessionId);
 });
 
 // --- Launch in Terminal ---
@@ -2396,6 +2646,7 @@ ipcMain.handle(
       defaultCwd?: string;
       defaultTool?: string;
       accentColor?: string | null;
+      remote?: import("ai-shelf").RemoteSshConfig | null;
       broadcastInput?: boolean;
       copyFromProfileId?: string;
     },
@@ -2419,6 +2670,7 @@ ipcMain.handle("profile-update", (
       defaultTool?: string;
       broadcastInput?: boolean;
       accentColor?: string | null;
+      remote?: import("ai-shelf").RemoteSshConfig | null;
       savedCommands?: { id: string; name: string; command: string; broadcast?: boolean }[];
       groupId?: string;
     },
@@ -3145,6 +3397,7 @@ app.whenReady().then(async () => {
 
   setupAppMenu();
   createWindow();
+  initDisplayWatcher();
   initSystemResume({ wakePtys: wakePtySessions });
 
   if (trayEnabled) {
@@ -3185,7 +3438,8 @@ let profileLayoutFlushInProgress = false;
 function isTerminalRendererWindow(win: BrowserWindow): boolean {
   if (win.webContents.isDestroyed()) return false;
   const url = win.webContents.getURL();
-  return !url.includes("#settings");
+  // View windows hold no layout of their own (their panes live in the origin window's).
+  return !url.includes("#settings") && !url.includes("#popout");
 }
 
 function flushProfileLayoutsFromRenderer(): Promise<void> {

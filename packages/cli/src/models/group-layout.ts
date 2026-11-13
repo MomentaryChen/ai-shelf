@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeRemoteSshConfig } from "../runtime/ssh-remote.js";
 
 export const SavedCommandSnippetSchema = z.object({
   id: z.uuid(),
@@ -13,7 +14,12 @@ export const SavedPaneSlotSchema = z.object({
   tool: z.string().min(1),
   cwd: z.string(),
   title: z.string().max(64).optional(),
+  /** AI agent conversation id (desktop resumes it on restore); validated at launch. */
+  agentSessionId: z.string().max(128).optional(),
 });
+
+/** Outer `.optional()` keeps the key optional; undefined skips the transform. */
+const RemoteSshSchema = z.unknown().transform((value) => normalizeRemoteSshConfig(value)).optional();
 
 export type SerializedLayoutNode =
   | { kind: "pane"; index: number }
@@ -34,6 +40,11 @@ export const GroupLayoutSnapshotSchema = z.object({
   broadcastInput: z.boolean().optional().default(false),
   accentColor: z.string().nullable().optional(),
   savedCommands: z.array(SavedCommandSnippetSchema).optional(),
+  /**
+   * SSH remote for every pane of the profile. `undefined` = "not provided"
+   * (writers keep the stored value); `null` = local profile. Invalid → null.
+   */
+  remote: RemoteSshSchema,
   updatedAt: z.string(),
 });
 

@@ -177,4 +177,118 @@ describe("matchPaneShortcutWithBindings", () => {
       type: "clear-screen",
     });
   });
+
+  it("opens command history with Ctrl+Shift+H only when a handler is registered", () => {
+    const map = resolveKeybindings({}, "win");
+    const action = matchPaneShortcutWithBindings(key("H", { ctrlKey: true, shiftKey: true }), map, xterm());
+    assert.deepEqual(action, { type: "command-history" });
+    assert.equal(shouldConsumePaneShortcut(action!, { panes: [pane("a")] }), false);
+    let opened = 0;
+    const h = handlers({ panes: [pane("a")], onOpenCommandHistory: () => (opened += 1) });
+    assert.equal(shouldConsumePaneShortcut(action!, h), true);
+    applyPaneShortcutAction(action!, h);
+    assert.equal(opened, 1);
+  });
+
+  it("maps swap / resize / equalize defaults and needs several panes", () => {
+    const map = resolveKeybindings({}, "win");
+    const swap = matchPaneShortcutWithBindings(
+      key("ArrowLeft", { ctrlKey: true, altKey: true, shiftKey: true }),
+      map,
+      xterm(),
+    );
+    assert.deepEqual(swap, { type: "swap-pane", direction: "left" });
+    const resize = matchPaneShortcutWithBindings(
+      key("ArrowDown", { altKey: true, shiftKey: true }),
+      map,
+      xterm(),
+    );
+    assert.deepEqual(resize, { type: "resize-pane", direction: "down" });
+    const equalize = matchPaneShortcutWithBindings(
+      key("+", { altKey: true, shiftKey: true, code: "Equal" }),
+      map,
+      xterm(),
+    );
+    assert.deepEqual(equalize, { type: "equalize-panes" });
+
+    const calls: string[] = [];
+    const multi = handlers({
+      panes: [pane("a"), pane("b")],
+      focusedPaneId: "b",
+      onSwapPane: (id, d) => calls.push(`swap ${id} ${d}`),
+      onResizePane: (id, d) => calls.push(`resize ${id} ${d}`),
+      onEqualizePanes: () => calls.push("equalize"),
+    });
+    for (const a of [swap!, resize!, equalize!]) {
+      assert.equal(shouldConsumePaneShortcut(a, multi), true);
+      assert.equal(shouldConsumePaneShortcut(a, { ...multi, panes: [pane("a")] }), false);
+      applyPaneShortcutAction(a, multi);
+    }
+    assert.deepEqual(calls, ["swap b left", "resize b down", "equalize"]);
+  });
+});
+
+describe("font zoom shortcuts", () => {
+  const map = resolveKeybindings({}, "win");
+  const key = (k: string, mods: Partial<KeyEventLike> = {}): KeyEventLike => ({
+    type: "keydown",
+    key: k,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    ...mods,
+  });
+
+  it("maps Ctrl+= / Ctrl+- / Ctrl+0", () => {
+    assert.deepEqual(matchPaneShortcutWithBindings(key("=", { ctrlKey: true, code: "Equal" }), map), {
+      type: "font-zoom",
+      direction: "in",
+    });
+    assert.deepEqual(matchPaneShortcutWithBindings(key("-", { ctrlKey: true, code: "Minus" }), map), {
+      type: "font-zoom",
+      direction: "out",
+    });
+    assert.deepEqual(matchPaneShortcutWithBindings(key("0", { ctrlKey: true, code: "Digit0" }), map), {
+      type: "font-zoom",
+      direction: "reset",
+    });
+  });
+
+  it("accepts Ctrl++ (Shift+= or numpad +) for the default zoom-in", () => {
+    const plus = key("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    assert.deepEqual(matchPaneShortcutWithBindings(plus, map), { type: "font-zoom", direction: "in" });
+    const numpad = key("+", { ctrlKey: true, code: "NumpadAdd" });
+    assert.deepEqual(matchPaneShortcutWithBindings(numpad, map), { type: "font-zoom", direction: "in" });
+  });
+
+  it("does not consume zoom keys without a zoom handler", () => {
+    const action = { type: "font-zoom", direction: "in" } as const;
+    assert.equal(shouldConsumePaneShortcut(action, { panes: [pane("a")] }), false);
+    assert.equal(
+      shouldConsumePaneShortcut(action, { panes: [pane("a")], onFontZoom: () => undefined }),
+      true,
+    );
+  });
+
+  it("maps Ctrl+Shift+Enter to toggle maximize for the focused pane", () => {
+    const chord = key("Enter", { ctrlKey: true, shiftKey: true, code: "Enter" });
+    assert.deepEqual(matchPaneShortcutWithBindings(chord, map), { type: "toggle-maximize" });
+    const seen: string[] = [];
+    applyPaneShortcutAction(
+      { type: "toggle-maximize" },
+      handlers({ panes: [pane("a"), pane("b")], focusedPaneId: "b", onToggleMaximizePane: (id) => seen.push(id) }),
+    );
+    assert.deepEqual(seen, ["b"]);
+    assert.equal(shouldConsumePaneShortcut({ type: "toggle-maximize" }, { panes: [pane("a")] }), false);
+  });
+
+  it("runs the zoom handler", () => {
+    const seen: string[] = [];
+    applyPaneShortcutAction(
+      { type: "font-zoom", direction: "out" },
+      handlers({ panes: [pane("a")], onFontZoom: (d) => seen.push(d) }),
+    );
+    assert.deepEqual(seen, ["out"]);
+  });
 });

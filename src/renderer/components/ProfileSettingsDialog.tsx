@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import type { ProfileInfo, SavedCommandSnippet } from "../types";
+import type { ProfileInfo, RemoteSshConfig, SavedCommandSnippet } from "../types";
+import { ProfileRemoteSshSection } from "./ProfileRemoteSshSection";
+import { ProfileDialogTabs, type ProfileDialogTab } from "./ProfileDialogTabs";
+import {
+  draftToRemote,
+  invalidRemoteField,
+  remoteToDraft,
+  type RemoteSshDraft,
+} from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import {
   PLAIN_SHELL_TOOL_ID,
@@ -15,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,6 +37,8 @@ export interface ProfileSettingsPatch {
   accentColor: string | null;
   savedCommands: SavedCommandSnippet[];
   groupId: string;
+  /** null = local profile. */
+  remote: RemoteSshConfig | null;
 }
 
 interface Props {
@@ -62,6 +73,9 @@ export function ProfileSettingsDialog({
   const [savedCommands, setSavedCommands] = useState<SavedCommandSnippet[]>([]);
   const [groupId, setGroupId] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [remoteDraft, setRemoteDraft] = useState<RemoteSshDraft>(() => remoteToDraft(null));
+  const [remoteTouched, setRemoteTouched] = useState(false);
+  const [tab, setTab] = useState<ProfileDialogTab>("general");
 
   const tools = profileToolChoices(availableTools, profile?.defaultTool);
 
@@ -74,12 +88,16 @@ export function ProfileSettingsDialog({
     setAccentColor(profile.accentColor ?? null);
     setSavedCommands(profile.savedCommands ?? []);
     setGroupId(profile.workspaceId);
+    setRemoteDraft(remoteToDraft(profile.remote));
+    setRemoteTouched(false);
+    setTab("general");
     setSaveError("");
   }, [open, profile]);
 
   if (!profile) return null;
 
   const effectiveTool = tools.includes(tool) ? tool : (tools[0] ?? PLAIN_SHELL_TOOL_ID);
+  const remoteInvalid = invalidRemoteField(remoteDraft);
 
   async function handleBrowse() {
     const picked = await window.api.pickFolder(cwd || undefined);
@@ -89,7 +107,17 @@ export function ProfileSettingsDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmedName = name.trim();
-    if (!trimmedName) return;
+    if (!trimmedName) {
+      // The name field may be on the other tab — switch there and say why.
+      setSaveError(t("profile.dialog.err.nameRequired"));
+      setTab("general");
+      return;
+    }
+    if (remoteInvalid) {
+      setRemoteTouched(true);
+      setTab("remote");
+      return;
+    }
     setSaveError("");
     const error = await onSave(profile!.id, {
       name: trimmedName,
@@ -98,6 +126,7 @@ export function ProfileSettingsDialog({
       broadcastInput,
       accentColor,
       groupId: groupId || profile!.workspaceId,
+      remote: draftToRemote(remoteDraft),
       savedCommands: savedCommands
         .map((s) => ({
           ...s,
@@ -111,11 +140,22 @@ export function ProfileSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm max-h-[min(90vh,720px)] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[min(90vh,720px)] max-w-md flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-chrome-border-subtle px-5 py-4">
           <DialogTitle className="text-[15px]">{t("profile.dialog.settingsTitle")}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+        <div className="shrink-0 px-5 pt-3">
+          <ProfileDialogTabs
+            value={tab}
+            onChange={setTab}
+            remoteEnabled={remoteDraft.enabled}
+            remoteInvalid={remoteTouched && remoteInvalid !== null}
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 pb-4">
+        {tab === "general" ? (
+        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general">
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.name")}
@@ -150,6 +190,11 @@ export function ProfileSettingsDialog({
           </select>
         </Label>
 
+        {remoteDraft.enabled ? (
+          <p className="mb-3 rounded-md border border-chrome-border-subtle px-3 py-2 text-[11px] text-chrome-text-dim">
+            {t("profile.remote.cwdReplacesLocal")}
+          </p>
+        ) : (
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.defaultDir")}
@@ -174,6 +219,7 @@ export function ProfileSettingsDialog({
             </button>
           </div>
         </Label>
+        )}
 
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.accentLegend")}</legend>
@@ -224,29 +270,41 @@ export function ProfileSettingsDialog({
         </Label>
 
         <SavedCommandsEditor value={savedCommands} onChange={setSavedCommands} disabled={busy} />
+        </div>
+        ) : (
+          <ProfileRemoteSshSection
+            value={remoteDraft}
+            onChange={(next) => {
+              setRemoteDraft(next);
+              setRemoteTouched(true);
+            }}
+            invalid={remoteTouched ? remoteInvalid : null}
+            disabled={busy}
+          />
+        )}
+        </div>
 
-        {saveError ? <p className="mb-3 text-[12px] text-fail">{saveError}</p> : null}
-
-        <div className="flex items-center justify-between gap-2">
+        <DialogFooter className="shrink-0 flex-col gap-2 border-t border-chrome-border-subtle px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          {saveError ? <p className="w-full text-[12px] text-fail sm:order-first sm:w-auto">{saveError}</p> : null}
           <Button
             type="button"
             variant="ghost"
             size="sm"
             disabled={busy}
             onClick={() => void onDelete(profile)}
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
             {t("profile.dialog.delete")}
           </Button>
-          <div className="flex gap-2">
+          <div className="flex w-full gap-2 sm:w-auto">
             <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
               {t("profile.dialog.cancel")}
             </Button>
-            <Button type="submit" size="sm" disabled={busy || !name.trim()}>
+            <Button type="submit" size="sm" disabled={busy}>
               {t("profile.dialog.save")}
             </Button>
           </div>
-        </div>
+        </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

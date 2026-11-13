@@ -1,7 +1,9 @@
-import type { PaneInfo } from "./split-tree";
+import type { PaneDirection, PaneInfo } from "./split-tree";
 import { shouldIgnoreShortcutForIme } from "./ime-keys";
+import type { FontZoomDirection } from "./font-zoom";
 import { getActiveKeybindings } from "../shortcuts/active-keybindings";
 import {
+  combosEqual,
   matchShortcut,
   type KeybindingMap,
   type KeyEventLike,
@@ -15,7 +17,13 @@ export type PaneShortcutAction =
   | { type: "close" }
   | { type: "clear-screen" }
   | { type: "restart-session" }
-  | { type: "split"; direction: "horizontal" | "vertical" };
+  | { type: "split"; direction: "horizontal" | "vertical" }
+  | { type: "font-zoom"; direction: FontZoomDirection }
+  | { type: "toggle-maximize" }
+  | { type: "command-history" }
+  | { type: "swap-pane"; direction: PaneDirection }
+  | { type: "resize-pane"; direction: PaneDirection }
+  | { type: "equalize-panes" };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -45,6 +53,8 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     onSplitPane,
     onClearPane,
     onRestartPane,
+    onFontZoom,
+    onToggleMaximizePane,
   } = h;
 
   // Ctrl+Tab MRU must work with zero local panes (e.g. empty workspace after a
@@ -86,6 +96,24 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     case "split":
       onSplitPane(focusId, action.direction);
       break;
+    case "font-zoom":
+      onFontZoom?.(action.direction);
+      break;
+    case "toggle-maximize":
+      onToggleMaximizePane?.(focusId);
+      break;
+    case "command-history":
+      h.onOpenCommandHistory?.();
+      break;
+    case "swap-pane":
+      h.onSwapPane?.(focusId, action.direction);
+      break;
+    case "resize-pane":
+      h.onResizePane?.(focusId, action.direction);
+      break;
+    case "equalize-panes":
+      h.onEqualizePanes?.();
+      break;
   }
 }
 
@@ -100,6 +128,18 @@ export interface PaneShortcutHandlers {
   onClearPane?: (paneId: string) => void;
   onRestartPane?: (paneId: string) => void;
   onSplitPane: (paneId: string, direction: "horizontal" | "vertical") => void;
+  /** Ctrl/Cmd + = / - / 0 — global terminal font size. */
+  onFontZoom?: (direction: FontZoomDirection) => void;
+  /** Show only this pane (or restore the split view); the layout is not changed. */
+  onToggleMaximizePane?: (paneId: string) => void;
+  /** Open the OSC 133 command history panel. */
+  onOpenCommandHistory?: () => void;
+  /** Swap the pane with its neighbour in `direction`. */
+  onSwapPane?: (paneId: string, direction: PaneDirection) => void;
+  /** Move the divider next to the pane one step in `direction`. */
+  onResizePane?: (paneId: string, direction: PaneDirection) => void;
+  /** Give every pane in each row / column the same size. */
+  onEqualizePanes?: () => void;
 }
 
 let getHandlers: (() => PaneShortcutHandlers | null) | null = null;
@@ -119,6 +159,20 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "closePane",
   "clearScreen",
   "restartSession",
+  "fontZoomIn",
+  "fontZoomOut",
+  "fontZoomReset",
+  "toggleMaximizePane",
+  "commandHistory",
+  "swapPaneLeft",
+  "swapPaneRight",
+  "swapPaneUp",
+  "swapPaneDown",
+  "resizePaneLeft",
+  "resizePaneRight",
+  "resizePaneUp",
+  "resizePaneDown",
+  "equalizePanes",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -158,6 +212,16 @@ function isCtrlShiftW(ev: KeyEventLike): boolean {
 }
 
 /**
+ * With the default Ctrl/Cmd+= zoom-in, also accept Ctrl/Cmd++ (Shift+= on US
+ * layouts, or the numpad +) — what most people press to "zoom in".
+ */
+function isDefaultZoomInPlus(ev: KeyEventLike, map: KeybindingMap): boolean {
+  const zoomIn = map.fontZoomIn;
+  if (!zoomIn || !combosEqual(zoomIn, { key: "=", mod: true })) return false;
+  return ev.type !== "keyup" && (ev.ctrlKey || ev.metaKey) && !ev.altKey && ev.key === "+";
+}
+
+/**
  * Map a key event to a pane action using the given keybindings (pure; unit tested).
  *
  * While close is still the default Ctrl/Cmd+W:
@@ -178,6 +242,8 @@ export function matchPaneShortcutWithBindings(
     return null;
   }
 
+  if (isDefaultZoomInPlus(ev, map)) return { type: "font-zoom", direction: "in" };
+
   const m = matchShortcut(ev, map, PANE_SHORTCUT_IDS);
   if (!m) return null;
   switch (m.id) {
@@ -197,6 +263,34 @@ export function matchPaneShortcutWithBindings(
       return { type: "clear-screen" };
     case "restartSession":
       return { type: "restart-session" };
+    case "fontZoomIn":
+      return { type: "font-zoom", direction: "in" };
+    case "fontZoomOut":
+      return { type: "font-zoom", direction: "out" };
+    case "fontZoomReset":
+      return { type: "font-zoom", direction: "reset" };
+    case "toggleMaximizePane":
+      return { type: "toggle-maximize" };
+    case "commandHistory":
+      return { type: "command-history" };
+    case "swapPaneLeft":
+      return { type: "swap-pane", direction: "left" };
+    case "swapPaneRight":
+      return { type: "swap-pane", direction: "right" };
+    case "swapPaneUp":
+      return { type: "swap-pane", direction: "up" };
+    case "swapPaneDown":
+      return { type: "swap-pane", direction: "down" };
+    case "resizePaneLeft":
+      return { type: "resize-pane", direction: "left" };
+    case "resizePaneRight":
+      return { type: "resize-pane", direction: "right" };
+    case "resizePaneUp":
+      return { type: "resize-pane", direction: "up" };
+    case "resizePaneDown":
+      return { type: "resize-pane", direction: "down" };
+    case "equalizePanes":
+      return { type: "equalize-panes" };
     default:
       return null;
   }
@@ -231,13 +325,29 @@ export function tryConsumePaneShortcut(ev: KeyboardEvent): boolean {
 /** Whether a matched action should run (and consume the key) for the current handlers. */
 export function shouldConsumePaneShortcut(
   action: PaneShortcutAction,
-  h: Pick<PaneShortcutHandlers, "panes" | "onFocusRecentTerminal">,
+  h: Pick<
+    PaneShortcutHandlers,
+    "panes" | "onFocusRecentTerminal" | "onFontZoom" | "onToggleMaximizePane"
+  > &
+    Partial<
+      Pick<
+        PaneShortcutHandlers,
+        "onOpenCommandHistory" | "onSwapPane" | "onResizePane" | "onEqualizePanes"
+      >
+    >,
 ): boolean {
   // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
   // split keys — those may belong to profile quick-switch or should no-op cleanly.
   if (h.panes.length === 0) {
     return action.type === "focus-next" && Boolean(h.onFocusRecentTerminal);
   }
+  if (action.type === "font-zoom") return Boolean(h.onFontZoom);
+  if (action.type === "toggle-maximize") return Boolean(h.onToggleMaximizePane);
+  if (action.type === "command-history") return Boolean(h.onOpenCommandHistory);
+  // Layout keys only mean something with several panes; otherwise the shell / TUI gets them.
+  if (action.type === "swap-pane") return h.panes.length > 1 && Boolean(h.onSwapPane);
+  if (action.type === "resize-pane") return h.panes.length > 1 && Boolean(h.onResizePane);
+  if (action.type === "equalize-panes") return h.panes.length > 1 && Boolean(h.onEqualizePanes);
   return true;
 }
 

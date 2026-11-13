@@ -4,3 +4,5 @@ release
 pnpm-lock.yaml
 src/renderer
 tests/screenshots
+installer/target
+installer/gen

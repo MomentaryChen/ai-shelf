@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   getInventory: () => ipcRenderer.invoke("get-inventory"),
@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("api", {
   runDoctorTool: (tool) => ipcRenderer.invoke("doctor-tool", tool),
   checkUpdate: () => ipcRenderer.invoke("check-update"),
   getSelfInfo: () => ipcRenderer.invoke("get-self-info"),
+  setTitleBarOverlay: (opts) => ipcRenderer.send("set-title-bar-overlay", opts),
   getToolsList: () => ipcRenderer.invoke("get-tools-list"),
   checkToolLatest: (tool) => ipcRenderer.invoke("refresh-tool-update-info", tool),
   refreshToolUpdateInfo: (tool) => ipcRenderer.invoke("refresh-tool-update-info", tool),
@@ -35,6 +36,7 @@ contextBridge.exposeInMainWorld("api", {
   getAppUpdateState: () => ipcRenderer.invoke("get-app-update-state"),
   confirmAppUpdateDownload: () => ipcRenderer.invoke("confirm-app-update-download"),
   quitAndInstallAppUpdate: () => ipcRenderer.invoke("quit-and-install-app-update"),
+  getAppUpdateImpact: () => ipcRenderer.invoke("get-app-update-impact"),
   onAppUpdateAvailable: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("app-update-available", handler);
@@ -54,6 +56,11 @@ contextBridge.exposeInMainWorld("api", {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("app-update-downloaded", handler);
     return () => ipcRenderer.off("app-update-downloaded", handler);
+  },
+  onAppUpdateInstalling: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app-update-installing", handler);
+    return () => ipcRenderer.off("app-update-installing", handler);
   },
   onAppUpdateError: (cb) => {
     const handler = (_e, payload) => cb(payload);
@@ -97,10 +104,23 @@ contextBridge.exposeInMainWorld("api", {
   mcpPingTool: (tool) => ipcRenderer.invoke("mcp-ping-tool", tool),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  openPathAt: (req) => ipcRenderer.invoke("open-path-at", req),
+  pathsExist: (paths) => ipcRenderer.invoke("paths-exist", paths),
+  // File.path was removed in Electron 32; dropped OS files resolve here.
+  getPathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return "";
+    }
+  },
   launchInTerminal: (tool, terminal, cwd, extraArgs) =>
     ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
   ptySpawn: (tool, cwd, extraArgs, shell, options) =>
     ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell, options),
+  sshClientStatus: ()                      => ipcRenderer.invoke("ssh-client-status"),
+  pickSshKey: (defaultPath)                => ipcRenderer.invoke("pick-ssh-key", defaultPath),
+  sshTestConnection: (remote)              => ipcRenderer.invoke("ssh-test-connection", remote),
   ptyAttach: (sessionId, opts)              => ipcRenderer.invoke("pty-attach", sessionId, opts),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
   ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),
@@ -112,6 +132,7 @@ contextBridge.exposeInMainWorld("api", {
   ptyWrite:  (sessionId, data)          => ipcRenderer.send("pty-write",  sessionId, data),
   ptyResize: (sessionId, cols, rows)    => ipcRenderer.invoke("pty-resize", sessionId, cols, rows),
   ptyKill:   (sessionId)                => ipcRenderer.send("pty-kill",   sessionId),
+  ptyCommandStates: (sessionIds)        => ipcRenderer.invoke("pty-command-states", sessionIds),
   onPtyData: (cb) => {
     const handler = (_e, p) => cb(p);
     ipcRenderer.on("pty-data", handler);
@@ -200,6 +221,38 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.off("profile-layout-flush", handler);
   },
   sendProfileLayoutFlushDone: () => ipcRenderer.send("profile-layout-flush-done"),
+  paneViewSync: (views) => ipcRenderer.send("pane-view-sync", views),
+  paneViewDragEnd: (req) => ipcRenderer.invoke("pane-view-drag-end", req),
+  paneViewFocus: (paneId) => ipcRenderer.invoke("pane-view-focus", paneId),
+  paneViewGetState: () => ipcRenderer.invoke("pane-view-get-state"),
+  paneViewAction: (action) => ipcRenderer.send("pane-view-action", action),
+  paneViewStoreGet: (key) => ipcRenderer.invoke("pane-view-store-get", key),
+  paneViewStoreSave: (key, views) => ipcRenderer.invoke("pane-view-store-save", key, views),
+  onPaneViewIntent: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("pane-view-intent", handler);
+    return () => ipcRenderer.off("pane-view-intent", handler);
+  },
+  onPaneViewState: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("pane-view-state", handler);
+    return () => ipcRenderer.off("pane-view-state", handler);
+  },
+  onPaneViewConfirmClose: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("pane-view-confirm-close", handler);
+    return () => ipcRenderer.off("pane-view-confirm-close", handler);
+  },
+  onPaneViewNotice: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("pane-view-notice", handler);
+    return () => ipcRenderer.off("pane-view-notice", handler);
+  },
+  onPaneViewFocusPane: (cb) => {
+    const handler = (_e, paneId) => cb(paneId);
+    ipcRenderer.on("pane-view-focus-pane", handler);
+    return () => ipcRenderer.off("pane-view-focus-pane", handler);
+  },
   usageGetProviders: () => ipcRenderer.invoke("usage-get-providers"),
   usageGetCredentialStatus: () => ipcRenderer.invoke("usage-get-credential-status"),
   usageSetCredential: (tool, fieldKey, value) =>
@@ -311,4 +364,6 @@ contextBridge.exposeInMainWorld("api", {
   portsHostStats: () => ipcRenderer.invoke("ports-host-stats"),
   wslListDistros: () => ipcRenderer.invoke("wsl-list-distros"),
   wslDistroIp: (distro) => ipcRenderer.invoke("wsl-distro-ip", distro),
+  gitCwdInfo: (cwd) => ipcRenderer.invoke("git-cwd-info", cwd),
+  gitWorktreeAdd: (req) => ipcRenderer.invoke("git-worktree-add", req),
 });

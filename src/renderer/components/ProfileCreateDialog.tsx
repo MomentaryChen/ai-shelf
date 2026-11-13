@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ProfileInfo } from "../types";
+import type { ProfileInfo, RemoteSshConfig } from "../types";
+import { ProfileRemoteSshSection } from "./ProfileRemoteSshSection";
+import { ProfileDialogTabs, type ProfileDialogTab } from "./ProfileDialogTabs";
+import {
+  draftToRemote,
+  invalidRemoteField,
+  remoteToDraft,
+  type RemoteSshDraft,
+} from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import {
   PLAIN_SHELL_TOOL_ID,
@@ -39,8 +47,10 @@ interface Props {
     defaultTool: string;
     accentColor: string | null;
     broadcastInput: boolean;
+    /** null = local profile. */
+    remote: RemoteSshConfig | null;
     copyFromProfileId?: string;
-  }) => void;
+  }) => string | void | Promise<string | void>;
   onQuickCreateGroup?: (name: string) => Promise<{ ok: boolean; groupId?: string; error?: string }>;
 }
 
@@ -67,6 +77,11 @@ export function ProfileCreateDialog({
   const [newGroupName, setNewGroupName] = useState("");
   const [quickCreatingGroup, setQuickCreatingGroup] = useState(false);
   const [groupErr, setGroupErr] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [tab, setTab] = useState<ProfileDialogTab>("general");
+  const [remoteDraft, setRemoteDraft] = useState<RemoteSshDraft>(() => remoteToDraft(null));
+  const [remoteTouched, setRemoteTouched] = useState(false);
 
   const tools = useMemo(
     () => profileToolChoices(availableTools),
@@ -87,6 +102,11 @@ export function ProfileCreateDialog({
       setGroupErr("");
       setStartFrom("blank");
       setCopyFromProfileId(null);
+      setTab("general");
+      setRemoteDraft(remoteToDraft(null));
+      setRemoteTouched(false);
+      setSubmitError("");
+      setSubmitting(false);
       startKeyRef.current = "blank:";
       const defaults = profileCreateDefaults("blank", profiles, null, tools);
       setName("");
@@ -111,6 +131,11 @@ export function ProfileCreateDialog({
     setTool(defaults.defaultTool);
     setAccentColor(defaults.accentColor);
     setBroadcastInput(defaults.broadcastInput);
+    // Copying a profile copies its SSH target too; templates / blank start local.
+    const source =
+      startFrom === "copy" ? profiles.find((p) => p.id === copyFromProfileId) : undefined;
+    setRemoteDraft(remoteToDraft(source?.remote ?? null));
+    setRemoteTouched(false);
     if (defaults.copyNameSource !== undefined) {
       setName(t("profile.dialog.copyNameDefault", { name: defaults.copyNameSource }));
     }
@@ -126,6 +151,7 @@ export function ProfileCreateDialog({
 
   const effectiveTool = tools.includes(tool) ? tool : (tools[0] ?? PLAIN_SHELL_TOOL_ID);
   const canCopy = profiles.length > 0;
+  const remoteInvalid = invalidRemoteField(remoteDraft);
 
   function handleStartFromChange(next: ProfileStartFrom) {
     setStartFrom(next);
@@ -143,20 +169,50 @@ export function ProfileCreateDialog({
     if (picked) setCwd(picked);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  /** Missing General-tab fields: switch there and say why (the button stays enabled). */
+  function showGeneralError(message: string, focusName: boolean) {
+    setSubmitError(message);
+    setTab("general");
+    if (focusName) window.setTimeout(() => nameInputRef.current?.focus(), 0);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     const trimmed = name.trim();
-    if (!trimmed || !effectiveTool || !groupId) return;
-    onCreate({
+    if (!trimmed) {
+      showGeneralError(t("profile.dialog.err.nameRequired"), true);
+      return;
+    }
+    if (!groupId) {
+      showGeneralError(t("profile.dialog.err.groupRequired"), false);
+      return;
+    }
+    if (!effectiveTool) return;
+    if (remoteInvalid) {
+      setRemoteTouched(true);
+      setTab("remote");
+      return;
+    }
+    setSubmitError("");
+    setSubmitting(true);
+    const error = await onCreate({
       groupId,
       name: trimmed,
       defaultCwd: cwd.trim(),
       defaultTool: effectiveTool,
       accentColor,
       broadcastInput,
+      remote: draftToRemote(remoteDraft),
       copyFromProfileId:
         startFrom === "copy" && copyFromProfileId ? copyFromProfileId : undefined,
     });
+    setSubmitting(false);
+    if (error) {
+      // Keep the dialog (and everything typed) open so the user can fix it.
+      setSubmitError(error);
+      return;
+    }
     setName("");
     setCwd("");
     setTool(tools[0] ?? PLAIN_SHELL_TOOL_ID);
@@ -164,6 +220,9 @@ export function ProfileCreateDialog({
     setBroadcastInput(false);
     setStartFrom("blank");
     setCopyFromProfileId(null);
+    setRemoteDraft(remoteToDraft(null));
+    setRemoteTouched(false);
+    setTab("general");
   }
 
   async function handleQuickCreateGroup() {
@@ -184,7 +243,7 @@ export function ProfileCreateDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="max-h-[90vh] max-w-sm overflow-y-auto"
+        className="flex max-h-[min(90vh,720px)] max-w-md flex-col overflow-hidden p-0"
         onOpenAutoFocus={(e) => {
           // Radix focuses the first tabbable (the "start from" select) by default;
           // land the caret in the name field instead, like the pre-shadcn dialog.
@@ -192,10 +251,21 @@ export function ProfileCreateDialog({
           nameInputRef.current?.focus();
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b border-chrome-border-subtle px-5 py-4">
           <DialogTitle className="text-[15px]">{t("profile.dialog.createTitle")}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+        <div className="shrink-0 px-5 pt-3">
+          <ProfileDialogTabs
+            value={tab}
+            onChange={setTab}
+            remoteEnabled={remoteDraft.enabled}
+            remoteInvalid={remoteTouched && remoteInvalid !== null}
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 pb-4">
+        {tab === "general" ? (
+        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general">
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">
             {t("profile.dialog.startFromLegend")}
@@ -303,6 +373,11 @@ export function ProfileCreateDialog({
           />
         </Label>
 
+        {remoteDraft.enabled ? (
+          <p className="mb-3 rounded-md border border-chrome-border-subtle px-3 py-2 text-[11px] text-chrome-text-dim">
+            {t("profile.remote.cwdReplacesLocal")}
+          </p>
+        ) : (
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.defaultDir")}
@@ -323,6 +398,7 @@ export function ProfileCreateDialog({
             </button>
           </div>
         </Label>
+        )}
 
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.accentLegend")}</legend>
@@ -363,16 +439,34 @@ export function ProfileCreateDialog({
           </div>
         </fieldset>
 
-        <Label className="mb-5 flex cursor-pointer items-center gap-2 rounded-md border border-chrome-border-subtle px-3 py-2.5 text-[13px] font-normal text-chrome-text-secondary">
+        <Label className="mb-1 flex cursor-pointer items-center gap-2 rounded-md border border-chrome-border-subtle px-3 py-2.5 text-[13px] font-normal text-chrome-text-secondary">
           <Checkbox checked={broadcastInput} onCheckedChange={(v) => setBroadcastInput(v === true)} />
           {t("profile.syncBroadcast")}
         </Label>
+        </div>
+        ) : (
+          <ProfileRemoteSshSection
+            value={remoteDraft}
+            onChange={(next) => {
+              setRemoteDraft(next);
+              setRemoteTouched(true);
+            }}
+            invalid={remoteTouched ? remoteInvalid : null}
+          />
+        )}
+        </div>
 
-        <DialogFooter className="mt-2">
+        {submitError ? (
+          <p role="alert" className="shrink-0 px-5 pb-3 text-[12px] text-fail">
+            {submitError}
+          </p>
+        ) : null}
+        <DialogFooter className="shrink-0 border-t border-chrome-border-subtle px-5 py-4">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t("profile.dialog.cancel")}
           </Button>
-          <Button type="submit" size="sm" disabled={!name.trim() || !groupId}>
+          {/* Never silently disabled: missing fields may sit on the other tab, so submit explains. */}
+          <Button type="submit" size="sm" disabled={submitting}>
             {t("profile.dialog.create")}
           </Button>
         </DialogFooter>

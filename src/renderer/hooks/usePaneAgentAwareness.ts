@@ -4,6 +4,7 @@ import type { ChatSettings } from "../chat-settings";
 import {
   applyPaneAgentOutput,
   applyPaneAgentUserInput,
+  applyPaneCommandRunning,
   createPaneAgentState,
   paneNeedsAttention,
   PANE_AGENT_MIN_RUNNING_FOR_READY_MS,
@@ -20,6 +21,7 @@ import {
   type BackgroundAttentionMap,
 } from "../../shared/background-agent-attention.js";
 import { paneDisplayLabel } from "../utils/pane-label";
+import { paneNotifyDedupe } from "../terminal/terminal-notify";
 import type { MessageKey } from "../i18n/messages/en";
 
 export type PaneAgentStateMap = Record<string, PaneAgentStatus>;
@@ -214,6 +216,8 @@ export function usePaneAgentAwareness(
         return;
       }
       if (settings.paneAgentNotifySystem) {
+        // A terminal notification (long command, OSC 9, bell) just covered this pane.
+        if (!paneNotifyDedupe.claim(pane.id, "agent", Date.now())) return;
         await window.api.showPaneAgentNotification({
           title,
           body,
@@ -488,9 +492,21 @@ export function usePaneAgentAwareness(
       updateSession(sessionId, () => createPaneAgentState());
     });
 
+    // OSC 133 command start / prompt return, parsed in main from the raw stream.
+    const offMeta = window.api.onPtyMeta(({ sessionId, alive, commandRunning }) => {
+      if (commandRunning === undefined || !alive) return;
+      // Flush coalesced output first so the state change is ordered after it.
+      if (pendingOutputRef.current.has(sessionId)) flushPendingOutput();
+      const now = Date.now();
+      updateSession(sessionId, (prev) =>
+        applyPaneCommandRunning(prev, commandRunning, now, stateOptions(settings)),
+      );
+    });
+
     return () => {
       offData();
       offExit();
+      offMeta();
       cancelOutputCoalesce();
     };
   }, [
@@ -498,6 +514,7 @@ export function usePaneAgentAwareness(
     clearReadyPending,
     commitPaneState,
     dispatchAttention,
+    flushPendingOutput,
     notify,
     scheduleOutputFlush,
     settings,
@@ -519,6 +536,53 @@ export function usePaneAgentAwareness(
       return changed ? next : prev;
     });
   }, [trackedPanes]);
+
+  /**
+   * Seed OSC 133 command state for newly tracked panes. Live pty-meta broadcasts
+   * only report changes, so a fresh tracker (reload, awareness re-enabled, a
+   * restored pane) would otherwise miss a command that is already running.
+   */
+  const seededSessionsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!settings.paneAgentAwarenessEnabled) {
+      seededSessionsRef.current.clear();
+      return;
+    }
+    const live = new Set(trackedPanes.map((p) => p.sessionId));
+    for (const id of seededSessionsRef.current) {
+      if (!live.has(id)) seededSessionsRef.current.delete(id);
+    }
+    const fresh = [...live].filter((id) => !seededSessionsRef.current.has(id));
+    if (fresh.length === 0) return;
+    for (const id of fresh) seededSessionsRef.current.add(id);
+    let cancelled = false;
+    let settled = false;
+    void window.api
+      .ptyCommandStates(fresh)
+      .then((states) => {
+        settled = true;
+        if (cancelled) return;
+        const now = Date.now();
+        for (const [sessionId, running] of Object.entries(states)) {
+          if (running === null) continue;
+          // A pty-meta broadcast that arrived first is newer — keep it.
+          updateSession(sessionId, (prev) =>
+            prev.commandRunning !== null
+              ? prev
+              : applyPaneCommandRunning(prev, running, now, stateOptions(settings)),
+          );
+        }
+      })
+      .catch(() => {
+        settled = true;
+        for (const id of fresh) seededSessionsRef.current.delete(id);
+      });
+    return () => {
+      cancelled = true;
+      // Reply not in yet: let the next run query these sessions again.
+      if (!settled) for (const id of fresh) seededSessionsRef.current.delete(id);
+    };
+  }, [settings, trackedPanes, updateSession]);
 
   const recordUserInput = useCallback(
     (sessionId: string) => {
@@ -573,12 +637,14 @@ export function usePaneAgentAwareness(
     void window.api.setTrayPaneAttention(count);
   }, [focusedPaneId, trackedPanes, settings, states, windowFocused]);
 
-  const statusMap: PaneAgentStateMap = {};
-  if (settings.paneAgentAwarenessEnabled) {
+  const statusMap = useMemo<PaneAgentStateMap>(() => {
+    const map: PaneAgentStateMap = {};
+    if (!settings.paneAgentAwarenessEnabled) return map;
     for (const pane of trackedPanes) {
-      statusMap[pane.id] = states[pane.id]?.status ?? "idle";
+      map[pane.id] = states[pane.id]?.status ?? "idle";
     }
-  }
+    return map;
+  }, [settings.paneAgentAwarenessEnabled, trackedPanes, states]);
 
   const backgroundAttention = useMemo(() => summarizeBackgroundAttention(attention), [attention]);
 

@@ -94,7 +94,9 @@ export function PasteConfirmDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="sm:items-center sm:justify-between">
+          <p className="hidden text-[11px] text-chrome-text-dim sm:block">{t("terminal.pasteConfirm.dismissHint")}</p>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
             {t("profile.dialog.cancel")}
           </Button>
@@ -108,6 +110,7 @@ export function PasteConfirmDialog({
               ? t("terminal.pasteConfirm.pasteBroadcast", { count: broadcastCount })
               : t("terminal.pasteConfirm.paste")}
           </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

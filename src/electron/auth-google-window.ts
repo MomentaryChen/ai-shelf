@@ -3,6 +3,7 @@ import { getRendererPageUrl } from "./renderer-server.js";
 import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { getAuthStatePublic } from "./auth-service.js";
 import type { AuthStatePublic } from "../shared/auth-types.js";
+import { boundsCenteredOnWindow } from "./window-state.js";
 
 export interface GoogleAuthWindowResult {
   ok: boolean;
@@ -79,9 +80,10 @@ export function openGoogleAuthWindow(
   return new Promise((resolve) => {
     pending = resolve;
 
+    const size = { width: 520, height: 720 };
     authWindow = new BrowserWindow({
-      width: 520,
-      height: 720,
+      // Open on the same monitor as the window that started sign-in.
+      ...(boundsCenteredOnWindow(size, parent) ?? size),
       modal: parent != null,
       parent: parent ?? undefined,
       show: false,
