@@ -200,6 +200,23 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.off("profile-layout-flush", handler);
   },
   sendProfileLayoutFlushDone: () => ipcRenderer.send("profile-layout-flush-done"),
+  panePopoutOpen: (req) => ipcRenderer.invoke("pane-popout-open", req),
+  panePopoutInfo: () => ipcRenderer.invoke("pane-popout-info"),
+  panePopoutDock: (paneId) => ipcRenderer.invoke("pane-popout-dock", paneId),
+  panePopoutFocus: (paneId) => ipcRenderer.invoke("pane-popout-focus", paneId),
+  panePopoutClose: () => ipcRenderer.invoke("pane-popout-close"),
+  panePopoutReportBusy: (paneId, busy) => ipcRenderer.send("pane-popout-busy", paneId, busy),
+  panePopoutReportCwd: (cwd) => ipcRenderer.send("pane-popout-cwd", cwd),
+  onPanePopoutEvent: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("pane-popout-event", handler);
+    return () => ipcRenderer.off("pane-popout-event", handler);
+  },
+  onPanePopoutConfirmClose: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("pane-popout-confirm-close", handler);
+    return () => ipcRenderer.off("pane-popout-confirm-close", handler);
+  },
   usageGetProviders: () => ipcRenderer.invoke("usage-get-providers"),
   usageGetCredentialStatus: () => ipcRenderer.invoke("usage-get-credential-status"),
   usageSetCredential: (tool, fieldKey, value) =>
