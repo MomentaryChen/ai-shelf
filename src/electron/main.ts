@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, Menu, clipboard } from "electron";
-import type { MenuItemConstructorOptions } from "electron";
+import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions } from "electron";
 import { join, normalize, dirname, basename } from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, mkdir, unlink, writeFile } from "node:fs/promises";
@@ -545,6 +545,27 @@ function attachWindow(win: BrowserWindow, titleBase: string) {
 }
 
 const TERMINAL_WINDOW_SIZE = { width: 1200, height: 800 };
+
+/** Height of the in-app title bar (renderer header) that replaces the native caption. */
+const MAIN_TITLE_BAR_HEIGHT = 40;
+
+/**
+ * Main window draws its own title bar (mode tabs live there). Windows/Linux keep the
+ * native min/max/close via the Window Controls Overlay; macOS keeps inset traffic lights.
+ */
+function mainTitleBarOptions(): Partial<BrowserWindowConstructorOptions> {
+  if (process.platform === "darwin") {
+    return { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 14, y: 13 } };
+  }
+  return {
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#0a0a0a",
+      symbolColor: "#e8e8ec",
+      height: MAIN_TITLE_BAR_HEIGHT,
+    },
+  };
+}
 const TERMINAL_WINDOW_MIN = { width: 900, height: 600 };
 
 function createWindow() {
@@ -562,6 +583,7 @@ function createWindow() {
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
+    ...mainTitleBarOptions(),
   });
 
   if (isMaximized) mainWindow.maximize();
@@ -2216,6 +2238,24 @@ function markPtySessionDead(sessionId: string, exitCode: number) {
   broadcastPtyExit(sessionId, exitCode);
   broadcastPtyMeta(sessionId);
 }
+
+/** Renderer keeps the native caption buttons in step with the in-app title bar colors. */
+ipcMain.on(
+  "set-title-bar-overlay",
+  (e, opts: { color?: unknown; symbolColor?: unknown } | undefined) => {
+    if (process.platform === "darwin") return;
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || win.isDestroyed()) return;
+    const color = typeof opts?.color === "string" ? opts.color : undefined;
+    const symbolColor = typeof opts?.symbolColor === "string" ? opts.symbolColor : undefined;
+    if (!color && !symbolColor) return;
+    try {
+      win.setTitleBarOverlay({ color, symbolColor, height: MAIN_TITLE_BAR_HEIGHT });
+    } catch {
+      /* window was created without an overlay */
+    }
+  },
+);
 
 ipcMain.on("pty-write", (e, sessionId: string, data: string) => {
   // A popped-out pane takes input only from its pop-out window.
