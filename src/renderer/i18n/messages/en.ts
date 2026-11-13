@@ -939,8 +939,10 @@ export const en = {
   "usage.summary.totalCost": "Total cost (period)",
   "usage.summary.totalInputTokens": "Input tokens (all tools)",
   "usage.summary.totalOutputTokens": "Output tokens (all tools)",
-  "usage.summary.configured": "Tools with API keys",
+  "usage.summary.configured": "Connected tools",
   "usage.summary.active": "Tools reporting data",
+  "usage.summary.billingCycleCost": "Billing-cycle spend (not in period total)",
+  "usage.table.billingCycleSuffix": "(billing cycle)",
   "usage.unified.title": "Daily rollup",
   "usage.unified.hint":
     "Costs and tokens merged across every tool that reported data for this period.",
@@ -948,7 +950,7 @@ export const en = {
   "usage.unified.noDaily":
     "Connected tools report subscription quotas or billing-cycle totals without a daily history. See each tool for allowance details.",
   "usage.unified.quotaNote":
-    "Period total cost includes billing-cycle or quota-based tools that do not appear in the daily chart below.",
+    "Quota-based tools have no daily history, so they do not appear in the chart below. Billing-cycle spend is shown separately and is not part of the period total.",
   "usage.credentials.title": "API credentials",
   "usage.credentials.hint":
     "Admin API keys are required for usage and billing endpoints. Standard chat API keys usually will not work.",

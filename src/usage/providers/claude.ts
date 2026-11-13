@@ -168,6 +168,7 @@ export async function fetchClaudeUsage(
     | "daily"
     | "byModel"
     | "totalCostUsd"
+    | "costScope"
     | "totalInputTokens"
     | "totalOutputTokens"
     | "quotas"
