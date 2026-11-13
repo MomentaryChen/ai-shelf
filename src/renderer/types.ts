@@ -852,9 +852,21 @@ export interface ElectronAPI {
     extraArgs?: string,
     /** Embedded PTY shell preference: auto | pwsh | powershell | cmd | wsl | bash | zsh | fish | sh. */
     shell?: string,
-    /** `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro. */
-    options?: { wslDistro?: string },
-  ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string }>;
+    /**
+     * `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro.
+     * `agentSession` opts into agent conversation resume (Claude Code): resume
+     * `resumeId` when its transcript exists, else start with a new session id.
+     */
+    options?: { wslDistro?: string; agentSession?: { resumeId?: string } },
+  ) => Promise<{
+    success: boolean;
+    sessionId?: string;
+    cwd?: string;
+    error?: string;
+    /** Agent conversation id the pane now holds (resume on next launch). */
+    agentSessionId?: string;
+    agentSessionResumed?: boolean;
+  }>;
   ptyAttach: (
     sessionId: string,
     opts?: { includeBuffer?: boolean },

@@ -147,6 +147,9 @@ export interface TerminalClipboardOptions {
   onOpenFind?: () => void;
   onClear?: () => void;
   onRestart?: () => void;
+  /** Restart an agent pane with a brand-new conversation (menu item shown while this returns true). */
+  onNewConversation?: () => void;
+  canStartNewConversation?: () => boolean;
   /** "New pane in git worktree" entry. */
   onNewWorktreePane?: () => void;
   onExportOutput?: () => void;
@@ -448,6 +451,9 @@ export function bindTerminalClipboard(
     }
     if (options.onClear) addItem(getStoredT("terminal.ctx.clear"), true, options.onClear);
     if (options.onRestart) addItem(getStoredT("terminal.ctx.restart"), true, options.onRestart);
+    if (options.onNewConversation && (options.canStartNewConversation?.() ?? true)) {
+      addItem(getStoredT("terminal.ctx.newConversation"), true, options.onNewConversation);
+    }
     if (options.onNewWorktreePane) {
       addItem(getStoredT("git.worktree.ctx"), true, options.onNewWorktreePane);
     }

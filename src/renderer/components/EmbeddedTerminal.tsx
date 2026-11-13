@@ -78,6 +78,8 @@ interface Props {
   onSessionLost?: (sessionId: string) => void;
   onWrite?: (data: string, sessionId: string) => void;
   onRestart?: () => void;
+  /** Agent panes only: restart with a brand-new conversation (context-menu item). */
+  onNewConversation?: () => void;
   /** Context menu: open a new pane in a git worktree of this pane's repo. */
   onNewWorktreePane?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
@@ -87,7 +89,7 @@ interface Props {
 /** Callback props — routed through a ref so they never force an xterm re-render. */
 type TerminalCallbacks = Pick<
   Props,
-  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onCwdReport" | "onNewWorktreePane"
+  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onNewConversation" | "onCwdReport" | "onNewWorktreePane"
 >;
 
 type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
@@ -463,6 +465,8 @@ function EmbeddedTerminalInner({
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
       onRestart: () => callbacksRef.current.onRestart?.(),
+      onNewConversation: () => callbacksRef.current.onNewConversation?.(),
+      canStartNewConversation: () => Boolean(callbacksRef.current.onNewConversation),
       onNewWorktreePane: () => callbacksRef.current.onNewWorktreePane?.(),
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
@@ -951,6 +955,7 @@ export function EmbeddedTerminal({
   onSessionLost,
   onWrite,
   onRestart,
+  onNewConversation,
   onCwdReport,
   onNewWorktreePane,
   ...dataProps
@@ -960,6 +965,7 @@ export function EmbeddedTerminal({
     onSessionLost,
     onWrite,
     onRestart,
+    onNewConversation,
     onCwdReport,
     onNewWorktreePane,
   });
@@ -969,6 +975,7 @@ export function EmbeddedTerminal({
       onSessionLost,
       onWrite,
       onRestart,
+      onNewConversation,
       onCwdReport,
       onNewWorktreePane,
     };

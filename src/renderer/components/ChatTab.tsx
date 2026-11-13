@@ -26,7 +26,7 @@ import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
-import { useProfileWorkspace } from "../hooks/useProfileWorkspace";
+import { useProfileWorkspace, type SpawnPaneOptions } from "../hooks/useProfileWorkspace";
 import {
   usePaneAgentAwareness,
   type BackgroundAgentNotice,
@@ -98,6 +98,7 @@ import {
   type ChatSettings,
 } from "../chat-settings";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
+import { agentSessionSupported } from "../../shared/agent-session-resume.js";
 import {
   PLAIN_SHELL_TOOL_ID,
   isPlainShellTool,
@@ -248,19 +249,34 @@ function ChatTabInner({
   const terminalScrollback = settings.terminalScrollback;
   const availableTools = useMemo(() => toolIdsFromInventory(data), [data]);
 
-  const spawnPane = useCallback(async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+  const spawnPane = useCallback(async (
+    tool: string,
+    cwd: string,
+    opts?: SpawnPaneOptions,
+  ): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
     const shell = resolveEmbeddedPtyShell(
       settings.preferredShell,
       settings.externalTerminal,
       tool,
     );
+    const agentSession =
+      settings.terminalResumeAgentSessions && agentSessionSupported(tool)
+        ? { resumeId: opts?.resumeAgentSessionId }
+        : undefined;
+    const spawnOptions =
+      shell === "wsl" || agentSession
+        ? {
+            ...(shell === "wsl" ? { wslDistro: settings.wslDistro } : {}),
+            ...(agentSession ? { agentSession } : {}),
+          }
+        : undefined;
     const result = await window.api.ptySpawn(
       tool,
       cwd || undefined,
       extraArgs,
       shell,
-      shell === "wsl" ? { wslDistro: settings.wslDistro } : undefined,
+      spawnOptions,
     );
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
@@ -274,20 +290,23 @@ function ChatTabInner({
       tool,
       sessionId: result.sessionId,
       cwd: result.cwd || cwd || "",
+      ...(result.agentSessionId ? { agentSessionId: result.agentSessionId } : {}),
     };
   }, [
     settings.externalTerminal,
     settings.preferredShell,
+    settings.terminalResumeAgentSessions,
     settings.toolLaunchArgs,
     settings.wslDistro,
     t,
   ]);
 
   const spawnPaneResilient = useCallback(
-    async (tool: string, cwd: string): Promise<PaneInfo | null> => {
+    async (tool: string, cwd: string, opts?: SpawnPaneOptions): Promise<PaneInfo | null> => {
       const order = [tool, ...(tool !== "shell" ? ["shell"] : [])];
       for (const t of order) {
-        const pane = await spawnPane(t, cwd);
+        // The saved conversation id belongs to the agent tool, never the shell fallback.
+        const pane = await spawnPane(t, cwd, t === tool ? opts : undefined);
         if (pane) return pane;
       }
       return spawnPane("shell", cwd);
@@ -711,7 +730,10 @@ function ChatTabInner({
       const tool = victim.tool;
       try {
         window.api.ptyKill(victim.sessionId);
-        const next = await spawnPaneResilient(tool, cwd);
+        // Main resumes only when the transcript exists for the new cwd, else starts fresh.
+        const next = await spawnPaneResilient(tool, cwd, {
+          resumeAgentSessionId: victim.agentSessionId,
+        });
         if (!next) {
           setTerminalError(
             (prev) =>
@@ -738,8 +760,12 @@ function ChatTabInner({
     [spawnPaneResilient, resolveCwd, t],
   );
 
+  /**
+   * Restart a pane's PTY. Agent panes resume their conversation unless
+   * `newConversation` is set ("Start new conversation").
+   */
   const respawnPane = useCallback(
-    async (paneId: string) => {
+    async (paneId: string, opts?: { newConversation?: boolean }) => {
       if (respawningPaneIdsRef.current.has(paneId)) return;
       const layoutNow = layoutRef.current;
       const victim = layoutNow ? findPane(layoutNow, paneId) : null;
@@ -750,7 +776,9 @@ function ChatTabInner({
       const tool = victim.tool;
       try {
         window.api.ptyKill(victim.sessionId);
-        const next = await spawnPaneResilient(tool, cwd);
+        const next = await spawnPaneResilient(tool, cwd, {
+          resumeAgentSessionId: opts?.newConversation ? undefined : victim.agentSessionId,
+        });
         if (!next) {
           setTerminalError(
             (prev) =>
@@ -1806,6 +1834,11 @@ function ChatTabInner({
               void respawnPane(pane.id);
             }}
             onRestart={() => void respawnPane(pane.id)}
+            onNewConversation={
+              pane.agentSessionId
+                ? () => void respawnPane(pane.id, { newConversation: true })
+                : undefined
+            }
             onNewWorktreePane={() => openWorktreeDialog(pane.id)}
             onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
