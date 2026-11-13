@@ -171,6 +171,12 @@ import { registerPortsHandlers } from "./ports-handlers.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
 import { registerGitHandlers } from "./git-handlers.js";
 import { initSystemResume } from "./system-resume.js";
+import {
+  boundsCenteredOnWindow,
+  getInitialWindowBounds,
+  initDisplayWatcher,
+  trackWindowState,
+} from "./window-state.js";
 import { ptyWakeResizeSteps } from "../shared/system-resume.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
@@ -513,18 +519,28 @@ function attachWindow(win: BrowserWindow, titleBase: string) {
   bindWindowTitle(win, titleBase);
 }
 
+const TERMINAL_WINDOW_SIZE = { width: 1200, height: 800 };
+const TERMINAL_WINDOW_MIN = { width: 900, height: 600 };
+
 function createWindow() {
+  const { isMaximized, ...bounds } = getInitialWindowBounds(
+    "main",
+    TERMINAL_WINDOW_SIZE,
+    TERMINAL_WINDOW_MIN,
+  );
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    ...bounds,
+    minWidth: TERMINAL_WINDOW_MIN.width,
+    minHeight: TERMINAL_WINDOW_MIN.height,
     title: formatWindowTitle("AI Shelf"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
+
+  if (isMaximized) mainWindow.maximize();
+  trackWindowState(mainWindow, "main");
 
   mainWindow.loadURL(getRendererPageUrl());
   attachWindow(mainWindow, "AI Shelf");
@@ -535,22 +551,29 @@ function createWindow() {
   });
 }
 
-function createChatWindow() {
+function createChatWindow(opener?: BrowserWindow | null) {
   if (chatWindow && !chatWindow.isDestroyed()) {
     chatWindow.focus();
     return;
   }
+  const { isMaximized, ...bounds } = getInitialWindowBounds(
+    "chat",
+    TERMINAL_WINDOW_SIZE,
+    TERMINAL_WINDOW_MIN,
+    opener,
+  );
   chatWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    ...bounds,
+    minWidth: TERMINAL_WINDOW_MIN.width,
+    minHeight: TERMINAL_WINDOW_MIN.height,
     title: formatWindowTitle("AI Terminal"),
     icon: APP_ICON,
     webPreferences: sharedWebPreferences,
     autoHideMenuBar: true,
     backgroundColor: "#0f172a",
   });
+  if (isMaximized) chatWindow.maximize();
+  trackWindowState(chatWindow, "chat");
   chatWindow.loadURL(getRendererPageUrl("chat"));
   attachWindow(chatWindow, "AI Terminal");
   bindMinimizeToTray(chatWindow);
@@ -559,14 +582,20 @@ function createChatWindow() {
   });
 }
 
-function createSettingsWindow() {
+/**
+ * Short-lived settings dialog: owned by the window that opened it, so it stays above
+ * that window and opens centered on the same monitor.
+ */
+function createSettingsWindow(opener?: BrowserWindow | null) {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.focus();
     return;
   }
+  const size = { width: 680, height: 760 };
+  const parent = opener && !opener.isDestroyed() ? opener : (mainWindow ?? undefined);
   settingsWindow = new BrowserWindow({
-    width: 680,
-    height: 760,
+    ...(boundsCenteredOnWindow(size, parent) ?? size),
+    parent,
     minWidth: 560,
     minHeight: 560,
     title: formatWindowTitle("Terminal Settings"),
@@ -582,12 +611,12 @@ function createSettingsWindow() {
   });
 }
 
-ipcMain.handle("open-chat-window", () => {
-  createChatWindow();
+ipcMain.handle("open-chat-window", (event) => {
+  createChatWindow(BrowserWindow.fromWebContents(event.sender));
 });
 
-ipcMain.handle("open-settings-window", () => {
-  createSettingsWindow();
+ipcMain.handle("open-settings-window", (event) => {
+  createSettingsWindow(BrowserWindow.fromWebContents(event.sender));
 });
 
 ipcMain.handle("toggle-devtools", (event) => {
@@ -3170,6 +3199,7 @@ app.whenReady().then(async () => {
 
   setupAppMenu();
   createWindow();
+  initDisplayWatcher();
   initSystemResume({ wakePtys: wakePtySessions });
 
   if (trayEnabled) {
