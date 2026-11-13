@@ -35,6 +35,8 @@ export function EditablePaneTitle({
 
   function commit() {
     setEditing(false);
+    // Unchanged: keep following the auto / tool label instead of freezing it as a custom title.
+    if (draft.trim() === label.trim()) return;
     onRename(normalizePaneTitle(draft) ?? "");
   }
 

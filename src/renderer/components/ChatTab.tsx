@@ -993,6 +993,19 @@ function ChatTabInner({
     });
   }, []);
 
+  /** Live pane title from OSC 0 / 2 ("" clears); shown only while no user title is set. */
+  const reportPaneTitle = useCallback((sessionId: string, nextTitle: string) => {
+    const autoTitle = nextTitle.trim() || undefined;
+    setLayout((prev) => {
+      if (!prev) return prev;
+      const hit = collectPanes(prev).find((p) => p.sessionId === sessionId);
+      if (!hit || hit.autoTitle === autoTitle) return prev;
+      return mapPanesInTree(prev, (p) =>
+        p.sessionId === sessionId ? { ...p, autoTitle } : p,
+      );
+    });
+  }, []);
+
   const changePaneCwd = useCallback(
     async (paneId: string) => {
       const layoutNow = layoutRef.current;
@@ -1837,6 +1850,9 @@ function ChatTabInner({
       case "cwd":
         reportPaneCwd(action.sessionId, action.cwd);
         return;
+      case "title":
+        reportPaneTitle(action.sessionId, action.title);
+        return;
       case "bounds":
         updateView(view.id, (v) => ({ ...v, bounds: action.bounds }));
         return;
@@ -2331,6 +2347,7 @@ function ChatTabInner({
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onCwdReport={reportPaneCwd}
+            onTitleReport={reportPaneTitle}
             cwd={pane.cwd}
             onTerminalNotify={handleTerminalNotify}
             onSessionLost={() => {
