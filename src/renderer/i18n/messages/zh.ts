@@ -717,6 +717,7 @@ export const zh: Record<MessageKey, string> = {
   "terminal.pasteConfirm.singleLine": "合併為單行貼上",
   "terminal.pasteConfirm.paste": "貼上",
   "terminal.pasteConfirm.pasteBroadcast": "貼上到 {count} 個",
+  "terminal.pasteConfirm.dismissHint": "按 Esc 取消，不會貼上",
   "terminal.ctx.find": "尋找…",
   "terminal.ctx.selectAll": "全選",
   "terminal.ctx.clear": "清屏",

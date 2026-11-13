@@ -742,6 +742,7 @@ export const en = {
   "terminal.pasteConfirm.singleLine": "Paste as single line",
   "terminal.pasteConfirm.paste": "Paste",
   "terminal.pasteConfirm.pasteBroadcast": "Paste to {count}",
+  "terminal.pasteConfirm.dismissHint": "Esc cancels without pasting",
   "terminal.ctx.find": "Find…",
   "terminal.ctx.selectAll": "Select all",
   "terminal.ctx.clear": "Clear screen",
