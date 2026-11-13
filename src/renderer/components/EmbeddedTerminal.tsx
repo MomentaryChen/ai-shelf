@@ -5,7 +5,9 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import type { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
-import { bindTerminalClipboard } from "../terminal/xterm-clipboard";
+import { bindTerminalClipboard, writeClipboardText } from "../terminal/xterm-clipboard";
+import { bindTerminalCommandMarks } from "../terminal/xterm-command-marks";
+import { getCommandStatus, setCommandStatus } from "../terminal/command-marks";
 import {
   attachTerminalSearch,
   buildSearchSnapshot,
@@ -442,6 +444,14 @@ function EmbeddedTerminalInner({
     };
     const unregisterClear = registerTerminalClear(sessionId, doClear);
     let pasteToThisPaneOnly = false;
+    // OSC 133 prompt / output marks. Not live until the replayed backlog is parsed.
+    const commandMarks = bindTerminalCommandMarks(term, {
+      onStatus: (status, live) => {
+        if (!live && getCommandStatus(sessionId)) return;
+        setCommandStatus(sessionId, status);
+      },
+    });
+    commandMarks.setLive(false);
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
@@ -452,6 +462,16 @@ function EmbeddedTerminalInner({
       getCopyOnSelect: () => copyOnSelectRef.current,
       // Paste confirmation (multi-line / large / broadcast) decides the targets.
       onPaste: (text) => requestPasteRef.current(text),
+      commandMarks: {
+        hasMarks: commandMarks.hasMarks,
+        canJump: commandMarks.canJump,
+        canCopyLastOutput: commandMarks.canCopyLastOutput,
+        jumpPrompt: (direction) => void commandMarks.jumpPrompt(direction),
+        copyLastOutput: () => {
+          const text = commandMarks.lastOutputText();
+          if (text) void writeClipboardText(text);
+        },
+      },
     });
     const pasteLocal = (text: string) => {
       if (cancelled || exited) return;
@@ -658,6 +678,7 @@ function EmbeddedTerminalInner({
         typeof r.endSeq === "number" ? r.endSeq : (r.buffer?.length ?? 0),
       );
       for (const chunk of writes) writeSafe(chunk);
+      term.write("", () => commandMarks.setLive(true));
       replayed = true;
       scheduleFit(true);
     };
@@ -766,6 +787,7 @@ function EmbeddedTerminalInner({
       unbindImeTrace();
       unbindLinks();
       unbindCwd();
+      commandMarks.dispose();
       webgl?.dispose();
       ro.disconnect();
       searchAddon.dispose();

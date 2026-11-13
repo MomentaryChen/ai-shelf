@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { PaneInfo } from "../terminal/split-tree";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
+import { TerminalCommandStatus } from "./TerminalCommandStatus";
 
 type SessionStatus = "live" | "exited" | "stale";
 
@@ -124,6 +125,7 @@ export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
         {cwd}
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-3 font-mono tabular-nums text-chrome-text-subtle">
+        <TerminalCommandStatus sessionId={pane.sessionId} />
         <span title={t("status.shell")}>{shell}</span>
         {size ? <span title={t("status.size")}>{size}</span> : null}
         <span title={t("status.pid")}>

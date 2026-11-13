@@ -748,6 +748,14 @@ export const en = {
   "terminal.ctx.restart": "Restart session",
   "terminal.ctx.exportOutput": "Export output…",
   "terminal.ctx.copyOutputForIssue": "Copy output for issue",
+  // Shell command marks (OSC 133)
+  "terminal.marks.jumpPrev": "Jump to previous prompt",
+  "terminal.marks.jumpNext": "Jump to next prompt",
+  "terminal.marks.copyLastOutput": "Copy last command output",
+  "terminal.marks.status.ok": "Last command succeeded",
+  "terminal.marks.status.failed": "Last command failed (exit {code})",
+  "terminal.marks.status.unknown": "Last command finished",
+  "terminal.marks.status.duration": "took {duration}",
   "chat.emptyPanes.title": "No terminals open in “{profile}”",
   "chat.emptyPanes.desc":
     "The layout is saved automatically and restored when you come back (up to {max} panes).",
