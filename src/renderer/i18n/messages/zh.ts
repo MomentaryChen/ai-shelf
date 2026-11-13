@@ -469,6 +469,10 @@ export const zh: Record<MessageKey, string> = {
   "profile.dialog.cwdPlaceholder": "留空則使用使用者目錄",
   "profile.dialog.browse": "瀏覽",
   "profile.remote.legend": "遠端（SSH）",
+  "profile.tab.label": "Profile 設定分頁",
+  "profile.tab.general": "一般",
+  "profile.tab.remote": "遠端（SSH）",
+  "profile.remote.cwdReplacesLocal": "此 profile 透過 SSH 連線，起始目錄請在「遠端（SSH）」分頁設定。",
   "profile.remote.enable": "所有 terminal 透過 SSH 連線",
   "profile.remote.hint":
     "使用本機的 ssh client 與 ~/.ssh/config（金鑰、agent、ProxyJump）。密碼在 terminal 內輸入，不會儲存。遠端主機需自行安裝 AI CLI。",

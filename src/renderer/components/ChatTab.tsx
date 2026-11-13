@@ -1547,6 +1547,7 @@ function ChatTabInner({
               defaultTool: opts.defaultTool,
               accentColor: opts.accentColor,
               broadcastInput: opts.broadcastInput,
+              remote: opts.remote,
               copyFromProfileId: opts.copyFromProfileId,
             });
             if (r.success && r.profile) await handleActivateProfile(r.profile);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ProfileInfo, RemoteSshConfig, SavedCommandSnippet } from "../types";
 import { ProfileRemoteSshSection } from "./ProfileRemoteSshSection";
+import { ProfileDialogTabs, type ProfileDialogTab } from "./ProfileDialogTabs";
 import {
   draftToRemote,
   invalidRemoteField,
@@ -73,6 +74,7 @@ export function ProfileSettingsDialog({
   const [saveError, setSaveError] = useState("");
   const [remoteDraft, setRemoteDraft] = useState<RemoteSshDraft>(() => remoteToDraft(null));
   const [remoteTouched, setRemoteTouched] = useState(false);
+  const [tab, setTab] = useState<ProfileDialogTab>("general");
 
   const tools = profileToolChoices(availableTools, profile?.defaultTool);
 
@@ -87,6 +89,7 @@ export function ProfileSettingsDialog({
     setGroupId(profile.workspaceId);
     setRemoteDraft(remoteToDraft(profile.remote));
     setRemoteTouched(false);
+    setTab("general");
     setSaveError("");
   }, [open, profile]);
 
@@ -106,6 +109,7 @@ export function ProfileSettingsDialog({
     if (!trimmedName) return;
     if (remoteInvalid) {
       setRemoteTouched(true);
+      setTab("remote");
       return;
     }
     setSaveError("");
@@ -135,6 +139,14 @@ export function ProfileSettingsDialog({
           <DialogTitle className="text-[15px]">{t("profile.dialog.settingsTitle")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
+        <ProfileDialogTabs
+          value={tab}
+          onChange={setTab}
+          remoteEnabled={remoteDraft.enabled}
+          remoteInvalid={remoteTouched && remoteInvalid !== null}
+        />
+        {tab === "general" ? (
+        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general">
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.name")}
@@ -169,6 +181,11 @@ export function ProfileSettingsDialog({
           </select>
         </Label>
 
+        {remoteDraft.enabled ? (
+          <p className="mb-3 rounded-md border border-chrome-border-subtle px-3 py-2 text-[11px] text-chrome-text-dim">
+            {t("profile.remote.cwdReplacesLocal")}
+          </p>
+        ) : (
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.defaultDir")}
@@ -193,16 +210,7 @@ export function ProfileSettingsDialog({
             </button>
           </div>
         </Label>
-
-        <ProfileRemoteSshSection
-          value={remoteDraft}
-          onChange={(next) => {
-            setRemoteDraft(next);
-            setRemoteTouched(true);
-          }}
-          invalidField={remoteTouched ? remoteInvalid : null}
-          disabled={busy}
-        />
+        )}
 
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.accentLegend")}</legend>
@@ -253,6 +261,18 @@ export function ProfileSettingsDialog({
         </Label>
 
         <SavedCommandsEditor value={savedCommands} onChange={setSavedCommands} disabled={busy} />
+        </div>
+        ) : (
+          <ProfileRemoteSshSection
+            value={remoteDraft}
+            onChange={(next) => {
+              setRemoteDraft(next);
+              setRemoteTouched(true);
+            }}
+            invalidField={remoteTouched ? remoteInvalid : null}
+            disabled={busy}
+          />
+        )}
 
         {saveError ? <p className="mb-3 text-[12px] text-fail">{saveError}</p> : null}
 

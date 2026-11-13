@@ -487,6 +487,10 @@ export const en = {
   "profile.dialog.cwdPlaceholder": "Leave empty for home directory",
   "profile.dialog.browse": "Browse",
   "profile.remote.legend": "Remote (SSH)",
+  "profile.tab.label": "Profile settings sections",
+  "profile.tab.general": "General",
+  "profile.tab.remote": "Remote (SSH)",
+  "profile.remote.cwdReplacesLocal": "This profile connects over SSH — set the start directory under Remote (SSH).",
   "profile.remote.enable": "Connect every terminal over SSH",
   "profile.remote.hint":
     "Uses this computer's ssh client and ~/.ssh/config (keys, agent, ProxyJump). Passwords are typed in the terminal and never stored. The AI CLI must be installed on the remote host.",

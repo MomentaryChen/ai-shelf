@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ProfileInfo } from "../types";
+import type { ProfileInfo, RemoteSshConfig } from "../types";
+import { ProfileRemoteSshSection } from "./ProfileRemoteSshSection";
+import { ProfileDialogTabs, type ProfileDialogTab } from "./ProfileDialogTabs";
+import {
+  draftToRemote,
+  invalidRemoteField,
+  remoteToDraft,
+  type RemoteSshDraft,
+} from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import {
   PLAIN_SHELL_TOOL_ID,
@@ -39,6 +47,8 @@ interface Props {
     defaultTool: string;
     accentColor: string | null;
     broadcastInput: boolean;
+    /** null = local profile. */
+    remote: RemoteSshConfig | null;
     copyFromProfileId?: string;
   }) => void;
   onQuickCreateGroup?: (name: string) => Promise<{ ok: boolean; groupId?: string; error?: string }>;
@@ -67,6 +77,9 @@ export function ProfileCreateDialog({
   const [newGroupName, setNewGroupName] = useState("");
   const [quickCreatingGroup, setQuickCreatingGroup] = useState(false);
   const [groupErr, setGroupErr] = useState("");
+  const [tab, setTab] = useState<ProfileDialogTab>("general");
+  const [remoteDraft, setRemoteDraft] = useState<RemoteSshDraft>(() => remoteToDraft(null));
+  const [remoteTouched, setRemoteTouched] = useState(false);
 
   const tools = useMemo(
     () => profileToolChoices(availableTools),
@@ -87,6 +100,9 @@ export function ProfileCreateDialog({
       setGroupErr("");
       setStartFrom("blank");
       setCopyFromProfileId(null);
+      setTab("general");
+      setRemoteDraft(remoteToDraft(null));
+      setRemoteTouched(false);
       startKeyRef.current = "blank:";
       const defaults = profileCreateDefaults("blank", profiles, null, tools);
       setName("");
@@ -111,6 +127,11 @@ export function ProfileCreateDialog({
     setTool(defaults.defaultTool);
     setAccentColor(defaults.accentColor);
     setBroadcastInput(defaults.broadcastInput);
+    // Copying a profile copies its SSH target too; templates / blank start local.
+    const source =
+      startFrom === "copy" ? profiles.find((p) => p.id === copyFromProfileId) : undefined;
+    setRemoteDraft(remoteToDraft(source?.remote ?? null));
+    setRemoteTouched(false);
     if (defaults.copyNameSource !== undefined) {
       setName(t("profile.dialog.copyNameDefault", { name: defaults.copyNameSource }));
     }
@@ -126,6 +147,7 @@ export function ProfileCreateDialog({
 
   const effectiveTool = tools.includes(tool) ? tool : (tools[0] ?? PLAIN_SHELL_TOOL_ID);
   const canCopy = profiles.length > 0;
+  const remoteInvalid = invalidRemoteField(remoteDraft);
 
   function handleStartFromChange(next: ProfileStartFrom) {
     setStartFrom(next);
@@ -147,6 +169,11 @@ export function ProfileCreateDialog({
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || !effectiveTool || !groupId) return;
+    if (remoteInvalid) {
+      setRemoteTouched(true);
+      setTab("remote");
+      return;
+    }
     onCreate({
       groupId,
       name: trimmed,
@@ -154,6 +181,7 @@ export function ProfileCreateDialog({
       defaultTool: effectiveTool,
       accentColor,
       broadcastInput,
+      remote: draftToRemote(remoteDraft),
       copyFromProfileId:
         startFrom === "copy" && copyFromProfileId ? copyFromProfileId : undefined,
     });
@@ -164,6 +192,9 @@ export function ProfileCreateDialog({
     setBroadcastInput(false);
     setStartFrom("blank");
     setCopyFromProfileId(null);
+    setRemoteDraft(remoteToDraft(null));
+    setRemoteTouched(false);
+    setTab("general");
   }
 
   async function handleQuickCreateGroup() {
@@ -196,6 +227,14 @@ export function ProfileCreateDialog({
           <DialogTitle className="text-[15px]">{t("profile.dialog.createTitle")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
+        <ProfileDialogTabs
+          value={tab}
+          onChange={setTab}
+          remoteEnabled={remoteDraft.enabled}
+          remoteInvalid={remoteTouched && remoteInvalid !== null}
+        />
+        {tab === "general" ? (
+        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general">
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">
             {t("profile.dialog.startFromLegend")}
@@ -303,6 +342,11 @@ export function ProfileCreateDialog({
           />
         </Label>
 
+        {remoteDraft.enabled ? (
+          <p className="mb-3 rounded-md border border-chrome-border-subtle px-3 py-2 text-[11px] text-chrome-text-dim">
+            {t("profile.remote.cwdReplacesLocal")}
+          </p>
+        ) : (
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.defaultDir")}
@@ -323,6 +367,7 @@ export function ProfileCreateDialog({
             </button>
           </div>
         </Label>
+        )}
 
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.dialog.accentLegend")}</legend>
@@ -367,6 +412,17 @@ export function ProfileCreateDialog({
           <Checkbox checked={broadcastInput} onCheckedChange={(v) => setBroadcastInput(v === true)} />
           {t("profile.syncBroadcast")}
         </Label>
+        </div>
+        ) : (
+          <ProfileRemoteSshSection
+            value={remoteDraft}
+            onChange={(next) => {
+              setRemoteDraft(next);
+              setRemoteTouched(true);
+            }}
+            invalidField={remoteTouched ? remoteInvalid : null}
+          />
+        )}
 
         <DialogFooter className="mt-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>

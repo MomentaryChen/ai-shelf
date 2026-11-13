@@ -69,8 +69,12 @@ export function ProfileRemoteSshSection({ value, onChange, invalidField, disable
   );
 
   return (
-    <fieldset className="mb-4 rounded-lg border border-chrome-border-subtle bg-chrome-surface/40 p-3">
-      <legend className="mb-2 block text-[11px] text-chrome-text-subtle">{t("profile.remote.legend")}</legend>
+    <div
+      role="tabpanel"
+      id="profile-tabpanel-remote"
+      aria-labelledby="profile-tab-remote"
+      className="mb-4"
+    >
       <Label className="mb-2 flex cursor-pointer items-center gap-2 text-[13px] font-normal text-chrome-text-secondary">
         <Checkbox
           checked={value.enabled}
@@ -110,6 +114,6 @@ export function ProfileRemoteSshSection({ value, onChange, invalidField, disable
           <p className="text-[10px] text-chrome-text-dim">{t("profile.remote.appliesOnRestart")}</p>
         </>
       ) : null}
-    </fieldset>
+    </div>
   );
 }
