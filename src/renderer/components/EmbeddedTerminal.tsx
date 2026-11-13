@@ -50,6 +50,7 @@ import { getXtermTheme } from "../app-theme";
 import { getAppBg } from "../chat-settings";
 import { disposeTerminal } from "../terminal/xterm-dispose";
 import { attachTerminalWebgl } from "../terminal/xterm-webgl";
+import { watchDevicePixelRatio } from "../terminal/dpr-watch";
 import { OS_RESUME_EVENT } from "../os-resume";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
@@ -771,6 +772,18 @@ function EmbeddedTerminalInner({
     };
     window.addEventListener(OS_RESUME_EVENT, onOsResume);
 
+    // A monitor with another scale changes DPR, often with no CSS resize.
+    // xterm redraws glyphs itself; refit so cols/rows and the PTY follow.
+    const unwatchDpr = watchDevicePixelRatio(window, () => {
+      if (cancelled) return;
+      scheduleFit(true);
+      try {
+        term.refresh(0, Math.max(term.rows - 1, 0));
+      } catch {
+        /* disposed mid-change */
+      }
+    });
+
     return () => {
       cancelled = true;
       opened = false;
@@ -789,6 +802,7 @@ function EmbeddedTerminalInner({
       el.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("resize", onWindowResize);
       window.removeEventListener(OS_RESUME_EVENT, onOsResume);
+      unwatchDpr();
       document.fonts.removeEventListener("loadingdone", onFontsLoadingDone);
       unregisterClear();
       unregisterPaste();
