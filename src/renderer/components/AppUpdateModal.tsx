@@ -359,12 +359,14 @@ export function AppUpdateModal() {
                 <div className="mt-4 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/8 px-3 py-2.5 text-xs leading-relaxed text-text-primary">
                   <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
                   <span>
-                    {impact.flows > 0
+                    {impact.flows > 0 && impact.terminals > 0
                       ? t("appUpdate.impactTerminalsFlows", {
                           terminals: impact.terminals,
                           flows: impact.flows,
                         })
-                      : t("appUpdate.impactTerminals", { terminals: impact.terminals })}
+                      : impact.flows > 0
+                        ? t("appUpdate.impactFlows", { flows: impact.flows })
+                        : t("appUpdate.impactTerminals", { terminals: impact.terminals })}
                   </span>
                 </div>
               )}

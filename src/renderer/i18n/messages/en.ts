@@ -947,7 +947,8 @@ export const en = {
   "appUpdate.retry": "Retry",
   "appUpdate.manualDownload": "Download manually",
   "appUpdate.impactTerminals":
-    "{terminals} open terminal session(s) will close when AI Shelf restarts. Claude Code conversations resume when panes are restored.",
+    "{terminals} open terminal session(s) will close when AI Shelf restarts.",
+  "appUpdate.impactFlows": "{flows} running Flow(s) will be stopped when AI Shelf restarts.",
   "appUpdate.impactTerminalsFlows":
     "{terminals} open terminal session(s) and {flows} running Flow(s) will be stopped when AI Shelf restarts.",
   "appUpdate.updatedTo": "Updated to v{version}",

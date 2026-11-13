@@ -911,7 +911,8 @@ export const zh: Record<MessageKey, string> = {
   "appUpdate.retry": "重試",
   "appUpdate.manualDownload": "手動下載",
   "appUpdate.impactTerminals":
-    "目前有 {terminals} 個終端機工作階段，重新啟動時會關閉；Claude Code 對話會在窗格還原時接續。",
+    "目前有 {terminals} 個終端機工作階段，重新啟動時會關閉。",
+  "appUpdate.impactFlows": "目前有 {flows} 個 Flow 正在執行，重新啟動時會被中斷。",
   "appUpdate.impactTerminalsFlows":
     "目前有 {terminals} 個終端機工作階段、{flows} 個 Flow 正在執行，重新啟動時會被中斷。",
   "appUpdate.updatedTo": "已更新至 v{version}",
