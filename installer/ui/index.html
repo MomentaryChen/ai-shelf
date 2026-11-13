@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Shelf Setup</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="titlebar" data-tauri-drag-region>
+      <span class="titlebar-name" data-tauri-drag-region data-i18n="windowTitle"></span>
+      <div class="titlebar-actions">
+        <button type="button" class="tb-btn" id="btn-minimize" data-i18n-aria="minimize">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" /></svg>
+        </button>
+        <button type="button" class="tb-btn tb-close" id="btn-close" data-i18n-aria="close">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Start: install or update -->
+      <section class="screen" id="screen-start" hidden>
+        <div class="hero">
+          <img class="app-icon" src="icon.png" alt="" />
+          <div>
+            <h1 id="start-title"></h1>
+            <p class="version-row" id="start-version"></p>
+          </div>
+        </div>
+
+        <div class="banner banner-warn" id="running-banner" hidden>
+          <p data-i18n="runningBody"></p>
+          <div class="banner-actions">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              id="btn-recheck"
+              data-i18n="recheck"
+            ></button>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              id="btn-force-close"
+              hidden
+              data-i18n="forceClose"
+            ></button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              id="btn-close-app"
+              data-i18n="closeApp"
+            ></button>
+          </div>
+        </div>
+
+        <div class="location-line" id="location-line"></div>
+
+        <details class="custom" id="custom">
+          <summary data-i18n="customize"></summary>
+          <div class="custom-body">
+            <fieldset class="mode">
+              <legend data-i18n="installFor"></legend>
+              <label
+                ><input type="radio" name="mode" value="currentUser" checked />
+                <span data-i18n="onlyMe"></span
+              ></label>
+              <label
+                ><input type="radio" name="mode" value="allUsers" />
+                <span data-i18n="allUsers"></span
+              ></label>
+            </fieldset>
+            <label class="field-label" for="dir-input" data-i18n="location"></label>
+            <div class="dir-row">
+              <input id="dir-input" type="text" spellcheck="false" autocomplete="off" />
+              <button
+                type="button"
+                class="btn btn-outline"
+                id="btn-browse"
+                data-i18n="browse"
+              ></button>
+            </div>
+            <p class="dir-preview" id="dir-preview"></p>
+          </div>
+        </details>
+
+        <footer class="actions">
+          <button type="button" class="btn btn-primary" id="btn-install"></button>
+        </footer>
+      </section>
+
+      <!-- Installing -->
+      <section class="screen" id="screen-progress" hidden>
+        <div class="hero">
+          <img class="app-icon" src="icon.png" alt="" />
+          <div>
+            <h1 id="progress-title"></h1>
+            <p class="muted" id="progress-stage"></p>
+          </div>
+        </div>
+        <ol class="stages" id="stages">
+          <li data-stage="prepare" data-i18n="stagePrepare"></li>
+          <li data-stage="install" data-i18n="stageInstall"></li>
+          <li data-stage="finalize" data-i18n="stageFinalize"></li>
+        </ol>
+        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="bar">
+          <div class="bar-fill" id="bar-fill"></div>
+        </div>
+        <p class="percent" id="percent">0%</p>
+        <p class="muted small" id="uac-hint" hidden data-i18n="uacHint"></p>
+      </section>
+
+      <!-- Done -->
+      <section class="screen" id="screen-done" hidden>
+        <div class="result">
+          <div class="result-icon ok">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          </div>
+          <h1 id="done-title"></h1>
+          <p class="muted" id="done-body"></p>
+        </div>
+        <footer class="actions">
+          <button
+            type="button"
+            class="btn btn-outline"
+            id="btn-done-close"
+            data-i18n="close"
+          ></button>
+          <button type="button" class="btn btn-primary" id="btn-launch" data-i18n="launch"></button>
+        </footer>
+      </section>
+
+      <!-- Error -->
+      <section class="screen" id="screen-error" hidden>
+        <div class="result">
+          <div class="result-icon fail">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v6M12 16.5v.5" /></svg>
+          </div>
+          <h1 data-i18n="errorTitle"></h1>
+          <p class="muted" id="error-body"></p>
+          <details class="tech">
+            <summary data-i18n="techDetails"></summary>
+            <pre id="error-detail"></pre>
+          </details>
+        </div>
+        <footer class="actions">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            id="btn-error-close"
+            data-i18n="close"
+          ></button>
+          <button
+            type="button"
+            class="btn btn-outline"
+            id="btn-standard"
+            data-i18n="useStandard"
+          ></button>
+          <button type="button" class="btn btn-primary" id="btn-retry" data-i18n="retry"></button>
+        </footer>
+      </section>
+    </main>
+
+    <!-- Confirm leaving mid-install -->
+    <div class="overlay" id="confirm-exit" hidden>
+      <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-exit-title">
+        <h2 id="confirm-exit-title" data-i18n="exitTitle"></h2>
+        <p class="muted" data-i18n="exitBody"></p>
+        <div class="actions">
+          <button
+            type="button"
+            class="btn btn-outline"
+            id="btn-exit-cancel"
+            data-i18n="keepInstalling"
+          ></button>
+          <button
+            type="button"
+            class="btn btn-danger"
+            id="btn-exit-confirm"
+            data-i18n="exitAnyway"
+          ></button>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
