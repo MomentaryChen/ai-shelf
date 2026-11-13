@@ -491,6 +491,11 @@ export const zh: Record<MessageKey, string> = {
   "profile.remote.invalid.port": "Port 需介於 1–65535。",
   "profile.remote.invalid.jump": "跳板機格式：[user@]host[:port]，最多 4 層並以逗號分隔。",
   "profile.remote.invalid.cwd": "遠端目錄不可包含控制字元。",
+  "profile.remote.identityFile": "私鑰檔案",
+  "profile.remote.identityFilePlaceholder": "選填，例如 ~/.ssh/id_ed25519",
+  "profile.remote.identityFileHint":
+    "只儲存路徑，不會儲存金鑰內容。若旁邊有對應的 <金鑰>-cert.pub，會自動用於憑證登入。其他電腦找不到此檔案時，ssh 會改用 agent / ~/.ssh/config。",
+  "profile.remote.invalid.identityFile": "私鑰路徑不可以 - 開頭，也不可包含 % 或控制字元。",
   "profile.remote.sshMissing":
     "本機找不到 ssh client。Windows 請到 設定 → 系統 → 選用功能 安裝「OpenSSH 用戶端」，或以系統管理員執行：Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
   "profile.remote.sshFound": "ssh client：{path}",
@@ -731,6 +736,17 @@ export const zh: Record<MessageKey, string> = {
   "pane.agent.bg.toastDismiss": "關閉",
   "terminal.scrollToBottom": "捲動到底部",
   "terminal.newOutput": "新輸出",
+  "terminal.ssh.exitedPrompt": "[SSH 連線已結束 — 按 R 重新連線，其他鍵關閉]",
+  "terminal.ssh.fail.keyfile":
+    "SSH：無法使用私鑰（檔案不存在、格式錯誤、權限或密碼不對）。請檢查 Profile 設定 → 遠端（SSH）的私鑰路徑。",
+  "terminal.ssh.fail.auth": "SSH：認證失敗。請確認使用者名稱，以及金鑰已加入 ssh-agent 或 ~/.ssh/config（或指定私鑰檔案）。",
+  "terminal.ssh.fail.hostkey":
+    "SSH：主機金鑰與 known_hosts 不符。若伺服器重裝過，請移除舊紀錄（ssh-keygen -R <主機>）後重新連線。",
+  "terminal.ssh.fail.resolve": "SSH：找不到主機名稱。請檢查「主機」欄位或 ~/.ssh/config 的 HostName。",
+  "terminal.ssh.fail.timeout": "SSH：連線逾時（10 秒）。主機或跳板機無法連到，請檢查 VPN / 網路、Port 與跳板機設定。",
+  "terminal.ssh.fail.refused": "SSH：連線被拒。對方可能沒有啟動 sshd，或 Port 不對。",
+  "terminal.ssh.fail.jump": "SSH：經由跳板機的連線失敗 — 可能是跳板機本身連不上，或跳板機連不到目標主機。請先確認跳板機位址 / Port，再確認目標主機 / Port 在跳板機那端是否可達。",
+  "terminal.ssh.fail.unknown": "SSH：連線失敗，詳細原因請看上方 ssh 訊息。",
   "terminal.ctx.copy": "複製",
   "terminal.ctx.paste": "貼上",
   "terminal.pasteConfirm.title": "要貼上這段文字嗎？",

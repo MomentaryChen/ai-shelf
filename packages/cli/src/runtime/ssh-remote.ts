@@ -20,6 +20,12 @@ export interface RemoteSshConfig {
   jump?: string;
   /** Remote start directory; empty = remote login directory. `~` / `~/…` allowed. */
   cwd?: string;
+  /**
+   * Local private key (`ssh -i`). Only the path is stored, never key material;
+   * ssh also loads `<key>-cert.pub` next to it for certificate login. A path
+   * missing on this machine just falls back to agent / ~/.ssh/config keys.
+   */
+  identityFile?: string;
 }
 
 export const SSH_CLIENT_NOT_FOUND_ERROR = "SSH client not found";
@@ -30,6 +36,9 @@ const JUMP_HOP_RE =
   /^(?:[A-Za-z0-9_][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9_][A-Za-z0-9._-]{0,252}(?::\d{1,5})?$/u;
 const MAX_JUMP_HOPS = 4;
 const MAX_REMOTE_CWD = 1024;
+const MAX_IDENTITY_PATH = 1024;
+/** Seconds before an unreachable host / gateway fails instead of hanging. */
+export const SSH_CONNECT_TIMEOUT_SECONDS = 10;
 
 export function isValidSshHost(value: string): boolean {
   return HOST_RE.test(value);
@@ -56,6 +65,19 @@ export function isValidSshJump(value: string): boolean {
 export function isValidRemoteCwd(value: string): boolean {
   // eslint-disable-next-line no-control-regex
   return value.length <= MAX_REMOTE_CWD && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+export function isValidIdentityFile(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value.length <= MAX_IDENTITY_PATH &&
+    !value.startsWith("-") &&
+    // ssh stat()s the literal -i path, then %-expands it: a `%` can never work
+    // (escaping as %% fails the stat, raw % is mis-expanded), so reject it.
+    !value.includes("%") &&
+    // eslint-disable-next-line no-control-regex
+    !/[\u0000-\u001f\u007f]/u.test(value)
+  );
 }
 
 /**
@@ -92,6 +114,12 @@ export function normalizeRemoteSshConfig(raw: unknown): RemoteSshConfig | null {
     const cwd = r.cwd.trim();
     if (!isValidRemoteCwd(cwd)) return null;
     if (cwd) out.cwd = cwd;
+  }
+  if (r.identityFile !== undefined && r.identityFile !== null && r.identityFile !== "") {
+    if (typeof r.identityFile !== "string") return null;
+    const identityFile = r.identityFile.trim();
+    if (!isValidIdentityFile(identityFile)) return null;
+    out.identityFile = identityFile;
   }
   return out;
 }
@@ -139,9 +167,18 @@ export function buildRemoteSshCommand(options: { cwd?: string; command?: string 
 export function buildSshArgs(config: RemoteSshConfig, command?: string): string[] {
   const safe = normalizeRemoteSshConfig(config);
   if (!safe) throw new Error("Invalid SSH remote configuration");
-  const args = ["-t", "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=3"];
+  const args = [
+    "-t",
+    "-o",
+    `ConnectTimeout=${String(SSH_CONNECT_TIMEOUT_SECONDS)}`,
+    "-o",
+    "ServerAliveInterval=30",
+    "-o",
+    "ServerAliveCountMax=3",
+  ];
   if (safe.port) args.push("-p", String(safe.port));
   if (safe.user) args.push("-l", safe.user);
+  if (safe.identityFile) args.push("-i", safe.identityFile);
   if (safe.jump) args.push("-J", safe.jump);
   args.push("--", safe.host);
   const remote = buildRemoteSshCommand({ cwd: safe.cwd, command });

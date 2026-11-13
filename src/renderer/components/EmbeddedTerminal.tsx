@@ -52,6 +52,7 @@ import { OS_RESUME_EVENT } from "../os-resume";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
 import { useLocale } from "../i18n/LocaleProvider";
+import { classifySshFailure, isSshPaneShell, SSH_ERROR_EXIT_CODE } from "../utils/ssh-failure";
 
 interface Props {
   sessionId: string;
@@ -128,6 +129,9 @@ function EmbeddedTerminalInner({
   callbacksRef,
 }: InnerProps) {
   const { t } = useLocale();
+  /** Read inside the long-lived terminal effect without re-creating the terminal. */
+  const tRef = useRef(t);
+  tRef.current = t;
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
@@ -411,15 +415,42 @@ function EmbeddedTerminalInner({
 
     let exited = false;
     let cancelled = false;
+    /** Pane meta shell from attach; `ssh:…` marks a remote (SSH profile) pane. */
+    let ptyShell: string | null = null;
 
-    const markExited = () => {
+    /** Plain text of the last rows — where ssh prints why it failed. */
+    const readOutputTail = (rows = 60): string => {
+      const buf = term.buffer.active;
+      const lines: string[] = [];
+      for (let i = Math.max(0, buf.length - rows); i < buf.length; i++) {
+        lines.push(buf.getLine(i)?.translateToString(true) ?? "");
+      }
+      return lines.join("\n");
+    };
+
+    const markExited = (exitCode?: number | null) => {
       if (cancelled || exited) return;
       exited = true;
       const wasAtBottom = isTerminalAtBottom(term);
-      term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
+      const remote = isSshPaneShell(ptyShell);
+      if (remote && exitCode === SSH_ERROR_EXIT_CODE) {
+        const kind = classifySshFailure(readOutputTail());
+        term.writeln(`\r\n\x1b[33m${tRef.current(`terminal.ssh.fail.${kind}`)}\x1b[0m`);
+      }
+      term.writeln(
+        remote
+          ? `\r\n\x1b[90m${tRef.current("terminal.ssh.exitedPrompt")}\x1b[0m`
+          : "\r\n\x1b[90m[process exited — press any key to close]\x1b[0m",
+      );
       if (!wasAtBottom) setHasNewOutput(true);
-      const d = term.onKey(() => {
+      const d = term.onKey(({ key }) => {
         d.dispose();
+        // Remote panes: R reconnects in place (same pane, same profile target).
+        const restart = callbacksRef.current.onRestart;
+        if (remote && restart && (key === "r" || key === "R")) {
+          restart();
+          return;
+        }
         stableOnExit();
       });
     };
@@ -621,9 +652,9 @@ function EmbeddedTerminalInner({
       if (text) writeSafe(text);
     });
 
-    const offExit = window.api.onPtyExit(({ sessionId: sid }) => {
+    const offExit = window.api.onPtyExit(({ sessionId: sid, exitCode }) => {
       if (sid !== sessionId) return;
-      markExited();
+      markExited(exitCode);
     });
 
     term.onData((data) => {
@@ -664,12 +695,13 @@ function EmbeddedTerminalInner({
 
     void window.api.ptyAttach(sessionId).then((r) => {
       if (cancelled) return;
+      ptyShell = r.shell ?? null;
       if (!r.alive) {
         // Replay history for a known-dead session (Find / "press any key") and
         // only ask the parent to respawn when meta vanished entirely.
         allowPtyResize = false;
         replayAtPtySize(r);
-        markExited();
+        markExited(r.exitCode);
         if (
           shouldRespawnLostSession({
             exitCode: r.exitCode,

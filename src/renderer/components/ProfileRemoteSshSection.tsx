@@ -22,6 +22,7 @@ const INVALID_KEY: Record<RemoteSshField, MessageKey> = {
   port: "profile.remote.invalid.port",
   jump: "profile.remote.invalid.jump",
   cwd: "profile.remote.invalid.cwd",
+  identityFile: "profile.remote.invalid.identityFile",
 };
 
 /** Profile settings block: run every pane of the profile over the local ssh client. */
@@ -108,6 +109,36 @@ export function ProfileRemoteSshSection({ value, onChange, invalidField, disable
           </div>
           {field("jump", "profile.remote.jump", "profile.remote.jumpPlaceholder")}
           {field("cwd", "profile.remote.cwd", "profile.remote.cwdPlaceholder")}
+          <Label className="mb-1 block">
+            <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
+              {t("profile.remote.identityFile")}
+            </span>
+            <div className="flex gap-2">
+              <Input
+                value={value.identityFile}
+                onChange={(e) => set({ identityFile: e.target.value })}
+                placeholder={t("profile.remote.identityFilePlaceholder")}
+                disabled={disabled}
+                spellCheck={false}
+                autoCapitalize="off"
+                aria-invalid={invalidField === "identityFile"}
+                className={`${INPUT_CLASS} min-w-0 flex-1 font-mono ${invalidField === "identityFile" ? "border-fail" : ""}`}
+              />
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  void window.api.pickSshKey?.(value.identityFile || undefined).then((picked) => {
+                    if (picked) set({ identityFile: picked });
+                  });
+                }}
+                className="shrink-0 cursor-pointer rounded-md border border-chrome-border-strong px-3 py-2 text-[12px] text-chrome-text-secondary hover:border-chrome-border-hover disabled:opacity-40"
+              >
+                {t("profile.dialog.browse")}
+              </button>
+            </div>
+          </Label>
+          <p className="mb-2 text-[10px] text-chrome-text-dim">{t("profile.remote.identityFileHint")}</p>
           {invalidField ? (
             <p className="mb-1 text-[11px] text-fail">{t(INVALID_KEY[invalidField])}</p>
           ) : null}

@@ -1945,6 +1945,28 @@ ipcMain.handle(
   },
 );
 
+/** Private key picker for SSH profiles; starts in ~/.ssh (hidden files shown). */
+ipcMain.handle("pick-ssh-key", async (event, defaultPath?: string) => {
+  const trimmed = defaultPath?.trim().replace(/^~(?=$|[\\/])/, homedir());
+  const sshDir = join(homedir(), ".ssh");
+  const start =
+    trimmed && existsSync(normalize(trimmed))
+      ? normalize(trimmed)
+      : existsSync(sshDir)
+        ? sshDir
+        : homedir();
+  const options: Electron.OpenDialogOptions = {
+    properties: ["openFile", "showHiddenFiles"],
+    defaultPath: start,
+  };
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const { canceled, filePaths } =
+    parent && !parent.isDestroyed()
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+  return canceled ? null : (filePaths[0] ?? null);
+});
+
 /** Which local ssh client a remote profile would use (null = none installed). */
 ipcMain.handle("ssh-client-status", () => {
   const path = resolveSshExecutable();

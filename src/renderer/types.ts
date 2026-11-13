@@ -470,6 +470,8 @@ export interface RemoteSshConfig {
   jump?: string;
   /** Remote start directory; empty = remote login directory. */
   cwd?: string;
+  /** Local private key path (`ssh -i`); never key material. */
+  identityFile?: string;
 }
 
 export interface ProfileTerminal {
@@ -871,6 +873,8 @@ export interface ElectronAPI {
   ) => Promise<{ success: boolean; sessionId?: string; cwd?: string; error?: string; code?: string }>;
   /** Local ssh client used by remote (SSH) profiles; `path` null when none is installed. */
   sshClientStatus: () => Promise<{ found: boolean; path: string | null }>;
+  /** File picker for an SSH private key (opens in ~/.ssh); null when canceled. */
+  pickSshKey: (defaultPath?: string) => Promise<string | null>;
   ptyAttach: (
     sessionId: string,
     opts?: { includeBuffer?: boolean },

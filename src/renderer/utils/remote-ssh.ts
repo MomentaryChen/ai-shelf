@@ -16,9 +16,13 @@ export interface RemoteSshDraft {
   port: string;
   jump: string;
   cwd: string;
+  identityFile: string;
 }
 
-export type RemoteSshField = "host" | "user" | "port" | "jump" | "cwd";
+export type RemoteSshField = "host" | "user" | "port" | "jump" | "cwd" | "identityFile";
+
+// eslint-disable-next-line no-control-regex
+const CONTROL_RE = /[\u0000-\u001f\u007f]/u;
 
 export function remoteToDraft(remote: RemoteSshConfig | null | undefined): RemoteSshDraft {
   return {
@@ -28,6 +32,7 @@ export function remoteToDraft(remote: RemoteSshConfig | null | undefined): Remot
     port: remote?.port ? String(remote.port) : "",
     jump: remote?.jump ?? "",
     cwd: remote?.cwd ?? "",
+    identityFile: remote?.identityFile ?? "",
   };
 }
 
@@ -57,8 +62,14 @@ export function invalidRemoteField(draft: RemoteSshDraft): RemoteSshField | null
       });
     if (!ok) return "jump";
   }
-  // eslint-disable-next-line no-control-regex
-  if (draft.cwd.length > 1024 || /[\u0000-\u001f\u007f]/u.test(draft.cwd)) return "cwd";
+  if (draft.cwd.length > 1024 || CONTROL_RE.test(draft.cwd)) return "cwd";
+  const key = draft.identityFile.trim();
+  if (
+    key &&
+    (key.length > 1024 || key.startsWith("-") || key.includes("%") || CONTROL_RE.test(key))
+  ) {
+    return "identityFile";
+  }
   return null;
 }
 
@@ -74,6 +85,8 @@ export function draftToRemote(draft: RemoteSshDraft): RemoteSshConfig | null {
   if (jump) out.jump = jump;
   const cwd = draft.cwd.trim();
   if (cwd) out.cwd = cwd;
+  const identityFile = draft.identityFile.trim();
+  if (identityFile) out.identityFile = identityFile;
   return out;
 }
 

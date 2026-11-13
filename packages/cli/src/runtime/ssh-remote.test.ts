@@ -100,21 +100,65 @@ describe("buildRemoteSshCommand", () => {
 describe("buildSshArgs", () => {
   it("puts options before -- and the host last", () => {
     const args = buildSshArgs(
-      { kind: "ssh", host: "box", user: "dev", port: 2222, jump: "gw" },
+      {
+        kind: "ssh",
+        host: "box",
+        user: "dev",
+        port: 2222,
+        jump: "gw",
+        identityFile: "C:\\Users\\me\\.ssh\\id_ed25519",
+      },
       "codex",
     );
-    assert.deepEqual(args.slice(0, 5), [
+    assert.deepEqual(args.slice(0, 7), [
       "-t",
+      "-o",
+      "ConnectTimeout=10",
       "-o",
       "ServerAliveInterval=30",
       "-o",
       "ServerAliveCountMax=3",
     ]);
-    assert.deepEqual(args.slice(5, 11), ["-p", "2222", "-l", "dev", "-J", "gw"]);
-    assert.equal(args[11], "--");
-    assert.equal(args[12], "box");
-    assert.match(args[13] ?? "", /codex/);
-    assert.equal(args.length, 14);
+    assert.deepEqual(args.slice(7, 15), [
+      "-p",
+      "2222",
+      "-l",
+      "dev",
+      "-i",
+      "C:\\Users\\me\\.ssh\\id_ed25519",
+      "-J",
+      "gw",
+    ]);
+    assert.equal(args[15], "--");
+    assert.equal(args[16], "box");
+    assert.match(args[17] ?? "", /codex/);
+    assert.equal(args.length, 18);
+  });
+
+  it("rejects % in the key path (ssh would %-expand it after the stat)", () => {
+    assert.equal(
+      normalizeRemoteSshConfig({ kind: "ssh", host: "box", identityFile: "~/.ssh/key%d" }),
+      null,
+    );
+  });
+
+  it("rejects an identity path that looks like an option or has control chars", () => {
+    assert.equal(
+      normalizeRemoteSshConfig({ kind: "ssh", host: "box", identityFile: "-oX=y" }),
+      null,
+    );
+    assert.equal(
+      normalizeRemoteSshConfig({ kind: "ssh", host: "box", identityFile: "a\nb" }),
+      null,
+    );
+    assert.deepEqual(
+      normalizeRemoteSshConfig({ kind: "ssh", host: "box", identityFile: " ~/.ssh/k " }),
+      {
+        kind: "ssh",
+        host: "box",
+        identityFile: "~/.ssh/k",
+      },
+    );
   });
 
   it("omits the remote command for a plain shell", () => {

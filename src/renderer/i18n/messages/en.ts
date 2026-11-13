@@ -510,6 +510,11 @@ export const en = {
   "profile.remote.invalid.port": "Port must be 1–65535.",
   "profile.remote.invalid.jump": "Jump host format: [user@]host[:port], up to 4 hops separated by commas.",
   "profile.remote.invalid.cwd": "Remote directory cannot contain control characters.",
+  "profile.remote.identityFile": "Private key file",
+  "profile.remote.identityFilePlaceholder": "Optional, e.g. ~/.ssh/id_ed25519",
+  "profile.remote.identityFileHint":
+    "Only the path is saved (never the key). A matching <key>-cert.pub is used automatically for certificate login. If the file is missing on another computer, ssh falls back to the agent / ~/.ssh/config.",
+  "profile.remote.invalid.identityFile": "Key path cannot start with -, or contain % or control characters.",
   "profile.remote.sshMissing":
     "No ssh client found on this computer. On Windows, install it in Settings → System → Optional features → OpenSSH Client, or run (as admin): Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
   "profile.remote.sshFound": "ssh client: {path}",
@@ -757,6 +762,20 @@ export const en = {
   "pane.agent.bg.toastDismiss": "Dismiss",
   "terminal.scrollToBottom": "Scroll to bottom",
   "terminal.newOutput": "New output",
+  "terminal.ssh.exitedPrompt": "[SSH session ended — press R to reconnect, any other key to close]",
+  "terminal.ssh.fail.keyfile":
+    "SSH: the private key could not be used (missing file, wrong format, permissions or passphrase). Check the key path in Profile settings → Remote (SSH).",
+  "terminal.ssh.fail.auth":
+    "SSH: authentication failed. Check the user name, and that your key is in ssh-agent or ~/.ssh/config (or set a private key file).",
+  "terminal.ssh.fail.hostkey":
+    "SSH: the host key does not match known_hosts. If the server was reinstalled, remove its old entry (ssh-keygen -R <host>) and reconnect.",
+  "terminal.ssh.fail.resolve": "SSH: host name not found. Check the Host field or the HostName in ~/.ssh/config.",
+  "terminal.ssh.fail.timeout":
+    "SSH: connection timed out (10s). The host or gateway is unreachable — check VPN / network, the port, and the jump host.",
+  "terminal.ssh.fail.refused": "SSH: connection refused. sshd may not be running, or the port is wrong.",
+  "terminal.ssh.fail.jump":
+    "SSH: the connection through the jump host (gateway) failed — either the gateway is unreachable, or it cannot reach the target. Check the gateway address / port, then the target host / port as seen from the gateway.",
+  "terminal.ssh.fail.unknown": "SSH: the connection failed. See the ssh message above for details.",
   "terminal.ctx.copy": "Copy",
   "terminal.ctx.paste": "Paste",
   "terminal.pasteConfirm.title": "Paste this text?",
