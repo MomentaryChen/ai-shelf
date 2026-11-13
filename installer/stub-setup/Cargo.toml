@@ -1,0 +1,9 @@
+[package]
+name = "stub-setup"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Fake NSIS payload for developing the AI Shelf installer without touching a real install"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"

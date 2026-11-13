@@ -1,0 +1,39 @@
+[package]
+name = "ai-shelf-setup"
+version = "0.1.0"
+description = "AI Shelf custom Windows installer (bootstrapper around the NSIS payload)"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "ai-shelf-setup"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sys-locale = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+known-folders = "1"
+
+[features]
+# Tauri serves the embedded `ui/` assets through its custom protocol in release builds.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+[workspace]
+members = ["stub-setup"]

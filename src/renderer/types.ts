@@ -1121,34 +1121,28 @@ export interface ElectronAPI {
   onPaneAgentFocus: (cb: (paneId: string) => void) => () => void;
   onProfileLayoutFlush: (cb: () => void) => () => void;
   sendProfileLayoutFlushDone: () => void;
-  /** Open a pane in its own window ("drag" = tear-off; main checks the cursor is outside every window). */
-  panePopoutOpen: (req: PanePopoutOpenRequest) => Promise<PanePopoutOpenResult>;
-  /** Pop-out window: the panes it shows (null when this window is not a pop-out). */
-  panePopoutInfo: () => Promise<PanePopoutInfo | null>;
-  /** Dock a popped-out pane back into its origin window (no id = every pane of this pop-out). */
-  panePopoutDock: (paneId?: string) => Promise<{ ok: boolean }>;
-  panePopoutFocus: (paneId: string) => Promise<{ ok: boolean }>;
+  /** Origin window: declare every view window it owns (main opens / updates / closes windows to match). */
+  paneViewSync: (views: PaneViewDecl[]) => void;
   /**
-   * Pop-out window: close one of its panes (kills the PTY), or the whole window
-   * without an id. A pane whose agent is busy answers `busy` unless `force`.
+   * A pane header drag ended outside any drop target ("drag"), or "Open in new window" ("menu").
+   * Main resolves where it landed and sends the origin a `move` intent (or a notice to a
+   * rejecting window). Works from the origin window and from view windows.
    */
-  panePopoutClose: (paneId?: string, force?: boolean) => Promise<{ ok: boolean; busy?: boolean }>;
-  /** Pop-out window: new terminal in this window, next to `anchorPaneId` (spawned by the origin). */
-  panePopoutNewPane: (anchorPaneId: string) => Promise<PanePopoutNewPaneResult>;
-  /** Origin window: show a freshly spawned pane in the pop-out window that holds `anchorPaneId`. */
-  panePopoutAttach: (req: PanePopoutAttachRequest) => Promise<{ ok: boolean }>;
-  /** Origin window: answer a pop-out's "new-pane" request. */
-  panePopoutNewPaneResult: (requestId: string, result: PanePopoutNewPaneResult) => void;
-  /** Origin window: whether a popped-out pane's agent is busy (drives the close prompt). */
-  panePopoutReportBusy: (paneId: string, busy: boolean) => void;
-  /** Origin window: a popped-out pane's numbered label. */
-  panePopoutReportLabel: (paneId: string, label: string) => void;
-  /** Pop-out window: OSC 7 cwd, forwarded to the origin's layout. */
-  panePopoutReportCwd: (paneId: string, cwd: string) => void;
-  /** Pop-out window: its pane list changed. */
-  onPanePopoutPanes: (cb: (info: PanePopoutInfo) => void) => () => void;
-  onPanePopoutEvent: (cb: (event: PanePopoutEvent) => void) => () => void;
-  onPanePopoutConfirmClose: (cb: () => void) => () => void;
+  paneViewDragEnd: (req: PaneViewDragEndRequest) => Promise<{ ok: boolean; result: string }>;
+  /** Bring up the view window showing this pane and focus the pane there. */
+  paneViewFocus: (paneId: string) => Promise<{ ok: boolean }>;
+  /** View window: its current declaration (null when this window is not a view). */
+  paneViewGetState: () => Promise<PaneViewDecl | null>;
+  /** View window: ask the origin to change the view (forwarded as an intent). */
+  paneViewAction: (action: PaneViewAction) => void;
+  /** Per-machine saved views, keyed by `${originKind}|${workspaceId}:${profileId}`. */
+  paneViewStoreGet: (key: string) => Promise<unknown[]>;
+  paneViewStoreSave: (key: string, views: unknown[]) => Promise<{ ok: boolean }>;
+  onPaneViewIntent: (cb: (intent: PaneViewIntent) => void) => () => void;
+  onPaneViewState: (cb: (state: PaneViewDecl) => void) => () => void;
+  onPaneViewConfirmClose: (cb: () => void) => () => void;
+  onPaneViewNotice: (cb: (notice: { kind: "other-profile"; profileName: string }) => void) => () => void;
+  onPaneViewFocusPane: (cb: (paneId: string) => void) => () => void;
   usageGetProviders: () => Promise<{
     providers: UsageProviderMeta[];
     encryptionAvailable: boolean;
@@ -1392,47 +1386,61 @@ declare global {
   }
 }
 
-export interface PanePopoutPane {
-  id: string;
-  tool: string;
-  sessionId: string;
-  cwd: string;
-  title?: string;
-  agentSessionId?: string;
+export interface PaneViewRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
-export interface PanePopoutOpenRequest {
-  pane: PanePopoutPane;
-  label: string;
+/** One extra view window of a profile, as declared by its origin window. */
+export interface PaneViewDecl {
+  viewId: string;
+  /** `${workspaceId}:${profileId}` */
+  profileKey: string;
+  profileName: string;
   accentColor: string | null;
-  /** Current pane size in CSS px (pop-out opens at about this size). */
+  /** Split tree of the view's panes (full pane info, resolved from the profile layout). */
+  layout: import("./terminal/split-tree").LayoutNode;
+  focusedPaneId: string | null;
+  labels: Record<string, string>;
+  busy: Record<string, boolean>;
+  bounds: PaneViewRect | null;
+}
+
+export interface PaneViewDragEndRequest {
+  paneId: string;
+  /** Origin window only (a view window's profile is known to main). */
+  profileKey?: string;
+  profileName?: string;
+  trigger: "drag" | "menu";
+  /** Pane size in CSS px — a new view opens at about this size. */
   width?: number;
   height?: number;
-  trigger: "drag" | "menu";
 }
 
-export type PanePopoutOpenResult =
-  | { ok: true }
-  | { ok: false; reason: "inside-window" | "invalid" | "no-origin" };
+/** View window → origin, forwarded by main. */
+export type PaneViewAction =
+  | { type: "focus"; paneId: string }
+  | { type: "close-pane"; paneId: string }
+  | { type: "dock-pane"; paneId: string }
+  | { type: "dock-all" }
+  | { type: "close-view" }
+  | { type: "move-in-view"; dragPaneId: string; targetPaneId: string; zone: import("./terminal/pane-drop-zone").PaneDropZone }
+  | { type: "resize"; splitId: string; ratio: number }
+  | { type: "cwd"; sessionId: string; cwd: string }
+  | { type: "title"; sessionId: string; title: string }
+  | { type: "bounds"; bounds: PaneViewRect };
 
-export interface PanePopoutInfo {
-  panes: { pane: PanePopoutPane; label: string }[];
-  accentColor: string | null;
-  /** Pane to bring to the front (just created in, or focused from, the origin). */
-  activePaneId?: string;
-}
-
-export interface PanePopoutAttachRequest {
-  anchorPaneId: string;
-  pane: PanePopoutPane;
-  label: string;
-}
-
-/** `error` is a localized message from the origin window. */
-export type PanePopoutNewPaneResult = { ok: true } | { ok: false; error?: string };
-
-export type PanePopoutEvent =
-  | { type: "ended"; paneId: string; reason: "docked" | "closed" | "gone" }
-  | { type: "cwd"; paneId: string; sessionId: string; cwd: string }
-  /** A pop-out window asks for a new terminal next to `anchorPaneId`. */
-  | { type: "new-pane"; requestId: string; anchorPaneId: string };
+/** Main → origin window. */
+export type PaneViewIntent =
+  | {
+      type: "move";
+      paneId: string;
+      fromViewId: string | null;
+      target:
+        | { kind: "new-view"; bounds: PaneViewRect }
+        | { kind: "into-view"; viewId: string }
+        | { kind: "dock" };
+    }
+  | { type: "action"; viewId: string; action: PaneViewAction };

@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Maximize2,
   Minimize2,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToolLogo } from "./ToolLogo";
@@ -61,7 +62,8 @@ interface Props {
   onFocusPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
   onMinimizePane?: (paneId: string) => void;
-  onSplitPane: (paneId: string, direction: SplitDirection) => void;
+  /** Omitted = no split buttons (view windows). */
+  onSplitPane?: (paneId: string, direction: SplitDirection) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
   onRenamePane?: (paneId: string, title: string) => void;
   onPaneCwdClick?: (paneId: string) => void;
@@ -89,6 +91,8 @@ interface Props {
   onToggleMaximizePane?: (paneId: string) => void;
   /** Formatted maximize shortcut for tooltips (e.g. `Ctrl+Shift+Enter`). */
   maximizeShortcutKeys?: string;
+  /** View windows: put the pane back into its origin window. */
+  onDockPane?: (paneId: string) => void;
 }
 
 export type PanePopOutTrigger = "drag" | "menu";
@@ -109,6 +113,7 @@ type PaneDragState = {
   onMovePane?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onPopOutPane?: Props["onPopOutPane"];
+  onDockPane?: Props["onDockPane"];
 };
 
 export function SplitPaneLayout(props: Props) {
@@ -136,6 +141,7 @@ export function SplitPaneLayout(props: Props) {
     onMovePane: props.onMovePane,
     onProfilePaneDrop: props.onProfilePaneDrop,
     onPopOutPane: props.onPopOutPane,
+    onDockPane: props.onDockPane,
   };
 
   return (
@@ -188,7 +194,7 @@ function SplitPaneLayoutInner({
           onFocus={() => onFocusPane(node.pane.id)}
           onClose={() => onClosePane(node.pane.id)}
           onMinimize={onMinimizePane ? () => onMinimizePane(node.pane.id) : undefined}
-          onSplit={(dir) => onSplitPane(node.pane.id, dir)}
+          onSplit={onSplitPane ? (dir) => onSplitPane(node.pane.id, dir) : undefined}
           onRename={
             onRenamePane ? (title) => onRenamePane(node.pane.id, title) : undefined
           }
@@ -338,7 +344,7 @@ function WarpPaneShell({
   onFocus: () => void;
   onClose: () => void;
   onMinimize?: () => void;
-  onSplit: (dir: SplitDirection) => void;
+  onSplit?: (dir: SplitDirection) => void;
   onRename?: (title: string) => void;
   onCwdClick?: () => void;
   maximized?: boolean;
@@ -364,6 +370,7 @@ function WarpPaneShell({
     onMovePane,
     onProfilePaneDrop,
     onPopOutPane,
+    onDockPane,
   } = drag;
   const popOut = (trigger: PanePopOutTrigger) => {
     if (!onPopOutPane) return;
@@ -596,12 +603,16 @@ function WarpPaneShell({
           </span>
         )}
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/pane:opacity-100">
-          <IconBtn title={t("pane.splitRight")} onClick={() => onSplit("horizontal")}>
-            <SplitSquareHorizontal className="h-3.5 w-3.5" />
-          </IconBtn>
-          <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
-            <SplitSquareVertical className="h-3.5 w-3.5" />
-          </IconBtn>
+          {onSplit && (
+            <>
+              <IconBtn title={t("pane.splitRight")} onClick={() => onSplit("horizontal")}>
+                <SplitSquareHorizontal className="h-3.5 w-3.5" />
+              </IconBtn>
+              <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
+                <SplitSquareVertical className="h-3.5 w-3.5" />
+              </IconBtn>
+            </>
+          )}
           {onToggleMaximize && (
             <IconBtn
               title={withKeys(
@@ -625,6 +636,11 @@ function WarpPaneShell({
           {onPopOutPane && (
             <IconBtn title={t("pane.popout.open")} onClick={() => popOut("menu")}>
               <ExternalLink className="h-3.5 w-3.5" />
+            </IconBtn>
+          )}
+          {onDockPane && (
+            <IconBtn title={t("pane.popout.dock")} onClick={() => onDockPane(pane.id)}>
+              <PanelLeftOpen className="h-3.5 w-3.5" />
             </IconBtn>
           )}
         </div>
