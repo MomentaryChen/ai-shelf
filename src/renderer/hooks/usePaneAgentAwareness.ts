@@ -573,12 +573,14 @@ export function usePaneAgentAwareness(
     void window.api.setTrayPaneAttention(count);
   }, [focusedPaneId, trackedPanes, settings, states, windowFocused]);
 
-  const statusMap: PaneAgentStateMap = {};
-  if (settings.paneAgentAwarenessEnabled) {
+  const statusMap = useMemo<PaneAgentStateMap>(() => {
+    const map: PaneAgentStateMap = {};
+    if (!settings.paneAgentAwarenessEnabled) return map;
     for (const pane of trackedPanes) {
-      statusMap[pane.id] = states[pane.id]?.status ?? "idle";
+      map[pane.id] = states[pane.id]?.status ?? "idle";
     }
-  }
+    return map;
+  }, [settings.paneAgentAwarenessEnabled, trackedPanes, states]);
 
   const backgroundAttention = useMemo(() => summarizeBackgroundAttention(attention), [attention]);
 

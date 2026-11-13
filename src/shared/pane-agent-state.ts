@@ -226,3 +226,25 @@ export function paneNeedsAttention(status: PaneAgentStatus): boolean {
 export function isPaneAgentBusy(status: PaneAgentStatus): boolean {
   return status === "running" || status === "waiting_input" || status === "stalled";
 }
+
+const LIGHT_PRIORITY: Record<PaneAgentStatus, number> = {
+  idle: 0,
+  running: 1,
+  stalled: 2,
+  waiting_input: 3,
+};
+
+/**
+ * Strongest non-idle status across panes (for a profile / sidebar light).
+ * waiting_input > stalled > running; null when every pane is idle or unknown.
+ */
+export function strongestPaneAgentStatus(
+  statuses: Iterable<PaneAgentStatus | null | undefined>,
+): PaneAgentStatus | null {
+  let best: PaneAgentStatus | null = null;
+  for (const s of statuses) {
+    if (!s || s === "idle") continue;
+    if (!best || LIGHT_PRIORITY[s] > LIGHT_PRIORITY[best]) best = s;
+  }
+  return best;
+}

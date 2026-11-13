@@ -32,3 +32,24 @@ export function PaneAgentStatusDot({ status }: { status: PaneAgentStatus }) {
     </Tooltip>
   );
 }
+
+/** Compact status light for sidebar rows; renders nothing when idle. */
+export function PaneAgentStatusLight({
+  status,
+  className = "",
+}: {
+  status: PaneAgentStatus | null | undefined;
+  className?: string;
+}) {
+  const { t } = useLocale();
+  if (!status || status === "idle") return null;
+  const label = t(`pane.agent.status.${status}` as const);
+  return (
+    <span
+      role="status"
+      aria-label={label}
+      title={label}
+      className={`inline-block h-2 w-2 shrink-0 rounded-full ${STATUS_CLASS[status]} ${className}`}
+    />
+  );
+}

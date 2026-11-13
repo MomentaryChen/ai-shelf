@@ -38,7 +38,7 @@ import {
   strongestAttention,
 } from "../../shared/background-agent-attention.js";
 import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
-import { isPaneAgentBusy } from "../../shared/pane-agent-state.js";
+import { isPaneAgentBusy, strongestPaneAgentStatus } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useProfileQuickSwitch } from "../hooks/useProfileQuickSwitch";
 import { useSlideDirection } from "../hooks/useSlideDirection";
@@ -1304,6 +1304,7 @@ function ChatTabInner({
                 live: true,
                 minimized: isActive ? isPaneMinimized(p.id, pane.id) : false,
                 agentAttention: isActive ? null : (backgroundPaneAttention[pane.id]?.kind ?? null),
+                agentStatus: paneAgentStates[pane.id] ?? null,
               }))
             : shouldShowSavedTerminalPreview(live.length, isActive)
               ? p.terminals.map((terminal, idx) => ({
@@ -1327,9 +1328,11 @@ function ChatTabInner({
           savedCommands: p.savedCommands ?? [],
           terminals,
           agentAttention: isActive ? null : (backgroundAttention[p.id] ?? null),
+          agentStatus: strongestPaneAgentStatus(live.map((pane) => paneAgentStates[pane.id])),
         };
       }),
     [
+      paneAgentStates,
       backgroundAttention,
       backgroundPaneAttention,
       currentGroup?.profiles,

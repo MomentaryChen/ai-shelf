@@ -29,6 +29,8 @@ import { writeProfilePaneDrag } from "../terminal/profile-pane-display";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { ToolLogo } from "./ToolLogo";
 import { BackgroundAttentionBadge } from "./BackgroundAttentionBadge";
+import { PaneAgentStatusLight } from "./PaneAgentStatusDot";
+import type { PaneAgentStatus } from "../../shared/pane-agent-state.js";
 import type { BackgroundAttentionKind } from "../../shared/background-agent-attention.js";
 import { profileToolLabel } from "../utils/available-tools";
 import {
@@ -79,6 +81,8 @@ export interface SidebarProfileItem {
   terminals?: SidebarTerminalItem[];
   /** Background agent attention summary (non-active profiles only). */
   agentAttention?: { kind: BackgroundAttentionKind; count: number } | null;
+  /** Strongest live agent status across this profile's terminals (null = all idle). */
+  agentStatus?: PaneAgentStatus | null;
 }
 
 export interface SidebarSavedCommandItem {
@@ -98,6 +102,8 @@ export interface SidebarTerminalItem {
   minimized?: boolean;
   /** Background agent attention for this terminal (non-active profiles only). */
   agentAttention?: BackgroundAttentionKind | null;
+  /** Live agent status for this terminal (running / waiting / stalled light). */
+  agentStatus?: PaneAgentStatus | null;
 }
 
 interface SidebarProps {
@@ -379,9 +385,14 @@ export function Sidebar({
                 >
                   <span className="relative inline-flex">
                     <ToolLogo tool={terminal.tool ?? "shell"} size={14} />
-                    {terminal.agentAttention && (
+                    {terminal.agentAttention ? (
                       <BackgroundAttentionBadge
                         kind={terminal.agentAttention}
+                        className="absolute -right-1 -top-1 ring-2 ring-chrome-surface"
+                      />
+                    ) : (
+                      <PaneAgentStatusLight
+                        status={terminal.agentStatus}
                         className="absolute -right-1 -top-1 ring-2 ring-chrome-surface"
                       />
                     )}
@@ -606,11 +617,13 @@ export function Sidebar({
                           }
                         />
                         <span className="truncate font-medium">{item.name}</span>
-                        {!active && item.agentAttention && (
+                        {!active && item.agentAttention ? (
                           <BackgroundAttentionBadge
                             kind={item.agentAttention.kind}
                             count={item.agentAttention.count}
                           />
+                        ) : (
+                          <PaneAgentStatusLight status={item.agentStatus} />
                         )}
                       </button>
                       <span
@@ -842,8 +855,10 @@ export function Sidebar({
                                       {terminal.label}
                                     </span>
                                   )}
-                                  {terminal.agentAttention && (
+                                  {terminal.agentAttention ? (
                                     <BackgroundAttentionBadge kind={terminal.agentAttention} />
+                                  ) : (
+                                    <PaneAgentStatusLight status={terminal.agentStatus} />
                                   )}
                                   {terminal.live && (
                                     <span className="ml-auto inline-flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/term:opacity-100">
