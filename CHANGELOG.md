@@ -11,7 +11,7 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ### Added
 
-- **Tasks mode** — Save prompts you use often and run one in a profile with a single click. AI Shelf switches to the profile, opens a new pane with its agent CLI (or the tool the task names), and sends the prompt once the agent is ready. If the agent shows a start-up dialog such as folder trust or login, the prompt waits until you answer it. Five built-in templates are included. Tasks are files under the app data `tasks/` folder.
+- **Tasks mode** — Save prompts you use often and run one in a profile with a single click. AI Shelf switches to the profile, opens a new pane with its agent CLI (or the tool the task names), and sends the prompt once the agent is ready. If the agent shows a start-up dialog such as folder trust or login, the prompt waits until you answer it. Five built-in templates are included. Tasks are files under the app data `tasks/` folder. Each task is a card: click it to run. A task keeps one terminal, so while it is open the card switches to that terminal instead of sending the prompt again.
 
 ### Removed
 

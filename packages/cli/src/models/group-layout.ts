@@ -16,6 +16,8 @@ export const SavedPaneSlotSchema = z.object({
   title: z.string().max(64).optional(),
   /** AI agent conversation id (desktop resumes it on restore); validated at launch. */
   agentSessionId: z.string().max(128).optional(),
+  /** Task (Tasks mode) the pane was opened for. */
+  taskId: z.string().max(80).optional(),
 });
 
 /** Outer `.optional()` keeps the key optional; undefined skips the transform. */

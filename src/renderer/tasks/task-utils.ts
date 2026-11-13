@@ -108,3 +108,26 @@ export function promptPreview(prompt: string, maxLines = 3): { text: string; tru
   const kept = lines.slice(0, maxLines);
   return { text: kept.join("\n"), truncated: lines.length > maxLines };
 }
+
+/** Where a task's live terminal is. */
+export interface TaskPaneRef {
+  profileId: string;
+  paneId: string;
+}
+
+/**
+ * Live terminal per task id, from every loaded profile's panes. A task has at most one
+ * terminal; if two panes carry the same id (e.g. a hand-edited layout), the first wins.
+ */
+export function collectTaskPanes(
+  profiles: Iterable<{ profileId: string; panes: readonly { id: string; taskId?: string }[] }>,
+): Map<string, TaskPaneRef> {
+  const out = new Map<string, TaskPaneRef>();
+  for (const { profileId, panes } of profiles) {
+    for (const pane of panes) {
+      const taskId = pane.taskId?.trim();
+      if (taskId && !out.has(taskId)) out.set(taskId, { profileId, paneId: pane.id });
+    }
+  }
+  return out;
+}

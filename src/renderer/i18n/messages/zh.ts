@@ -1263,7 +1263,8 @@ export const zh: Record<MessageKey, string> = {
 
   "tasks.loading": "載入任務中…",
   "tasks.title": "任務",
-  "tasks.subtitle": "儲存好的提示詞：在設定檔中開啟終端機、啟動 AI CLI，並自動幫你送出提示詞。",
+  "tasks.subtitle":
+    "儲存好的提示詞卡片：點一下就在設定檔中開啟終端機、啟動 AI CLI 並送出提示詞。每個任務只會有一個終端機。",
   "tasks.count": "共 {count} 個",
   "tasks.new": "新增任務",
   "tasks.fromTemplate": "從範本建立",
@@ -1277,10 +1278,13 @@ export const zh: Record<MessageKey, string> = {
   "tasks.empty.desc":
     "任務就是一段儲存好的提示詞。執行時會在設定檔中開啟新的終端機、啟動 AI CLI（Claude、Codex 等），並自動幫你輸入提示詞。",
   "tasks.card.activeProfile": "目前的設定檔",
+  "tasks.card.open": "終端機已開啟",
   "tasks.card.profileMissing": "找不到設定檔「{name}」",
   "tasks.action.run": "執行",
-  "tasks.action.runHint": "開啟終端機並將提示詞送給 AI",
+  "tasks.action.runHint": "點一下開啟終端機並將提示詞送給 AI",
   "tasks.action.running": "啟動中…",
+  "tasks.action.open": "前往終端機",
+  "tasks.action.openHint": "這個任務的終端機還開著，點一下切換過去",
   "tasks.action.edit": "編輯",
   "tasks.action.duplicate": "複製",
   "tasks.action.delete": "刪除",

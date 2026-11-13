@@ -37,6 +37,12 @@ The body after the frontmatter is the prompt, sent unchanged as the agent's firs
 
 A plain-shell profile (no agent CLI installed) cannot run tasks.
 
+## One terminal per task
+
+Each task is a card on the Tasks page. Click the card to run it.
+
+A task has at most one terminal. While that terminal is open, the card shows **Terminal open** and a click switches to it instead of sending the prompt again. Close the terminal to run the task again. The link is saved with the profile layout, so a terminal restored after a restart still belongs to its task.
+
 ## Migration from AI Flow
 
 On the first start after the upgrade, each `flows/*.flow.md` becomes `tasks/<id>.task.md`:

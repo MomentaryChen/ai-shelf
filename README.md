@@ -54,7 +54,7 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 - **Terminal** — profiles sidebar, embedded multi-pane xterm.js + node-pty, broadcast input, external launch
 - **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage** (spend / budgets)
 - **Tools** — everyday utilities: Codec, Crypto, Time, Cron, Regex, JSON, Markdown, Mermaid, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL
-- **Tasks** — saved prompts: pick a profile, press Run, and a new pane starts its agent CLI and sends the prompt (built-in templates)
+- **Tasks** — saved prompts: pick a profile, click the card, and a new pane starts its agent CLI and sends the prompt; a task keeps one terminal, so a second click switches to it (built-in templates)
 - **Profiles sidebar** — create/rename/delete profiles; each profile stores split-pane layout in SQLite
 - **External launch** — Windows Terminal / PowerShell / CMD on Windows; `$SHELL` (bash / zsh / fish / sh) on macOS and Linux
 - **Cloud backup** — optional Google sign-in to back up profiles (manual sync; see in-app Account settings)

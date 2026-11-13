@@ -1312,7 +1312,8 @@ export const en = {
 
   "tasks.loading": "Loading tasks…",
   "tasks.title": "Tasks",
-  "tasks.subtitle": "Saved prompts that open a terminal in a profile, start its agent CLI and send the prompt for you.",
+  "tasks.subtitle":
+    "Saved prompt cards: click one to open a terminal in a profile, start its agent CLI and send the prompt. Each task keeps one terminal.",
   "tasks.count": "{count} saved",
   "tasks.new": "New task",
   "tasks.fromTemplate": "From template",
@@ -1326,10 +1327,13 @@ export const en = {
   "tasks.empty.desc":
     "A task is a saved prompt. Run it to open a new terminal in a profile, start the agent CLI (Claude, Codex, …) and have the prompt typed in for you.",
   "tasks.card.activeProfile": "Active profile",
+  "tasks.card.open": "Terminal open",
   "tasks.card.profileMissing": "Profile “{name}” not found",
   "tasks.action.run": "Run",
-  "tasks.action.runHint": "Open a terminal and send this prompt to the agent",
+  "tasks.action.runHint": "Click to open a terminal and send this prompt to the agent",
   "tasks.action.running": "Starting…",
+  "tasks.action.open": "Go to terminal",
+  "tasks.action.openHint": "This task’s terminal is still open. Click to switch to it",
   "tasks.action.edit": "Edit",
   "tasks.action.duplicate": "Duplicate",
   "tasks.action.delete": "Delete",

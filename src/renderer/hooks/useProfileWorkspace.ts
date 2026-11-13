@@ -118,7 +118,13 @@ async function reconcileLayoutPtys(
 
     next = mapPanesInTree(next, (p) =>
       p.id === pane.id
-        ? { ...replacement, id: pane.id, cwd: pane.cwd || replacement.cwd, title: pane.title }
+        ? {
+            ...replacement,
+            id: pane.id,
+            cwd: pane.cwd || replacement.cwd,
+            title: pane.title,
+            ...(pane.taskId ? { taskId: pane.taskId } : {}),
+          }
         : p,
     );
   }
@@ -307,7 +313,12 @@ export function useProfileWorkspace(
         }
         if (pane) {
           const title = normalizePaneTitle(slot.title ?? "");
-          const restored = title ? { ...pane, title } : pane;
+          const restored: PaneInfo = {
+            ...pane,
+            ...(title ? { title } : {}),
+            // A shell fallback is not the task's agent; only the saved tool keeps the link.
+            ...(slot.taskId && pane.tool === slot.tool ? { taskId: slot.taskId } : {}),
+          };
           spawned.push(restored);
           slotPanes.push(restored);
         } else {
