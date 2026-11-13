@@ -147,6 +147,8 @@ export interface TerminalClipboardOptions {
   onOpenFind?: () => void;
   onClear?: () => void;
   onRestart?: () => void;
+  /** "New pane in git worktree" entry. */
+  onNewWorktreePane?: () => void;
   onExportOutput?: () => void;
   onCopyOutputForIssue?: () => void;
   /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
@@ -410,6 +412,9 @@ export function bindTerminalClipboard(
     }
     if (options.onClear) addItem(getStoredT("terminal.ctx.clear"), true, options.onClear);
     if (options.onRestart) addItem(getStoredT("terminal.ctx.restart"), true, options.onRestart);
+    if (options.onNewWorktreePane) {
+      addItem(getStoredT("git.worktree.ctx"), true, options.onNewWorktreePane);
+    }
 
     document.body.appendChild(menuEl);
     requestAnimationFrame(() => {

@@ -68,11 +68,20 @@ function inRange(run: AttributionRunInput, rangeStartMs: number, rangeEndMs: num
   return start >= rangeStartMs && start <= rangeEndMs;
 }
 
+/**
+ * Tool spend for the selected period. Billing-cycle totals (claude.ai extra-usage
+ * credits) cover a different window, so they are not split across period runs.
+ */
+function periodToolCostUsd(tool: UsageToolSnapshot): number {
+  if (tool.costScope === "billingCycle") return 0;
+  return tool.totalCostUsd ?? 0;
+}
+
 function toolCostMap(tools: UsageToolSnapshot[]): Map<UsageToolId, number> {
   const map = new Map<UsageToolId, number>();
   for (const tool of tools) {
     if (tool.status !== "ok") continue;
-    const cost = tool.totalCostUsd ?? 0;
+    const cost = periodToolCostUsd(tool);
     if (cost > 0) map.set(tool.toolId, cost);
   }
   return map;
@@ -148,7 +157,13 @@ export function attributeRunCosts(
   tools: UsageToolSnapshot[],
   rangeStartMs: number,
   rangeEndMs: number,
-): Array<AttributionRunInput & { attributedCostUsd: number; estimated: boolean; toolId: UsageToolId | null }> {
+): Array<
+  AttributionRunInput & {
+    attributedCostUsd: number;
+    estimated: boolean;
+    toolId: UsageToolId | null;
+  }
+> {
   const windowRuns = runs.filter(
     (r) =>
       (r.status === "completed" || r.status === "failed" || r.status === "cancelled") &&
@@ -158,7 +173,11 @@ export function attributeRunCosts(
   const costs = toolCostMap(tools);
   const measured = new Set<string>();
   const attributed: Array<
-    AttributionRunInput & { attributedCostUsd: number; estimated: boolean; toolId: UsageToolId | null }
+    AttributionRunInput & {
+      attributedCostUsd: number;
+      estimated: boolean;
+      toolId: UsageToolId | null;
+    }
   > = [];
 
   for (const run of windowRuns) {
@@ -219,7 +238,11 @@ export function attributeRunCosts(
 
 export function buildAttributionInsights(
   attributed: Array<
-    AttributionRunInput & { attributedCostUsd: number; estimated: boolean; toolId: UsageToolId | null }
+    AttributionRunInput & {
+      attributedCostUsd: number;
+      estimated: boolean;
+      toolId: UsageToolId | null;
+    }
   >,
   tools: UsageToolSnapshot[],
 ): Pick<UsageCostInsights, "byTool" | "byProfile" | "byFlow" | "hottestFlow"> {
@@ -229,7 +252,7 @@ export function buildAttributionInsights(
 
   for (const tool of tools) {
     if (tool.status !== "ok") continue;
-    const cost = tool.totalCostUsd ?? 0;
+    const cost = periodToolCostUsd(tool);
     if (cost <= 0 && (tool.totalInputTokens ?? 0) <= 0) continue;
     // Seed tool rows with provider totals; run counts added below.
     const row = byToolMap.get(tool.toolId) ?? {
@@ -302,7 +325,12 @@ export function buildAttributionInsights(
 export function evaluateBudgetAlert(
   weekSpendUsd: number,
   prefs: UsageBudgetPrefs,
-  providerQuotas: Array<{ labelKey: string; label?: string; usedPercent: number; toolId: UsageToolId }>,
+  providerQuotas: Array<{
+    labelKey: string;
+    label?: string;
+    usedPercent: number;
+    toolId: UsageToolId;
+  }>,
 ): UsageBudgetAlert {
   const budget = prefs.weeklyBudgetUsd;
   const alertAt = prefs.alertAtPercent;
@@ -363,7 +391,8 @@ export function rangeWindowMs(days: number, now = Date.now()): { startMs: number
 export function collectProviderQuotaAlerts(
   tools: UsageToolSnapshot[],
 ): Array<{ labelKey: string; label?: string; usedPercent: number; toolId: UsageToolId }> {
-  const out: Array<{ labelKey: string; label?: string; usedPercent: number; toolId: UsageToolId }> = [];
+  const out: Array<{ labelKey: string; label?: string; usedPercent: number; toolId: UsageToolId }> =
+    [];
   for (const tool of tools) {
     if (tool.status !== "ok" || !tool.quotas) continue;
     for (const q of tool.quotas) {
@@ -378,8 +407,33 @@ export function collectProviderQuotaAlerts(
   return out;
 }
 
-export function sumAttributedCost(
-  attributed: Array<{ attributedCostUsd: number }>,
-): number {
+export function sumAttributedCost(attributed: Array<{ attributedCostUsd: number }>): number {
   return attributed.reduce((sum, r) => sum + r.attributedCostUsd, 0);
+}
+
+function dailyCostInWindow(tool: UsageToolSnapshot, startMs: number, endMs: number): number {
+  return tool.daily
+    .filter((d) => {
+      const ms = Date.parse(`${d.date}T12:00:00.000Z`);
+      return Number.isFinite(ms) && ms >= startMs && ms <= endMs;
+    })
+    .reduce((sum, d) => sum + d.costUsd, 0);
+}
+
+/**
+ * Week spend for the decision card.
+ * A tool may publish `weekCostUsd` when its daily rows have tokens but the provider
+ * no longer puts dollars on each event (Cursor included usage). That measured week
+ * total wins over a token-weighted split of the longer range.
+ */
+export function weekSpendUsdFromTools(
+  tools: UsageToolSnapshot[],
+  week: { startMs: number; endMs: number },
+): number {
+  return tools
+    .filter((t) => t.status === "ok")
+    .reduce((sum, tool) => {
+      if (tool.weekCostUsd != null && tool.weekCostUsd > 0) return sum + tool.weekCostUsd;
+      return sum + dailyCostInWindow(tool, week.startMs, week.endMs);
+    }, 0);
 }

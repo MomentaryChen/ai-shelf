@@ -571,8 +571,20 @@ export function FlowTab() {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto p-4">
-        <StaggerStack className="mx-auto h-full w-full max-w-5xl gap-3">
+      <main
+        className={
+          showCreate
+            ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-4"
+            : "min-w-0 flex-1 overflow-y-auto p-4"
+        }
+      >
+        <StaggerStack
+          className={
+            showCreate
+              ? "mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-3"
+              : "mx-auto h-full w-full max-w-5xl gap-3"
+          }
+        >
           {showCreate && (
             <FlowCreateChat
               key={chatFlowId ?? `draft-${draftChatEpoch}`}

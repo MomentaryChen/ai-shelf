@@ -37,21 +37,136 @@ function DialogOverlay({
   );
 }
 
+/** Gap kept between a dialog and the window edge, in px. */
+const DIALOG_EDGE_GAP = 8;
+
+const DRAG_IGNORE_SELECTOR =
+  "button, input, select, textarea, a, label, [role='button'], [contenteditable='true'], [data-no-dialog-drag]";
+
+/**
+ * Lets a centered dialog be dragged by its header (or its own padding) while
+ * never leaving the window. The drag offset lives on the DOM node via the
+ * `translate` property, so each newly opened dialog starts centered again.
+ */
+function useDraggableDialog() {
+  const nodeRef = React.useRef<HTMLDivElement | null>(null);
+  const offsetRef = React.useRef({ x: 0, y: 0 });
+  const cleanupRef = React.useRef<(() => void) | null>(null);
+
+  const apply = React.useCallback((x: number, y: number) => {
+    const node = nodeRef.current;
+    if (!node) return;
+    const prev = offsetRef.current;
+    const rect = node.getBoundingClientRect();
+    // Rect of the dialog in its centered (un-dragged) position.
+    const baseLeft = rect.left - prev.x;
+    const baseTop = rect.top - prev.y;
+    const minX = DIALOG_EDGE_GAP - baseLeft;
+    const maxX = window.innerWidth - DIALOG_EDGE_GAP - (baseLeft + rect.width);
+    const minY = DIALOG_EDGE_GAP - baseTop;
+    const maxY = window.innerHeight - DIALOG_EDGE_GAP - (baseTop + rect.height);
+    const clampAxis = (v: number, min: number, max: number) =>
+      max < min ? 0 : Math.min(Math.max(v, min), max);
+    const next = { x: clampAxis(x, minX, maxX), y: clampAxis(y, minY, maxY) };
+    offsetRef.current = next;
+    node.style.translate = `${next.x}px ${next.y}px`;
+  }, []);
+
+  const lastNodeRef = React.useRef<HTMLDivElement | null>(null);
+
+  const setNode = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node === nodeRef.current) return;
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      nodeRef.current = node;
+      if (!node) return;
+      // A freshly mounted dialog (new open) starts centered; a re-attached
+      // node (ref callback identity change) keeps its dragged position.
+      if (node !== lastNodeRef.current) offsetRef.current = { x: 0, y: 0 };
+      lastNodeRef.current = node;
+      const reclamp = () => apply(offsetRef.current.x, offsetRef.current.y);
+      window.addEventListener("resize", reclamp);
+      const ro = new ResizeObserver(reclamp);
+      ro.observe(node);
+      cleanupRef.current = () => {
+        window.removeEventListener("resize", reclamp);
+        ro.disconnect();
+      };
+    },
+    [apply],
+  );
+
+  const onPointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      const node = nodeRef.current;
+      const target = e.target as HTMLElement;
+      if (!node) return;
+      const onHandle =
+        target === node ||
+        (target.closest("[data-slot='dialog-header']") !== null &&
+          target.closest(DRAG_IGNORE_SELECTOR) === null);
+      if (!onHandle) return;
+      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const origin = { ...offsetRef.current };
+      const pointerId = e.pointerId;
+      node.setPointerCapture(pointerId);
+      const move = (ev: PointerEvent) => {
+        apply(origin.x + ev.clientX - startX, origin.y + ev.clientY - startY);
+      };
+      const up = () => {
+        if (node.hasPointerCapture(pointerId)) node.releasePointerCapture(pointerId);
+        node.removeEventListener("pointermove", move);
+        node.removeEventListener("pointerup", up);
+        node.removeEventListener("pointercancel", up);
+      };
+      node.addEventListener("pointermove", move);
+      node.addEventListener("pointerup", up);
+      node.addEventListener("pointercancel", up);
+    },
+    [apply],
+  );
+
+  return { setNode, onPointerDown };
+}
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  ref,
+  onPointerDown,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
+  const { setNode, onPointerDown: onDragPointerDown } = useDraggableDialog();
+  const mergedRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      setNode(node);
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [setNode, ref],
+  );
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
+        ref={mergedRef}
         data-slot="dialog-content"
+        onPointerDown={(e) => {
+          onPointerDown?.(e);
+          if (!e.defaultPrevented) onDragPointerDown(e);
+        }}
         className={cn(
-          "ui-dialog-rise fixed top-1/2 left-1/2 z-[201] grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-chrome-border bg-chrome-surface p-5 shadow-float",
+          // Centered with inset + auto margins (no transform) so the dialog can
+          // never be pushed past the top of the window; height is capped to the
+          // viewport. Dragging adds a clamped `translate` offset on top.
+          "ui-dialog-rise fixed inset-0 z-[201] m-auto grid h-fit max-h-[calc(100vh-1rem)] w-full max-w-md gap-4 rounded-xl border border-chrome-border bg-chrome-surface p-5 shadow-float",
           "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
           className,
         )}
@@ -76,7 +191,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-1.5 text-left", className)}
+      className={cn("flex cursor-move flex-col gap-1.5 text-left select-none", className)}
       {...props}
     />
   );

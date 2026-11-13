@@ -1,5 +1,5 @@
-import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { Monitor, Terminal, FolderOpen, Hand, SquareTerminal } from "lucide-react";
+import { Fragment, useState, useEffect, useRef, useCallback, useMemo, memo, type CSSProperties } from "react";
+import { ChevronLeft, Monitor, Terminal, FolderOpen, Hand, SquareTerminal } from "lucide-react";
 import { WarmTypingDots } from "./WarmTypingDots";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import { EmbeddedTerminal } from "./EmbeddedTerminal";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
 import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
+import { GitWorktreeDialog } from "./GitWorktreeDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
@@ -110,6 +111,12 @@ import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { Command } from "./CommandPalette";
 import { useTerminalCommands } from "../hooks/useTerminalCommands";
+import {
+  SIDEBAR_EASE,
+  SIDEBAR_GUTTER_WIDTH,
+  SIDEBAR_MOTION_MS,
+  SIDEBAR_RAIL_WIDTH,
+} from "../sidebar-collapse";
 
 const SIDEBAR_WIDTH_KEY = "ai-inventory-sidebar-width";
 const SIDEBAR_COLLAPSED_KEY = "ai-inventory-sidebar-collapsed";
@@ -176,9 +183,15 @@ function ChatTabInner({
   const [addingTerminal, setAddingTerminal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
+  const [sidebarContentCollapsed, setSidebarContentCollapsed] = useState(loadSidebarCollapsed);
+  const sidebarCollapsedRef = useRef(sidebarCollapsed);
+  sidebarCollapsedRef.current = sidebarCollapsed;
+  const [sidebarMotionEpoch, setSidebarMotionEpoch] = useState(0);
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
+  /** Pane the "new pane in a git worktree" dialog splits from. */
+  const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -467,6 +480,33 @@ function ChatTabInner({
     }
   }, [sidebarCollapsed]);
 
+  const sidebarAnimating = sidebarMotionEpoch > 0;
+
+  const commitSidebarCollapsed = useCallback((next: boolean) => {
+    if (sidebarCollapsedRef.current === next) return;
+    sidebarCollapsedRef.current = next;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setSidebarMotionEpoch(0);
+      setSidebarContentCollapsed(next);
+    } else {
+      setSidebarMotionEpoch((n) => n + 1);
+      // Open the full list immediately so the growing column reveals it.
+      // Closing keeps the wide list until the column has finished clipping shut.
+      if (!next) setSidebarContentCollapsed(false);
+    }
+    setSidebarCollapsed(next);
+  }, []);
+
+  useEffect(() => {
+    if (sidebarMotionEpoch === 0) return;
+    const id = window.setTimeout(() => {
+      setSidebarMotionEpoch(0);
+      setSidebarContentCollapsed(sidebarCollapsedRef.current);
+    }, SIDEBAR_MOTION_MS);
+    return () => window.clearTimeout(id);
+  }, [sidebarMotionEpoch]);
+
   const refreshSidebarForest = useCallback(async (preferredGroupId?: string | null) => {
     const r = await window.api.profileGroupGetForest();
     if (!r.success || !r.forest) return;
@@ -554,12 +594,12 @@ function ChatTabInner({
 
       ev.preventDefault();
       ev.stopImmediatePropagation();
-      setSidebarCollapsed((prev) => !prev);
+      commitSidebarCollapsed(!sidebarCollapsedRef.current);
     };
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, []);
+  }, [commitSidebarCollapsed]);
 
   useEffect(() => {
     if (!migrationDone || initialRestoreDoneRef.current || restoreInFlightRef.current) return;
@@ -859,6 +899,41 @@ function ChatTabInner({
     [layout, availableTools, addPane, canAddPane, resolveCwd],
   );
 
+  const openWorktreeDialog = useCallback(
+    (paneId?: string) => {
+      const id = paneId ?? focusedPaneId;
+      const pane = id && layout ? collectPanes(layout).find((p) => p.id === id) : null;
+      if (!pane?.cwd) {
+        setTerminalError(t("git.worktree.err.noPane"));
+        return;
+      }
+      if (isRestoring()) {
+        setTerminalError(t("chat.err.restoringWait"));
+        return;
+      }
+      if (!canAddPane) {
+        setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
+        return;
+      }
+      setWorktreePaneId(pane.id);
+    },
+    [focusedPaneId, layout, isRestoring, canAddPane, maxPanes, t],
+  );
+
+  /** Split the source pane and start the same tool in the new worktree. */
+  const openWorktreePane = useCallback(
+    async (path: string): Promise<string | null> => {
+      const sourceId = worktreePaneId;
+      const parent = sourceId && layout ? collectPanes(layout).find((p) => p.id === sourceId) : null;
+      const tool = resolveLaunchTool(parent?.tool ?? availableTools[0], availableTools);
+      const created = await addPane(tool, path, parent?.id, "horizontal", {
+        keepOthersVisible: true,
+      });
+      return created ? null : t("git.worktree.err.openFailed", { path });
+    },
+    [worktreePaneId, layout, availableTools, addPane, t],
+  );
+
   async function handleActivateProfile(profile: ProfileInfo) {
     lastActiveByGroupRef.current = {
       ...lastActiveByGroupRef.current,
@@ -1096,8 +1171,20 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         void runSavedCommand(profileId, command, broadcast);
       },
+      newWorktreePane: () => {
+        onRequestTerminalMode?.();
+        openWorktreeDialog();
+      },
     }),
-    [addPane, openExternal, sidebarForest, broadcastCommandToPanes, runSavedCommand, onRequestTerminalMode],
+    [
+      addPane,
+      openExternal,
+      sidebarForest,
+      broadcastCommandToPanes,
+      runSavedCommand,
+      onRequestTerminalMode,
+      openWorktreeDialog,
+    ],
   );
 
   // Skip the default Profiles mirror workspace so Ctrl+1–9 follows the sidebar.
@@ -1268,16 +1355,29 @@ function ChatTabInner({
     onSplitPane: (id, dir) => void splitPane(id, dir),
   });
 
+  const sidebarColumnStyle: CSSProperties = {
+    width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidth,
+    transition: sidebarAnimating ? `width ${SIDEBAR_MOTION_MS}ms ${SIDEBAR_EASE}` : undefined,
+  };
+  const sidebarGutterStyle: CSSProperties = {
+    width: sidebarCollapsed ? 0 : SIDEBAR_GUTTER_WIDTH,
+    transition: sidebarAnimating ? `width ${SIDEBAR_MOTION_MS}ms ${SIDEBAR_EASE}` : undefined,
+  };
+
   const sidebar = (
-    <div style={{ width: sidebarCollapsed ? 64 : sidebarWidth }}>
+    <div
+      data-sidebar-column
+      className={`relative h-full min-w-0 shrink-0 ${sidebarAnimating ? "overflow-hidden" : "overflow-visible"}`}
+      style={sidebarColumnStyle}
+    >
+      <div className="h-full" style={{ width: sidebarAnimating ? sidebarWidth : "100%" }}>
       <Sidebar
         groups={sidebarGroups}
         currentGroupId={currentGroupId}
         profiles={sidebarProfiles}
         activeProfileId={activeProfile?.id ?? null}
         activeTerminalId={focusedPaneId}
-        collapsed={sidebarCollapsed}
-        onCollapsedChange={setSidebarCollapsed}
+        collapsed={sidebarContentCollapsed}
         onGroupChange={(groupId) => {
           setSelectedGroupId(groupId);
           const group = sidebarForest?.groups.find((g) => g.id === groupId);
@@ -1434,6 +1534,22 @@ function ChatTabInner({
           void handleActivateProfile(profile);
         }}
       />
+      </div>
+      <button
+        type="button"
+        title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        aria-expanded={!sidebarCollapsed}
+        onClick={() => commitSidebarCollapsed(!sidebarCollapsed)}
+        className="absolute right-2 top-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg text-chrome-text-muted transition-colors duration-200 hover:bg-chrome-hover hover:text-chrome-text"
+      >
+        <ChevronLeft
+          className="h-4 w-4"
+          style={{
+            transform: sidebarCollapsed ? "rotate(180deg)" : undefined,
+            transition: `transform ${SIDEBAR_MOTION_MS}ms ${SIDEBAR_EASE}`,
+          }}
+        />
+      </button>
     </div>
   );
 
@@ -1541,6 +1657,12 @@ function ChatTabInner({
         onDelete={(profile) => {
           setPendingDeleteProfile(profile);
         }}
+      />
+      <GitWorktreeDialog
+        open={worktreePaneId !== null}
+        cwd={(worktreePaneId ? panes.find((p) => p.id === worktreePaneId)?.cwd : null) ?? ""}
+        onClose={() => setWorktreePaneId(null)}
+        onCreated={openWorktreePane}
       />
       <BusyPaneCloseDialog
         open={busyClosePaneId !== null}
@@ -1684,6 +1806,7 @@ function ChatTabInner({
               void respawnPane(pane.id);
             }}
             onRestart={() => void respawnPane(pane.id)}
+            onNewWorktreePane={() => openWorktreeDialog(pane.id)}
             onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
@@ -1859,17 +1982,23 @@ function ChatTabInner({
           onOpen={openBackgroundToast}
           onDismiss={dismissBackgroundToast}
         />
-        {!sidebarCollapsed && (
-          <div className="w-2.5 shrink-0 self-stretch" style={{ width: 10 }}>
-            <ResizeDivider
-              mode="delta"
-              orientation="horizontal"
-              onResize={(delta) =>
-                setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)))
-              }
-            />
-          </div>
-        )}
+        <div
+          className={`shrink-0 self-stretch overflow-hidden ${
+            sidebarCollapsed || sidebarAnimating ? "pointer-events-none" : ""
+          }`}
+          style={sidebarGutterStyle}
+          inert={sidebarCollapsed || sidebarAnimating}
+        >
+          <ResizeDivider
+            mode="delta"
+            orientation="horizontal"
+            onResize={(delta) => {
+              setSidebarMotionEpoch(0);
+              setSidebarContentCollapsed(sidebarCollapsedRef.current);
+              setSidebarWidth((w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w + delta)));
+            }}
+          />
+        </div>
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
           {topBar}
           {terminalError && (
