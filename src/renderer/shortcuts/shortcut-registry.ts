@@ -45,6 +45,9 @@ export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
   paste: "shortcuts.terminal.paste",
   pasteAlt: "shortcuts.terminal.pasteAlt",
   selectAll: "shortcuts.terminal.selectAll",
+  jumpPrevPrompt: "terminal.marks.jumpPrev",
+  jumpNextPrompt: "terminal.marks.jumpNext",
+  copyLastCommandOutput: "terminal.marks.copyLastOutput",
 };
 
 export const SHORTCUT_SECTION_TITLE_KEYS: Record<ShortcutSectionId, MessageKey> = {
