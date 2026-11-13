@@ -2,11 +2,39 @@ import type { UsageDailyUnifiedRow, UsageDayBucket, UsageToolId, UsageToolSnapsh
 
 export interface UsageDashboardSummary {
   totalCostUsd: number;
+  billingCycleCostUsd: number;
   totalInputTokens: number;
   totalOutputTokens: number;
   configuredCount: number;
   supportedCount: number;
+  activeCount: number;
   dailyUnified: UsageDailyUnifiedRow[];
+}
+
+/**
+ * Connected = the tool has a usage source: saved API credentials, or local session
+ * data on disk. A fetch error still counts — the source exists, it just failed.
+ */
+export function isUsageToolConnected(tool: UsageToolSnapshot): boolean {
+  return tool.status === "ok" || tool.status === "error";
+}
+
+/**
+ * Reporting = a connected tool returned something for this period: cost, tokens,
+ * or a quota snapshot. A local database with no sessions in range does not count.
+ */
+export function isUsageToolReporting(tool: UsageToolSnapshot): boolean {
+  if (tool.status !== "ok") return false;
+  if ((tool.totalCostUsd ?? 0) > 0) return true;
+  if ((tool.totalInputTokens ?? 0) > 0 || (tool.totalOutputTokens ?? 0) > 0) return true;
+  if ((tool.quotas?.length ?? 0) > 0) return true;
+  return tool.daily.some(
+    (d) => d.costUsd > 0 || (d.inputTokens ?? 0) > 0 || (d.outputTokens ?? 0) > 0,
+  );
+}
+
+function isBillingCycleCost(tool: UsageToolSnapshot): boolean {
+  return tool.costScope === "billingCycle";
 }
 
 function mergeDayBucket(
@@ -25,11 +53,7 @@ function mergeDayBucket(
   row.byTool[toolId] = tool;
 }
 
-export function aggregateUsageDashboard(
-  tools: UsageToolSnapshot[],
-  configuredCount: number,
-  supportedCount: number,
-): UsageDashboardSummary {
+export function aggregateUsageDashboard(tools: UsageToolSnapshot[]): UsageDashboardSummary {
   const okTools = tools.filter((t) => t.status === "ok");
   const byDate = new Map<string, UsageDailyUnifiedRow>();
 
@@ -49,12 +73,17 @@ export function aggregateUsageDashboard(
 
   const dailyUnified = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 
+  const sumCost = (list: UsageToolSnapshot[]) =>
+    list.reduce((sum, t) => sum + (t.totalCostUsd ?? 0), 0);
+
   return {
-    totalCostUsd: okTools.reduce((sum, t) => sum + (t.totalCostUsd ?? 0), 0),
+    totalCostUsd: sumCost(okTools.filter((t) => !isBillingCycleCost(t))),
+    billingCycleCostUsd: sumCost(okTools.filter(isBillingCycleCost)),
     totalInputTokens: okTools.reduce((sum, t) => sum + (t.totalInputTokens ?? 0), 0),
     totalOutputTokens: okTools.reduce((sum, t) => sum + (t.totalOutputTokens ?? 0), 0),
-    configuredCount,
-    supportedCount,
+    configuredCount: tools.filter(isUsageToolConnected).length,
+    supportedCount: tools.filter((t) => t.status !== "unsupported").length,
+    activeCount: tools.filter(isUsageToolReporting).length,
     dailyUnified,
   };
 }

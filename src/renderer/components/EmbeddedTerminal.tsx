@@ -78,6 +78,8 @@ interface Props {
   onRestart?: () => void;
   /** Agent panes only: restart with a brand-new conversation (context-menu item). */
   onNewConversation?: () => void;
+  /** Context menu: open a new pane in a git worktree of this pane's repo. */
+  onNewWorktreePane?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
   onCwdReport?: (sessionId: string, cwd: string) => void;
 }
@@ -85,7 +87,7 @@ interface Props {
 /** Callback props — routed through a ref so they never force an xterm re-render. */
 type TerminalCallbacks = Pick<
   Props,
-  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onNewConversation" | "onCwdReport"
+  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onNewConversation" | "onCwdReport" | "onNewWorktreePane"
 >;
 
 type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
@@ -450,6 +452,7 @@ function EmbeddedTerminalInner({
       onRestart: () => callbacksRef.current.onRestart?.(),
       onNewConversation: () => callbacksRef.current.onNewConversation?.(),
       canStartNewConversation: () => Boolean(callbacksRef.current.onNewConversation),
+      onNewWorktreePane: () => callbacksRef.current.onNewWorktreePane?.(),
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
@@ -927,6 +930,7 @@ export function EmbeddedTerminal({
   onRestart,
   onNewConversation,
   onCwdReport,
+  onNewWorktreePane,
   ...dataProps
 }: Props) {
   const callbacksRef = useRef<TerminalCallbacks>({
@@ -936,6 +940,7 @@ export function EmbeddedTerminal({
     onRestart,
     onNewConversation,
     onCwdReport,
+    onNewWorktreePane,
   });
   useLayoutEffect(() => {
     callbacksRef.current = {
@@ -945,6 +950,7 @@ export function EmbeddedTerminal({
       onRestart,
       onNewConversation,
       onCwdReport,
+      onNewWorktreePane,
     };
   });
   return <EmbeddedTerminalMemo {...dataProps} callbacksRef={callbacksRef} />;

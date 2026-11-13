@@ -150,6 +150,8 @@ export interface TerminalClipboardOptions {
   /** Restart an agent pane with a brand-new conversation (menu item shown while this returns true). */
   onNewConversation?: () => void;
   canStartNewConversation?: () => boolean;
+  /** "New pane in git worktree" entry. */
+  onNewWorktreePane?: () => void;
   onExportOutput?: () => void;
   onCopyOutputForIssue?: () => void;
   /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
@@ -415,6 +417,9 @@ export function bindTerminalClipboard(
     if (options.onRestart) addItem(getStoredT("terminal.ctx.restart"), true, options.onRestart);
     if (options.onNewConversation && (options.canStartNewConversation?.() ?? true)) {
       addItem(getStoredT("terminal.ctx.newConversation"), true, options.onNewConversation);
+    }
+    if (options.onNewWorktreePane) {
+      addItem(getStoredT("git.worktree.ctx"), true, options.onNewWorktreePane);
     }
 
     document.body.appendChild(menuEl);

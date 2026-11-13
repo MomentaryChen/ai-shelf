@@ -1,6 +1,11 @@
 /** Types mirroring the inventory data from the main process. */
 
 import type { AuthSessionReport, AuthStatePublic } from "../shared/auth-types.js";
+import type {
+  GitCwdInfo,
+  GitWorktreeAddRequest,
+  GitWorktreeAddResult,
+} from "../shared/git-worktree.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { FlowChatMessage, FlowPromptLogEntry } from "../shared/flow-chat-types.js";
@@ -634,6 +639,8 @@ export interface UsageToolSnapshot {
   totalOutputTokens?: number;
   /** Provider-measured spend for the last 7 UTC days, when daily rows have no dollars. */
   weekCostUsd?: number;
+  /** "billingCycle" = totalCostUsd covers the provider billing cycle, not the selected range. */
+  costScope?: "period" | "billingCycle";
   daily: UsageDayBucket[];
   byModel?: UsageModelBreakdown[];
   quotas?: UsageQuotaWindow[];
@@ -695,10 +702,12 @@ export interface UsageDashboardResult {
   tools: UsageToolSnapshot[];
   summary: {
     totalCostUsd: number;
+    billingCycleCostUsd: number;
     totalInputTokens: number;
     totalOutputTokens: number;
     configuredCount: number;
     supportedCount: number;
+    activeCount: number;
     dailyUnified: UsageDailyUnifiedRow[];
   };
   insights: UsageCostInsights;
@@ -1275,6 +1284,10 @@ export interface ElectronAPI {
     | { ok: true; ip: string; distro: string }
     | { ok: false; error: string; code?: "unsupported" | "missing" | "failed" | "invalid" }
   >;
+  /** Branch / worktree / dirty state for a pane cwd; null when not a repo or git is unavailable. */
+  gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
+  /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
+  gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
 }
 
 export type WslDistroRow = {

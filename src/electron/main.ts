@@ -169,6 +169,7 @@ import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 import { registerPortsHandlers } from "./ports-handlers.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
+import { registerGitHandlers } from "./git-handlers.js";
 import { initSystemResume } from "./system-resume.js";
 import { ptyWakeResizeSteps } from "../shared/system-resume.js";
 
@@ -256,6 +257,7 @@ registerSyncHandlers();
 registerUsageHandlers();
 registerPortsHandlers();
 registerWslHandlers();
+registerGitHandlers();
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =

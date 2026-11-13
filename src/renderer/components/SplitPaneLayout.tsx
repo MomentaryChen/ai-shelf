@@ -18,6 +18,7 @@ import {
 } from "../utils/profile-colors";
 import { PaneAgentStatusDot } from "./PaneAgentStatusDot";
 import type { PaneAgentStatus } from "../../shared/pane-agent-state.js";
+import { PaneGitBranch } from "./TerminalGitStatus";
 
 const DIVIDER_PX = 10;
 
@@ -445,6 +446,7 @@ function WarpPaneShell({
             {t("pane.broadcastSyncBadge")}
           </span>
         )}
+        <PaneGitBranch cwd={pane.cwd} />
         {onCwdClick ? (
           <button
             type="button"

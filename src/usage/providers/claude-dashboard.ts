@@ -207,7 +207,7 @@ export async function testClaudeDashboardSession(creds: ClaudeDashboardCreds): P
 export async function fetchClaudeDashboardUsage(
   creds: ClaudeDashboardCreds,
 ): Promise<
-  Pick<UsageToolSnapshot, "quotas" | "totalCostUsd" | "daily" | "byModel"> & {
+  Pick<UsageToolSnapshot, "quotas" | "totalCostUsd" | "costScope" | "daily" | "byModel"> & {
     authSourceKey: "usage.claude.auth.personal.title";
   }
 > {
@@ -233,6 +233,8 @@ export async function fetchClaudeDashboardUsage(
   return {
     quotas,
     totalCostUsd,
+    // extra_usage credits accumulate over the claude.ai billing cycle, not the selected range.
+    costScope: "billingCycle",
     daily: [],
     byModel: undefined,
     authSourceKey: "usage.claude.auth.personal.title",
