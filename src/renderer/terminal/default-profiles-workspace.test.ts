@@ -16,6 +16,7 @@ function profile(id: string, name: string, workspaceId: string): ProfileInfo {
     defaultTool: "claude",
     broadcastInput: false,
     accentColor: null,
+    remote: null,
     paneCount: 0,
     terminals: [],
     savedCommands: [],

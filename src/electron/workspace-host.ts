@@ -125,6 +125,7 @@ export function updateProfile(
     defaultTool?: string;
     broadcastInput?: boolean;
     accentColor?: string | null;
+      remote?: import("ai-shelf").RemoteSshConfig | null;
     savedCommands?: {
       id: string;
       name: string;

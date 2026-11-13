@@ -2,6 +2,7 @@ import type { SessionModel } from "../models/session.js";
 import type { ProcessRegistry } from "./process-registry.js";
 import type { EventBus } from "./event-bus.js";
 import type { PtyRuntime } from "./pty-runtime.js";
+import type { RemoteSshConfig } from "./ssh-remote.js";
 import { RuntimeError } from "../core/errors/app-error.js";
 import {
   classifySession,
@@ -48,6 +49,8 @@ export class SessionRuntime {
     private readonly eventBus: EventBus,
     private readonly sessions: SessionRuntimeUpdatePort,
     private readonly host: SessionRuntimeHost = defaultHost,
+    /** SSH remote of the session's profile (group); null = local. */
+    private readonly remoteForGroup: (groupId: string) => RemoteSshConfig | null = () => null,
   ) {}
 
   runtimeIdFor(sessionId: string): string {
@@ -70,6 +73,7 @@ export class SessionRuntime {
       cwd: session.cwd,
       shell: session.shell,
       tool: tool ?? session.tool ?? undefined,
+      remote: this.remoteForGroup(session.group_id),
       onData: () => {
         this.eventBus.publish({
           type: "SessionOutputReceived",

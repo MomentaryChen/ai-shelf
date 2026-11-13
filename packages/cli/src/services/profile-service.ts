@@ -8,6 +8,7 @@ import { AppError } from "../core/errors/app-error.js";
 import { homedir } from "node:os";
 import { isProfileAccentColor, pickNextProfileAccentColor } from "../models/profile-colors.js";
 import { DEFAULT_PROFILE_GROUP_NAME, type ProfileGroupInfo } from "./profile-group-service.js";
+import { normalizeRemoteSshConfig, type RemoteSshConfig } from "../runtime/ssh-remote.js";
 
 /** @deprecated Use DEFAULT_PROFILE_GROUP_NAME */
 export const PROFILES_WORKSPACE_NAME = DEFAULT_PROFILE_GROUP_NAME;
@@ -21,6 +22,8 @@ export interface ProfileInfo {
   defaultTool: string;
   broadcastInput: boolean;
   accentColor: string | null;
+  /** SSH remote every pane of this profile connects to; null = local. */
+  remote: RemoteSshConfig | null;
   paneCount: number;
   terminals: { tool: string; cwd: string; title?: string }[];
   savedCommands: SavedCommandSnippet[];
@@ -51,6 +54,8 @@ export interface CreateProfileInput {
   defaultTool?: string;
   accentColor?: string | null;
   broadcastInput?: boolean;
+  /** null / omitted = local profile (copies the source's remote when copying). */
+  remote?: RemoteSshConfig | null;
   copyFromProfileId?: string;
 }
 
@@ -213,6 +218,7 @@ export class ProfileService {
       broadcastInput,
       accentColor: resolvedAccent,
       savedCommands: source?.savedCommands ? [...source.savedCommands] : [],
+      remote: resolveRemoteInput(input.remote !== undefined ? input.remote : source?.remote),
       updatedAt: new Date().toISOString(),
     };
     this.layouts.upsert(group.id, ws.id, snapshot);
@@ -230,6 +236,8 @@ export class ProfileService {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      /** null clears (local profile); undefined keeps the stored remote. */
+      remote?: RemoteSshConfig | null;
       groupId?: string;
     },
   ): ProfileInfo {
@@ -285,12 +293,18 @@ export class ProfileService {
     const prevDefaultCwd = snap.defaultCwd;
     const nextDefaultCwd = patch.defaultCwd !== undefined ? patch.defaultCwd : snap.defaultCwd;
     const defaultCwdChanged = patch.defaultCwd !== undefined && patch.defaultCwd !== prevDefaultCwd;
-    const panes = defaultCwdChanged
-      ? snap.panes.map((slot) => ({
-          ...slot,
-          cwd: !slot.cwd || slot.cwd === prevDefaultCwd ? "" : slot.cwd,
-        }))
-      : snap.panes;
+    const prevRemote = snap.remote ?? null;
+    const nextRemote = patch.remote !== undefined ? resolveRemoteInput(patch.remote) : prevRemote;
+    // Pane cwds belong to one machine; switching local ↔ remote (or host) resets them.
+    const remoteChanged = JSON.stringify(prevRemote) !== JSON.stringify(nextRemote);
+    const panes = remoteChanged
+      ? snap.panes.map((slot) => ({ ...slot, cwd: "" }))
+      : defaultCwdChanged
+        ? snap.panes.map((slot) => ({
+            ...slot,
+            cwd: !slot.cwd || slot.cwd === prevDefaultCwd ? "" : slot.cwd,
+          }))
+        : snap.panes;
 
     const next: GroupLayoutSnapshot = {
       ...snap,
@@ -303,6 +317,7 @@ export class ProfileService {
         patch.broadcastInput !== undefined ? patch.broadcastInput : snap.broadcastInput,
       accentColor: nextAccent,
       savedCommands: patch.savedCommands !== undefined ? patch.savedCommands : snap.savedCommands,
+      remote: nextRemote,
       panes,
       updatedAt: new Date().toISOString(),
     };
@@ -491,10 +506,19 @@ export class ProfileService {
       defaultTool: snap?.defaultTool ?? meta?.defaultTool ?? DEFAULT_PROFILE_TOOL,
       broadcastInput: snap?.broadcastInput ?? false,
       accentColor: snap?.accentColor ?? meta?.accentColor ?? null,
+      remote: snap?.remote ?? null,
       paneCount: meta?.paneCount ?? 0,
       terminals: snap?.panes ?? [],
       savedCommands: snap?.savedCommands ?? [],
       updatedAt: meta?.updatedAt ?? null,
     };
   }
+}
+
+/** Validate a remote from callers; a non-null value that fails validation is rejected loudly. */
+function resolveRemoteInput(remote: RemoteSshConfig | null | undefined): RemoteSshConfig | null {
+  if (remote === undefined || remote === null) return null;
+  const safe = normalizeRemoteSshConfig(remote);
+  if (!safe) throw new AppError("Invalid SSH remote configuration", "INVALID_REMOTE");
+  return safe;
 }

@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   collectPanes,
+  effectiveMaximizedPaneId,
   equalizeRunAroundPane,
+  maximizedSplitSide,
+  removePaneFromTree,
   splitPaneInTree,
+  toggleMaximizedPaneId,
   type LayoutNode,
   type PaneInfo,
   type SplitDirection,
@@ -94,5 +98,60 @@ describe("equalizeRunAroundPane", () => {
     assert.equal(next.kind === "split" && next.ratio, 0.3);
     const column = next.kind === "split" ? next.second : next;
     assertShares(shares(column, "vertical"), { right: 1 / 3, r2: 1 / 3, r3: 1 / 3 });
+  });
+});
+
+describe("maximize pane", () => {
+  const leaf = (id: string): LayoutNode => ({ kind: "pane", pane: pane(id) });
+  // a | (b / c)
+  const root: LayoutNode = {
+    kind: "split",
+    id: "row",
+    direction: "horizontal",
+    ratio: 0.4,
+    first: leaf("a"),
+    second: {
+      kind: "split",
+      id: "col",
+      direction: "vertical",
+      ratio: 0.5,
+      first: leaf("b"),
+      second: leaf("c"),
+    },
+  };
+
+  it("applies only to the focused pane in a multi-pane layout", () => {
+    assert.equal(effectiveMaximizedPaneId(root, "b", "b"), "b");
+    // Focusing another pane restores the split view.
+    assert.equal(effectiveMaximizedPaneId(root, "b", "a"), null);
+    assert.equal(effectiveMaximizedPaneId(root, null, "a"), null);
+    // A single pane has nothing to maximize over.
+    assert.equal(effectiveMaximizedPaneId(leaf("a"), "a", "a"), null);
+    assert.equal(effectiveMaximizedPaneId(null, "a", "a"), null);
+  });
+
+  it("restores once the maximized pane is closed", () => {
+    const after = removePaneFromTree(root, "b");
+    assert.equal(effectiveMaximizedPaneId(after, "b", "b"), null);
+  });
+
+  it("finds which split side to keep at every level", () => {
+    assert.equal(maximizedSplitSide(root, "a"), "first");
+    assert.equal(maximizedSplitSide(root, "c"), "second");
+    assert.ok(root.kind === "split");
+    assert.equal(maximizedSplitSide(root.second, "c"), "second");
+    assert.equal(maximizedSplitSide(root.second, "a"), null);
+    assert.equal(maximizedSplitSide(root, null), null);
+  });
+
+  it("toggles on and off without touching the tree", () => {
+    const snapshot = JSON.stringify(root);
+    const on = toggleMaximizedPaneId(root, null, "c");
+    assert.equal(on, "c");
+    assert.equal(toggleMaximizedPaneId(root, on, "c"), null);
+    // Toggling a different pane switches the maximized pane.
+    assert.equal(toggleMaximizedPaneId(root, "a", "b"), "b");
+    assert.equal(toggleMaximizedPaneId(leaf("a"), null, "a"), null);
+    assert.equal(JSON.stringify(root), snapshot);
   });
 });

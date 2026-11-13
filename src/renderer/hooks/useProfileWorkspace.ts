@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { ProfileForest, ProfileInfo } from "../types";
+import type { ProfileForest, ProfileInfo, RemoteSshConfig } from "../types";
 import {
   collectPanes,
   findPane,
@@ -32,15 +32,15 @@ import {
 import {
   collectBackgroundProfilePanes,
   LayoutChangeNotifyingMap,
+  parseProfileCacheKey,
 } from "../terminal/background-profile-panes";
 import { forestWithoutDefaultProfilesMirror } from "../terminal/default-profiles-workspace";
+import { removePaneFromCachedLayout } from "../terminal/popout-panes";
 
 export interface SpawnPaneOptions {
   /** Saved agent conversation id to resume (ignored unless the tool / setting supports it). */
   resumeAgentSessionId?: string;
 }
-
-type SpawnPaneFn = (tool: string, cwd: string, opts?: SpawnPaneOptions) => Promise<PaneInfo | null>;
 
 interface ProfileLiveState {
   layout: LayoutNode;
@@ -67,9 +67,21 @@ function applyLayout(
 }
 
 /** Respawn panes whose PTY no longer exists in the main process (e.g. after crash or rebuild). */
+/**
+ * Spawns one pane. `remote` is the owning profile's SSH config (null = local);
+ * it is passed explicitly so a pane never inherits another profile's target.
+ */
+type SpawnPaneFn = (
+  tool: string,
+  cwd: string,
+  remote: RemoteSshConfig | null,
+  opts?: SpawnPaneOptions,
+) => Promise<PaneInfo | null>;
+
 async function reconcileLayoutPtys(
   node: LayoutNode,
   spawnPane: SpawnPaneFn,
+  remote: RemoteSshConfig | null,
 ): Promise<LayoutNode> {
   let next = node;
   for (const pane of collectPanes(node)) {
@@ -77,13 +89,13 @@ async function reconcileLayoutPtys(
     if (attached.alive) continue;
 
     window.api.ptyKill(pane.sessionId);
-    let replacement = await spawnPane(pane.tool, pane.cwd, {
+    let replacement = await spawnPane(pane.tool, pane.cwd, remote, {
       resumeAgentSessionId: pane.agentSessionId,
     });
     if (!replacement && pane.tool !== "shell") {
-      replacement = await spawnPane("shell", pane.cwd);
+      replacement = await spawnPane("shell", pane.cwd, remote);
     }
-    if (!replacement) replacement = await spawnPane("shell", "");
+    if (!replacement) replacement = await spawnPane("shell", "", remote);
 
     if (!replacement) continue;
 
@@ -264,11 +276,11 @@ export function useProfileWorkspace(
           };
         }
         const paneCwd = slot.cwd?.trim() || cwdDefault;
-        let pane = await spawnPane(slot.tool, paneCwd, {
+        let pane = await spawnPane(slot.tool, paneCwd, profile.remote ?? null, {
           resumeAgentSessionId: slot.agentSessionId,
         });
         if (!pane && slot.tool !== "shell") {
-          pane = await spawnPane("shell", paneCwd);
+          pane = await spawnPane("shell", paneCwd, profile.remote ?? null);
         }
         if (pane) {
           const title = normalizePaneTitle(slot.title ?? "");
@@ -303,7 +315,7 @@ export function useProfileWorkspace(
       if (!next) next = buildHorizontalLayout(spawned);
 
       // spawned is non-empty (guarded above), so next is always a layout here.
-      const reconciled = await reconcileLayoutPtys(next!, spawnPane);
+      const reconciled = await reconcileLayoutPtys(next!, spawnPane, profile.remote ?? null);
       if (!stillActive()) {
         teardownPtys(reconciled);
         setRestoringFlag(false);
@@ -355,7 +367,7 @@ export function useProfileWorkspace(
           const sameCached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
           const sameCachedPanes = sameCached ? collectPanes(sameCached.layout).length : 0;
           if (sameCached && sameCachedPanes > 0) {
-            const reconciled = await reconcileLayoutPtys(sameCached.layout, spawnPane);
+            const reconciled = await reconcileLayoutPtys(sameCached.layout, spawnPane, profile.remote ?? null);
             const panes = collectPanes(reconciled);
             const focusId =
               sameCached.focusedPaneId && panes.some((p) => p.id === sameCached.focusedPaneId)
@@ -418,7 +430,7 @@ export function useProfileWorkspace(
         const cached = targetCached ?? profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
         const cachedPaneCount = cached ? collectPanes(cached.layout).length : 0;
         if (cached && cachedPaneCount > 0) {
-          const reconciled = await reconcileLayoutPtys(cached.layout, spawnPane);
+          const reconciled = await reconcileLayoutPtys(cached.layout, spawnPane, profile.remote ?? null);
           const panes = collectPanes(reconciled);
           const focusId =
             cached.focusedPaneId && panes.some((p) => p.id === cached.focusedPaneId)
@@ -767,6 +779,34 @@ export function useProfileWorkspace(
     [applyMinimizedPaneIds],
   );
 
+  /**
+   * Close a pane that lives in a stashed (non-active) profile — its pop-out window
+   * was closed after the origin switched profiles. Kills the PTY, drops the pane
+   * from the live cache and saves that profile so it does not come back on restart.
+   * Returns false when no stashed profile holds the pane.
+   */
+  const closePaneInStashedProfile = useCallback(
+    (paneId: string, resolveProfile: (workspaceId: string, profileId: string) => ProfileInfo | null) => {
+      const active = activeProfileRef.current;
+      const activeKey = active ? cacheKey(active.workspaceId, active.id) : null;
+      for (const [key, entry] of profileLiveCacheRef.current.entries()) {
+        if (key === activeKey) continue;
+        const victim = findPane(entry.layout, paneId);
+        if (!victim) continue;
+        window.api.ptyKill(victim.sessionId);
+        const next = removePaneFromCachedLayout(entry, paneId);
+        if (next) profileLiveCacheRef.current.set(key, next);
+        else profileLiveCacheRef.current.delete(key);
+        const { workspaceId, profileId } = parseProfileCacheKey(key);
+        const profile = resolveProfile(workspaceId, profileId);
+        if (profile) void persistProfile(profile, next?.layout ?? null);
+        return true;
+      }
+      return false;
+    },
+    [cacheKey, persistProfile],
+  );
+
   // Memoized so it only rebuilds when layout / minimized / focus actually change
   // references — a fresh tree every render would remount-reconcile every pane.
   const displayLayout = useMemo(
@@ -816,5 +856,6 @@ export function useProfileWorkspace(
     minimizePane,
     unminimizePanes,
     forgetMinimizedPane,
+    closePaneInStashedProfile,
   };
 }

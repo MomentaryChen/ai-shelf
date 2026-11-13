@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   getInventory: () => ipcRenderer.invoke("get-inventory"),
@@ -97,10 +97,23 @@ contextBridge.exposeInMainWorld("api", {
   mcpPingTool: (tool) => ipcRenderer.invoke("mcp-ping-tool", tool),
   openPath: (filePath) => ipcRenderer.invoke("open-path", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  openPathAt: (req) => ipcRenderer.invoke("open-path-at", req),
+  pathsExist: (paths) => ipcRenderer.invoke("paths-exist", paths),
+  // File.path was removed in Electron 32; dropped OS files resolve here.
+  getPathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return "";
+    }
+  },
   launchInTerminal: (tool, terminal, cwd, extraArgs) =>
     ipcRenderer.invoke("launch-in-terminal", tool, terminal, cwd, extraArgs),
   ptySpawn: (tool, cwd, extraArgs, shell, options) =>
     ipcRenderer.invoke("pty-spawn", tool, cwd, extraArgs, shell, options),
+  sshClientStatus: ()                      => ipcRenderer.invoke("ssh-client-status"),
+  pickSshKey: (defaultPath)                => ipcRenderer.invoke("pick-ssh-key", defaultPath),
+  sshTestConnection: (remote)              => ipcRenderer.invoke("ssh-test-connection", remote),
   ptyAttach: (sessionId, opts)              => ipcRenderer.invoke("pty-attach", sessionId, opts),
   ptyGetOutputBuffer: (sessionId)           => ipcRenderer.invoke("pty-get-output-buffer", sessionId),
   ptyExportOutput: (sessionId, defaultName) => ipcRenderer.invoke("pty-export-output", sessionId, defaultName),
@@ -201,6 +214,23 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.off("profile-layout-flush", handler);
   },
   sendProfileLayoutFlushDone: () => ipcRenderer.send("profile-layout-flush-done"),
+  panePopoutOpen: (req) => ipcRenderer.invoke("pane-popout-open", req),
+  panePopoutInfo: () => ipcRenderer.invoke("pane-popout-info"),
+  panePopoutDock: (paneId) => ipcRenderer.invoke("pane-popout-dock", paneId),
+  panePopoutFocus: (paneId) => ipcRenderer.invoke("pane-popout-focus", paneId),
+  panePopoutClose: () => ipcRenderer.invoke("pane-popout-close"),
+  panePopoutReportBusy: (paneId, busy) => ipcRenderer.send("pane-popout-busy", paneId, busy),
+  panePopoutReportCwd: (cwd) => ipcRenderer.send("pane-popout-cwd", cwd),
+  onPanePopoutEvent: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("pane-popout-event", handler);
+    return () => ipcRenderer.off("pane-popout-event", handler);
+  },
+  onPanePopoutConfirmClose: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on("pane-popout-confirm-close", handler);
+    return () => ipcRenderer.off("pane-popout-confirm-close", handler);
+  },
   usageGetProviders: () => ipcRenderer.invoke("usage-get-providers"),
   usageGetCredentialStatus: () => ipcRenderer.invoke("usage-get-credential-status"),
   usageSetCredential: (tool, fieldKey, value) =>

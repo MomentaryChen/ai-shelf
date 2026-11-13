@@ -10,7 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ProfileForest, ProviderEntry, ProfileInfo } from "../types";
+import type {
+  PanePopoutEvent,
+  ProfileForest,
+  ProviderEntry,
+  ProfileInfo,
+  RemoteSshConfig,
+} from "../types";
+import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
 import { EmptyState } from "./EmptyState";
 import { toolLabel } from "../utils";
@@ -24,7 +31,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { ProfileCreateDialog } from "./ProfileCreateDialog";
 import { ProfileGroupNameDialog } from "./ProfileGroupNameDialog";
 import { ProfileSettingsDialog, type ProfileSettingsPatch } from "./ProfileSettingsDialog";
-import { SplitPaneLayout } from "./SplitPaneLayout";
+import { SplitPaneLayout, type PanePopOutSize, type PanePopOutTrigger } from "./SplitPaneLayout";
 import { ResizeDivider } from "./ResizeDivider";
 import { useProfileWorkspace, type SpawnPaneOptions } from "../hooks/useProfileWorkspace";
 import {
@@ -75,6 +82,11 @@ import {
 import { PROFILES_CHANGED_EVENT } from "../utils/profile-events";
 import { slideClassName } from "../utils/workspace-slide";
 import { hitPaneDropZone } from "../terminal/pane-drop-zone";
+import {
+  displayLayoutWithoutPoppedOut,
+  focusAfterPopOut,
+  withoutPoppedOut,
+} from "../terminal/popout-panes";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
   hasProfilePaneDrag,
@@ -89,6 +101,7 @@ import {
   profileTopBarLabelStyle,
 } from "../utils/profile-colors";
 import {
+  DEFAULT_TERMINAL_FONT_SIZE,
   getAppBg,
   isAppThemeTerminalBg,
   bumpDirHistory,
@@ -110,6 +123,8 @@ import {
 } from "../utils/available-tools";
 import { reorderById } from "../utils/reorder-by-id";
 import { useLocale } from "../i18n/LocaleProvider";
+import { zoomFontSize } from "../terminal/font-zoom";
+import { effectiveMaximizedPaneId, toggleMaximizedPaneId } from "../terminal/split-tree";
 import type { Command } from "./CommandPalette";
 import { useTerminalCommands } from "../hooks/useTerminalCommands";
 import {
@@ -191,6 +206,10 @@ function ChatTabInner({
   const [sidebarForest, setSidebarForest] = useState<ProfileForest | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [busyClosePaneId, setBusyClosePaneId] = useState<string | null>(null);
+  /** Panes shown in their own pop-out window: still in `layout` (saved / restored here), just not displayed. */
+  const [poppedOutPaneIds, setPoppedOutPaneIds] = useState<ReadonlySet<string>>(() => new Set());
+  const poppedOutPaneIdsRef = useRef(poppedOutPaneIds);
+  poppedOutPaneIdsRef.current = poppedOutPaneIds;
   /** Pane the "new pane in a git worktree" dialog splits from. */
   const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
@@ -217,6 +236,12 @@ function ChatTabInner({
     [layout],
   );
   const focusedPane = focusedPaneId ? (panes.find((p) => p.id === focusedPaneId) ?? null) : null;
+  /** Panes on screen in this window (popped-out ones take input only from their own window). */
+  const dockedPanes = useMemo(
+    () => withoutPoppedOut(panes, poppedOutPaneIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, poppedOutPaneIds],
+  );
 
   useEffect(() => {
     const onFocus = () => setWindowFocused(true);
@@ -239,6 +264,7 @@ function ChatTabInner({
       splitRight: shortcutKeys("splitHorizontal", keymap),
       splitDown: shortcutKeys("splitVertical", keymap),
       commandPalette: shortcutKeys("commandPalette", keymap),
+      toggleMaximize: shortcutKeys("toggleMaximizePane", keymap),
     }),
     [keymap],
   );
@@ -252,6 +278,7 @@ function ChatTabInner({
   const spawnPane = useCallback(async (
     tool: string,
     cwd: string,
+    remote: RemoteSshConfig | null,
     opts?: SpawnPaneOptions,
   ): Promise<PaneInfo | null> => {
     const extraArgs = resolveToolLaunchExtraArgs(settings.toolLaunchArgs, tool);
@@ -260,12 +287,16 @@ function ChatTabInner({
       settings.externalTerminal,
       tool,
     );
+    // A remote pane's cwd (`host:dir`) is meaningless locally, and vice versa.
+    const localCwd = remote || isRemotePaneCwd(cwd) ? "" : cwd;
+    // Conversation resume reads the local transcript store, so remote panes skip it.
     const agentSession =
-      settings.terminalResumeAgentSessions && agentSessionSupported(tool)
+      !remote && settings.terminalResumeAgentSessions && agentSessionSupported(tool)
         ? { resumeId: opts?.resumeAgentSessionId }
         : undefined;
-    const spawnOptions =
-      shell === "wsl" || agentSession
+    const spawnOptions = remote
+      ? { remote }
+      : shell === "wsl" || agentSession
         ? {
             ...(shell === "wsl" ? { wslDistro: settings.wslDistro } : {}),
             ...(agentSession ? { agentSession } : {}),
@@ -273,7 +304,7 @@ function ChatTabInner({
         : undefined;
     const result = await window.api.ptySpawn(
       tool,
-      cwd || undefined,
+      localCwd || undefined,
       extraArgs,
       shell,
       spawnOptions,
@@ -281,7 +312,11 @@ function ChatTabInner({
     if (!result.success || !result.sessionId) {
       const msg = result.error ?? "unknown error";
       console.error("[pty-spawn]", tool, msg);
-      setTerminalError(t("chat.err.startFailed", { tool, msg }));
+      setTerminalError(
+        result.code === "SSH_NOT_FOUND"
+          ? t("chat.err.sshNotFound")
+          : t("chat.err.startFailed", { tool, msg }),
+      );
       return null;
     }
     setTerminalError(null);
@@ -302,14 +337,20 @@ function ChatTabInner({
   ]);
 
   const spawnPaneResilient = useCallback(
-    async (tool: string, cwd: string, opts?: SpawnPaneOptions): Promise<PaneInfo | null> => {
+    async (
+      tool: string,
+      cwd: string,
+      remote: RemoteSshConfig | null,
+      opts?: SpawnPaneOptions,
+    ): Promise<PaneInfo | null> => {
+      // Fallbacks stay on the same target: a remote profile retries over ssh, never locally.
       const order = [tool, ...(tool !== "shell" ? ["shell"] : [])];
       for (const t of order) {
         // The saved conversation id belongs to the agent tool, never the shell fallback.
-        const pane = await spawnPane(t, cwd, t === tool ? opts : undefined);
+        const pane = await spawnPane(t, cwd, remote, t === tool ? opts : undefined);
         if (pane) return pane;
       }
-      return spawnPane("shell", cwd);
+      return spawnPane("shell", cwd, remote);
     },
     [spawnPane],
   );
@@ -342,6 +383,7 @@ function ChatTabInner({
     forgetMinimizedPane,
     persistCurrentProfile,
     flushPersistCurrentProfile,
+    closePaneInStashedProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -350,6 +392,37 @@ function ChatTabInner({
     spawnPaneResilient,
     settings.workingDir,
     broadcastInput,
+  );
+
+  /** Read at call time so add / restart always target the active profile's machine. */
+  const activeRemoteRef = useRef<RemoteSshConfig | null>(null);
+  activeRemoteRef.current = activeProfile?.remote ?? null;
+
+  /** Layout drawn in this window: popped-out panes are left out. */
+  const shownLayout = useMemo(
+    () => displayLayoutWithoutPoppedOut(displayLayout, poppedOutPaneIds, focusedPaneId),
+    [displayLayout, poppedOutPaneIds, focusedPaneId],
+  );
+
+  /**
+   * Maximized pane — view state only, never written to the layout. It lapses on
+   * its own when the pane closes, is minimized, or another pane takes focus.
+   */
+  const [maximizedPaneId, setMaximizedPaneId] = useState<string | null>(null);
+  const shownMaximizedPaneId = effectiveMaximizedPaneId(
+    shownLayout,
+    maximizedPaneId,
+    focusedPaneId,
+  );
+  useEffect(() => {
+    // Drop a lapsed maximize so refocusing that pane later does not re-maximize it.
+    if (maximizedPaneId && !shownMaximizedPaneId) setMaximizedPaneId(null);
+  }, [maximizedPaneId, shownMaximizedPaneId]);
+  const toggleMaximizePane = useCallback(
+    (paneId: string) => {
+      setMaximizedPaneId((prev) => toggleMaximizedPaneId(shownLayout, prev, paneId));
+    },
+    [shownLayout],
   );
 
   /** Live panes of non-active profiles, labelled for notifications. */
@@ -417,8 +490,10 @@ function ChatTabInner({
     [],
   );
 
-  const panesRef = useRef(panes);
-  panesRef.current = panes;
+  // Broadcast input / paste targets: docked panes only (main ignores writes to a
+  // popped-out session from any window but its pop-out).
+  const panesRef = useRef(dockedPanes);
+  panesRef.current = dockedPanes;
 
   const handlePtyWrite = useCallback(
     (data: string, sessionId: string) => {
@@ -436,7 +511,7 @@ function ChatTabInner({
     [broadcastInput, recordPaneAgentInput],
   );
 
-  const broadcastActive = broadcastInput && panes.length > 1;
+  const broadcastActive = broadcastInput && dockedPanes.length > 1;
 
   const broadcastInputRef = useRef(broadcastInput);
   broadcastInputRef.current = broadcastInput;
@@ -686,7 +761,11 @@ function ChatTabInner({
         return null;
       }
 
-      const pane = await spawnPaneResilient(tool || "shell", resolveCwd(cwd));
+      const pane = await spawnPaneResilient(
+        tool || "shell",
+        resolveCwd(cwd),
+        activeRemoteRef.current,
+      );
       if (!pane) return null;
 
       setLayout((prev) => {
@@ -731,7 +810,7 @@ function ChatTabInner({
       try {
         window.api.ptyKill(victim.sessionId);
         // Main resumes only when the transcript exists for the new cwd, else starts fresh.
-        const next = await spawnPaneResilient(tool, cwd, {
+        const next = await spawnPaneResilient(tool, cwd, activeRemoteRef.current, {
           resumeAgentSessionId: victim.agentSessionId,
         });
         if (!next) {
@@ -776,7 +855,7 @@ function ChatTabInner({
       const tool = victim.tool;
       try {
         window.api.ptyKill(victim.sessionId);
-        const next = await spawnPaneResilient(tool, cwd, {
+        const next = await spawnPaneResilient(tool, cwd, activeRemoteRef.current, {
           resumeAgentSessionId: opts?.newConversation ? undefined : victim.agentSessionId,
         });
         if (!next) {
@@ -935,6 +1014,11 @@ function ChatTabInner({
         setTerminalError(t("git.worktree.err.noPane"));
         return;
       }
+      // Worktrees are created with the local git; a remote (SSH) pane's repo lives elsewhere.
+      if (isRemotePaneCwd(pane.cwd)) {
+        setTerminalError(t("git.worktree.err.remotePane"));
+        return;
+      }
       if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
         return;
@@ -1004,6 +1088,10 @@ function ChatTabInner({
 
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
+      if (poppedOutPaneIdsRef.current.has(paneId)) {
+        void window.api.panePopoutFocus(paneId);
+        return;
+      }
       const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
       if (bg) {
         void openBackgroundPaneRef.current(bg.profileId, paneId);
@@ -1016,6 +1104,10 @@ function ChatTabInner({
   }, [activeProfile, focusPaneInDisplay]);
 
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
+    if (poppedOutPaneIdsRef.current.has(paneId)) {
+      void window.api.panePopoutFocus(paneId);
+      return;
+    }
     if (activeProfile?.id !== profile.id) {
       await handleActivateProfile(profile);
     }
@@ -1027,6 +1119,10 @@ function ChatTabInner({
     paneId: string,
     opts?: { targetPaneId?: string; zone?: PaneDropZone },
   ) {
+    if (poppedOutPaneIdsRef.current.has(paneId)) {
+      void window.api.panePopoutFocus(paneId);
+      return;
+    }
     if (activeProfile?.id !== profileId) {
       const r = await window.api.profileGroupGetForest();
       if (!r.success || !r.forest) return;
@@ -1130,10 +1226,12 @@ function ChatTabInner({
         await handleActivateProfileRef.current(profile);
       }
 
-      let targetPanes = getProfilePanes(profileId);
+      // Popped-out panes take input only from their own window.
+      const docked = () => withoutPoppedOut(getProfilePanes(profileId), poppedOutPaneIdsRef.current);
+      let targetPanes = docked();
       if (targetPanes.length === 0) {
         await handleNewTerminalRef.current(profile);
-        targetPanes = getProfilePanes(profileId);
+        targetPanes = docked();
       }
       if (targetPanes.length === 0) return;
 
@@ -1368,7 +1466,7 @@ function ChatTabInner({
   });
 
   usePaneShortcuts({
-    panes,
+    panes: dockedPanes,
     focusedPaneId,
     // layout may be null on an empty workspace — Ctrl+Tab MRU must still run
     // so focus can return to a live terminal in another workspace/profile.
@@ -1384,7 +1482,109 @@ function ChatTabInner({
     onClearPane: clearPaneScreen,
     onRestartPane: (id) => void respawnPane(id),
     onSplitPane: (id, dir) => void splitPane(id, dir),
+    onToggleMaximizePane: toggleMaximizePane,
+    onFontZoom: (direction) => {
+      const next = zoomFontSize(settings.terminalFontSize, direction, DEFAULT_TERMINAL_FONT_SIZE);
+      if (next !== settings.terminalFontSize) updateSettings({ terminalFontSize: next });
+    },
   });
+
+  // --- Pane pop-out windows -------------------------------------------------
+  /** Popped-out panes of the active profile (listed when nothing else is on screen). */
+  const poppedOutShown = useMemo(
+    () => (poppedOutPaneIds.size === 0 ? [] : panes.filter((p) => poppedOutPaneIds.has(p.id))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout, poppedOutPaneIds],
+  );
+
+  async function popOutPane(paneId: string, trigger: PanePopOutTrigger, size?: PanePopOutSize) {
+    const pane = layoutRef.current ? findPane(layoutRef.current, paneId) : null;
+    if (!pane || poppedOutPaneIdsRef.current.has(paneId)) return;
+    let paneSize = size;
+    if (!paneSize) {
+      const rect = document
+        .querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(paneId)}"]`)
+        ?.getBoundingClientRect();
+      if (rect) paneSize = { width: rect.width, height: rect.height };
+    }
+    const result = await window.api.panePopoutOpen({
+      pane: {
+        id: pane.id,
+        tool: pane.tool,
+        sessionId: pane.sessionId,
+        cwd: pane.cwd,
+        ...(pane.title ? { title: pane.title } : {}),
+        ...(pane.agentSessionId ? { agentSessionId: pane.agentSessionId } : {}),
+      },
+      label: paneLabels[paneId] ?? paneDisplayLabel(pane),
+      accentColor: activeProfile?.accentColor ?? null,
+      width: paneSize?.width,
+      height: paneSize?.height,
+      trigger,
+    });
+    if (!result.ok) return;
+    const nextPopped = new Set(poppedOutPaneIdsRef.current);
+    nextPopped.add(paneId);
+    poppedOutPaneIdsRef.current = nextPopped;
+    setPoppedOutPaneIds(nextPopped);
+    const hidden = new Set([...minimizedPaneIds, ...nextPopped]);
+    setFocusedPaneId((prev) => focusAfterPopOut(layoutRef.current, hidden, paneId, prev));
+  }
+
+  /** Pane came back from its pop-out window (dock / close / window gone). */
+  const handlePopoutEventRef = useRef((_event: PanePopoutEvent) => {});
+  handlePopoutEventRef.current = (event: PanePopoutEvent) => {
+    if (event.type === "cwd") {
+      reportPaneCwd(event.sessionId, event.cwd);
+      return;
+    }
+    const { paneId, reason } = event;
+    if (poppedOutPaneIdsRef.current.has(paneId)) {
+      const next = new Set(poppedOutPaneIdsRef.current);
+      next.delete(paneId);
+      poppedOutPaneIdsRef.current = next;
+      setPoppedOutPaneIds(next);
+    }
+    const inActiveLayout = Boolean(layoutRef.current && findPane(layoutRef.current, paneId));
+    if (reason === "closed") {
+      // Closing the pop-out closes the pane (PTY already killed by main).
+      if (inActiveLayout) performClosePane(paneId);
+      else
+        closePaneInStashedProfile(paneId, (workspaceId, profileId) =>
+          allProfiles.find((p) => p.id === profileId && p.workspaceId === workspaceId) ??
+          allProfiles.find((p) => p.id === profileId) ??
+          null,
+        );
+      return;
+    }
+    if (reason === "docked") {
+      if (inActiveLayout) {
+        if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+        else setFocusedPaneId(paneId);
+        return;
+      }
+      const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
+      if (bg) void openBackgroundPaneRef.current(bg.profileId, paneId);
+    }
+  };
+  useEffect(() => window.api.onPanePopoutEvent((event) => handlePopoutEventRef.current(event)), []);
+
+  // The pop-out asks for a confirm on close only while its agent is busy — this
+  // window tracks agent state for the pane, so report it to main.
+  const reportedPopoutBusyRef = useRef(new Map<string, boolean>());
+  useEffect(() => {
+    const reported = reportedPopoutBusyRef.current;
+    for (const paneId of poppedOutPaneIds) {
+      const status = paneAgentStates[paneId];
+      const busy = Boolean(status && isPaneAgentBusy(status));
+      if (reported.get(paneId) === busy) continue;
+      reported.set(paneId, busy);
+      window.api.panePopoutReportBusy(paneId, busy);
+    }
+    for (const paneId of [...reported.keys()]) {
+      if (!poppedOutPaneIds.has(paneId)) reported.delete(paneId);
+    }
+  }, [poppedOutPaneIds, paneAgentStates]);
 
   const sidebarColumnStyle: CSSProperties = {
     width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidth,
@@ -1594,19 +1794,22 @@ function ChatTabInner({
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         onClose={() => setCreateProfileOpen(false)}
-        onCreate={(opts) => {
+        onCreate={async (opts) => {
+          const r = await window.api.profileCreate(opts.name, {
+            groupId: opts.groupId,
+            defaultCwd: opts.defaultCwd || undefined,
+            defaultTool: opts.defaultTool,
+            accentColor: opts.accentColor,
+            broadcastInput: opts.broadcastInput,
+            remote: opts.remote,
+            copyFromProfileId: opts.copyFromProfileId,
+          });
+          // Failure keeps the dialog open with the reason (it used to close silently).
+          if (!r.success || !r.profile) return r.error ?? t("profile.failedCreate");
           setCreateProfileOpen(false);
           setSelectedGroupId(opts.groupId);
           void (async () => {
-            const r = await window.api.profileCreate(opts.name, {
-              groupId: opts.groupId,
-              defaultCwd: opts.defaultCwd || undefined,
-              defaultTool: opts.defaultTool,
-              accentColor: opts.accentColor,
-              broadcastInput: opts.broadcastInput,
-              copyFromProfileId: opts.copyFromProfileId,
-            });
-            if (r.success && r.profile) await handleActivateProfile(r.profile);
+            await handleActivateProfile(r.profile!);
             await refreshSidebarForest(opts.groupId);
           })();
         }}
@@ -1783,17 +1986,20 @@ function ChatTabInner({
       onDrop={handleDisplayDrop}
     >
       <div className="flex min-h-0 flex-1 flex-col">
-      {displayLayout ? (
+      {shownLayout ? (
       <SplitPaneLayout
-        node={displayLayout}
+        node={shownLayout}
         focusedPaneId={focusedPaneId}
         bg={bg}
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
         broadcastActive={broadcastActive}
-        broadcastPaneCount={panes.length}
+        broadcastPaneCount={dockedPanes.length}
         paneAgentStates={paneAgentStates}
         paneLabels={paneLabels}
+        maximizedPaneId={shownMaximizedPaneId}
+        onToggleMaximizePane={toggleMaximizePane}
+        maximizeShortcutKeys={paneShortcutLabels.toggleMaximize}
         onFocusPane={(paneId) => {
           if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
           else setFocusedPaneId(paneId);
@@ -1815,6 +2021,7 @@ function ChatTabInner({
           if (!activeProfile) return;
           placePaneInDisplay(activeProfile.id, dragPaneId, targetPaneId, zone);
         }}
+        onPopOutPane={(paneId, trigger, size) => void popOutPane(paneId, trigger, size)}
         renderTerminal={(pane, paneFocused) => (
           <EmbeddedTerminal
             key={pane.sessionId}
@@ -1828,10 +2035,12 @@ function ChatTabInner({
             copyOnSelect={settings.terminalCopyOnSelect}
             pasteConfirm={pasteConfirm}
             getPasteTargets={getPasteTargets}
-            active={active}
+            // Hidden behind a maximized pane: becoming active again refits xterm.
+            active={active && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)}
             focused={paneFocused}
             onWrite={handlePtyWrite}
             onCwdReport={reportPaneCwd}
+            cwd={pane.cwd}
             onSessionLost={() => {
               if (respawningPaneIdsRef.current.has(pane.id)) return;
               void respawnPane(pane.id);
@@ -1843,14 +2052,50 @@ function ChatTabInner({
                 : undefined
             }
             onNewWorktreePane={() => openWorktreeDialog(pane.id)}
+            onOpenInNewWindow={() => void popOutPane(pane.id, "menu")}
             onExit={() => closePane(pane.id, { skipConfirm: true })}
           />
         )}
       />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-chrome-border-subtle px-4 py-6 text-center text-[12px] text-chrome-text-dim">
-          <p>{t("chat.allTerminalsMinimized")}</p>
-          <p className="text-[11px]">{t("chat.selectTerminalFromSidebar")}</p>
+          {poppedOutShown.length > 0 ? (
+            <>
+              <p>{t("pane.popout.allPoppedOut")}</p>
+              <div className="flex max-w-md flex-col gap-1.5">
+                {poppedOutShown.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 rounded-lg border border-chrome-border-subtle bg-chrome-surface px-3 py-2 text-left text-[12px] text-chrome-text-secondary"
+                  >
+                    <ToolLogo tool={p.tool} size={14} />
+                    <span className="min-w-0 truncate">{paneLabels[p.id] ?? paneDisplayLabel(p)}</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void window.api.panePopoutFocus(p.id)}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
+                      >
+                        {t("pane.popout.show")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void window.api.panePopoutDock(p.id)}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-chrome-accent-text hover:bg-chrome-hover-strong"
+                      >
+                        {t("pane.popout.dockHere")}
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p>{t("chat.allTerminalsMinimized")}</p>
+              <p className="text-[11px]">{t("chat.selectTerminalFromSidebar")}</p>
+            </>
+          )}
           {activeProfile && panes.some((p) => minimizedPaneIds.has(p.id)) && (
             <div className="flex max-w-md flex-col gap-1.5">
               {panes

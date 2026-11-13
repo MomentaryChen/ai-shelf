@@ -33,6 +33,7 @@ import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
+import { testSshConnection } from "./ssh-test.js";
 import { planAgentSessionLaunch } from "../shared/agent-session-resume.js";
 import { claudeConfigDirForEnv, claudeTranscriptExists } from "./agent-session.js";
 import { run } from "../utils/exec.js";
@@ -96,8 +97,13 @@ import { setCodexModel } from "../utils/mcp-codex-toml.js";
 import {
   NO_SUITABLE_UNIX_SHELL_ERROR,
   NO_SUITABLE_WINDOWS_SHELL_ERROR,
+  SSH_CLIENT_NOT_FOUND_ERROR,
+  describeRemoteSsh,
   isValidWslDistroName,
+  normalizeRemoteSshConfig,
+  prepareSshJumpConfig,
   resolvePtySpawnPlan,
+  resolveSshExecutable,
   type GroupLayoutSnapshot,
 } from "ai-shelf";
 import { searchPtyOutput } from "../shared/pty-output-search.js";
@@ -173,6 +179,7 @@ import { getRendererPageUrl, startRendererServer, stopRendererServer } from "./r
 import { RENDERER_SESSION_PARTITION } from "./session-partition.js";
 import { registerUsageHandlers } from "./usage-handlers.js";
 import { registerPortsHandlers } from "./ports-handlers.js";
+import { registerOpenInEditorHandlers } from "./open-in-editor.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
 import { registerGitHandlers } from "./git-handlers.js";
 import { initSystemResume } from "./system-resume.js";
@@ -183,6 +190,13 @@ import {
   trackWindowState,
 } from "./window-state.js";
 import { ptyWakeResizeSteps } from "../shared/system-resume.js";
+import {
+  canControlPty,
+  getPopoutWindowForPane,
+  getPopoutWindows,
+  initPanePopouts,
+  onPtySessionKilled,
+} from "./popout-window.js";
 
 /** OAuth redirect/popup chains need third-party cookies in embedded Chromium. */
 app.commandLine.appendSwitch(
@@ -267,6 +281,7 @@ registerSettingsHandlers();
 registerSyncHandlers();
 registerUsageHandlers();
 registerPortsHandlers();
+registerOpenInEditorHandlers();
 registerWslHandlers();
 registerGitHandlers();
 
@@ -293,6 +308,8 @@ function getTrayDeps(): TrayDeps {
     getMainWindow: () => mainWindow,
     getChatWindow: () => chatWindow,
     createChatWindow,
+    getPopoutWindows,
+    getPopoutWindowForPane,
   };
 }
 
@@ -443,9 +460,12 @@ function setupAppMenu() {
       },
     },
     { type: "separator" },
-    { role: "resetZoom" },
-    { role: "zoomIn" },
-    { role: "zoomOut" },
+    // Ctrl/Cmd + 0 / = / - zoom the terminal font in the renderer (see
+    // font-zoom.ts). Keep page zoom in the menu but do not register its keys,
+    // or the accelerator could fire alongside the terminal shortcut.
+    { role: "resetZoom", registerAccelerator: false },
+    { role: "zoomIn", registerAccelerator: false },
+    { role: "zoomOut", registerAccelerator: false },
     { type: "separator" },
     { role: "togglefullscreen" },
   ];
@@ -615,6 +635,14 @@ function createSettingsWindow(opener?: BrowserWindow | null) {
     settingsWindow = null;
   });
 }
+
+initPanePopouts({
+  webPreferences: sharedWebPreferences,
+  icon: APP_ICON,
+  pageUrl: () => getRendererPageUrl("popout"),
+  attachWindow,
+  killPtySession,
+});
 
 ipcMain.handle("open-chat-window", (event) => {
   createChatWindow(BrowserWindow.fromWebContents(event.sender));
@@ -1845,7 +1873,11 @@ ipcMain.handle(
     cwd?: string,
     extraArgs?: string,
     shell?: string,
-    spawnOptions?: { wslDistro?: unknown; agentSession?: { resumeId?: unknown } },
+    spawnOptions?: {
+      wslDistro?: unknown;
+      remote?: unknown;
+      agentSession?: { resumeId?: unknown };
+    },
   ) => {
     let pty: PtyModule;
     try {
@@ -1854,18 +1886,46 @@ ipcMain.handle(
       return { success: false, error: (err as Error).message };
     }
     const shellOnly = tool === PLAIN_SHELL_TOOL_ID;
-    const workDirResult = resolvePtyWorkDir(cwd);
+    // SSH remote profile: never fall back to a local shell (see resolvePtySpawnPlan).
+    const hasRemote = spawnOptions?.remote !== undefined && spawnOptions.remote !== null;
+    const remote = hasRemote ? normalizeRemoteSshConfig(spawnOptions?.remote) : null;
+    if (hasRemote && !remote) {
+      return { success: false, error: "Invalid SSH remote configuration" };
+    }
+    let sshExecutable: string | null = null;
+    if (remote) {
+      sshExecutable = resolveSshExecutable();
+      if (!sshExecutable) {
+        return { success: false, error: SSH_CLIENT_NOT_FOUND_ERROR, code: "SSH_NOT_FOUND" };
+      }
+    }
+
+    // Jump hosts with their own key need a generated ssh_config; ssh then starts in its dir
+    // (ssh truncates long -F paths when forwarding them to jump processes).
+    let jumpConfig: { dir: string; fileName: string } | null = null;
+    if (remote) {
+      try {
+        jumpConfig = prepareSshJumpConfig(remote, join(app.getPath("userData"), "ssh"));
+      } catch (err) {
+        return { success: false, error: `SSH jump host config: ${(err as Error).message}` };
+      }
+    }
+
+    // The pane cwd of a remote profile is a remote path (remote.cwd); the local ssh process starts in home.
+    const workDirResult = remote
+      ? { ok: true as const, dir: jumpConfig?.dir ?? homedir() }
+      : resolvePtyWorkDir(cwd);
     if (!workDirResult.ok) {
       return { success: false, error: workDirResult.error };
     }
     const workDir = workDirResult.dir;
 
     // Agent conversation resume (the renderer opts in via `agentSession`). Skipped
-    // under WSL: the transcript lives in the distro's home, not visible from here.
+    // under WSL / SSH: the transcript lives on the other machine, not visible from here.
     let launchArgs = extraArgs;
     let agentSessionId: string | undefined;
     let agentSessionResumed = false;
-    if (!shellOnly && spawnOptions?.agentSession && shell !== "wsl") {
+    if (!shellOnly && !remote && spawnOptions?.agentSession && shell !== "wsl") {
       const resumeId = spawnOptions.agentSession.resumeId;
       const configDir = claudeConfigDirForEnv(process.env);
       const sessionPlan = planAgentSessionLaunch({
@@ -1907,6 +1967,10 @@ ipcMain.handle(
       shell,
       shellIntegration,
       wsl: { distro: wslDistro, cwd: workDir },
+      ssh:
+        remote && sshExecutable
+          ? { executable: sshExecutable, config: remote, jumpConfigFile: jumpConfig?.fileName }
+          : undefined,
     });
 
     const ptyOpts = {
@@ -1943,8 +2007,9 @@ ipcMain.handle(
       PTY_SESSIONS.set(sessionId, proc);
       PTY_META.set(sessionId, {
         pid: typeof proc.pid === "number" ? proc.pid : null,
-        shell:
-          shellPath === "wsl.exe" && wslDistro
+        shell: remote
+          ? describeRemoteSsh(remote)
+          : shellPath === "wsl.exe" && wslDistro
             ? `wsl:${wslDistro}`
             : basename(shellPath) || shellPath,
         cols: ptyOpts.cols,
@@ -1982,12 +2047,55 @@ ipcMain.handle(
       });
 
       broadcastPtyMeta(sessionId);
-      return { success: true, sessionId, cwd: workDir, agentSessionId, agentSessionResumed };
+      // Remote panes report `[user@]host:dir` so the status bar shows where the shell really is.
+      const reportedCwd = remote
+        ? `${remote.user ? `${remote.user}@` : ""}${remote.host}:${remote.cwd || "~"}`
+        : workDir;
+      return {
+        success: true,
+        sessionId,
+        cwd: reportedCwd,
+        agentSessionId,
+        agentSessionResumed,
+      };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
   },
 );
+
+/** Private key picker for SSH profiles; starts in ~/.ssh (hidden files shown). */
+ipcMain.handle("pick-ssh-key", async (event, defaultPath?: string) => {
+  const trimmed = defaultPath?.trim().replace(/^~(?=$|[\\/])/, homedir());
+  const sshDir = join(homedir(), ".ssh");
+  const start =
+    trimmed && existsSync(normalize(trimmed))
+      ? normalize(trimmed)
+      : existsSync(sshDir)
+        ? sshDir
+        : homedir();
+  const options: Electron.OpenDialogOptions = {
+    properties: ["openFile", "showHiddenFiles"],
+    defaultPath: start,
+  };
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const { canceled, filePaths } =
+    parent && !parent.isDestroyed()
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+  return canceled ? null : (filePaths[0] ?? null);
+});
+
+/** Probe the profile's full SSH route without a TTY (Profile settings → Test connection). */
+ipcMain.handle("ssh-test-connection", (_event, remote: unknown) =>
+  testSshConnection(remote, join(app.getPath("userData"), "ssh")),
+);
+
+/** Which local ssh client a remote profile would use (null = none installed). */
+ipcMain.handle("ssh-client-status", () => {
+  const path = resolveSshExecutable();
+  return { found: Boolean(path), path };
+});
 
 ipcMain.handle(
   "pty-attach",
@@ -2098,7 +2206,9 @@ function markPtySessionDead(sessionId: string, exitCode: number) {
   broadcastPtyMeta(sessionId);
 }
 
-ipcMain.on("pty-write", (_e, sessionId: string, data: string) => {
+ipcMain.on("pty-write", (e, sessionId: string, data: string) => {
+  // A popped-out pane takes input only from its pop-out window.
+  if (!canControlPty(sessionId, e.sender.id)) return;
   const proc = PTY_SESSIONS.get(sessionId);
   if (!proc) {
     notifyPtySessionGone(sessionId);
@@ -2111,7 +2221,10 @@ ipcMain.on("pty-write", (_e, sessionId: string, data: string) => {
   }
 });
 
-ipcMain.handle("pty-resize", (_e, sessionId: string, cols: number, rows: number) => {
+ipcMain.handle("pty-resize", (e, sessionId: string, cols: number, rows: number) => {
+  // Ignore (but report success — failure marks the pane dead) resizes from a
+  // window that no longer owns the session, e.g. the origin of a popped-out pane.
+  if (!canControlPty(sessionId, e.sender.id)) return { success: true as const };
   const proc = PTY_SESSIONS.get(sessionId);
   if (!proc) return ptySessionGoneResult(sessionId);
   try {
@@ -2141,7 +2254,7 @@ ipcMain.handle("pty-command-states", (_event, sessionIds: unknown) => {
   return out;
 });
 
-ipcMain.on("pty-kill", (_e, sessionId: string) => {
+function killPtySession(sessionId: string): void {
   try {
     PTY_SESSIONS.get(sessionId)?.kill();
   } catch {
@@ -2156,6 +2269,12 @@ ipcMain.on("pty-kill", (_e, sessionId: string) => {
   if (meta && meta.exitCode == null) meta.exitCode = -1;
   broadcastPtyExit(sessionId, meta?.exitCode ?? -1);
   broadcastPtyMeta(sessionId);
+}
+
+ipcMain.on("pty-kill", (_e, sessionId: string) => {
+  killPtySession(sessionId);
+  // Pane closed / restarted from its origin window while popped out.
+  onPtySessionKilled(sessionId);
 });
 
 // --- Launch in Terminal ---
@@ -2478,6 +2597,7 @@ ipcMain.handle(
       defaultCwd?: string;
       defaultTool?: string;
       accentColor?: string | null;
+      remote?: import("ai-shelf").RemoteSshConfig | null;
       broadcastInput?: boolean;
       copyFromProfileId?: string;
     },
@@ -2501,6 +2621,7 @@ ipcMain.handle("profile-update", (
       defaultTool?: string;
       broadcastInput?: boolean;
       accentColor?: string | null;
+      remote?: import("ai-shelf").RemoteSshConfig | null;
       savedCommands?: { id: string; name: string; command: string; broadcast?: boolean }[];
       groupId?: string;
     },
@@ -3268,7 +3389,8 @@ let profileLayoutFlushInProgress = false;
 function isTerminalRendererWindow(win: BrowserWindow): boolean {
   if (win.webContents.isDestroyed()) return false;
   const url = win.webContents.getURL();
-  return !url.includes("#settings");
+  // Pop-outs hold no layout of their own (their pane lives in the origin window's).
+  return !url.includes("#settings") && !url.includes("#popout");
 }
 
 function flushProfileLayoutsFromRenderer(): Promise<void> {

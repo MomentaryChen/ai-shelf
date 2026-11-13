@@ -152,6 +152,8 @@ export interface TerminalClipboardOptions {
   canStartNewConversation?: () => boolean;
   /** "New pane in git worktree" entry. */
   onNewWorktreePane?: () => void;
+  /** "Open in new window" (pop the pane out into its own window). */
+  onOpenInNewWindow?: () => void;
   onExportOutput?: () => void;
   onCopyOutputForIssue?: () => void;
   /** When true (default), right-click copies selection or pastes; Shift+right-click opens menu. */
@@ -456,6 +458,9 @@ export function bindTerminalClipboard(
     }
     if (options.onNewWorktreePane) {
       addItem(getStoredT("git.worktree.ctx"), true, options.onNewWorktreePane);
+    }
+    if (options.onOpenInNewWindow) {
+      addItem(getStoredT("pane.popout.open"), true, options.onOpenInNewWindow);
     }
 
     document.body.appendChild(menuEl);

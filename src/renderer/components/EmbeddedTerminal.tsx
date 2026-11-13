@@ -18,6 +18,7 @@ import {
   SEARCH_DEBOUNCE_MS,
 } from "../terminal/terminal-search";
 import { bindTerminalLinks } from "../terminal/xterm-links";
+import { attachUnicode11 } from "../terminal/xterm-unicode";
 import { bindTerminalCwd } from "../terminal/xterm-cwd";
 import { attachImeAnchor } from "../terminal/xterm-ime-anchor";
 import { recordImeAnchor } from "../terminal/ime-anchor-log";
@@ -55,6 +56,7 @@ import { OS_RESUME_EVENT } from "../os-resume";
 import { TerminalFindBar } from "./TerminalFindBar";
 import { PasteConfirmDialog, type PendingPaste } from "./PasteConfirmDialog";
 import { useLocale } from "../i18n/LocaleProvider";
+import { classifySshFailure, isSshPaneShell, SSH_ERROR_EXIT_CODE } from "../utils/ssh-failure";
 
 interface Props {
   sessionId: string;
@@ -83,14 +85,25 @@ interface Props {
   onNewConversation?: () => void;
   /** Context menu: open a new pane in a git worktree of this pane's repo. */
   onNewWorktreePane?: () => void;
+  /** Context menu: open this pane in its own window. */
+  onOpenInNewWindow?: () => void;
   /** Live cwd from OSC 7 / shell integration (does not respawn the PTY). */
   onCwdReport?: (sessionId: string, cwd: string) => void;
+  /** Pane cwd; relative path links in the output resolve against it. */
+  cwd?: string;
 }
 
 /** Callback props — routed through a ref so they never force an xterm re-render. */
 type TerminalCallbacks = Pick<
   Props,
-  "onExit" | "onSessionLost" | "onWrite" | "onRestart" | "onNewConversation" | "onCwdReport" | "onNewWorktreePane"
+  | "onExit"
+  | "onSessionLost"
+  | "onWrite"
+  | "onRestart"
+  | "onNewConversation"
+  | "onCwdReport"
+  | "onNewWorktreePane"
+  | "onOpenInNewWindow"
 >;
 
 type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
@@ -132,13 +145,19 @@ function EmbeddedTerminalInner({
   getPasteTargets,
   active = true,
   focused = true,
+  cwd,
   callbacksRef,
 }: InnerProps) {
   const { t } = useLocale();
+  /** Read inside the long-lived terminal effect without re-creating the terminal. */
+  const tRef = useRef(t);
+  tRef.current = t;
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
   const activeRef = useRef(active);
+  const cwdRef = useRef(cwd);
+  cwdRef.current = cwd;
   const focusedRef = useRef(focused);
   focusedRef.current = focused;
   const fitRef = useRef<((forceMetrics?: boolean) => void) | null>(null);
@@ -400,12 +419,14 @@ function EmbeddedTerminalInner({
       scrollback,
       scrollOnUserInput: false,
       smoothScrollDuration: 0,
-      allowProposedApi: false,
+      // Proposed API is needed for term.unicode (Unicode 11 widths).
+      allowProposedApi: true,
       rightClickSelectsWord: !rightClickPasteRef.current,
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+    attachUnicode11(term);
     term.open(el);
     termRef.current = term;
     // Assigned once fit() exists. WebGL loads async, so the callback runs later.
@@ -418,15 +439,42 @@ function EmbeddedTerminalInner({
 
     let exited = false;
     let cancelled = false;
+    /** Pane meta shell from attach; `ssh:…` marks a remote (SSH profile) pane. */
+    let ptyShell: string | null = null;
 
-    const markExited = () => {
+    /** Plain text of the last rows — where ssh prints why it failed. */
+    const readOutputTail = (rows = 60): string => {
+      const buf = term.buffer.active;
+      const lines: string[] = [];
+      for (let i = Math.max(0, buf.length - rows); i < buf.length; i++) {
+        lines.push(buf.getLine(i)?.translateToString(true) ?? "");
+      }
+      return lines.join("\n");
+    };
+
+    const markExited = (exitCode?: number | null) => {
       if (cancelled || exited) return;
       exited = true;
       const wasAtBottom = isTerminalAtBottom(term);
-      term.writeln("\r\n\x1b[90m[process exited — press any key to close]\x1b[0m");
+      const remote = isSshPaneShell(ptyShell);
+      if (remote && exitCode === SSH_ERROR_EXIT_CODE) {
+        const kind = classifySshFailure(readOutputTail());
+        term.writeln(`\r\n\x1b[33m${tRef.current(`terminal.ssh.fail.${kind}`)}\x1b[0m`);
+      }
+      term.writeln(
+        remote
+          ? `\r\n\x1b[90m${tRef.current("terminal.ssh.exitedPrompt")}\x1b[0m`
+          : "\r\n\x1b[90m[process exited — press any key to close]\x1b[0m",
+      );
       if (!wasAtBottom) setHasNewOutput(true);
-      const d = term.onKey(() => {
+      const d = term.onKey(({ key }) => {
         d.dispose();
+        // Remote panes: R reconnects in place (same pane, same profile target).
+        const restart = callbacksRef.current.onRestart;
+        if (remote && restart && (key === "r" || key === "R")) {
+          restart();
+          return;
+        }
         stableOnExit();
       });
     };
@@ -465,10 +513,19 @@ function EmbeddedTerminalInner({
     const unbindClipboard = bindTerminalClipboard(term, el, {
       onOpenFind: () => openFindRef.current(),
       onClear: doClear,
-      onRestart: () => callbacksRef.current.onRestart?.(),
+      // Menu items appear only when the host supplied the action (a pop-out window has
+      // no layout to restart into or split, so it leaves these out).
+      onRestart: callbacksRef.current.onRestart
+        ? () => callbacksRef.current.onRestart?.()
+        : undefined,
       onNewConversation: () => callbacksRef.current.onNewConversation?.(),
       canStartNewConversation: () => Boolean(callbacksRef.current.onNewConversation),
-      onNewWorktreePane: () => callbacksRef.current.onNewWorktreePane?.(),
+      onNewWorktreePane: callbacksRef.current.onNewWorktreePane
+        ? () => callbacksRef.current.onNewWorktreePane?.()
+        : undefined,
+      onOpenInNewWindow: callbacksRef.current.onOpenInNewWindow
+        ? () => callbacksRef.current.onOpenInNewWindow?.()
+        : undefined,
       onExportOutput: doExportOutput,
       onCopyOutputForIssue: doCopyOutputForIssue,
       getRightClickPaste: () => rightClickPasteRef.current,
@@ -508,7 +565,7 @@ function EmbeddedTerminalInner({
     const unbindImeCommitGuard = attachImeCommitGuard(term);
     // Dropped CJK input has no live repro; see terminal/ime-input-log.
     const unbindImeTrace = attachImeInputTrace(term, sessionId);
-    const unbindLinks = bindTerminalLinks(term);
+    const unbindLinks = bindTerminalLinks(term, { getCwd: () => cwdRef.current });
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
       callbacksRef.current.onCwdReport?.(sessionId, cwd);
     });
@@ -654,9 +711,9 @@ function EmbeddedTerminalInner({
       if (text) writeSafe(text);
     });
 
-    const offExit = window.api.onPtyExit(({ sessionId: sid }) => {
+    const offExit = window.api.onPtyExit(({ sessionId: sid, exitCode }) => {
       if (sid !== sessionId) return;
-      markExited();
+      markExited(exitCode);
     });
 
     term.onData((data) => {
@@ -698,12 +755,13 @@ function EmbeddedTerminalInner({
 
     void window.api.ptyAttach(sessionId).then((r) => {
       if (cancelled) return;
+      ptyShell = r.shell ?? null;
       if (!r.alive) {
         // Replay history for a known-dead session (Find / "press any key") and
         // only ask the parent to respawn when meta vanished entirely.
         allowPtyResize = false;
         replayAtPtySize(r);
-        markExited();
+        markExited(r.exitCode);
         if (
           shouldRespawnLostSession({
             exitCode: r.exitCode,
@@ -972,6 +1030,7 @@ export function EmbeddedTerminal({
   onNewConversation,
   onCwdReport,
   onNewWorktreePane,
+  onOpenInNewWindow,
   ...dataProps
 }: Props) {
   const callbacksRef = useRef<TerminalCallbacks>({
@@ -982,6 +1041,7 @@ export function EmbeddedTerminal({
     onNewConversation,
     onCwdReport,
     onNewWorktreePane,
+    onOpenInNewWindow,
   });
   useLayoutEffect(() => {
     callbacksRef.current = {
@@ -992,6 +1052,7 @@ export function EmbeddedTerminal({
       onNewConversation,
       onCwdReport,
       onNewWorktreePane,
+      onOpenInNewWindow,
     };
   });
   return <EmbeddedTerminalMemo {...dataProps} callbacksRef={callbacksRef} />;

@@ -3,6 +3,8 @@
  * Keeps Windows/Unix candidate args, preference ordering, and env in one place.
  */
 
+import { buildSshArgs, type RemoteSshConfig } from "./ssh-remote.js";
+
 export type PtyShellPreference =
   | "auto"
   | "pwsh"
@@ -386,12 +388,39 @@ export function resolvePtySpawnPlan(options: {
     distro?: string;
     cwd?: string;
   };
+  /**
+   * SSH remote profile: the only candidate is the local ssh client. There is
+   * deliberately no local-shell fallback — a remote profile that silently
+   * opened a local shell would run saved / broadcast commands on the wrong machine.
+   */
+  ssh?: {
+    executable: string;
+    config: RemoteSshConfig;
+    /** Bare file name from prepareSshJumpConfig (ssh must start in that dir). */
+    jumpConfigFile?: string;
+  };
 }): ResolvedPtySpawnPlan {
   const platform = options.platform ?? process.platform;
   const env = buildPtyEnv({
     env: options.env,
     wtSessionFallback: options.wtSessionFallback,
   });
+  if (options.ssh) {
+    const candidate: PtyShellCandidate = [
+      options.ssh.executable,
+      buildSshArgs(options.ssh.config, options.command, {
+        jumpConfigFile: options.ssh.jumpConfigFile,
+      }),
+    ];
+    const isWin = platform === "win32";
+    return {
+      platform: isWin ? "win32" : "unix",
+      windowsCandidates: isWin ? [candidate] : [],
+      unixCandidates: isWin ? [] : [candidate],
+      unix: { file: candidate[0], args: [...candidate[1]] },
+      env,
+    };
+  }
   const pwshCommand = options.shellIntegration?.pwshCommand;
   const bashInitFile = options.shellIntegration?.bashInitFile;
   const unixCandidates = buildUnixPtyCandidates(
