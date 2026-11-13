@@ -1592,20 +1592,22 @@ function ChatTabInner({
         availableTools={availableTools}
         inventoryScanning={inventoryScanning}
         onClose={() => setCreateProfileOpen(false)}
-        onCreate={(opts) => {
+        onCreate={async (opts) => {
+          const r = await window.api.profileCreate(opts.name, {
+            groupId: opts.groupId,
+            defaultCwd: opts.defaultCwd || undefined,
+            defaultTool: opts.defaultTool,
+            accentColor: opts.accentColor,
+            broadcastInput: opts.broadcastInput,
+            remote: opts.remote,
+            copyFromProfileId: opts.copyFromProfileId,
+          });
+          // Failure keeps the dialog open with the reason (it used to close silently).
+          if (!r.success || !r.profile) return r.error ?? t("profile.failedCreate");
           setCreateProfileOpen(false);
           setSelectedGroupId(opts.groupId);
           void (async () => {
-            const r = await window.api.profileCreate(opts.name, {
-              groupId: opts.groupId,
-              defaultCwd: opts.defaultCwd || undefined,
-              defaultTool: opts.defaultTool,
-              accentColor: opts.accentColor,
-              broadcastInput: opts.broadcastInput,
-              remote: opts.remote,
-              copyFromProfileId: opts.copyFromProfileId,
-            });
-            if (r.success && r.profile) await handleActivateProfile(r.profile);
+            await handleActivateProfile(r.profile!);
             await refreshSidebarForest(opts.groupId);
           })();
         }}

@@ -5,6 +5,10 @@ import { classifySshFailure, isSshPaneShell } from "./ssh-failure.js";
 describe("classifySshFailure", () => {
   const cases: [string, string][] = [
     ["Host key verification failed.\r\n", "hostkey"],
+    [
+      "No ED25519 host key is known for box and you have requested strict checking.\r\nHost key verification failed.\r\n",
+      "hostkeyNew",
+    ],
     ["Warning: Identity file C:/k not accessible: No such file or directory.\r\nno such identity: C:/k\r\ndev@box: Permission denied (publickey).", "keyfile"],
     ["dev@box: Permission denied (publickey,password).\r\n", "auth"],
     ["ssh: Could not resolve hostname nope: No such host is known.\r\n", "resolve"],

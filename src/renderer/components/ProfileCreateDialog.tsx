@@ -50,7 +50,7 @@ interface Props {
     /** null = local profile. */
     remote: RemoteSshConfig | null;
     copyFromProfileId?: string;
-  }) => void;
+  }) => string | void | Promise<string | void>;
   onQuickCreateGroup?: (name: string) => Promise<{ ok: boolean; groupId?: string; error?: string }>;
 }
 
@@ -77,6 +77,8 @@ export function ProfileCreateDialog({
   const [newGroupName, setNewGroupName] = useState("");
   const [quickCreatingGroup, setQuickCreatingGroup] = useState(false);
   const [groupErr, setGroupErr] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<ProfileDialogTab>("general");
   const [remoteDraft, setRemoteDraft] = useState<RemoteSshDraft>(() => remoteToDraft(null));
   const [remoteTouched, setRemoteTouched] = useState(false);
@@ -103,6 +105,8 @@ export function ProfileCreateDialog({
       setTab("general");
       setRemoteDraft(remoteToDraft(null));
       setRemoteTouched(false);
+      setSubmitError("");
+      setSubmitting(false);
       startKeyRef.current = "blank:";
       const defaults = profileCreateDefaults("blank", profiles, null, tools);
       setName("");
@@ -165,16 +169,34 @@ export function ProfileCreateDialog({
     if (picked) setCwd(picked);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  /** Missing General-tab fields: switch there and say why (the button stays enabled). */
+  function showGeneralError(message: string, focusName: boolean) {
+    setSubmitError(message);
+    setTab("general");
+    if (focusName) window.setTimeout(() => nameInputRef.current?.focus(), 0);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     const trimmed = name.trim();
-    if (!trimmed || !effectiveTool || !groupId) return;
+    if (!trimmed) {
+      showGeneralError(t("profile.dialog.err.nameRequired"), true);
+      return;
+    }
+    if (!groupId) {
+      showGeneralError(t("profile.dialog.err.groupRequired"), false);
+      return;
+    }
+    if (!effectiveTool) return;
     if (remoteInvalid) {
       setRemoteTouched(true);
       setTab("remote");
       return;
     }
-    onCreate({
+    setSubmitError("");
+    setSubmitting(true);
+    const error = await onCreate({
       groupId,
       name: trimmed,
       defaultCwd: cwd.trim(),
@@ -185,6 +207,12 @@ export function ProfileCreateDialog({
       copyFromProfileId:
         startFrom === "copy" && copyFromProfileId ? copyFromProfileId : undefined,
     });
+    setSubmitting(false);
+    if (error) {
+      // Keep the dialog (and everything typed) open so the user can fix it.
+      setSubmitError(error);
+      return;
+    }
     setName("");
     setCwd("");
     setTool(tools[0] ?? PLAIN_SHELL_TOOL_ID);
@@ -215,7 +243,7 @@ export function ProfileCreateDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="flex max-w-sm flex-col overflow-hidden"
+        className="flex max-w-md flex-col overflow-hidden"
         onOpenAutoFocus={(e) => {
           // Radix focuses the first tabbable (the "start from" select) by default;
           // land the caret in the name field instead, like the pre-shadcn dialog.
@@ -426,11 +454,17 @@ export function ProfileCreateDialog({
         )}
         </div>
 
+        {submitError ? (
+          <p role="alert" className="mt-2 text-[12px] text-fail">
+            {submitError}
+          </p>
+        ) : null}
         <DialogFooter className="mt-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t("profile.dialog.cancel")}
           </Button>
-          <Button type="submit" size="sm" disabled={!name.trim() || !groupId}>
+          {/* Never silently disabled: missing fields may sit on the other tab, so submit explains. */}
+          <Button type="submit" size="sm" disabled={submitting}>
             {t("profile.dialog.create")}
           </Button>
         </DialogFooter>

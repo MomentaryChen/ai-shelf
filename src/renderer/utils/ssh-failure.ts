@@ -5,6 +5,7 @@
 export type SshFailureKind =
   | "keyfile"
   | "auth"
+  | "hostkeyNew"
   | "hostkey"
   | "resolve"
   | "timeout"
@@ -16,6 +17,8 @@ export const SSH_ERROR_EXIT_CODE = 255;
 
 /** Ordered: the first match wins (more specific causes first). */
 const RULES: readonly (readonly [SshFailureKind, RegExp])[] = [
+  // Unknown host under BatchMode (connection test): first contact, nothing is wrong yet.
+  ["hostkeyNew", /host key is known for .* and you have requested strict checking/i],
   ["hostkey", /Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED/i],
   [
     "keyfile",

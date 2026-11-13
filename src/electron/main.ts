@@ -33,6 +33,7 @@ import type { ProviderEntry } from "../inventory/types.js";
 import { sortProviderEntries } from "../tool-sort.js";
 import { canonicalToolId, TOOL_LAUNCH_CMD, TOOL_UPDATE } from "../tools.js";
 import { resolveToolLaunchCommand } from "../tool-launch.js";
+import { testSshConnection } from "./ssh-test.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import {
@@ -1985,6 +1986,11 @@ ipcMain.handle("pick-ssh-key", async (event, defaultPath?: string) => {
       : await dialog.showOpenDialog(options);
   return canceled ? null : (filePaths[0] ?? null);
 });
+
+/** Probe the profile's full SSH route without a TTY (Profile settings → Test connection). */
+ipcMain.handle("ssh-test-connection", (_event, remote: unknown) =>
+  testSshConnection(remote, join(app.getPath("userData"), "ssh")),
+);
 
 /** Which local ssh client a remote profile would use (null = none installed). */
 ipcMain.handle("ssh-client-status", () => {

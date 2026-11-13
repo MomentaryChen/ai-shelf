@@ -277,12 +277,20 @@ export function prepareSshJumpConfig(
 export function buildSshArgs(
   config: RemoteSshConfig,
   command?: string,
-  options?: { jumpConfigFile?: string },
+  options?: {
+    jumpConfigFile?: string;
+    /**
+     * Connection test: no TTY, never prompt (BatchMode), run `exit 0` and
+     * ignore `command` / remote dir. Proves the route + key auth end to end.
+     */
+    probe?: boolean;
+  },
 ): string[] {
   const safe = normalizeRemoteSshConfig(config);
   if (!safe) throw new Error("Invalid SSH remote configuration");
+  const probe = options?.probe === true;
   const args = [
-    "-t",
+    ...(probe ? ["-T", "-o", "BatchMode=yes"] : ["-t"]),
     "-o",
     `ConnectTimeout=${String(SSH_CONNECT_TIMEOUT_SECONDS)}`,
     "-o",
@@ -303,6 +311,10 @@ export function buildSshArgs(
   const hops = safe.jumpHosts ?? [];
   if (hops.length > 0) args.push("-J", generated ? generated.jump : plainJump(hops));
   args.push("--", safe.host);
+  if (probe) {
+    args.push("exit 0");
+    return args;
+  }
   const remote = buildRemoteSshCommand({ cwd: safe.cwd, command });
   if (remote) args.push(remote);
   return args;

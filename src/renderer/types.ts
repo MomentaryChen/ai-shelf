@@ -884,6 +884,18 @@ export interface ElectronAPI {
   sshClientStatus: () => Promise<{ found: boolean; path: string | null }>;
   /** File picker for an SSH private key (opens in ~/.ssh); null when canceled. */
   pickSshKey: (defaultPath?: string) => Promise<string | null>;
+  /** Connect through the route non-interactively and run `exit 0`. */
+  sshTestConnection: (remote: RemoteSshConfig) => Promise<
+    | { ok: true; durationMs: number; client: string }
+    | {
+        ok: false;
+        reason: "invalid" | "no-client" | "failed" | "timeout";
+        exitCode: number | null;
+        output: string;
+        durationMs: number;
+        client: string | null;
+      }
+  >;
   ptyAttach: (
     sessionId: string,
     opts?: { includeBuffer?: boolean },

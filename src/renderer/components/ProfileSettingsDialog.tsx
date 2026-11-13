@@ -106,7 +106,12 @@ export function ProfileSettingsDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmedName = name.trim();
-    if (!trimmedName) return;
+    if (!trimmedName) {
+      // The name field may be on the other tab — switch there and say why.
+      setSaveError(t("profile.dialog.err.nameRequired"));
+      setTab("general");
+      return;
+    }
     if (remoteInvalid) {
       setRemoteTouched(true);
       setTab("remote");
@@ -134,7 +139,7 @@ export function ProfileSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm max-h-[min(90vh,720px)] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[min(90vh,720px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-[15px]">{t("profile.dialog.settingsTitle")}</DialogTitle>
         </DialogHeader>
@@ -291,7 +296,7 @@ export function ProfileSettingsDialog({
             <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>
               {t("profile.dialog.cancel")}
             </Button>
-            <Button type="submit" size="sm" disabled={busy || !name.trim()}>
+            <Button type="submit" size="sm" disabled={busy}>
               {t("profile.dialog.save")}
             </Button>
           </div>
