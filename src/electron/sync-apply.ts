@@ -1,4 +1,4 @@
-import { openDatabase } from "ai-shelf";
+import { normalizeRemoteSshConfig, openDatabase, serializeRemoteJson } from "ai-shelf";
 import { SYNC_BUNDLE_VERSION, type SyncBundle } from "../shared/sync-types.js";
 import { closeWorkspaceContext, getWorkspaceContext } from "./workspace-host.js";
 
@@ -90,9 +90,20 @@ function upsertLayout(
       .get(row.profileId) as { saved_commands_json: string } | undefined;
     savedCommandsJson = existingLayout?.saved_commands_json ?? "[]";
   }
+  // Bundles from older builds omit `remote` — keep the local value unless replacing.
+  // Cloud data is untrusted: re-validate so only structured ssh fields land in the DB.
+  let remoteJson: string | null;
+  if (options.replace || snapshot.remote !== undefined) {
+    remoteJson = serializeRemoteJson(normalizeRemoteSshConfig(snapshot.remote));
+  } else {
+    const existingRemote = db
+      .prepare(`SELECT remote_json FROM group_layouts WHERE group_id = ?`)
+      .get(row.profileId) as { remote_json: string | null } | undefined;
+    remoteJson = existingRemote?.remote_json ?? null;
+  }
   db.prepare(
-    `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, updated_at)
-     VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @saved_commands_json, @updated_at)
+    `INSERT INTO group_layouts (group_id, workspace_id, default_cwd, default_tool, layout_json, panes_json, broadcast_input, accent_color, saved_commands_json, remote_json, updated_at)
+     VALUES (@group_id, @workspace_id, @default_cwd, @default_tool, @layout_json, @panes_json, @broadcast_input, @accent_color, @saved_commands_json, @remote_json, @updated_at)
      ON CONFLICT(group_id) DO UPDATE SET
        workspace_id = excluded.workspace_id,
        default_cwd = excluded.default_cwd,
@@ -102,6 +113,7 @@ function upsertLayout(
        broadcast_input = excluded.broadcast_input,
        accent_color = excluded.accent_color,
        saved_commands_json = excluded.saved_commands_json,
+       remote_json = excluded.remote_json,
        updated_at = excluded.updated_at`,
   ).run({
     group_id: row.profileId,
@@ -113,6 +125,7 @@ function upsertLayout(
     broadcast_input: snapshot.broadcastInput ? 1 : 0,
     accent_color: snapshot.accentColor ?? null,
     saved_commands_json: savedCommandsJson,
+    remote_json: remoteJson,
     updated_at: snapshot.updatedAt,
   });
 }

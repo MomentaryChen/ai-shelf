@@ -464,6 +464,25 @@ export interface SavedCommandSnippet {
   broadcast?: boolean;
 }
 
+/** One SSH endpoint (jump host or target); mirrors SshHop in packages/cli runtime/ssh-remote. */
+export interface SshHop {
+  /** Hostname, IP, or a Host alias from ~/.ssh/config. */
+  host: string;
+  user?: string;
+  port?: number;
+  /** Local private key path; never key material. */
+  identityFile?: string;
+}
+
+/** SSH remote for a profile (mirrors RemoteSshConfig in packages/cli runtime/ssh-remote). */
+export interface RemoteSshConfig extends SshHop {
+  kind: "ssh";
+  /** Jump hosts in connection order (this computer → [0] → … → target); empty = direct. */
+  jumpHosts?: SshHop[];
+  /** Remote start directory; empty = remote login directory. */
+  cwd?: string;
+}
+
 export interface ProfileTerminal {
   tool: string;
   cwd: string;
@@ -478,6 +497,8 @@ export interface ProfileInfo {
   defaultTool: string;
   broadcastInput: boolean;
   accentColor: string | null;
+  /** SSH remote every pane connects to; null = local. */
+  remote: RemoteSshConfig | null;
   paneCount: number;
   terminals: ProfileTerminal[];
   savedCommands: SavedCommandSnippet[];
@@ -516,6 +537,7 @@ export interface ProfileCreateInput {
   defaultTool?: string;
   accentColor?: string | null;
   broadcastInput?: boolean;
+  remote?: RemoteSshConfig | null;
   copyFromProfileId?: string;
 }
 
@@ -854,19 +876,41 @@ export interface ElectronAPI {
     shell?: string,
     /**
      * `wslDistro` applies when shell is `wsl` (Windows only); empty = default distro.
+     * `remote` runs the pane over ssh (no local fallback); `code: "SSH_NOT_FOUND"` when no client.
      * `agentSession` opts into agent conversation resume (Claude Code): resume
      * `resumeId` when its transcript exists, else start with a new session id.
      */
-    options?: { wslDistro?: string; agentSession?: { resumeId?: string } },
+    options?: {
+      wslDistro?: string;
+      remote?: RemoteSshConfig | null;
+      agentSession?: { resumeId?: string };
+    },
   ) => Promise<{
     success: boolean;
     sessionId?: string;
     cwd?: string;
     error?: string;
+    code?: string;
     /** Agent conversation id the pane now holds (resume on next launch). */
     agentSessionId?: string;
     agentSessionResumed?: boolean;
   }>;
+  /** Local ssh client used by remote (SSH) profiles; `path` null when none is installed. */
+  sshClientStatus: () => Promise<{ found: boolean; path: string | null }>;
+  /** File picker for an SSH private key (opens in ~/.ssh); null when canceled. */
+  pickSshKey: (defaultPath?: string) => Promise<string | null>;
+  /** Connect through the route non-interactively and run `exit 0`. */
+  sshTestConnection: (remote: RemoteSshConfig) => Promise<
+    | { ok: true; durationMs: number; client: string }
+    | {
+        ok: false;
+        reason: "invalid" | "no-client" | "failed" | "timeout";
+        exitCode: number | null;
+        output: string;
+        durationMs: number;
+        client: string | null;
+      }
+  >;
   ptyAttach: (
     sessionId: string,
     opts?: { includeBuffer?: boolean },
@@ -982,6 +1026,8 @@ export interface ElectronAPI {
       broadcastInput?: boolean;
       accentColor?: string | null;
       savedCommands?: SavedCommandSnippet[];
+      /** null clears (local); omitted keeps the stored remote. */
+      remote?: RemoteSshConfig | null;
       groupId?: string;
     },
   ) => Promise<{ success: boolean; profile?: ProfileInfo; error?: string }>;

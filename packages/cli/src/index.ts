@@ -32,6 +32,20 @@ export {
   type UnixShellFamily,
   type WindowsShellFamily,
 } from "./runtime/pty-shell.js";
+export {
+  SSH_CLIENT_NOT_FOUND_ERROR,
+  buildRemoteSshCommand,
+  buildSshArgs,
+  buildSshJumpConfig,
+  prepareSshJumpConfig,
+  describeRemoteSsh,
+  normalizeRemoteSshConfig,
+  resolveSshExecutable,
+  sshExecutableCandidates,
+  type RemoteSshConfig,
+  type SshHop,
+} from "./runtime/ssh-remote.js";
+export { parseRemoteJson, serializeRemoteJson } from "./database/repositories/group-layout-repository.js";
 export type { WorkspaceModel } from "./models/workspace.js";
 export type { GroupModel } from "./models/group.js";
 export type { SessionModel } from "./models/session.js";
