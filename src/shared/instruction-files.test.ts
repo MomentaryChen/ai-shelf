@@ -6,6 +6,9 @@ import {
   contentFingerprint,
   cursorRuleFileName,
   cursorRuleNameForSource,
+  directoryFileName,
+  instructionRefKey,
+  instructionRefLabel,
   joinPath,
   normalizeRulePath,
   planInstructionSync,
@@ -127,6 +130,46 @@ describe("cursor rule names", () => {
     assert.equal(cursorRuleNameForSource({ kindId: "claude-global" }), "claude-global.mdc");
     assert.equal(cursorRuleNameForSource({ kindId: "copilot-project" }), "copilot-instructions.mdc");
     assert.equal(cursorRuleNameForSource({ kindId: "cursor-rule", rulePath: "a/b.mdc" }), "a/b.mdc");
+  });
+});
+
+describe("copilot instruction directory", () => {
+  it("resolves only *.instructions.md under .github/instructions", () => {
+    assert.equal(
+      resolveInstructionRef({ kindId: "copilot-instruction", rulePath: "ts/a.instructions.md" }, posixRoots),
+      "/work/proj/.github/instructions/ts/a.instructions.md",
+    );
+    assert.equal(resolveInstructionRef({ kindId: "copilot-instruction", rulePath: "a.md" }, posixRoots), null);
+    assert.equal(
+      resolveInstructionRef({ kindId: "copilot-instruction", rulePath: "../x.instructions.md" }, posixRoots),
+      null,
+    );
+  });
+
+  it("names, keys and labels directory refs", () => {
+    assert.equal(directoryFileName("copilot-instruction", "React Hooks"), "react-hooks.instructions.md");
+    assert.equal(directoryFileName("copilot-instruction", "x.instructions.md"), "x.instructions.md");
+    const ref = { kindId: "copilot-instruction" as const, rulePath: "a.instructions.md" };
+    assert.equal(instructionRefKey(ref), "copilot-instruction:a.instructions.md");
+    assert.equal(instructionRefLabel(ref), ".github/instructions/a.instructions.md");
+    assert.equal(cursorRuleNameForSource(ref), "a.mdc");
+  });
+
+  it("gives a new file applyTo front-matter and keeps an existing one", () => {
+    const target = { kindId: "copilot-instruction" as const, rulePath: "a.instructions.md" };
+    assert.equal(
+      buildSyncedContent({ sourceContent: "X\n", sourceLabel: "AGENTS.md", target, targetContent: null }),
+      '---\napplyTo: "**"\n---\nX\n',
+    );
+    assert.equal(
+      buildSyncedContent({
+        sourceContent: "X\n",
+        sourceLabel: "AGENTS.md",
+        target,
+        targetContent: '---\napplyTo: "src/**"\n---\nold\n',
+      }),
+      '---\napplyTo: "src/**"\n---\nX\n',
+    );
   });
 });
 

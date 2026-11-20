@@ -22,9 +22,11 @@ import { copilotPathCandidates } from "../inventory/copilot.js";
 import {
   INSTRUCTION_KINDS,
   contentFingerprint,
-  cursorRulesDir,
-  getInstructionKind,
+  DIRECTORY_KINDS,
+  directoryKindDir,
   instructionRefKey,
+  instructionRefLabel,
+  isDirectoryKind,
   normalizeRulePath,
   planInstructionSync,
   resolveInstructionRef,
@@ -92,8 +94,14 @@ function statInfo(path: string): { exists: boolean; size: number | null; mtimeMs
   }
 }
 
-/** Walk `.cursor/rules` for `.mdc` / `.md` files; returns `/`-separated relative paths. */
-export function listCursorRules(dir: string): string[] {
+/**
+ * Walk a directory kind's folder for files with an allowed suffix (defaults to
+ * Cursor's `.mdc` / `.md`); returns `/`-separated relative paths.
+ */
+export function listCursorRules(
+  dir: string,
+  suffixes: readonly string[] = DIRECTORY_KINDS["cursor-rule"].suffixes,
+): string[] {
   const out: string[] = [];
   const walk = (abs: string, prefix: string) => {
     let entries;
@@ -106,7 +114,7 @@ export function listCursorRules(dir: string): string[] {
       if (out.length >= MAX_RULE_FILES) return;
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) walk(join(abs, entry.name), rel);
-      else if (entry.isFile() && normalizeRulePath(rel)) out.push(rel);
+      else if (entry.isFile() && normalizeRulePath(rel, suffixes)) out.push(rel);
     }
   };
   walk(dir, "");
@@ -115,13 +123,15 @@ export function listCursorRules(dir: string): string[] {
 
 export function scanInstructionFiles(roots: InstructionRoots): InstructionScanResult {
   const files: InstructionFileInfo[] = [];
-  const rulesDir = cursorRulesDir(roots);
+  const directoryDirs: InstructionScanResult["directoryDirs"] = {};
   for (const kind of INSTRUCTION_KINDS) {
     if (kind.scope === "project" && !roots.projectDir) continue;
-    if (kind.id === "cursor-rule") {
-      if (!rulesDir) continue;
-      for (const rel of listCursorRules(rulesDir)) {
-        const ref: InstructionRef = { kindId: "cursor-rule", rulePath: rel };
+    if (isDirectoryKind(kind.id)) {
+      const dir = directoryKindDir(kind.id, roots);
+      if (!dir) continue;
+      directoryDirs[kind.id] = dir;
+      for (const rel of listCursorRules(dir, DIRECTORY_KINDS[kind.id].suffixes)) {
+        const ref: InstructionRef = { kindId: kind.id, rulePath: rel };
         const path = resolveInstructionRef(ref, roots);
         if (!path) continue;
         files.push({
@@ -129,7 +139,7 @@ export function scanInstructionFiles(roots: InstructionRoots): InstructionScanRe
           kindId: kind.id,
           scope: kind.scope,
           path,
-          label: `.cursor/rules/${rel}`,
+          label: instructionRefLabel(ref),
           readers: kind.readers,
           ...statInfo(path),
         });
@@ -148,11 +158,12 @@ export function scanInstructionFiles(roots: InstructionRoots): InstructionScanRe
       ...statInfo(path),
     });
   }
-  return { projectDir: roots.projectDir, files, cursorRulesDir: rulesDir };
+  return { projectDir: roots.projectDir, files, directoryDirs };
 }
 
 /**
- * Guard against a symlinked `.cursor/rules` (or rule subdirectory) that points
+ * Guard against a symlinked `.cursor/rules` / `.github/instructions` (or a
+ * subdirectory) that points
  * outside the project: the nearest existing ancestor of `path` must resolve
  * inside the project directory.
  */
@@ -180,7 +191,7 @@ function ruleStaysInProject(path: string, roots: InstructionRoots): boolean {
 export function resolveRefForIo(ref: unknown, roots: InstructionRoots): string | null {
   const path = resolveInstructionRef(ref, roots);
   if (!path) return null;
-  if ((ref as InstructionRef).kindId === "cursor-rule" && !ruleStaysInProject(path, roots)) {
+  if (isDirectoryKind((ref as InstructionRef).kindId) && !ruleStaysInProject(path, roots)) {
     return null;
   }
   return path;
@@ -228,10 +239,6 @@ export function writeInstructionFile(
   }
 }
 
-function sourceLabel(ref: InstructionRef): string {
-  if (ref.kindId === "cursor-rule") return `.cursor/rules/${ref.rulePath ?? ""}`;
-  return getInstructionKind(ref.kindId)?.label ?? ref.kindId;
-}
 
 function validRefs(list: unknown): InstructionRef[] {
   if (!Array.isArray(list)) return [];
@@ -273,7 +280,7 @@ export function previewInstructionSync(
     source,
     sourcePath,
     sourceContent,
-    sourceLabel: sourceLabel(source),
+    sourceLabel: instructionRefLabel(source),
     targets,
     caseInsensitive: CASE_INSENSITIVE,
   });

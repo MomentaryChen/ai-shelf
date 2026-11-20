@@ -49,6 +49,9 @@ describe("instruction files service", () => {
     writeFileSync(join(roots.projectDir!, ".cursor", "rules", "a.mdc"), "---\nx: 1\n---\nA\n");
     writeFileSync(join(roots.projectDir!, ".cursor", "rules", "sub", "b.md"), "B\n");
     writeFileSync(join(roots.projectDir!, ".cursor", "rules", "a.mdc.bak"), "old\n");
+    mkdirSync(join(roots.projectDir!, ".github", "instructions"), { recursive: true });
+    writeFileSync(join(roots.projectDir!, ".github", "instructions", "ts.instructions.md"), "TS\n");
+    writeFileSync(join(roots.projectDir!, ".github", "instructions", "notes.md"), "ignored\n");
 
     assert.deepEqual(listCursorRules(join(roots.projectDir!, ".cursor", "rules")), ["a.mdc", "sub/b.md"]);
 
@@ -61,6 +64,10 @@ describe("instruction files service", () => {
     assert.deepEqual(
       scan.files.filter((f) => f.kindId === "cursor-rule").map((f) => f.ref.rulePath),
       ["a.mdc", "sub/b.md"],
+    );
+    assert.deepEqual(
+      scan.files.filter((f) => f.kindId === "copilot-instruction").map((f) => f.label),
+      [".github/instructions/ts.instructions.md"],
     );
   });
 

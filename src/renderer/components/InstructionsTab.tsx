@@ -12,9 +12,13 @@ import {
   XCircle,
 } from "lucide-react";
 import {
-  cursorRuleFileName,
+  DIRECTORY_KINDS,
   cursorRuleNameForSource,
+  directoryFileName,
+  getInstructionKind,
   instructionRefKey,
+  instructionRefLabel,
+  type DirectoryKindId,
   type InstructionApplyResultItem,
   type InstructionFileInfo,
   type InstructionPreviewItem,
@@ -496,6 +500,7 @@ export function InstructionsTab() {
   const [compare, setCompare] = useState<string[]>([]);
   const [edit, setEdit] = useState<EditState | null>(null);
   const [ruleName, setRuleName] = useState("");
+  const [newKind, setNewKind] = useState<DirectoryKindId>("cursor-rule");
 
   // Resolve the initial project: last choice, else the app's working directory.
   useEffect(() => {
@@ -515,21 +520,32 @@ export function InstructionsTab() {
     setLoading(true);
     try {
       setScan(await window.api.instructionsScan(projectDir));
+    } catch (err) {
+      setScan({
+        projectDir: null,
+        projectError: (err as Error).message || t("instructions.error.generic"),
+        files: [],
+        directoryDirs: {},
+      });
     } finally {
       setLoading(false);
     }
+    // `t` only formats the fallback error text.
   }, [projectDir]);
 
   useEffect(() => {
     void rescan();
   }, [rescan]);
 
-  const files = scan?.files ?? [];
+  const files = useMemo(() => scan?.files ?? [], [scan]);
   const byKey = useMemo(() => new Map(files.map((f) => [keyOf(f), f])), [files]);
 
   // Forget compare picks that vanished after a rescan.
   useEffect(() => {
-    setCompare((prev) => prev.filter((k) => byKey.has(k)));
+    setCompare((prev) => {
+      const next = prev.filter((k) => byKey.has(k));
+      return next.length === prev.length ? prev : next;
+    });
   }, [byKey]);
 
   const changeProject = (dir: string | null) => {
@@ -552,20 +568,20 @@ export function InstructionsTab() {
 
   const global = files.filter((f) => f.scope === "global");
   const project = files.filter((f) => f.scope === "project");
-  const hasRules = project.some((f) => f.kindId === "cursor-rule");
-
-  const createRule = () => {
-    const rulePath = cursorRuleFileName(ruleName || "rules");
-    const existing = byKey.get(instructionRefKey({ kindId: "cursor-rule", rulePath }));
+  const createDirFile = () => {
+    const rulePath = directoryFileName(newKind, ruleName || "rules");
+    const ref: InstructionRef = { kindId: newKind, rulePath };
+    const existing = byKey.get(instructionRefKey(ref));
+    const dir = scan?.directoryDirs[newKind] ?? DIRECTORY_KINDS[newKind].segments.join("/");
     setEdit({
       create: !existing,
       file: existing ?? {
-        ref: { kindId: "cursor-rule", rulePath },
-        kindId: "cursor-rule",
+        ref,
+        kindId: newKind,
         scope: "project",
-        path: `${scan?.cursorRulesDir ?? ".cursor/rules"}/${rulePath}`,
-        label: `.cursor/rules/${rulePath}`,
-        readers: ["cursor"],
+        path: `${dir}/${rulePath}`,
+        label: instructionRefLabel(ref),
+        readers: getInstructionKind(newKind)?.readers ?? [],
         exists: false,
         size: null,
         mtimeMs: null,
@@ -649,9 +665,19 @@ export function InstructionsTab() {
             <>
               {renderRows(project)}
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-                <span className="text-[12px] text-text-secondary">
-                  {hasRules ? t("instructions.cursorRules.addMore") : t("instructions.cursorRules.none")}
-                </span>
+                <span className="text-[12px] text-text-secondary">{t("instructions.cursorRules.addMore")}</span>
+                <select
+                  value={newKind}
+                  onChange={(e) => setNewKind(e.target.value as DirectoryKindId)}
+                  aria-label={t("instructions.cursorRules.kind")}
+                  className="h-7 rounded-lg border border-border bg-bg-card px-2 font-mono text-[12px] text-text-primary"
+                >
+                  {(Object.keys(DIRECTORY_KINDS) as DirectoryKindId[]).map((id) => (
+                    <option key={id} value={id}>
+                      {DIRECTORY_KINDS[id].segments.join("/")}/
+                    </option>
+                  ))}
+                </select>
                 <Input
                   value={ruleName}
                   onChange={(e) => setRuleName(e.target.value)}
@@ -659,10 +685,13 @@ export function InstructionsTab() {
                   aria-label={t("instructions.cursorRules.namePlaceholder")}
                   className="h-7 w-44 font-mono text-[12px]"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") createRule();
+                    if (e.key === "Enter") createDirFile();
                   }}
                 />
-                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[12px]" onClick={createRule}>
+                <span className="font-mono text-[11px] text-text-tertiary">
+                  {directoryFileName(newKind, ruleName || "rules")}
+                </span>
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[12px]" onClick={createDirFile}>
                   <FilePlus2 className="h-3.5 w-3.5" /> {t("instructions.cursorRules.add")}
                 </Button>
               </div>

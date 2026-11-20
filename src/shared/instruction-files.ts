@@ -23,6 +23,7 @@ export type InstructionKindId =
   | "copilot-project"
   | "cursorrules-project"
   | "cursor-rule"
+  | "copilot-instruction"
   | "codex-project"
   | "opencode-project"
   | "aider-conventions-project"
@@ -37,6 +38,25 @@ export interface InstructionKind {
   readers: string[];
   /** Directory kind: each matching file under the directory is its own item. */
   directory?: boolean;
+}
+
+/** Where directory kinds live (relative to the project) and which file names count. */
+export const DIRECTORY_KINDS = {
+  "cursor-rule": { segments: [".cursor", "rules"], suffixes: [".mdc", ".md"], newSuffix: ".mdc" },
+  "copilot-instruction": {
+    segments: [".github", "instructions"],
+    suffixes: [".instructions.md"],
+    newSuffix: ".instructions.md",
+  },
+} as const satisfies Record<
+  string,
+  { segments: readonly string[]; suffixes: readonly string[]; newSuffix: string }
+>;
+
+export type DirectoryKindId = keyof typeof DIRECTORY_KINDS;
+
+export function isDirectoryKind(id: string): id is DirectoryKindId {
+  return Object.prototype.hasOwnProperty.call(DIRECTORY_KINDS, id);
 }
 
 /** Ordered catalogue (UI order within each scope). */
@@ -84,6 +104,13 @@ export const INSTRUCTION_KINDS: readonly InstructionKind[] = [
     readers: ["cursor"],
     directory: true,
   },
+  {
+    id: "copilot-instruction",
+    scope: "project",
+    label: ".github/instructions/*.instructions.md",
+    readers: ["copilot"],
+    directory: true,
+  },
   { id: "codex-project", scope: "project", label: "CODEX.md", readers: ["codex"] },
   { id: "opencode-project", scope: "project", label: "OPENCODE.md", readers: ["opencode"] },
   { id: "aider-conventions-project", scope: "project", label: "CONVENTIONS.md", readers: ["aider"] },
@@ -122,9 +149,15 @@ export function joinPath(sep: string, ...parts: string[]): string {
   return trimmed.join(sep);
 }
 
+/** Absolute directory of a directory kind, or null without a project. */
+export function directoryKindDir(kindId: DirectoryKindId, roots: InstructionRoots): string | null {
+  if (!roots.projectDir) return null;
+  return joinPath(roots.sep, roots.projectDir, ...DIRECTORY_KINDS[kindId].segments);
+}
+
 /** Directory holding Cursor rule files for the project. */
 export function cursorRulesDir(roots: InstructionRoots): string | null {
-  return roots.projectDir ? joinPath(roots.sep, roots.projectDir, ".cursor", "rules") : null;
+  return directoryKindDir("cursor-rule", roots);
 }
 
 /**
@@ -144,6 +177,7 @@ export function resolveKindPath(kindId: InstructionKindId, roots: InstructionRoo
     case "opencode-global":
       return j(roots.opencodeDir, "AGENTS.md");
     case "cursor-rule":
+    case "copilot-instruction":
       return null;
   }
   if (!p) return null;
@@ -181,7 +215,7 @@ export function resolveKindPath(kindId: InstructionKindId, roots: InstructionRoo
  */
 export interface InstructionRef {
   kindId: InstructionKindId;
-  /** For `cursor-rule` only: path relative to `.cursor/rules`, `/`-separated. */
+  /** Directory kinds only: path relative to the kind's directory, `/`-separated. */
   rulePath?: string;
 }
 
@@ -195,11 +229,15 @@ function hasControlChar(s: string): boolean {
 }
 
 /**
- * Validate a rule path relative to `.cursor/rules`: forward-slash segments, no
- * `..` / `.` / empty segments, no drive letters or absolute roots, a safe file
- * name and an allowed extension. Returns the normalized path or null.
+ * Validate a path relative to a directory kind's folder: forward-slash
+ * segments, no `..` / `.` / empty segments, no drive letters or absolute
+ * roots, a safe file name and an allowed suffix. Returns the normalized path
+ * or null. Suffixes default to Cursor rules (`.mdc` / `.md`).
  */
-export function normalizeRulePath(rel: string): string | null {
+export function normalizeRulePath(
+  rel: string,
+  suffixes: readonly string[] = CURSOR_RULE_EXTENSIONS,
+): string | null {
   if (typeof rel !== "string") return null;
   const s = rel.replace(/\\/g, "/").trim();
   if (!s || s.startsWith("/") || /^[a-zA-Z]:/.test(s) || s.length > 200) return null;
@@ -210,7 +248,7 @@ export function normalizeRulePath(rel: string): string | null {
     if (/[. ]$/.test(seg)) return null;
   }
   const base = (segs.at(-1) ?? "").toLowerCase();
-  const ext = CURSOR_RULE_EXTENSIONS.find((e) => base.endsWith(e));
+  const ext = suffixes.find((e) => base.endsWith(e));
   if (!ext || base.length === ext.length) return null; // need a name before the extension
   return segs.join("/");
 }
@@ -222,9 +260,12 @@ export function resolveInstructionRef(ref: unknown, roots: InstructionRoots): st
   if (typeof kindId !== "string") return null;
   const kind = getInstructionKind(kindId);
   if (!kind) return null;
-  if (kind.id === "cursor-rule") {
-    const dir = cursorRulesDir(roots);
-    const rel = typeof rulePath === "string" ? normalizeRulePath(rulePath) : null;
+  if (isDirectoryKind(kind.id)) {
+    const dir = directoryKindDir(kind.id, roots);
+    const rel =
+      typeof rulePath === "string"
+        ? normalizeRulePath(rulePath, DIRECTORY_KINDS[kind.id].suffixes)
+        : null;
     if (!dir || !rel) return null;
     return joinPath(roots.sep, dir, ...rel.split("/"));
   }
@@ -233,23 +274,44 @@ export function resolveInstructionRef(ref: unknown, roots: InstructionRoots): st
 
 /** Stable key for a ref (renderer list keys / selection). */
 export function instructionRefKey(ref: InstructionRef): string {
-  return ref.kindId === "cursor-rule" ? `cursor-rule:${ref.rulePath ?? ""}` : ref.kindId;
+  return isDirectoryKind(ref.kindId) ? `${ref.kindId}:${ref.rulePath ?? ""}` : ref.kindId;
+}
+
+/** Display label for a ref, e.g. `AGENTS.md` or `.cursor/rules/a.mdc`. */
+export function instructionRefLabel(ref: InstructionRef): string {
+  if (isDirectoryKind(ref.kindId)) {
+    return `${DIRECTORY_KINDS[ref.kindId].segments.join("/")}/${ref.rulePath ?? ""}`;
+  }
+  return getInstructionKind(ref.kindId)?.label ?? ref.kindId;
+}
+
+/** Turn an arbitrary name into a safe file name for a directory kind. */
+export function directoryFileName(kindId: DirectoryKindId, name: string): string {
+  const { suffixes, newSuffix } = DIRECTORY_KINDS[kindId];
+  let stem = name.trim().toLowerCase();
+  for (const suffix of suffixes) {
+    if (stem.endsWith(suffix)) {
+      stem = stem.slice(0, -suffix.length);
+      break;
+    }
+  }
+  stem = stem.replace(/[^a-z0-9._-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "");
+  return `${stem || "rules"}${newSuffix}`;
 }
 
 /** Turn an arbitrary name into a safe `.mdc` rule file name. */
 export function cursorRuleFileName(name: string): string {
-  const base = name
-    .replace(/\.(mdc|md)$/i, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^[-.]+|[-.]+$/g, "");
-  return `${base || "rules"}.mdc`;
+  return directoryFileName("cursor-rule", name);
 }
 
 /** Default rule file name when syncing a non-rule source into Cursor rules. */
 export function cursorRuleNameForSource(source: InstructionRef): string {
   if (source.kindId === "cursor-rule" && source.rulePath) {
     return normalizeRulePath(source.rulePath) ?? "rules.mdc";
+  }
+  if (source.kindId === "copilot-instruction" && source.rulePath) {
+    const file = source.rulePath.split("/").pop() ?? "";
+    return cursorRuleFileName(file.replace(/\.instructions\.md$/i, ""));
   }
   const kind = getInstructionKind(source.kindId);
   const file = (kind?.label ?? "rules").split("/").pop() ?? "rules";
@@ -286,13 +348,20 @@ export function defaultCursorRuleFrontMatter(description: string, eol = "\n"): s
   return `---${eol}description: ${safe}${eol}alwaysApply: true${eol}---${eol}`;
 }
 
+/** Front-matter for a brand-new `.github/instructions/*.instructions.md` file. */
+export function defaultCopilotInstructionFrontMatter(eol = "\n"): string {
+  return `---${eol}applyTo: "**"${eol}---${eol}`;
+}
+
 /**
  * Content to write into a target when syncing from `sourceContent`.
  *
  * Rule: the source is copied verbatim (front-matter included), except when the
- * target is a Cursor rule and the source has no front-matter of its own —
- *  - an existing rule keeps its own front-matter and only the body is replaced;
- *  - a new rule gets a default `alwaysApply: true` block so Cursor applies it.
+ * target is a directory kind (Cursor rule / Copilot `*.instructions.md`) and
+ * the source has no front-matter of its own —
+ *  - an existing file keeps its own front-matter and only the body is replaced;
+ *  - a new file gets a default block so the tool applies it everywhere
+ *    (`alwaysApply: true` for Cursor, `applyTo: "**"` for Copilot).
  * Line endings and BOMs are never normalized.
  */
 export function buildSyncedContent(opts: {
@@ -303,7 +372,7 @@ export function buildSyncedContent(opts: {
   targetContent: string | null;
 }): string {
   const { sourceContent, target, targetContent } = opts;
-  if (!isCursorRuleRef(target)) return sourceContent;
+  if (!isDirectoryKind(target.kindId)) return sourceContent;
   const src = splitFrontMatter(sourceContent);
   if (src.frontMatter) return sourceContent;
   if (targetContent != null) {
@@ -312,7 +381,11 @@ export function buildSyncedContent(opts: {
     return sourceContent;
   }
   const eol = sourceContent.includes("\r\n") ? "\r\n" : "\n";
-  return defaultCursorRuleFrontMatter(`Synced from ${opts.sourceLabel}`, eol) + sourceContent;
+  const header =
+    target.kindId === "cursor-rule"
+      ? defaultCursorRuleFrontMatter(`Synced from ${opts.sourceLabel}`, eol)
+      : defaultCopilotInstructionFrontMatter(eol);
+  return header + sourceContent;
 }
 
 // --- Sync planning ---
@@ -425,8 +498,8 @@ export interface InstructionScanResult {
   /** Error when the requested project directory is not usable. */
   projectError?: string;
   files: InstructionFileInfo[];
-  /** Absolute `.cursor/rules` directory, or null without a project. */
-  cursorRulesDir: string | null;
+  /** Absolute directory per directory kind (empty without a project). */
+  directoryDirs: Partial<Record<DirectoryKindId, string>>;
 }
 
 export interface InstructionPreviewItem extends InstructionSyncPlanItem {
