@@ -49,11 +49,27 @@ export function appendPtyChunk(buf: PtyChunkBuffer, data: string, maxChars: numb
   return trimPtyChunkBuffer(buf, maxChars);
 }
 
-/** Drop the front until `length <= maxChars`. Returns the kept text when trimmed. */
+/**
+ * Share of `maxChars` kept after a trim. Trimming joins the whole buffer and
+ * rewrites the mirrored log, so leave headroom instead of doing it on every
+ * chunk once a long session sits at the cap.
+ */
+export const PTY_TRIM_KEEP_RATIO = 0.75;
+
+/** Chars kept when a buffer capped at `maxChars` is trimmed. */
+export function ptyTrimKeepChars(maxChars: number): number {
+  if (!Number.isFinite(maxChars)) return maxChars;
+  return Math.max(0, Math.floor(maxChars * PTY_TRIM_KEEP_RATIO));
+}
+
+/**
+ * Once `length > maxChars`, drop the front down to `ptyTrimKeepChars(maxChars)`.
+ * Returns the kept text when trimmed.
+ */
 export function trimPtyChunkBuffer(buf: PtyChunkBuffer, maxChars: number): string | null {
   if (buf.length <= maxChars) return null;
   const text = materializePtyChunk(buf);
-  const trimmed = text.slice(text.length - maxChars);
+  const trimmed = text.slice(text.length - ptyTrimKeepChars(maxChars));
   buf.pieces = [{ text: trimmed, offset: 0 }];
   buf.start = 0;
   buf.length = trimmed.length;
