@@ -92,6 +92,15 @@ contextBridge.exposeInMainWorld("api", {
   syncSkills: (opts) => ipcRenderer.invoke("sync-skills", opts),
   readConfigFile: (filePath) => ipcRenderer.invoke("read-config-file", filePath),
   writeConfigFile: (filePath, content) => ipcRenderer.invoke("write-config-file", filePath, content),
+  instructionsDefaultProject: () => ipcRenderer.invoke("instructions-default-project"),
+  instructionsScan: (projectDir) => ipcRenderer.invoke("instructions-scan", projectDir),
+  instructionsRead: (projectDir, ref) => ipcRenderer.invoke("instructions-read", projectDir, ref),
+  instructionsWrite: (projectDir, ref, content) =>
+    ipcRenderer.invoke("instructions-write", projectDir, ref, content),
+  instructionsPreviewSync: (projectDir, opts) =>
+    ipcRenderer.invoke("instructions-preview-sync", projectDir, opts),
+  instructionsApplySync: (projectDir, opts) =>
+    ipcRenderer.invoke("instructions-apply-sync", projectDir, opts),
   claudeSettingsListFiles: (projectDir) => ipcRenderer.invoke("claude-settings-list-files", projectDir),
   claudeSettingsRead: (scope, projectDir) => ipcRenderer.invoke("claude-settings-read", scope, projectDir),
   claudeSettingsWrite: (scope, projectDir, expectedContent, draft) =>
