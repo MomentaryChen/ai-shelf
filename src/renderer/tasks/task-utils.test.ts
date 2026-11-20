@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, test } from "node:test";
 import {
   collectTaskPanes,
+  formatCostUsd,
+  formatRunDuration,
+  formatTokenCount,
+  runStatusTone,
   keepTaskLink,
   duplicateTaskName,
   filterTasks,
@@ -169,4 +173,32 @@ describe("keepTaskLink", () => {
       {},
     );
   });
+});
+
+test("formatRunDuration", () => {
+  const s = "2026-01-01T00:00:00.000Z";
+  assert.equal(formatRunDuration(s, "2026-01-01T00:00:42.000Z"), "42s");
+  assert.equal(formatRunDuration(s, "2026-01-01T00:03:05.000Z"), "3m 05s");
+  assert.equal(formatRunDuration(s, "2026-01-01T01:02:00.000Z"), "1h 02m");
+  assert.equal(formatRunDuration(s, undefined, Date.parse(s) + 5000), "5s");
+  assert.equal(formatRunDuration("bad", undefined), null);
+});
+
+test("formatCostUsd + formatTokenCount", () => {
+  assert.equal(formatCostUsd(undefined), null);
+  assert.equal(formatCostUsd(0), "$0.00");
+  assert.equal(formatCostUsd(0.00423), "$0.0042");
+  assert.equal(formatCostUsd(12.4), "$12.40");
+  assert.equal(formatTokenCount(950), "950");
+  assert.equal(formatTokenCount(1234), "1.2k");
+  assert.equal(formatTokenCount(45_600), "46k");
+  assert.equal(formatTokenCount(4_100_000), "4.1M");
+});
+
+test("runStatusTone", () => {
+  assert.equal(runStatusTone("running", undefined), "live");
+  assert.equal(runStatusTone("exited", 0), "ok");
+  assert.equal(runStatusTone("exited", 1), "warn");
+  assert.equal(runStatusTone("closed", -1), "neutral");
+  assert.equal(runStatusTone("interrupted", -1), "warn");
 });

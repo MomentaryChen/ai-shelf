@@ -42,6 +42,36 @@ export const TASK_TEMPLATES: readonly TaskTemplate[] = [
     },
   },
   {
+    id: "explain-selection",
+    name: { en: "Explain a code snippet", zh: "解釋一段程式碼" },
+    description: {
+      en: "Asks for the snippet (from the clipboard) and its file each time it runs.",
+      zh: "每次執行時填入程式碼片段（從剪貼簿帶入）與所在檔案。",
+    },
+    prompt: {
+      en: [
+        "Explain this code from `{{file}}` on branch `{{branch}}`:",
+        "",
+        "```",
+        "{{selection}}",
+        "```",
+        "",
+        "Read the surrounding file and its callers as needed. Explain what it does, why it is written this way, and any bugs or edge cases you notice.",
+        "Do not modify any files.",
+      ].join("\n"),
+      zh: [
+        "請解釋 `{{file}}`（分支 `{{branch}}`）中的這段程式碼：",
+        "",
+        "```",
+        "{{selection}}",
+        "```",
+        "",
+        "視需要閱讀所在檔案與呼叫它的地方。說明它在做什麼、為什麼這樣寫，以及你注意到的 bug 或邊界情況。",
+        "請不要修改任何檔案。",
+      ].join("\n"),
+    },
+  },
+  {
     id: "write-tests",
     name: { en: "Write tests for recent changes", zh: "為最近的變更補測試" },
     description: {
