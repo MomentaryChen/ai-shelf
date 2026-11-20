@@ -182,6 +182,7 @@ import { registerPortsHandlers } from "./ports-handlers.js";
 import { registerOpenInEditorHandlers } from "./open-in-editor.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
 import { registerGitHandlers } from "./git-handlers.js";
+import { registerInstructionFilesHandlers } from "./instruction-files-handlers.js";
 import { initSystemResume } from "./system-resume.js";
 import {
   boundsCenteredOnWindow,
@@ -235,6 +236,7 @@ registerPortsHandlers();
 registerOpenInEditorHandlers();
 registerWslHandlers();
 registerGitHandlers();
+registerInstructionFilesHandlers();
 
 /** Update commands for each AI tool */
 const TOOL_UPDATE_COMMANDS: Record<string, { check: string[]; update: string[]; label: string }> =

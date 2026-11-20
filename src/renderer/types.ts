@@ -11,6 +11,12 @@ import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../sha
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
+import type {
+  InstructionApplyResultItem,
+  InstructionPreviewResult,
+  InstructionRef,
+  InstructionScanResult,
+} from "../shared/instruction-files.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
@@ -813,6 +819,26 @@ export interface ElectronAPI {
   }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
+  instructionsDefaultProject: () => Promise<string | null>;
+  instructionsScan: (projectDir: string | null) => Promise<InstructionScanResult>;
+  instructionsRead: (projectDir: string | null, ref: InstructionRef) => Promise<ConfigFileReadResult>;
+  instructionsWrite: (
+    projectDir: string | null,
+    ref: InstructionRef,
+    content: string,
+  ) => Promise<{ success: boolean; error?: string; backupPath?: string | null }>;
+  instructionsPreviewSync: (
+    projectDir: string | null,
+    opts: { source: InstructionRef; targets: InstructionRef[] },
+  ) => Promise<InstructionPreviewResult>;
+  instructionsApplySync: (
+    projectDir: string | null,
+    opts: {
+      source: InstructionRef;
+      sourceFingerprint: string;
+      targets: { ref: InstructionRef; fingerprint: string }[];
+    },
+  ) => Promise<{ ok: boolean; error?: string; results: InstructionApplyResultItem[] }>;
   mcpListServers: (tool: string) => Promise<McpListResult>;
   mcpUpsertServer: (
     tool: string,

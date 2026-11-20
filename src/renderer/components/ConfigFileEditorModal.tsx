@@ -10,15 +10,31 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "../i18n/LocaleProvider";
+import type { ConfigFileReadResult } from "../types";
 
 interface Props {
   path: string;
   onClose: () => void;
   onSaved?: () => void;
+  /** Override the read IPC (e.g. validated instruction-file refs). Defaults to `readConfigFile`. */
+  read?: () => Promise<ConfigFileReadResult>;
+  /** Override the write IPC. Defaults to `writeConfigFile`. */
+  write?: (content: string) => Promise<{ success: boolean; error?: string }>;
+  /** Start from this text when the file does not exist yet (create flow). */
+  initialContent?: string;
+  title?: string;
 }
 
 /** In-app editor for a raw config file with JSON validation and .bak backup. */
-export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
+export function ConfigFileEditorModal({
+  path,
+  onClose,
+  onSaved,
+  read,
+  write,
+  initialContent,
+  title,
+}: Props) {
   const { t } = useLocale();
   const [content, setContent] = useState("");
   const [original, setOriginal] = useState("");
@@ -26,6 +42,8 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /** File is missing and we're creating it — Save is enabled even when unchanged. */
+  const [creating, setCreating] = useState(false);
 
   const isJson = path.endsWith(".json");
 
@@ -33,13 +51,14 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
-    window.api
-      .readConfigFile(path)
+    (read ? read() : window.api.readConfigFile(path))
       .then((res) => {
         if (cancelled) return;
         if (res.success) {
-          setContent(res.content);
+          const missing = !res.exists && initialContent !== undefined;
+          setContent(missing ? initialContent : res.content);
           setOriginal(res.content);
+          setCreating(missing);
         } else {
           setLoadError(res.error ?? "Failed to read file");
         }
@@ -50,6 +69,7 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
     return () => {
       cancelled = true;
     };
+    // `read` / `initialContent` are per-open; reloading keys off the path.
   }, [path]);
 
   const jsonError = (() => {
@@ -62,15 +82,16 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
     }
   })();
 
-  const dirty = content !== original;
+  const dirty = creating || content !== original;
 
   const save = async () => {
     setSaving(true);
     setSaveError(null);
-    const res = await window.api.writeConfigFile(path, content);
+    const res = write ? await write(content) : await window.api.writeConfigFile(path, content);
     setSaving(false);
     if (res.success) {
       setOriginal(content);
+      setCreating(false);
       onSaved?.();
       onClose();
     } else {
@@ -82,7 +103,7 @@ export function ConfigFileEditorModal({ path, onClose, onSaved }: Props) {
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col border-border bg-bg-card text-text-primary">
         <DialogHeader>
-          <DialogTitle className="text-sm text-text-primary">{t("configEditor.title")}</DialogTitle>
+          <DialogTitle className="text-sm text-text-primary">{title ?? t("configEditor.title")}</DialogTitle>
         </DialogHeader>
         <p className="break-all font-mono text-xs text-text-secondary">{path}</p>
 

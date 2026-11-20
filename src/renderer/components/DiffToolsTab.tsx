@@ -10,26 +10,14 @@ import {
   computeLineDiff,
   formatUnifiedDiff,
   MAX_DIFF_LINES,
-  type DiffLine,
 } from "../utils/diff-tools";
 import { Card } from "./Card";
+import { LineDiffView } from "./LineDiffView";
 import { SectionHeading } from "./SectionHeading";
 import { StaggerStack } from "./StaggerStack";
 
 const fieldClass =
   "h-[220px] resize-none overflow-auto border-border bg-bg-primary font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-tertiary [field-sizing:fixed]";
-
-function lineTone(type: DiffLine["type"]): string {
-  if (type === "add") return "bg-ok/12 text-ok";
-  if (type === "remove") return "bg-fail/12 text-fail";
-  return "text-text-secondary";
-}
-
-function linePrefix(type: DiffLine["type"]): string {
-  if (type === "add") return "+";
-  if (type === "remove") return "−";
-  return " ";
-}
 
 export function DiffToolsTab() {
   const { t } = useLocale();
@@ -200,23 +188,7 @@ export function DiffToolsTab() {
               )}
 
               {computed.ok && hasInput && !identical && (
-                <pre className="m-0 p-0 font-mono text-[12px] leading-relaxed">
-                  {computed.result.lines.map((line, idx) => (
-                    <div
-                      key={`${line.type}-${line.leftNo ?? "x"}-${line.rightNo ?? "x"}-${idx}`}
-                      className={`flex gap-2 whitespace-pre-wrap break-all px-3 py-0.5 ${lineTone(line.type)}`}
-                    >
-                      <span className="w-10 shrink-0 select-none text-right tabular-nums text-text-tertiary">
-                        {line.leftNo ?? ""}
-                      </span>
-                      <span className="w-10 shrink-0 select-none text-right tabular-nums text-text-tertiary">
-                        {line.rightNo ?? ""}
-                      </span>
-                      <span className="w-3 shrink-0 select-none">{linePrefix(line.type)}</span>
-                      <span className="min-w-0 flex-1">{line.text.length ? line.text : " "}</span>
-                    </div>
-                  ))}
-                </pre>
+                <LineDiffView lines={computed.result.lines} />
               )}
             </div>
           </div>
