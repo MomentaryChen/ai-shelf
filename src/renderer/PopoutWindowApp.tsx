@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, Plus, Undo2, X } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { EditablePaneTitle } from "./components/EditablePaneTitle";
 import { EmbeddedTerminal } from "./components/EmbeddedTerminal";
 import { BusyPaneCloseDialog } from "./components/BusyPaneCloseDialog";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -239,6 +240,11 @@ export function PopoutWindowApp() {
     window.api.paneViewAction({ type: "title", sessionId, title: title.trim() });
   }, []);
 
+  /** User rename (pane header or sidebar): the origin owns the title and echoes new labels. */
+  const renamePane = useCallback((paneId: string, title: string) => {
+    window.api.paneViewAction({ type: "rename", paneId, title });
+  }, []);
+
   // Long-command / bell notifications for the terminals shown here (the origin
   // window does not mount them, so it cannot raise these).
   const viewPanes = useMemo(() => (layout ? collectPanes(layout) : []), [layout]);
@@ -335,9 +341,18 @@ export function PopoutWindowApp() {
                 const isFocused = pane.id === focusedPane?.id;
                 return (
                   <li key={pane.id} className="group relative">
-                    <button
-                      type="button"
+                    {/* Not a <button>: the title turns into an input on double-click. */}
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => focusPane(pane.id)}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          focusPane(pane.id);
+                        }
+                      }}
                       title={sidebarCollapsed ? label : pane.cwd || label}
                       aria-current={isFocused ? "true" : undefined}
                       className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-md text-left text-[12px] transition-colors ${
@@ -351,8 +366,14 @@ export function PopoutWindowApp() {
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                         <ToolLogo tool={pane.tool} size={14} />
                       </span>
-                      {!sidebarCollapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
-                    </button>
+                      {!sidebarCollapsed && (
+                        <EditablePaneTitle
+                          label={label}
+                          onRename={(title) => renamePane(pane.id, title)}
+                          className="flex-1"
+                        />
+                      )}
+                    </div>
                     {!sidebarCollapsed && (
                       <button
                         type="button"
@@ -405,6 +426,7 @@ export function PopoutWindowApp() {
             onFocusPane={focusPane}
             onClosePane={(paneId) => closePane(paneId)}
             onResizeSplit={resizeSplit}
+            onRenamePane={renamePane}
             onMovePane={(dragPaneId, targetPaneId, zone) =>
               window.api.paneViewAction({ type: "move-in-view", dragPaneId, targetPaneId, zone })
             }
