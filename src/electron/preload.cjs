@@ -1,5 +1,45 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
+/**
+ * One "pty-data" ipc listener per window, fanned out in the preload. Each
+ * listener call copies the chunk across the contextBridge, so per-subscriber
+ * ipcRenderer.on (one per EmbeddedTerminal, incl. parked ones) multiplied the
+ * cost of every chunk. Per-session subscribers only see their own session.
+ */
+const ptyDataAll = new Set();
+const ptyDataBySession = new Map();
+let ptyDataListening = false;
+
+function callPtyDataSubscriber(cb, payload) {
+  try {
+    cb(payload);
+  } catch (err) {
+    console.error("[pty-data]", err);
+  }
+}
+
+function onPtyDataMessage(_e, payload) {
+  if (ptyDataAll.size > 0) {
+    for (const cb of [...ptyDataAll]) callPtyDataSubscriber(cb, payload);
+  }
+  const sid = payload && payload.sessionId;
+  const subs = sid != null ? ptyDataBySession.get(sid) : undefined;
+  if (subs) {
+    for (const cb of [...subs]) callPtyDataSubscriber(cb, payload);
+  }
+}
+
+function syncPtyDataListener() {
+  const want = ptyDataAll.size > 0 || ptyDataBySession.size > 0;
+  if (want && !ptyDataListening) {
+    ipcRenderer.on("pty-data", onPtyDataMessage);
+    ptyDataListening = true;
+  } else if (!want && ptyDataListening) {
+    ipcRenderer.off("pty-data", onPtyDataMessage);
+    ptyDataListening = false;
+  }
+}
+
 contextBridge.exposeInMainWorld("api", {
   getInventory: () => ipcRenderer.invoke("get-inventory"),
   startInventoryScan: () => ipcRenderer.invoke("start-inventory-scan"),
@@ -147,10 +187,34 @@ contextBridge.exposeInMainWorld("api", {
   ptyResize: (sessionId, cols, rows)    => ipcRenderer.invoke("pty-resize", sessionId, cols, rows),
   ptyKill:   (sessionId)                => ipcRenderer.send("pty-kill",   sessionId),
   ptyCommandStates: (sessionIds)        => ipcRenderer.invoke("pty-command-states", sessionIds),
+  /** Every session's output. Prefer onPtyDataFor when only one session matters. */
   onPtyData: (cb) => {
-    const handler = (_e, p) => cb(p);
-    ipcRenderer.on("pty-data", handler);
-    return () => ipcRenderer.off("pty-data", handler);
+    const sub = (p) => cb(p);
+    ptyDataAll.add(sub);
+    syncPtyDataListener();
+    return () => {
+      ptyDataAll.delete(sub);
+      syncPtyDataListener();
+    };
+  },
+  /** Output of one session only — other sessions' chunks never cross the bridge. */
+  onPtyDataFor: (sessionId, cb) => {
+    const sub = (p) => cb(p);
+    let subs = ptyDataBySession.get(sessionId);
+    if (!subs) {
+      subs = new Set();
+      ptyDataBySession.set(sessionId, subs);
+    }
+    subs.add(sub);
+    syncPtyDataListener();
+    return () => {
+      const current = ptyDataBySession.get(sessionId);
+      if (current) {
+        current.delete(sub);
+        if (current.size === 0) ptyDataBySession.delete(sessionId);
+      }
+      syncPtyDataListener();
+    };
   },
   onPtyExit: (cb) => {
     const handler = (_e, p) => cb(p);

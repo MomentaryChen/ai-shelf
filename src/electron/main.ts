@@ -42,7 +42,7 @@ import {
   trackAgentSessionUsage,
 } from "./agent-session-usage.js";
 import { run } from "../utils/exec.js";
-import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
+import { formatGitBuildLabel, readGitBuildInfoCached } from "../utils/git-build-info.js";
 import {
   fetchRemoteLatestVersion,
   resolveToolLatestVersion,
@@ -225,6 +225,7 @@ import {
   onAppUpdateStateChanged,
   runHealthCheck,
 } from "./health-monitor.js";
+import { createInventoryCache } from "./inventory-cache.js";
 import { runPtyLogGc, type PtyLogGcResult, type PtyLogRetentionPrefs } from "./pty-log-gc.js";
 import {
   readPtyLogRetentionPrefs,
@@ -322,7 +323,7 @@ function formatWindowTitle(base: string): string {
     /* keep base */
   }
   const gitRoot = app.isPackaged ? app.getAppPath() : process.cwd();
-  const gitLabel = formatGitBuildLabel(readGitBuildInfo(gitRoot));
+  const gitLabel = formatGitBuildLabel(readGitBuildInfoCached(gitRoot));
   if (gitLabel) {
     title += ` — ${gitLabel}`;
   }
@@ -354,7 +355,11 @@ if (app.isPackaged) {
 }
 
 const INVENTORY_CACHE_TTL_MS = 30_000;
-let inventoryCache: { at: number; entries: ProviderEntry[] } | null = null;
+/** 30s TTL cache + one shared scan for concurrent get-inventory / scans / health checks. */
+const inventory = createInventoryCache(
+  () => DETECTORS.map((detect) => () => detect({ quick: true })),
+  INVENTORY_CACHE_TTL_MS,
+);
 
 type PtyModule = typeof import("node-pty");
 let ptyModule: PtyModule | null = null;
@@ -374,14 +379,11 @@ async function getPty(): Promise<PtyModule> {
 }
 
 function getCachedInventory(): ProviderEntry[] | null {
-  if (inventoryCache && Date.now() - inventoryCache.at < INVENTORY_CACHE_TTL_MS) {
-    return inventoryCache.entries;
-  }
-  return null;
+  return inventory.get();
 }
 
 function setInventoryCache(entries: ProviderEntry[]) {
-  inventoryCache = { at: Date.now(), entries };
+  inventory.set(entries);
 }
 
 function mergeInventoryEntry(entries: ProviderEntry[], entry: ProviderEntry): ProviderEntry[] {
@@ -658,13 +660,7 @@ ipcMain.handle("toggle-devtools", (event) => {
 });
 
 // IPC handlers
-ipcMain.handle("get-inventory", async () => {
-  const cached = getCachedInventory();
-  if (cached) return cached;
-  const entries = await detectAll({ quick: true });
-  setInventoryCache(entries);
-  return entries;
-});
+ipcMain.handle("get-inventory", () => inventory.load());
 
 ipcMain.handle("start-inventory-scan", async (event) => {
   const push = (channel: string, payload: unknown) => {
@@ -675,16 +671,8 @@ ipcMain.handle("start-inventory-scan", async (event) => {
   if (entries.length > 0) {
     for (const entry of entries) push("inventory-entry", entry);
   } else {
-    await Promise.all(
-      DETECTORS.map(async (detect) => {
-        try {
-          const entry = await detect({ quick: true });
-          entries = mergeInventoryEntry(entries, entry);
-          push("inventory-entry", entry);
-        } catch { /* skip failed detectors */ }
-      }),
-    );
-    setInventoryCache(entries);
+    // Joins a scan already running (another window, get-inventory, health check).
+    entries = await inventory.scan((entry) => push("inventory-entry", entry));
   }
 
   const enrichCount = entries.filter(shouldEnrichModels).length;
@@ -704,7 +692,7 @@ ipcMain.handle("start-inventory-scan", async (event) => {
 });
 
 ipcMain.handle("clear-inventory-cache", () => {
-  inventoryCache = null;
+  inventory.invalidate();
 });
 
 /** Shared: run doctor checks for a single inventory entry */
@@ -713,8 +701,7 @@ async function runDoctorForEntry(entry: Awaited<ReturnType<typeof detectAll>>[nu
 }
 
 ipcMain.handle("run-doctor", async () => {
-  const entries = getCachedInventory() ?? await detectAll({ quick: true });
-  if (!getCachedInventory()) setInventoryCache(entries);
+  const entries = await inventory.load();
   return Promise.all(entries.map(runDoctorForEntry));
 });
 
@@ -781,8 +768,8 @@ ipcMain.handle("check-update", async () => {
 
   let entries: Awaited<ReturnType<typeof detectAll>> = [];
   try {
-    entries = await detectAll({ quick: true });
-    setInventoryCache(entries);
+    // Always re-detect installed versions, but share a scan already in flight.
+    entries = await inventory.scan();
   } catch {
     entries = getCachedInventory() ?? [];
   }
@@ -867,8 +854,7 @@ ipcMain.handle("get-tools-list", async () => {
     updateCommand: string;
   }[] = [];
 
-  const entries = getCachedInventory() ?? await detectAll({ quick: true });
-  if (!getCachedInventory()) setInventoryCache(entries);
+  const entries = await inventory.load();
   for (const entry of entries) {
     const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
     results.push({
@@ -1005,24 +991,31 @@ ipcMain.handle("run-install", async (_event, tool: string) => {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
   });
   if (result.ok) {
-    inventoryCache = null;
+    inventory.invalidate();
     return { success: true, message: result.stdout || "Install completed" };
   }
   return { success: false, message: result.stderr || result.stdout || "Install failed" };
 });
 
+/** Memoized: probing package managers spawns up to three blocking processes. */
+let selfUpdateCmdCache: string | null = null;
+
 function detectSelfUpdateCmd(): string {
+  if (selfUpdateCmdCache != null) return selfUpdateCmdCache;
+  selfUpdateCmdCache = "npm update -g ai-shelf";
   for (const pm of ["pnpm", "yarn", "npm"] as const) {
     try {
       execSync(`${pm} --version`, { stdio: "ignore" });
-      return pm === "pnpm"
-        ? "pnpm update -g ai-shelf"
-        : pm === "yarn"
-          ? "yarn global upgrade ai-shelf"
-          : "npm update -g ai-shelf";
+      selfUpdateCmdCache =
+        pm === "pnpm"
+          ? "pnpm update -g ai-shelf"
+          : pm === "yarn"
+            ? "yarn global upgrade ai-shelf"
+            : "npm update -g ai-shelf";
+      break;
     } catch { /* not available */ }
   }
-  return "npm update -g ai-shelf";
+  return selfUpdateCmdCache;
 }
 
 type SelfUpdateEntry = {
@@ -1077,7 +1070,7 @@ ipcMain.handle("get-self-info", () => {
   try { version = app.getVersion(); } catch { /* ok */ }
   const git = app.isPackaged
     ? { branch: null, commitShort: null, dirty: false }
-    : readGitBuildInfo(app.getAppPath());
+    : readGitBuildInfoCached(app.getAppPath());
   return {
     version,
     updateCommand: app.isPackaged ? "" : detectSelfUpdateCmd(),
@@ -1702,12 +1695,31 @@ function appendPtyBuffer(sessionId: string, data: string) {
   else mirrorPtyLogAppend(sessionId, data);
 }
 
+/**
+ * Windows that may host terminals: renderer pages (main, #chat, popout / pane
+ * views) except the settings dialog. Auth popups, the hidden claude.ai usage
+ * window and other external pages never listen for PTY events, so skip the
+ * per-chunk IPC copy to them.
+ */
+function ptyBroadcastTargets(): BrowserWindow[] {
+  let rendererPage: string | null = null;
+  try {
+    rendererPage = getRendererPageUrl();
+  } catch {
+    /* renderer server not up — fall back to every window */
+  }
+  return BrowserWindow.getAllWindows().filter((win) => {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return false;
+    if (win === settingsWindow) return false;
+    if (!rendererPage) return true;
+    return win.webContents.getURL().startsWith(rendererPage);
+  });
+}
+
 function sendPtyData(sessionId: string, data: string, endSeq: number) {
   if (!data) return;
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send("pty-data", { sessionId, data, endSeq });
-    }
+  for (const win of ptyBroadcastTargets()) {
+    win.webContents.send("pty-data", { sessionId, data, endSeq });
   }
 }
 
@@ -1770,10 +1782,8 @@ function broadcastPtyData(sessionId: string, data: string) {
 function broadcastPtyExit(sessionId: string, exitCode: number) {
   // Finish the output slices before the exit event so the banner stays at the tail.
   flushPtyDataBroadcast(sessionId, () => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) {
-        win.webContents.send("pty-exit", { sessionId, exitCode });
-      }
+    for (const win of ptyBroadcastTargets()) {
+      win.webContents.send("pty-exit", { sessionId, exitCode });
     }
   });
 }
@@ -1809,10 +1819,8 @@ function wakePtySessions(): void {
 function broadcastPtyMeta(sessionId: string) {
   const payload = ptyMetaPayload(sessionId);
   if (!payload) return;
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send("pty-meta", payload);
-    }
+  for (const win of ptyBroadcastTargets()) {
+    win.webContents.send("pty-meta", payload);
   }
 }
 
@@ -2400,6 +2408,21 @@ ipcMain.on("pty-kill", (_e, sessionId: string) => {
 
 // --- Launch in Terminal ---
 
+/** Memoized `where.exe wt` probe (blocking spawn) — answer is stable for the process. */
+let hasWindowsTerminalCache: boolean | null = null;
+
+function hasWindowsTerminal(): boolean {
+  if (hasWindowsTerminalCache == null) {
+    try {
+      execSync("where.exe wt", { stdio: "ignore" });
+      hasWindowsTerminalCache = true;
+    } catch {
+      hasWindowsTerminalCache = false;
+    }
+  }
+  return hasWindowsTerminalCache;
+}
+
 ipcMain.handle(
   "launch-in-terminal",
   (_event, tool: string, terminal: string = "auto", cwd?: string, extraArgs?: string) => {
@@ -2417,14 +2440,7 @@ ipcMain.handle(
   try {
     const plat = process.platform;
     if (plat === "win32") {
-      const hasWt = (() => {
-        try {
-          execSync("where.exe wt", { stdio: "ignore" });
-          return true;
-        } catch {
-          return false;
-        }
-      })();
+      const hasWt = hasWindowsTerminal();
       if (terminal === "wt" || terminal === "auto") {
         if (hasWt) {
           const wtArgs = cwd
@@ -2847,12 +2863,8 @@ ipcMain.handle("import-backup", async () => {
 
 // --- Config snapshots (MCP / .claude.json / skills) ---
 
-async function inventoryForSnapshot(): Promise<ProviderEntry[]> {
-  const cached = getCachedInventory();
-  if (cached) return cached;
-  const entries = await detectAll({ quick: true });
-  setInventoryCache(entries);
-  return entries;
+function inventoryForSnapshot(): Promise<ProviderEntry[]> {
+  return inventory.load();
 }
 
 ipcMain.handle("config-snapshot-list", () => {
@@ -3065,7 +3077,7 @@ app.whenReady().then(async () => {
 
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
-  initHealthMonitor(() => mainWindow);
+  initHealthMonitor(() => mainWindow, () => inventory.load());
   initPtyLogGc();
   initTaskService();
   initTaskRunStore();

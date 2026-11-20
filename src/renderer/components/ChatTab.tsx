@@ -78,7 +78,11 @@ import {
 import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
 import { AttentionInbox, type AttentionInboxViewItem } from "./AttentionInbox";
 import { nextAttentionPaneId, sortAttentionInbox } from "../../shared/attention-inbox.js";
-import { isPaneAgentBusy, strongestPaneAgentStatus } from "../../shared/pane-agent-state.js";
+import {
+  isPaneAgentBusy,
+  strongestPaneAgentStatus,
+  type PaneAgentStatus,
+} from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
 import { CommandHistoryPanel, type SaveCommandResult } from "./CommandHistoryPanel";
@@ -2005,10 +2009,12 @@ function ChatTabInner({
       const profile = profileByKey(v.profileKey);
       const labels: Record<string, string> = {};
       const busy: Record<string, boolean> = {};
+      const agentStatus: Record<string, PaneAgentStatus> = {};
       for (const pane of collectPanes(v.layout)) {
         labels[pane.id] = paneLabels[pane.id] ?? paneDisplayLabel(pane);
         const status = paneAgentStates[pane.id];
         busy[pane.id] = Boolean(status && isPaneAgentBusy(status));
+        if (status && status !== "idle") agentStatus[pane.id] = status;
       }
       return {
         viewId: v.id,
@@ -2019,6 +2025,7 @@ function ChatTabInner({
         focusedPaneId: v.focusedPaneId,
         labels,
         busy,
+        agentStatus,
         bounds: v.bounds,
         tools: availableTools,
       };

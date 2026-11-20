@@ -8,7 +8,7 @@
 
 [中文說明](README.zh-TW.md) · [Changelog](CHANGELOG.md)
 
-**v5.3.0** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
+**v5.3.1** — pnpm monorepo with an Electron desktop app, a lightweight inventory CLI (`ai`), and a terminal profile manager (`ai-shelf`). **Profile** is the shared data model for the desktop app and CLI — see [docs/data-model.md](docs/data-model.md).
 
 ---
 
@@ -246,7 +246,7 @@ See [`packages/cli/STRUCTURE.md`](packages/cli/STRUCTURE.md) for package interna
 ## Development
 
 ```bash
-pnpm install                 # postinstall rebuilds native addons for Electron
+pnpm install                 # postinstall rebuilds native addons for Electron (skipped when already built)
 
 # TypeScript
 pnpm dev                     # watch root src/ (inventory + electron main)
@@ -254,17 +254,19 @@ pnpm dev:cli                 # watch packages/cli
 pnpm dev:renderer            # Vite dev server for React UI
 
 # Build & run
-pnpm build                   # CLI package + tsc + Vite renderer
+pnpm build                   # CLI package, then tsc + Vite renderer in parallel
+pnpm typecheck               # all tsc passes in parallel, incremental
 pnpm start                   # node dist/cli.js  →  `ai` commands
 pnpm electron                # build + launch desktop app
 pnpm electron:dev            # electron without rebuild (after pnpm build)
 
 # Native modules (node-pty for Electron)
-pnpm rebuild:native          # current Electron ABI
-pnpm rebuild:native:all      # all installed Electron versions
+pnpm rebuild:native          # current Electron ABI (no-op while the build stamp matches)
+pnpm rebuild:native:all      # force a full rebuild (or AISHELF_FORCE_NATIVE_REBUILD=1)
 
 # Quality & packaging
-pnpm test:e2e                # Playwright screenshot tests
+pnpm test:e2e                # Playwright screenshot tests (builds first)
+pnpm test:e2e:nobuild        # Playwright against the existing dist/
 pnpm gen:docs-assets         # refresh README/docs PNGs + GIFs (en+zh) before release (Windows + ffmpeg)
 pnpm lint
 pnpm format / pnpm format:check

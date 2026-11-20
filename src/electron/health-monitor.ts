@@ -42,6 +42,8 @@ export type HealthMonitorState = {
 };
 
 let getMainWindow: (() => BrowserWindow | null) | null = null;
+/** Main injects its cached / deduped inventory loader; default is a direct scan. */
+let loadInventory: () => Promise<ProviderEntry[]> = () => detectAll({ quick: true });
 let startupTimer: ReturnType<typeof setTimeout> | null = null;
 let intervalTimer: ReturnType<typeof setInterval> | null = null;
 let intervalMinutesScheduled: number | null = null;
@@ -225,7 +227,7 @@ export async function runHealthCheck(): Promise<HealthMonitorState> {
       return getHealthMonitorState();
     }
 
-    const entries = await detectAll({ quick: true });
+    const entries = await loadInventory();
     const updateAlerts = await buildUpdateAlerts(entries);
     const doctorResults = entries.map(runChecksForEntry);
     const { alerts: doctorAlerts, summary } = buildDoctorAlerts(doctorResults);
@@ -282,8 +284,12 @@ export function applyHealthMonitorPrefs(partial: Partial<HealthMonitorPrefs>): H
   return state.prefs;
 }
 
-export function initHealthMonitor(getWindow: () => BrowserWindow | null): void {
+export function initHealthMonitor(
+  getWindow: () => BrowserWindow | null,
+  inventoryLoader?: () => Promise<ProviderEntry[]>,
+): void {
   getMainWindow = getWindow;
+  if (inventoryLoader) loadInventory = inventoryLoader;
   state.prefs = readHealthMonitorPrefs();
 
   if (startupTimer) clearTimeout(startupTimer);

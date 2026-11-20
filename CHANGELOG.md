@@ -9,6 +9,27 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.3.1] - 2026-11-20
+
+View windows show each terminal's folder and whether its agent is waiting, and inventory no longer sends Claude a prompt just to read the model.
+
+### Added
+
+- **View-window sidebar** — Each row shows the terminal's folder under the title, and the same running, waiting, or stalled light as the main sidebar (on the icon when the sidebar is collapsed). The pane header gets the status dot too.
+
+### Fixed
+
+- **New terminal in a view window** — The menu lists installed AI CLIs again. It had been offering only the plain shell.
+- **Claude model detection** — Inventory and doctor read the model from Claude's settings files. They no longer run `claude config get model`, which current Claude Code treats as a prompt: a paid request that waited out the timeout on every scan.
+
+### Changed
+
+- **Faster scans** — Doctor, update, and the skills, MCP, and config inventory skip remote model-list fetches. Overview and per-tool text output do the same. `inventory models` and `--json` still load the full list.
+- **Update check** — Looking up the latest npm versions no longer freezes the app. A successful lookup is reused for an hour.
+- **Inventory** — Overlapping scans share one run instead of each starting a full detection.
+
+[5.3.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.3.1
+
 ## [5.3.0] - 2026-11-20
 
 Terminals stay put when you switch away, and you can see what an agent changed, resume an old Claude conversation, and read what a pane spent.
