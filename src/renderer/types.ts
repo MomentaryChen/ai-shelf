@@ -1286,6 +1286,8 @@ export type PaneViewAction =
   | { type: "resize"; splitId: string; ratio: number }
   | { type: "cwd"; sessionId: string; cwd: string }
   | { type: "title"; sessionId: string; title: string }
+  /** User title for a pane ("" clears it back to the auto / tool label). */
+  | { type: "rename"; paneId: string; title: string }
   | { type: "bounds"; bounds: PaneViewRect };
 
 /** Main → origin window. */

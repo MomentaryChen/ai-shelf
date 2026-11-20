@@ -491,6 +491,7 @@ function ChatTabInner({
     closePaneInStashedProfile,
     getProfileLayoutByKey,
     insertPaneInStashedProfile,
+    renamePaneInStashedProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -1901,6 +1902,17 @@ function ChatTabInner({
     );
   }
 
+  /** Rename a pane wherever its profile is (active layout or stashed). */
+  function renameProfilePane(profileKey: string, paneId: string, title: string) {
+    if (activeProfileKey === profileKey && layoutRef.current && findPane(layoutRef.current, paneId)) {
+      renamePane(paneId, title);
+      return;
+    }
+    renamePaneInStashedProfile(paneId, title, (workspaceId, profileId) =>
+      profileByKey(`${workspaceId}:${profileId}`),
+    );
+  }
+
   /** Same array back when `fn` changes nothing (keeps syncs / store writes quiet). */
   function updateView(viewId: string, fn: (view: PaneView) => PaneView) {
     setViews((prev) => {
@@ -2083,6 +2095,9 @@ function ChatTabInner({
       case "title":
         reportPaneTitle(action.sessionId, action.title);
         return;
+      case "rename":
+        renameProfilePane(view.profileKey, action.paneId, action.title);
+        return;
       case "bounds":
         updateView(view.id, (v) => ({ ...v, bounds: action.bounds }));
         return;
@@ -2252,8 +2267,14 @@ function ChatTabInner({
           });
         }}
         onTerminalRename={(profileId, terminalId, title) => {
-          if (activeProfile?.id !== profileId) return;
-          renamePane(terminalId, title);
+          if (activeProfile?.id === profileId) {
+            renamePane(terminalId, title);
+            return;
+          }
+          // A terminal of a background profile (e.g. shown in a view window).
+          renamePaneInStashedProfile(terminalId, title, (workspaceId, id) =>
+            profileByKey(`${workspaceId}:${id}`),
+          );
         }}
         onTerminalClose={(profileId, terminalId) => {
           if (activeProfile?.id !== profileId) return;

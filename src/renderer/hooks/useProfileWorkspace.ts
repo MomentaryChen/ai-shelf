@@ -898,6 +898,36 @@ export function useProfileWorkspace(
     [cacheKey, persistProfile],
   );
 
+  /**
+   * Set a pane's user title in a stashed (non-active) profile: a rename from a view
+   * window or the sidebar after the origin switched profiles. Saves the profile.
+   * False when no stashed profile holds the pane.
+   */
+  const renamePaneInStashedProfile = useCallback(
+    (
+      paneId: string,
+      title: string,
+      resolveProfile: (workspaceId: string, profileId: string) => ProfileInfo | null,
+    ): boolean => {
+      const active = activeProfileRef.current;
+      const activeKey = active ? cacheKey(active.workspaceId, active.id) : null;
+      const normalized = normalizePaneTitle(title);
+      for (const [key, entry] of profileLiveCacheRef.current.entries()) {
+        if (key === activeKey || !findPane(entry.layout, paneId)) continue;
+        const layoutNext = mapPanesInTree(entry.layout, (p) =>
+          p.id === paneId ? { ...p, title: normalized } : p,
+        );
+        profileLiveCacheRef.current.set(key, { ...entry, layout: layoutNext });
+        const { workspaceId, profileId } = parseProfileCacheKey(key);
+        const profile = resolveProfile(workspaceId, profileId);
+        if (profile) void persistProfile(profile, layoutNext);
+        return true;
+      }
+      return false;
+    },
+    [cacheKey, persistProfile],
+  );
+
   // Memoized so it only rebuilds when layout / minimized / focus actually change
   // references — a fresh tree every render would remount-reconcile every pane.
   const displayLayout = useMemo(
@@ -950,5 +980,6 @@ export function useProfileWorkspace(
     closePaneInStashedProfile,
     getProfileLayoutByKey,
     insertPaneInStashedProfile,
+    renamePaneInStashedProfile,
   };
 }
