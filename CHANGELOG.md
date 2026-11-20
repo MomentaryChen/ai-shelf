@@ -9,6 +9,20 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.2.1] - 2026-11-20
+
+View windows can split, pick a tool for a new terminal, and rename panes.
+
+### Added
+
+- **View-window new terminals** — Pane headers in a view window have split right and split down, same as the main window (the new pane uses that pane's tool and folder). The title bar has a **New terminal** menu for a plain shell or any installed AI CLI, opened beside the focused pane. The sidebar **New terminal** button is unchanged.
+
+### Fixed
+
+- **Rename in a view window** — Double-click a pane header or a sidebar title in a view window to rename that terminal. Renaming from the main sidebar also applies when that profile is not the one open in the main window, and the name is saved with the profile.
+
+[5.2.1]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.2.1
+
 ## [5.2.0] - 2026-11-13
 
 Tasks run from the card and reuse the same terminal until you close it.

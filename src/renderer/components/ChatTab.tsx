@@ -2278,8 +2278,14 @@ function ChatTabInner({
           });
         }}
         onTerminalRename={(profileId, terminalId, title) => {
-          if (activeProfile?.id !== profileId) return;
-          renamePane(terminalId, title);
+          if (activeProfile?.id === profileId) {
+            renamePane(terminalId, title);
+            return;
+          }
+          // A terminal of a background profile (e.g. shown in a view window).
+          renamePaneInStashedProfile(terminalId, title, (workspaceId, id) =>
+            profileByKey(`${workspaceId}:${id}`),
+          );
         }}
         onTerminalClose={(profileId, terminalId) => {
           if (activeProfile?.id !== profileId) return;
