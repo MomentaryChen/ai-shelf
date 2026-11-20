@@ -8,6 +8,7 @@ import {
   useMemo,
   memo,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -72,6 +73,8 @@ import {
   strongestAttention,
 } from "../../shared/background-agent-attention.js";
 import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
+import { AttentionInbox, type AttentionInboxViewItem } from "./AttentionInbox";
+import { nextAttentionPaneId, sortAttentionInbox } from "../../shared/attention-inbox.js";
 import { isPaneAgentBusy, strongestPaneAgentStatus } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
@@ -594,15 +597,56 @@ function ChatTabInner({
     [backgroundAgentPanes, handleBackgroundNotice],
   );
 
-  const { paneAgentStates, recordPaneAgentInput, backgroundAttention, backgroundPaneAttention } =
-    usePaneAgentAwareness(
-      panes,
-      focusedPaneId,
-      settings,
-      t,
-      windowFocused,
-      backgroundAgentOptions,
-    );
+  const {
+    paneAgentStates,
+    recordPaneAgentInput,
+    backgroundAttention,
+    backgroundPaneAttention,
+    attentionInbox,
+    markPaneSeen,
+  } = usePaneAgentAwareness(
+    panes,
+    focusedPaneId,
+    settings,
+    t,
+    windowFocused,
+    backgroundAgentOptions,
+    active,
+  );
+
+  /** Attention inbox rows, resolved to the pane's current label and profile. */
+  const attentionInboxItems = useMemo<AttentionInboxViewItem[]>(() => {
+    const items: AttentionInboxViewItem[] = [];
+    for (const item of sortAttentionInbox(attentionInbox)) {
+      const local = panes.find((p) => p.id === item.paneId);
+      if (local) {
+        items.push({
+          ...item,
+          paneLabel: paneDisplayLabel(local),
+          profileName: activeProfile?.name ?? null,
+        });
+        continue;
+      }
+      const bg = backgroundAgentPanes.find((b) => b.pane.id === item.paneId);
+      if (bg) {
+        items.push({ ...item, paneLabel: paneDisplayLabel(bg.pane), profileName: bg.profileName });
+      }
+    }
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attentionInbox, layout, backgroundAgentPanes, activeProfile?.name]);
+  const attentionInboxItemsRef = useRef(attentionInboxItems);
+  attentionInboxItemsRef.current = attentionInboxItems;
+  /** Jump to / focus a pane wherever it lives (view window, stashed profile, this layout). */
+  const jumpToPaneRef = useRef((_paneId: string) => {});
+  /** Attention inbox: jump to the oldest pane waiting on the user (skips the one in view). */
+  const jumpNextAttention = useCallback(() => {
+    const current = active && windowFocused ? focusedPaneId : null;
+    const paneId = nextAttentionPaneId(attentionInboxItemsRef.current, current);
+    if (paneId) jumpToPaneRef.current(paneId);
+  }, [active, windowFocused, focusedPaneId]);
+  const jumpNextAttentionRef = useRef(jumpNextAttention);
+  jumpNextAttentionRef.current = jumpNextAttention;
 
   const handleTerminalNotify = useTerminalNotifications({
     panes,
@@ -1251,22 +1295,28 @@ function ChatTabInner({
     return unsub;
   }, []);
 
+  jumpToPaneRef.current = (paneId: string) => {
+    // A pane in a view window never becomes this window's focused pane, so clear it here.
+    markPaneSeen(paneId);
+    if (findViewOfPane(viewsRef.current, paneId)) {
+      void window.api.paneViewFocus(paneId);
+      return;
+    }
+    const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
+    if (bg) {
+      void openBackgroundPaneRef.current(bg.profileId, paneId);
+      return;
+    }
+    if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+    else setFocusedPaneId(paneId);
+  };
+
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
-      if (findViewOfPane(viewsRef.current, paneId)) {
-        void window.api.paneViewFocus(paneId);
-        return;
-      }
-      const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
-      if (bg) {
-        void openBackgroundPaneRef.current(bg.profileId, paneId);
-        return;
-      }
-      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
-      else setFocusedPaneId(paneId);
+      jumpToPaneRef.current(paneId);
     });
     return unsub;
-  }, [activeProfile, focusPaneInDisplay]);
+  }, []);
 
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
     if (findViewOfPane(viewsRef.current, paneId)) {
@@ -1551,6 +1601,10 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         setCommandHistoryOpen(true);
       },
+      jumpNextAttention: () => {
+        onRequestTerminalMode?.();
+        jumpNextAttentionRef.current();
+      },
     }),
     [
       addPane,
@@ -1579,6 +1633,7 @@ function ChatTabInner({
       currentGroupId: paletteGroupId,
       paneCount: panes.length,
       savedCommands: activeProfile?.savedCommands ?? [],
+      attentionCount: attentionInboxItems.length,
     },
     paletteActions,
   );
@@ -1757,6 +1812,7 @@ function ChatTabInner({
       const next = equalizeAllSplits(shownLayout);
       setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
     },
+    onJumpNextAttention: jumpNextAttention,
   });
 
   // --- Profile view windows -------------------------------------------------
@@ -2549,6 +2605,15 @@ function ChatTabInner({
         splitRight: paneShortcutLabels.splitRight ?? t("keybindings.unbound"),
         splitDown: paneShortcutLabels.splitDown ?? t("keybindings.unbound"),
       }}
+      inbox={
+        <AttentionInbox
+          items={attentionInboxItems}
+          onOpen={(paneId) => jumpToPaneRef.current(paneId)}
+          onJumpNext={jumpNextAttention}
+          jumpShortcut={shortcutKeys("nextAttentionPane", keymap)}
+          embedded={Boolean(titleBarSlot)}
+        />
+      }
     />
   );
 
@@ -2911,9 +2976,12 @@ function WarpTopBar({
   available,
   splitShortcutLabels,
   embedded = false,
+  inbox,
 }: {
   /** Rendered inside the app title bar instead of as its own row. */
   embedded?: boolean;
+  /** Attention inbox entry point (shown first among the right-hand actions). */
+  inbox?: ReactNode;
   profileKey?: string | null;
   profileEnterClass?: string;
   profileLabel: string | null;
@@ -2970,6 +3038,7 @@ function WarpTopBar({
       {restoring && <span className="text-[11px] text-chrome-text-subtle">{t("chat.restoringShort")}</span>}
 
       <div className={`ml-auto flex shrink-0 items-center gap-2 ${embedded ? "app-no-drag" : ""}`}>
+        {inbox}
         {panesLeft <= PANES_LEFT_HINT_THRESHOLD && (
           <span
             role="status"

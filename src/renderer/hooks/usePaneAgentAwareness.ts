@@ -20,6 +20,12 @@ import {
   type BackgroundAttentionKind,
   type BackgroundAttentionMap,
 } from "../../shared/background-agent-attention.js";
+import {
+  lastMeaningfulLine,
+  reduceAttentionInbox,
+  type AttentionInboxEvent,
+  type AttentionInboxMap,
+} from "../../shared/attention-inbox.js";
 import { paneDisplayLabel } from "../utils/pane-label";
 import { paneNotifyDedupe } from "../terminal/terminal-notify";
 import type { MessageKey } from "../i18n/messages/en";
@@ -97,6 +103,8 @@ export function usePaneAgentAwareness(
   t: (key: MessageKey, params?: Record<string, string | number>) => string,
   windowFocused: boolean,
   background: BackgroundAgentOptions = NO_BACKGROUND,
+  /** This terminal view is on screen (false in Inventory / Tasks mode). */
+  viewActive = true,
 ) {
   const [states, setStates] = useState<Record<string, PaneAgentState>>({});
   const statesRef = useRef(states);
@@ -118,6 +126,16 @@ export function usePaneAgentAwareness(
   onNoticeRef.current = background.onNotice;
   const windowFocusedRef = useRef(windowFocused);
   windowFocusedRef.current = windowFocused;
+  const focusedPaneIdRef = useRef(focusedPaneId);
+  focusedPaneIdRef.current = focusedPaneId;
+  const viewActiveRef = useRef(viewActive);
+  viewActiveRef.current = viewActive;
+  /** The user is looking at this pane right now (independent of notification settings). */
+  const isViewingPane = useCallback(
+    (paneId: string) =>
+      viewActiveRef.current && windowFocusedRef.current && focusedPaneIdRef.current === paneId,
+    [],
+  );
   const backgroundByPane = useMemo(() => {
     const map = new Map<string, BackgroundAgentPane>();
     for (const b of backgroundPanes) map.set(b.pane.id, b);
@@ -148,6 +166,32 @@ export function usePaneAgentAwareness(
     const paneIds = new Set(backgroundByPane.keys());
     dispatchAttention({ type: "retain", paneIds });
   }, [backgroundByPane, dispatchAttention]);
+
+  /** Attention inbox: every tracked pane (any profile) waiting on the user. */
+  const [inbox, setInbox] = useState<AttentionInboxMap>({});
+  const dispatchInbox = useCallback((event: AttentionInboxEvent) => {
+    setInbox((prev) => reduceAttentionInbox(prev, event));
+  }, []);
+  const paneTailLine = useCallback(
+    (paneId: string) => lastMeaningfulLine(draftRef.current[paneId]?.tail ?? ""),
+    [],
+  );
+
+  useEffect(() => {
+    dispatchInbox({ type: "retain", paneIds: new Set(trackedPanes.map((p) => p.id)) });
+  }, [trackedPanes, dispatchInbox]);
+
+  // Looking at a pane clears its inbox entry.
+  useEffect(() => {
+    if (focusedPaneId && windowFocused && viewActive) {
+      dispatchInbox({ type: "seen", paneId: focusedPaneId });
+    }
+  }, [focusedPaneId, windowFocused, viewActive, dispatchInbox]);
+
+  const markPaneSeen = useCallback(
+    (paneId: string) => dispatchInbox({ type: "seen", paneId }),
+    [dispatchInbox],
+  );
 
   const paneBySession = useRef(new Map<string, PaneInfo>());
   useEffect(() => {
@@ -245,6 +289,13 @@ export function usePaneAgentAwareness(
         if (!shouldNotifyPane(pane)) return;
 
         readyNotifiedRef.current[pane.id] = true;
+        dispatchInbox({
+          type: "finished",
+          paneId: pane.id,
+          at: Date.now(),
+          line: paneTailLine(pane.id),
+          viewing: isViewingPane(pane.id),
+        });
         const bg = backgroundByPaneRef.current.get(pane.id);
         if (bg) {
           dispatchAttention({
@@ -263,7 +314,15 @@ export function usePaneAgentAwareness(
         );
       }, PANE_AGENT_READY_IDLE_STABLE_MS);
     },
-    [clearReadyPending, dispatchAttention, notify, shouldNotifyPane],
+    [
+      clearReadyPending,
+      dispatchAttention,
+      dispatchInbox,
+      isViewingPane,
+      notify,
+      paneTailLine,
+      shouldNotifyPane,
+    ],
   );
 
   const handleTransition = useCallback(
@@ -278,6 +337,16 @@ export function usePaneAgentAwareness(
       if (next === "running" || next === "waiting_input") {
         clearReadyPending(pane.id);
       }
+
+      // Inbox first: it must not depend on notification settings or cooldowns.
+      dispatchInbox({
+        type: "status",
+        paneId: pane.id,
+        next,
+        at: Date.now(),
+        line: paneTailLine(pane.id),
+        viewing: isViewingPane(pane.id),
+      });
 
       const bg = backgroundByPaneRef.current.get(pane.id);
       if (bg) {
@@ -324,7 +393,10 @@ export function usePaneAgentAwareness(
     [
       clearReadyPending,
       dispatchAttention,
+      dispatchInbox,
+      isViewingPane,
       notify,
+      paneTailLine,
       scheduleReadyNotify,
       settings,
       shouldNotifyPane,
@@ -430,6 +502,7 @@ export function usePaneAgentAwareness(
       draftRef.current = {};
       setStates({});
       setAttention({});
+      setInbox({});
       prevStatusRef.current = {};
       readyNotifiedRef.current = {};
       for (const id of Object.keys(readyPendingRef.current)) {
@@ -469,6 +542,16 @@ export function usePaneAgentAwareness(
       if (pane) {
         readyNotifiedRef.current[pane.id] = false;
         clearReadyPending(pane.id);
+        if (exitCode !== 0) {
+          // Snapshot the last line now: the state (and tail) is reset just below.
+          dispatchInbox({
+            type: "exited",
+            paneId: pane.id,
+            exitCode,
+            at: Date.now(),
+            line: paneTailLine(pane.id),
+          });
+        }
         const bg = backgroundByPaneRef.current.get(pane.id);
         if (bg && exitCode !== 0) {
           dispatchAttention({
@@ -514,8 +597,10 @@ export function usePaneAgentAwareness(
     clearReadyPending,
     commitPaneState,
     dispatchAttention,
+    dispatchInbox,
     flushPendingOutput,
     notify,
+    paneTailLine,
     scheduleOutputFlush,
     settings,
     updateSession,
@@ -655,5 +740,9 @@ export function usePaneAgentAwareness(
     backgroundAttention,
     /** Per-pane background attention (keyed by pane id). */
     backgroundPaneAttention: attention,
+    /** Attention inbox: panes in any profile waiting on the user (keyed by pane id). */
+    attentionInbox: inbox,
+    /** Clear a pane's inbox entry (opened from the inbox / a notification). */
+    markPaneSeen,
   };
 }
