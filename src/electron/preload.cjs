@@ -313,4 +313,7 @@ contextBridge.exposeInMainWorld("api", {
   wslDistroIp: (distro) => ipcRenderer.invoke("wsl-distro-ip", distro),
   gitCwdInfo: (cwd) => ipcRenderer.invoke("git-cwd-info", cwd),
   gitWorktreeAdd: (req) => ipcRenderer.invoke("git-worktree-add", req),
+  conversationsList: (opts) => ipcRenderer.invoke("conversations-list", opts),
+  conversationsRead: (provider, sessionId) => ipcRenderer.invoke("conversations-read", provider, sessionId),
+  conversationsSearch: (query) => ipcRenderer.invoke("conversations-search", query),
 });

@@ -44,6 +44,8 @@ export interface SpawnPaneOptions {
   resumeAgentSessionId?: string;
   /** Task prompt typed into the agent once it starts; never stored with the pane. */
   initialInput?: string;
+  /** Resume even when the "Resume agent conversations" setting is off (explicit user action). */
+  forceAgentSession?: boolean;
 }
 
 /** Lets the caller keep extra per-profile state (view windows) in step with save / restore. */

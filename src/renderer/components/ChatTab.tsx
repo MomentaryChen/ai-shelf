@@ -76,6 +76,11 @@ import { isPaneAgentBusy, strongestPaneAgentStatus } from "../../shared/pane-age
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
 import { CommandHistoryPanel, type SaveCommandResult } from "./CommandHistoryPanel";
+import {
+  ConversationHistoryDialog,
+  type ConversationResumeOutcome,
+} from "./ConversationHistoryDialog";
+import type { ConversationSummary } from "../../shared/conversation-history.js";
 import { savedCommandNameFor } from "../terminal/command-history";
 import {
   copySplitRatios,
@@ -296,6 +301,7 @@ function ChatTabInner({
     setViewsState(value);
   }, []);
   const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
+  const [conversationHistoryOpen, setConversationHistoryOpen] = useState(false);
   /** Pane the "new pane in a git worktree" dialog splits from. */
   const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
@@ -371,7 +377,9 @@ function ChatTabInner({
     const localCwd = remote || isRemotePaneCwd(cwd) ? "" : cwd;
     // Conversation resume reads the local transcript store, so remote panes skip it.
     const agentSession =
-      !remote && settings.terminalResumeAgentSessions && agentSessionSupported(tool)
+      !remote &&
+      (settings.terminalResumeAgentSessions || opts?.forceAgentSession) &&
+      agentSessionSupported(tool)
         ? { resumeId: opts?.resumeAgentSessionId }
         : undefined;
     const initialInput = opts?.initialInput?.trim() ? { initialInput: opts.initialInput } : {};
@@ -894,7 +902,13 @@ function ChatTabInner({
       cwd?: string,
       splitTargetId?: string,
       direction: SplitDirection = "horizontal",
-      opts?: { keepOthersVisible?: boolean; initialInput?: string; taskId?: string },
+      opts?: {
+        keepOthersVisible?: boolean;
+        initialInput?: string;
+        taskId?: string;
+        /** Conversation to resume (history "Resume in new pane"); bypasses the resume setting. */
+        resumeAgentSessionId?: string;
+      },
     ): Promise<PaneInfo | null> => {
       if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
@@ -913,7 +927,14 @@ function ChatTabInner({
         tool || "shell",
         resolveCwd(cwd),
         activeRemoteRef.current,
-        opts?.initialInput ? { initialInput: opts.initialInput } : undefined,
+        opts?.initialInput || opts?.resumeAgentSessionId
+          ? {
+              ...(opts.initialInput ? { initialInput: opts.initialInput } : {}),
+              ...(opts.resumeAgentSessionId
+                ? { resumeAgentSessionId: opts.resumeAgentSessionId, forceAgentSession: true }
+                : {}),
+            }
+          : undefined,
       );
       if (!spawned) return null;
       // A shell fallback never got the prompt, so it is not the task's terminal.
@@ -1381,6 +1402,49 @@ function ChatTabInner({
   handleNewTerminalRef.current = handleNewTerminal;
 
   /**
+   * Conversation history "Resume in new pane": focus the pane that already holds the
+   * conversation, else open a pane in its cwd that launches `claude --resume <id>`
+   * through the same agent-session path restored panes use.
+   */
+  async function resumeConversation(session: ConversationSummary): Promise<ConversationResumeOutcome> {
+    if (addingTerminal || profileBusy || isRestoring()) return "busy";
+    if (!session.cwd) return "failed";
+    // Two panes writing the same transcript would corrupt it — reuse the open one.
+    for (const profile of allProfiles) {
+      const open = getProfilePanes(profile.id).find((p) => p.agentSessionId === session.sessionId);
+      if (open) {
+        onRequestTerminalMode?.();
+        await restorePaneToDisplayById(profile.id, open.id);
+        return "focused";
+      }
+    }
+    const local = panes.find((p) => p.agentSessionId === session.sessionId);
+    if (local) {
+      onRequestTerminalMode?.();
+      setFocusedPaneId(local.id);
+      return "focused";
+    }
+    // The transcript lives on this machine; a remote (SSH) profile cannot resume it.
+    if (activeRemoteRef.current) return "remote";
+    onRequestTerminalMode?.();
+    setAddingTerminal(true);
+    setTerminalError(null);
+    try {
+      const created = await addPane(session.tool, session.cwd, undefined, "horizontal", {
+        resumeAgentSessionId: session.sessionId,
+      });
+      if (!created) return "failed";
+      // Main starts a fresh conversation when it cannot resume (WSL shell, launch flags
+      // that pick a conversation, transcript not found) — say so instead of hiding it.
+      return created.agentSessionId === session.sessionId ? "ok" : "not-resumed";
+    } catch {
+      return "failed";
+    } finally {
+      setAddingTerminal(false);
+    }
+  }
+
+  /**
    * Tasks: activate the task's profile (by id, or by name for hand-written files), open a
    * pane with its agent tool, and have main type the prompt in once the agent is ready.
    */
@@ -1550,6 +1614,10 @@ function ChatTabInner({
       openCommandHistory: () => {
         onRequestTerminalMode?.();
         setCommandHistoryOpen(true);
+      },
+      openConversationHistory: () => {
+        onRequestTerminalMode?.();
+        setConversationHistoryOpen(true);
       },
     }),
     [
@@ -2466,6 +2534,11 @@ function ChatTabInner({
         cwd={(worktreePaneId ? panes.find((p) => p.id === worktreePaneId)?.cwd : null) ?? ""}
         onClose={() => setWorktreePaneId(null)}
         onCreated={openWorktreePane}
+      />
+      <ConversationHistoryDialog
+        open={conversationHistoryOpen}
+        onClose={() => setConversationHistoryOpen(false)}
+        onResume={(session) => resumeConversation(session)}
       />
       <CommandHistoryPanel
         open={commandHistoryOpen}

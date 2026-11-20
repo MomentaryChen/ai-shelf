@@ -11,6 +11,12 @@ import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../sha
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
+import type {
+  ConversationDetail,
+  ConversationProviderId,
+  ConversationSearchResult,
+  ConversationSummary,
+} from "../shared/conversation-history.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
@@ -1218,6 +1224,20 @@ export interface ElectronAPI {
   gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
   /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
   gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
+  /** Past agent conversations (Claude Code transcripts), newest first. */
+  conversationsList: (opts?: {
+    /** Re-check cached facts such as whether each session's folder still exists. */
+    refresh?: boolean;
+  }) => Promise<{ success: boolean; sessions?: ConversationSummary[]; error?: string }>;
+  /** One conversation with its messages (capped for preview). */
+  conversationsRead: (
+    provider: ConversationProviderId,
+    sessionId: string,
+  ) => Promise<{ success: boolean; detail?: ConversationDetail; error?: string }>;
+  /** Full-text search across conversations; a newer call cancels an older one. */
+  conversationsSearch: (
+    query: string,
+  ) => Promise<{ success: boolean; result?: ConversationSearchResult; error?: string }>;
 }
 
 export type WslDistroRow = {

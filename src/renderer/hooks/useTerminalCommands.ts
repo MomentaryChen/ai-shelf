@@ -3,6 +3,7 @@ import {
   AppWindow,
   FolderGit2,
   History,
+  MessagesSquare,
   Monitor,
   Radio,
   Terminal,
@@ -28,6 +29,8 @@ export interface TerminalCommandActions {
   newWorktreePane: () => void;
   /** Open the OSC 133 command history panel. */
   openCommandHistory?: () => void;
+  /** Open the past agent conversations (Claude Code) browser. */
+  openConversationHistory?: () => void;
 }
 
 export interface TerminalCommandOptions {
@@ -52,7 +55,7 @@ export function useTerminalCommands(
 ): Command[] {
   const { addPane, openExternal, activateProfile, broadcastCommand, runSavedCommand, newWorktreePane } =
     actions;
-  const { openCommandHistory } = actions;
+  const { openCommandHistory, openConversationHistory } = actions;
   const { currentGroupId, paneCount, savedCommands } = options;
 
   return useMemo(() => {
@@ -95,6 +98,17 @@ export function useTerminalCommands(
         keywords: "command history recent commands rerun search osc 133 shell",
         shortcut: shortcutKeys("commandHistory"),
         run: () => openCommandHistory(),
+      });
+    }
+
+    if (openConversationHistory) {
+      cmds.push({
+        id: "conversation-history",
+        title: t("conversations.open"),
+        group: t("cmd.group.agents"),
+        icon: icon(MessagesSquare),
+        keywords: "conversation history resume past session claude transcript search chat",
+        run: () => openConversationHistory(),
       });
     }
 
@@ -207,5 +221,6 @@ export function useTerminalCommands(
     runSavedCommand,
     newWorktreePane,
     openCommandHistory,
+    openConversationHistory,
   ]);
 }
