@@ -157,6 +157,9 @@ function parseDecl(raw: unknown): PaneViewDecl | null {
     focusedPaneId: str(d.focusedPaneId),
     labels: parseRecord(d.labels, (v) => (typeof v === "string" ? v : null)),
     busy: parseRecord(d.busy, (v) => (typeof v === "boolean" ? v : null)),
+    agentStatus: parseRecord(d.agentStatus, (v) =>
+      v === "running" || v === "waiting_input" || v === "stalled" ? v : null,
+    ),
     bounds: parseRect(d.bounds),
   };
 }

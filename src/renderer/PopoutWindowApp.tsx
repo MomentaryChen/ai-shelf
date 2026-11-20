@@ -10,6 +10,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EditablePaneTitle } from "./components/EditablePaneTitle";
 import { EmbeddedTerminal } from "./components/EmbeddedTerminal";
+import { PaneAgentStatusLight } from "./components/PaneAgentStatusDot";
 import { BusyPaneCloseDialog } from "./components/BusyPaneCloseDialog";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SplitPaneLayout } from "./components/SplitPaneLayout";
@@ -439,6 +440,8 @@ export function PopoutWindowApp() {
               {panes.map((pane) => {
                 const label = view.labels[pane.id] ?? pane.title ?? pane.tool;
                 const isFocused = pane.id === focusedPane?.id;
+                const agentStatus = view.agentStatus?.[pane.id] ?? null;
+                const cwd = pane.cwd.trim();
                 return (
                   <li key={pane.id} className="group relative">
                     {/* Not a <button>: the title turns into an input on double-click. */}
@@ -453,25 +456,41 @@ export function PopoutWindowApp() {
                           focusPane(pane.id);
                         }
                       }}
-                      title={sidebarCollapsed ? label : pane.cwd || label}
+                      title={cwd ? `${label}\n${cwd}` : label}
                       aria-current={isFocused ? "true" : undefined}
-                      className={`flex h-8 w-full cursor-pointer items-center gap-2 rounded-md text-left text-[12px] transition-colors ${
-                        sidebarCollapsed ? "justify-center px-0" : "px-2 pr-7"
+                      className={`flex w-full cursor-pointer gap-2 rounded-md text-left text-[12px] transition-colors ${
+                        sidebarCollapsed ? "h-8 items-center justify-center px-0" : "items-start px-2 py-1 pr-7"
                       } ${
                         isFocused
                           ? "bg-chrome-hover text-chrome-text"
                           : "text-chrome-text-muted hover:bg-chrome-hover hover:text-chrome-text"
                       }`}
                     >
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                      <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                         <ToolLogo tool={pane.tool} size={14} />
+                        {sidebarCollapsed && (
+                          <PaneAgentStatusLight
+                            status={agentStatus}
+                            className="absolute -right-0.5 -top-0.5 ring-2 ring-chrome-surface"
+                          />
+                        )}
                       </span>
                       {!sidebarCollapsed && (
-                        <EditablePaneTitle
-                          label={label}
-                          onRename={(title) => renamePane(pane.id, title)}
-                          className="flex-1"
-                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex min-h-5 items-center gap-1">
+                            <EditablePaneTitle
+                              label={label}
+                              onRename={(title) => renamePane(pane.id, title)}
+                              className="min-w-0 truncate"
+                            />
+                            <PaneAgentStatusLight status={agentStatus} />
+                          </span>
+                          {cwd ? (
+                            <span className="block truncate text-[10px] leading-tight text-chrome-text-dim">
+                              {cwd}
+                            </span>
+                          ) : null}
+                        </span>
                       )}
                     </div>
                     {!sidebarCollapsed && (
@@ -518,6 +537,7 @@ export function PopoutWindowApp() {
             bg={bg}
             profileAccentColor={view.accentColor}
             paneLabels={view.labels}
+            paneAgentStates={view.agentStatus}
             onFocusPane={focusPane}
             onClosePane={(paneId) => closePane(paneId)}
             onResizeSplit={resizeSplit}
