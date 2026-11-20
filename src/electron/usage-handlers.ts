@@ -20,6 +20,7 @@ import {
 import { testGeminiApiKey, testGeminiGcpCredentials } from "../usage/providers/gemini.js";
 import { USAGE_PROVIDERS } from "../usage/registry.js";
 import type { UsageToolId } from "../usage/types.js";
+import { readAgentSessionUsage } from "./agent-session-usage.js";
 
 function asToolId(tool: unknown): UsageToolId | null {
   if (typeof tool !== "string") return null;
@@ -27,6 +28,11 @@ function asToolId(tool: unknown): UsageToolId | null {
 }
 
 export function registerUsageHandlers(): void {
+  // Per-pane agent conversation usage (status bar); null when unknown / unreadable.
+  ipcMain.handle("agent-session-usage", (_event, ptySessionId: unknown) =>
+    typeof ptySessionId === "string" ? readAgentSessionUsage(ptySessionId) : null,
+  );
+
   ipcMain.handle("usage-get-providers", () => ({
     providers: USAGE_PROVIDERS,
     encryptionAvailable: isUsageEncryptionAvailable(),
