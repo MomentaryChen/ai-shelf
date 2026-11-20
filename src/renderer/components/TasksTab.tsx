@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Copy,
   FolderOpen,
+  History,
   LayoutTemplate,
   ListChecks,
   Pencil,
@@ -35,6 +36,7 @@ import type {
   RunTaskResult,
   TaskDef,
   TaskInput,
+  TaskRunRecord,
 } from "../types";
 import { TOOL_LAUNCH_CMD } from "../../tools.js";
 import { toolDisplayName } from "../../tool-sort.js";
@@ -47,6 +49,10 @@ import {
   type TaskProfileResolution,
 } from "../tasks/task-utils.js";
 import { TASK_TEMPLATES, localizeTemplate } from "../tasks/task-templates.js";
+import { extractTaskVariables, fillTaskVariables } from "../../shared/task-variables.js";
+import { formatCostUsd } from "../tasks/task-utils.js";
+import { TaskVariablesDialog, type PendingVariableRun } from "./TaskVariablesDialog";
+import { RunStatusPill, TaskRunsDialog, useRunTime } from "./TaskRunsDialog";
 import { Badge } from "./Badge";
 import { Card } from "./Card";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -175,6 +181,12 @@ export function TasksTab({
   const [runError, setRunError] = useState<RunError | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  /** Profile an empty `profileId` runs in, as far as the forest knows. */
+  const [lastActiveProfileId, setLastActiveProfileId] = useState<string | null>(null);
+  const [pendingVars, setPendingVars] = useState<PendingVariableRun | null>(null);
+  const [historyTask, setHistoryTask] = useState<TaskDef | null>(null);
+  const [latestRuns, setLatestRuns] = useState<Record<string, TaskRunRecord>>({});
+  const [runsTick, setRunsTick] = useState(0);
 
   const reload = useCallback(() => setReloadTick((n) => n + 1), []);
   const openIds = useMemo(() => new Set(openTaskIds ?? []), [openTaskIds]);
@@ -193,6 +205,7 @@ export function TasksTab({
         setTasks(list);
         if (forestRes.success && "forest" in forestRes && forestRes.forest) {
           setGroups(forestRes.forest.groups);
+          setLastActiveProfileId(forestRes.forest.lastActiveProfileId);
           setForestLoaded(true);
         }
       })
@@ -206,6 +219,20 @@ export function TasksTab({
       cancelled = true;
     };
   }, [active, reloadTick]);
+
+  // Last-run badges: on show, after a run starts or a terminal closes, and after history edits.
+  const openKey = [...openIds].sort().join(" ");
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    window.api
+      .tasksRunsLatest()
+      .then((map) => !cancelled && setLatestRuns(map))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [active, reloadTick, runsTick, openKey]);
 
   const resolutions = useMemo(() => {
     const map = new Map<string, TaskProfileResolution<ProfileInfo>>();
@@ -311,11 +338,25 @@ export function TasksTab({
       setRunError({ taskId: task.id, taskName: task.name, reason: problem });
       return;
     }
+    // A task with {{variables}} asks for their values first; an open terminal is just shown.
+    const names = openIds.has(task.id) ? [] : extractTaskVariables(task.prompt);
+    if (names.length > 0) {
+      setPendingVars({ task, names, cwd: taskCwd(task) });
+      return;
+    }
+    await start(task, {});
+  };
+
+  const start = async (task: TaskDef, values: Record<string, string>) => {
+    if (runningId) return;
     setRunningId(task.id);
     try {
+      const hasValues = Object.keys(values).length > 0;
       const res = await onRunTask({
         taskId: task.id,
-        prompt: task.prompt,
+        taskName: task.name,
+        prompt: hasValues ? fillTaskVariables(task.prompt, values) : task.prompt,
+        ...(hasValues ? { variables: values } : {}),
         ...(task.profileId?.trim() ? { profileId: task.profileId.trim() } : {}),
         ...(task.tool?.trim() ? { tool: task.tool.trim() } : {}),
       });
@@ -324,8 +365,19 @@ export function TasksTab({
       setRunError({ taskId: task.id, taskName: task.name, reason: "spawn-failed" });
     } finally {
       setRunningId(null);
+      setRunsTick((n) => n + 1);
     }
   };
+
+  /** Folder the task's terminal would open in, for `{{branch}}` and the file picker. */
+  function taskCwd(task: TaskDef): string {
+    const r = resolutions.get(task.id);
+    if (r?.kind === "found") return r.profile.defaultCwd?.trim() ?? "";
+    const activeProfile = groups
+      .flatMap((g) => g.profiles)
+      .find((p) => p.id === lastActiveProfileId);
+    return activeProfile?.defaultCwd?.trim() ?? "";
+  }
 
   function saveErrorText(code: string): string {
     const key = SAVE_ERROR_KEY[code];
@@ -468,8 +520,10 @@ export function TasksTab({
                     resolution={resolutions.get(task.id) ?? { kind: "active" }}
                     running={runningId === task.id}
                     open={openIds.has(task.id)}
+                    lastRun={latestRuns[task.id]}
                     runDisabled={runningId !== null}
                     onRun={() => void run(task)}
+                    onHistory={() => setHistoryTask(task)}
                     onEdit={() => openEdit(task)}
                     onDuplicate={() => void duplicate(task)}
                     onDelete={() => setPendingDelete(task)}
@@ -489,6 +543,21 @@ export function TasksTab({
         saveErrorText={saveErrorText}
         onClose={() => setEditor(null)}
         onSaved={handleSaved}
+      />
+
+      <TaskVariablesDialog
+        pending={pendingVars}
+        onCancel={() => setPendingVars(null)}
+        onRun={(task, values) => {
+          setPendingVars(null);
+          void start(task, values);
+        }}
+      />
+
+      <TaskRunsDialog
+        task={historyTask}
+        onClose={() => setHistoryTask(null)}
+        onChanged={() => setRunsTick((n) => n + 1)}
       />
 
       <TemplatePickerDialog
@@ -521,8 +590,10 @@ function TaskCard({
   resolution,
   running,
   open,
+  lastRun,
   runDisabled,
   onRun,
+  onHistory,
   onEdit,
   onDuplicate,
   onDelete,
@@ -532,14 +603,19 @@ function TaskCard({
   running: boolean;
   /** The task's terminal is open: the card switches to it. */
   open: boolean;
+  lastRun?: TaskRunRecord;
   runDisabled: boolean;
   onRun: () => void;
+  onHistory: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fmtTime = useRunTime(locale);
   const preview = promptPreview(task.prompt, 3);
+  const variables = useMemo(() => extractTaskVariables(task.prompt), [task.prompt]);
+  const lastCost = formatCostUsd(lastRun?.usage?.costUsd);
   const tool = task.tool?.trim();
   const iconBtn =
     "inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-accent-soft hover:text-text-primary";
@@ -621,6 +697,14 @@ function TaskCard({
             {t("tasks.card.open")}
           </span>
         )}
+        {variables.map((name) => (
+          <span
+            key={name}
+            className="rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[11px] text-text-secondary"
+          >
+            {`{{${name}}}`}
+          </span>
+        ))}
       </div>
 
       <pre
@@ -635,6 +719,27 @@ function TaskCard({
       </pre>
 
       <div className="mt-2 flex items-center justify-end gap-0.5">
+        {lastRun && (
+          <button
+            type="button"
+            onClick={alone(onHistory)}
+            className="mr-auto flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-[12px] text-text-secondary hover:text-text-primary"
+            title={t("tasks.action.history")}
+          >
+            <span className="truncate">{t("tasks.card.lastRun", { when: fmtTime(lastRun.startedAt) })}</span>
+            <RunStatusPill run={lastRun} />
+            {lastCost && <span className="tabular-nums">≈ {lastCost}</span>}
+          </button>
+        )}
+        <button
+          type="button"
+          className={iconBtn}
+          onClick={alone(onHistory)}
+          title={t("tasks.action.history")}
+          aria-label={t("tasks.action.history")}
+        >
+          <History className="h-4 w-4" />
+        </button>
         <button type="button" className={iconBtn} onClick={alone(onEdit)} title={t("tasks.action.edit")} aria-label={t("tasks.action.edit")}>
           <Pencil className="h-4 w-4" />
         </button>
@@ -693,7 +798,8 @@ function TaskEditorDialog({
 
   if (!form) return null;
 
-  const set = <K extends keyof EditorState>(key: K, value: EditorState[K]) =>
+  const promptVariables = extractTaskVariables(form.prompt);
+  const set =<K extends keyof EditorState>(key: K, value: EditorState[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
   const profileRef = form.profileId.trim();
@@ -839,6 +945,16 @@ function TaskEditorDialog({
               className="field-sizing-fixed min-h-[200px] resize-y border-chrome-border-subtle bg-chrome-bg font-mono text-[12px] leading-relaxed text-chrome-text placeholder:text-chrome-text-dim"
             />
             <p className={hintClass}>{t("tasks.editor.promptHint")}</p>
+            {promptVariables.length > 0 && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-chrome-text-dim">
+                {t("tasks.editor.variables")}
+                {promptVariables.map((name) => (
+                  <code key={name} className="rounded bg-chrome-bg px-1.5 py-0.5 text-chrome-text-secondary">
+                    {`{{${name}}}`}
+                  </code>
+                ))}
+              </p>
+            )}
           </div>
 
           {error && (

@@ -25,7 +25,12 @@ export type TaskSaveResult = { ok: true; task: TaskDef } | { ok: false; error: s
 export interface RunTaskRequest {
   /** The task's id. A task that already has a live terminal is shown, not started again. */
   taskId?: string;
+  /** Recorded in the run history. */
+  taskName?: string;
+  /** The prompt to send, variables already filled. */
   prompt: string;
+  /** Values the run form filled in, kept with the run record. */
+  variables?: Record<string, string>;
   profileId?: string;
   tool?: string;
 }

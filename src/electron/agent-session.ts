@@ -12,7 +12,12 @@ export function claudeConfigDirForEnv(env: Record<string, string | undefined>): 
   return raw && isAbsolute(raw) ? raw : join(homedir(), ".claude");
 }
 
-/** Path of `<config>/projects/<encoded cwd>/<sessionId>.jsonl`, or null when it does not exist. */
+/** True when `<config>/projects/<encoded cwd>/<sessionId>.jsonl` exists. */
+export function claudeTranscriptExists(configDir: string, cwd: string, sessionId: string): boolean {
+  return findClaudeTranscript(configDir, cwd, sessionId) !== null;
+}
+
+/** Path of `<config>/projects/<encoded cwd>/<sessionId>.jsonl`, or null when it is missing. */
 export function findClaudeTranscript(
   configDir: string,
   cwd: string,
@@ -33,9 +38,4 @@ export function findClaudeTranscript(
     if (existsSync(file)) return file;
   }
   return null;
-}
-
-/** True when `<config>/projects/<encoded cwd>/<sessionId>.jsonl` exists. */
-export function claudeTranscriptExists(configDir: string, cwd: string, sessionId: string): boolean {
-  return findClaudeTranscript(configDir, cwd, sessionId) !== null;
 }

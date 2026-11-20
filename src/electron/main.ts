@@ -188,6 +188,7 @@ import { registerPortsHandlers } from "./ports-handlers.js";
 import { registerOpenInEditorHandlers } from "./open-in-editor.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
 import { registerGitHandlers } from "./git-handlers.js";
+import { registerConversationHistoryHandlers } from "./conversation-history-handlers.js";
 import { registerInstructionFilesHandlers } from "./instruction-files-handlers.js";
 import { initSystemResume } from "./system-resume.js";
 import {
@@ -230,6 +231,21 @@ import {
   writePtyLogRetentionPrefs,
 } from "./pty-log-retention-pref.js";
 import { deleteTask, getTasksDir, initTaskService, listTasks, saveTask } from "./task-service.js";
+import {
+  appendTaskRunOutput,
+  clearTaskRuns,
+  deleteTaskRun,
+  finishTaskRun,
+  initTaskRunStore,
+  interruptAllTaskRuns,
+  latestTaskRuns,
+  listTaskRuns,
+  markTaskRunPromptNotSent,
+  parseTaskRunStart,
+  readTaskRunOutput,
+  resizeTaskRun,
+  startTaskRun,
+} from "./task-run-store.js";
 import type { TaskInput } from "../shared/task-types.js";
 import { InitialInputGate, bracketedPaste } from "../shared/pty-initial-input.js";
 import { previewMcpSync } from "../utils/mcp-sync-preview.js";
@@ -243,6 +259,7 @@ registerPortsHandlers();
 registerOpenInEditorHandlers();
 registerWslHandlers();
 registerGitHandlers();
+registerConversationHistoryHandlers();
 registerInstructionFilesHandlers();
 
 /** Update commands for each AI tool */
@@ -1853,6 +1870,23 @@ ipcMain.handle("pick-folder", async (event, defaultPath?: string) => {
   return canceled ? null : filePaths[0];
 });
 
+/** File picker for a task's `{{file}}` variable; starts in the task's folder. */
+ipcMain.handle("pick-file", async (event, defaultPath?: unknown) => {
+  const trimmed = typeof defaultPath === "string" ? defaultPath.trim() : "";
+  const resolvedDefault =
+    trimmed && existsSync(normalize(trimmed)) ? normalize(trimmed) : undefined;
+  const options: Electron.OpenDialogOptions = {
+    properties: ["openFile"],
+    ...(resolvedDefault ? { defaultPath: resolvedDefault } : {}),
+  };
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const { canceled, filePaths } =
+    parent && !parent.isDestroyed()
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+  return canceled ? null : (filePaths[0] ?? null);
+});
+
 ipcMain.handle(
   "pty-spawn",
   async (
@@ -1866,6 +1900,8 @@ ipcMain.handle(
       remote?: unknown;
       agentSession?: { resumeId?: unknown };
       initialInput?: unknown;
+      /** Tasks: record this spawn as a run of the task (see task-run-store). */
+      taskRun?: unknown;
     },
   ) => {
     let pty: PtyModule;
@@ -1914,19 +1950,33 @@ ipcMain.handle(
     let launchArgs = extraArgs;
     let agentSessionId: string | undefined;
     let agentSessionResumed = false;
-    const agentConfigDir = claudeConfigDirForEnv(process.env);
-    if (!shellOnly && !remote && spawnOptions?.agentSession && shell !== "wsl") {
-      const resumeId = spawnOptions.agentSession.resumeId;
+    const initialInput =
+      !shellOnly && typeof spawnOptions?.initialInput === "string"
+        ? spawnOptions.initialInput.trim()
+        : "";
+    // A task run is recorded only when its prompt will be typed in (never a shell fallback).
+    const taskRun = initialInput ? parseTaskRunStart(spawnOptions?.taskRun) : null;
+    const claudeConfigDir = claudeConfigDirForEnv(process.env);
+    // Task runs also get a conversation id when resume is off, so their usage can be read;
+    // it is then kept for the run record only and not returned to the pane.
+    const wantsSession = !!spawnOptions?.agentSession || !!taskRun;
+    if (!shellOnly && !remote && wantsSession && shell !== "wsl") {
+      const resumeId = spawnOptions?.agentSession?.resumeId;
       const sessionPlan = planAgentSessionLaunch({
         tool,
         extraArgs,
         resumeId: typeof resumeId === "string" ? resumeId : undefined,
-        transcriptExists: (id) => claudeTranscriptExists(agentConfigDir, workDir, id),
+        transcriptExists: (id) => claudeTranscriptExists(claudeConfigDir, workDir, id),
         newId: randomUUID,
       });
       launchArgs = sessionPlan.extraArgs;
       agentSessionId = sessionPlan.sessionId;
       agentSessionResumed = sessionPlan.resumed;
+    }
+    const runAgentSessionId = agentSessionId;
+    if (!spawnOptions?.agentSession) {
+      agentSessionId = undefined;
+      agentSessionResumed = false;
     }
 
     const cmd: string = shellOnly ? "" : (resolveToolLaunchCommand(tool, launchArgs) ?? "");
@@ -1999,7 +2049,7 @@ ipcMain.handle(
         trackAgentSessionUsage(sessionId, {
           tool,
           agentSessionId,
-          configDir: agentConfigDir,
+          configDir: claudeConfigDir,
           cwd: workDir,
         });
       }
@@ -2018,6 +2068,7 @@ ipcMain.handle(
 
       proc.onData((data) => {
         broadcastPtyData(sessionId, data);
+        appendTaskRunOutput(sessionId, data);
         const meta = PTY_META.get(sessionId);
         if (!meta) return;
         const next = scanOsc133Running(meta.osc133, data);
@@ -2034,13 +2085,23 @@ ipcMain.handle(
         /* ignore */
       }
 
-      const initialInput =
-        !shellOnly && typeof spawnOptions?.initialInput === "string"
-          ? spawnOptions.initialInput.trim()
-          : "";
+      if (taskRun) {
+        startTaskRun(sessionId, taskRun, {
+          tool,
+          // Remote panes run on the other host; record `[user@]host:dir` like the status bar.
+          cwd: remote
+            ? `${remote.user ? `${remote.user}@` : ""}${remote.host}:${remote.cwd || "~"}`
+            : workDir,
+          prompt: initialInput,
+          cols: ptyOpts.cols,
+          rows: ptyOpts.rows,
+          ...(runAgentSessionId ? { agentSessionId: runAgentSessionId, claudeConfigDir } : {}),
+        });
+      }
       if (initialInput) scheduleInitialInput(sessionId, proc, initialInput);
 
       proc.onExit(({ exitCode }) => {
+        finishTaskRun(sessionId, exitCode, "exited");
         PTY_SESSIONS.delete(sessionId);
         // Keep the output buffer for Find / export until the pane is killed.
         retainPtyBufferOnExit(sessionId);
@@ -2089,6 +2150,7 @@ function scheduleInitialInput(
     stop();
     if (decision === "give-up") {
       console.warn("[pty-spawn] task prompt not sent: agent stayed on a start-up dialog");
+      markTaskRunPromptNotSent(sessionId);
       return;
     }
     proc.write(bracketedPaste(text));
@@ -2237,6 +2299,7 @@ function ptySessionGoneResult(sessionId: string): { success: false; error: strin
 }
 
 function markPtySessionDead(sessionId: string, exitCode: number) {
+  finishTaskRun(sessionId, exitCode, "exited");
   PTY_SESSIONS.delete(sessionId);
   retainPtyBufferOnExit(sessionId);
   const meta = PTY_META.get(sessionId);
@@ -2286,6 +2349,7 @@ ipcMain.handle("pty-resize", (e, sessionId: string, cols: number, rows: number) 
   if (!proc) return ptySessionGoneResult(sessionId);
   try {
     proc.resize(cols, rows);
+    resizeTaskRun(sessionId, cols, rows);
     const meta = PTY_META.get(sessionId);
     if (meta) {
       meta.cols = cols;
@@ -2312,6 +2376,7 @@ ipcMain.handle("pty-command-states", (_event, sessionIds: unknown) => {
 });
 
 function killPtySession(sessionId: string): void {
+  finishTaskRun(sessionId, -1, "closed");
   try {
     PTY_SESSIONS.get(sessionId)?.kill();
   } catch {
@@ -2946,8 +3011,30 @@ ipcMain.handle("tasks-save", (_event, input: unknown) => {
 
 ipcMain.handle("tasks-delete", (_event, id: unknown) => {
   if (typeof id !== "string" || !id.trim()) return { ok: false, error: "invalid-id" };
-  return deleteTask(id.trim());
+  const res = deleteTask(id.trim());
+  if (res.ok) clearTaskRuns(id.trim());
+  return res;
 });
+
+ipcMain.handle("tasks-runs-list", (_event, taskId: unknown) =>
+  typeof taskId === "string" ? listTaskRuns(taskId) : [],
+);
+
+ipcMain.handle("tasks-runs-latest", () => latestTaskRuns());
+
+ipcMain.handle("tasks-run-output", (_event, taskId: unknown, runId: unknown) =>
+  typeof taskId === "string" && typeof runId === "string" ? readTaskRunOutput(taskId, runId) : null,
+);
+
+ipcMain.handle("tasks-run-delete", (_event, taskId: unknown, runId: unknown) =>
+  typeof taskId === "string" && typeof runId === "string"
+    ? deleteTaskRun(taskId, runId)
+    : { ok: false, error: "invalid-id" },
+);
+
+ipcMain.handle("tasks-runs-clear", (_event, taskId: unknown) =>
+  typeof taskId === "string" ? clearTaskRuns(taskId) : { ok: false, error: "invalid-id" },
+);
 
 ipcMain.handle("tasks-open-dir", () => {
   const dir = getTasksDir();
@@ -2981,6 +3068,7 @@ app.whenReady().then(async () => {
   initHealthMonitor(() => mainWindow);
   initPtyLogGc();
   initTaskService();
+  initTaskRunStore();
   onAppUpdateCheckSettled(() => onAppUpdateStateChanged());
 });
 
@@ -3037,6 +3125,7 @@ function flushProfileLayoutsFromRenderer(): Promise<void> {
 
 function tearDownOnQuit(): void {
   setAppQuitting(true);
+  interruptAllTaskRuns();
   for (const [, proc] of PTY_SESSIONS) {
     try { proc.kill(); } catch { /* already dead */ }
   }
