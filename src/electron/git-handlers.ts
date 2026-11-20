@@ -30,6 +30,8 @@ export type GitRun = {
   stderr: string;
   /** git (or wsl.exe) could not be started. */
   missing: boolean;
+  /** Killed by the timeout. */
+  timedOut?: boolean;
 };
 
 /**
@@ -82,6 +84,7 @@ export function runGit(
           stdout,
           stderr: stderr.replace(/\0/gu, "").trim() || err.message,
           missing: code === "ENOENT",
+          timedOut: (err as { killed?: boolean }).killed === true,
         });
       },
     );

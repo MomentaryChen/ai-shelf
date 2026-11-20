@@ -144,6 +144,18 @@ async function removeRepoFile(repo: Repo, path: string): Promise<boolean> {
   }
 }
 
+/** A failed `add --ignore-errors` that only reported per-path errors (no fatal, no timeout). */
+function isOnlySkippedPaths(r: GitRun): boolean {
+  if (r.missing || r.timedOut) return false;
+  const lines = r.stderr
+    .split(/\r?\n/u)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return (
+    lines.some((l) => l.startsWith("error:")) && lines.every((l) => /^(?:error|warning):/u.test(l))
+  );
+}
+
 /** Tree of the working tree as `git add -A` would stage it, without touching the real index. */
 async function buildSnapshot(repo: Repo): Promise<string | ChangeReviewError> {
   const ip = await runGit(repo.target, ["rev-parse", "--git-path", "index"], PROBE_TIMEOUT_MS);
@@ -156,11 +168,13 @@ async function buildSnapshot(repo: Repo): Promise<string | ChangeReviewError> {
     await copyRepoFile(repo, indexPath, tmp);
     const add = await runGit(
       repo.target,
-      ["-c", "core.safecrlf=false", "add", "-A"],
+      ["-c", "core.safecrlf=false", "add", "-A", "--ignore-errors"],
       SNAPSHOT_TIMEOUT_MS,
       { allowLocks: true, indexFile: tmp },
     );
-    if (!add.ok) return gitFail(add);
+    // `--ignore-errors` keeps going past paths git cannot add (e.g. a nested
+    // repo with no commit yet) and exits 1; those paths are just left out.
+    if (!add.ok && !isOnlySkippedPaths(add)) return gitFail(add);
     const tree = await runGit(repo.target, ["write-tree"], SNAPSHOT_TIMEOUT_MS, {
       allowLocks: true,
       indexFile: tmp,
