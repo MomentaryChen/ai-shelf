@@ -49,7 +49,14 @@ const COPIED_FLASH_MS = 1400;
  * pid / grid size are diagnostics, so those two live in the shell tooltip.
  * Claude panes also show the conversation's tokens and estimated cost.
  */
-export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
+export function TerminalStatusBar({
+  pane,
+  visible = true,
+}: {
+  pane: PaneInfo | null;
+  /** False while the terminal view is hidden (another app mode); pauses usage polling. */
+  visible?: boolean;
+}) {
   const { t } = useLocale();
   const [status, setStatus] = useState<SessionStatus>("live");
   const [meta, setMeta] = useState<PtyMetaView>(EMPTY_META);
@@ -180,7 +187,7 @@ export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
         <TerminalSessionUsage
           sessionId={pane.sessionId}
           agentSessionId={pane.agentSessionId}
-          live={status === "live"}
+          live={status === "live" && visible}
         />
         <TerminalCommandStatus sessionId={pane.sessionId} />
         <span title={shellTitle}>{shell}</span>

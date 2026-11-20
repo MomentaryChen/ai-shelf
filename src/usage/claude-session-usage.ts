@@ -18,33 +18,7 @@ function count(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
 }
 
-/** `{ key, entry }` for an assistant line with usage, else null. */
-export function parseClaudeUsageLine(line: string): { key: string; entry: UsageEntry } | null {
-  // Cheap pre-filter: most lines (user turns, tool results) have no usage.
-  if (!line.includes('"usage"')) return null;
-  let row: unknown;
-  try {
-    row = JSON.parse(line);
-  } catch {
-    return null;
-  }
-  if (!row || typeof row !== "object") return null;
-  const r = row as { type?: unknown; requestId?: unknown; message?: unknown };
-  if (r.type !== "assistant" || !r.message || typeof r.message !== "object") return null;
-  const msg = r.message as { id?: unknown; model?: unknown; usage?: unknown };
-  const model = typeof msg.model === "string" ? msg.model : "";
-  // `<synthetic>` marks locally generated messages (errors, interrupts) — no API call.
-  if (!model || model.startsWith("<")) return null;
-  if (!msg.usage || typeof msg.usage !== "object") return null;
-  const key =
-    typeof msg.id === "string" && msg.id
-      ? msg.id
-      : typeof r.requestId === "string" && r.requestId
-        ? r.requestId
-        : null;
-  if (!key) return null;
-
-  const u = msg.usage as Record<string, unknown>;
+function usageEntry(model: string, u: Record<string, unknown>, fast: boolean): UsageEntry {
   const cacheWrite = count(u.cache_creation_input_tokens);
   const ttl =
     u.cache_creation && typeof u.cache_creation === "object"
@@ -52,17 +26,61 @@ export function parseClaudeUsageLine(line: string): { key: string; entry: UsageE
       : null;
   const write1h = ttl ? Math.min(count(ttl.ephemeral_1h_input_tokens), cacheWrite) : 0;
   return {
-    key,
-    entry: {
-      model,
-      inputTokens: count(u.input_tokens),
-      outputTokens: count(u.output_tokens),
-      cacheReadTokens: count(u.cache_read_input_tokens),
-      cacheWrite5mTokens: cacheWrite - write1h,
-      cacheWrite1hTokens: write1h,
-      fast: u.speed === "fast",
-    },
+    model,
+    inputTokens: count(u.input_tokens),
+    outputTokens: count(u.output_tokens),
+    cacheReadTokens: count(u.cache_read_input_tokens),
+    cacheWrite5mTokens: cacheWrite - write1h,
+    cacheWrite1hTokens: write1h,
+    fast,
   };
+}
+
+/**
+ * Billed usage entries of an assistant line (empty for other lines).
+ *
+ * Top-level `usage` covers the response's own model. Server-side sub-calls
+ * on another model (e.g. the advisor tool, `usage.iterations[]` entries of
+ * type `advisor_message` with their own `model`) are billed on top of it and
+ * are returned as extra entries keyed `<id>#<index>`.
+ */
+export function parseClaudeUsageLine(line: string): { key: string; entry: UsageEntry }[] {
+  // Cheap pre-filter: most lines (user turns, tool results) have no usage.
+  if (!line.includes('"usage"')) return [];
+  let row: unknown;
+  try {
+    row = JSON.parse(line);
+  } catch {
+    return [];
+  }
+  if (!row || typeof row !== "object") return [];
+  const r = row as { type?: unknown; requestId?: unknown; message?: unknown };
+  if (r.type !== "assistant" || !r.message || typeof r.message !== "object") return [];
+  const msg = r.message as { id?: unknown; model?: unknown; usage?: unknown };
+  const model = typeof msg.model === "string" ? msg.model : "";
+  // `<synthetic>` marks locally generated messages (errors, interrupts) — no API call.
+  if (!model || model.startsWith("<")) return [];
+  if (!msg.usage || typeof msg.usage !== "object") return [];
+  const key =
+    typeof msg.id === "string" && msg.id
+      ? msg.id
+      : typeof r.requestId === "string" && r.requestId
+        ? r.requestId
+        : null;
+  if (!key) return [];
+
+  const u = msg.usage as Record<string, unknown>;
+  const fast = u.speed === "fast";
+  const out = [{ key, entry: usageEntry(model, u, fast) }];
+  if (Array.isArray(u.iterations)) {
+    u.iterations.forEach((it: unknown, i) => {
+      if (!it || typeof it !== "object") return;
+      const iter = it as Record<string, unknown>;
+      if (iter.type === "message" || typeof iter.model !== "string" || !iter.model) return;
+      out.push({ key: `${key}#${String(i)}`, entry: usageEntry(iter.model, iter, fast) });
+    });
+  }
+  return out;
 }
 
 /**
@@ -91,11 +109,11 @@ export function createClaudeUsageAccumulator(): ClaudeUsageAccumulator {
   return {
     addText(text) {
       for (const line of text.split("\n")) {
-        const parsed = parseClaudeUsageLine(line.trim());
-        if (!parsed) continue;
-        entries.set(parsed.key, parsed.entry);
-        modelLastSeen.set(parsed.entry.model, ++seq);
-        cached = null;
+        for (const { key, entry } of parseClaudeUsageLine(line.trim())) {
+          entries.set(key, entry);
+          modelLastSeen.set(entry.model, ++seq);
+          cached = null;
+        }
       }
     },
     summary() {

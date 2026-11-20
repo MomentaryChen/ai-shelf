@@ -21,7 +21,7 @@ export function TerminalSessionUsage({
 }: {
   sessionId: string | null | undefined;
   agentSessionId: string | null | undefined;
-  /** Poll on an interval only while the PTY is live; otherwise read once. */
+  /** Poll on an interval only while the PTY is live and on screen; otherwise read once. */
   live: boolean;
 }) {
   const { t } = useLocale();
