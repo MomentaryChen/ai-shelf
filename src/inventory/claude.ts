@@ -58,29 +58,24 @@ export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEn
     ? parseCliVersionLine(versionResult.stdout.split("\n")[0] ?? "")
     : undefined;
 
-  // Run auth check, model list, and config get in parallel
-  const [authResult, cliModels, cfgResult] = await Promise.all([
+  // Run auth check and model list in parallel
+  const [authResult, cliModels] = await Promise.all([
     available
       ? run("claude", ["auth", "status", "--text"]).then((r) => r.ok ? "ok" : "missing" as ProviderEntry["auth"])
       : Promise.resolve(process.env["ANTHROPIC_API_KEY"] ? "ok" : "missing" as ProviderEntry["auth"]),
     opts.quick ? Promise.resolve([]) : listClaudeModels(),
-    available ? run("claude", ["config", "get", "model"]) : Promise.resolve({ ok: false, stdout: "", stderr: "" }),
   ]);
 
   const auth = authResult;
 
-  // Detect current default model: CLI first, then settings.json fallback
+  // Detect current default model from settings. Current Claude Code has no
+  // `config` subcommand: `claude config get model` is sent to the model as a
+  // prompt (a paid request that runs until the 10s timeout), so don't call it.
   let model: string | undefined;
-  if (cfgResult.ok) {
-    const val = cfgResult.stdout.trim();
-    if (val) model = val;
-  }
-  if (!model) {
-    const settings = tryReadJson<Record<string, unknown>>(claudeConfigDir("settings.json"))
-      ?? tryReadJson<Record<string, unknown>>(claudeJsonPath());
-    const val = settings?.["model"];
-    if (typeof val === "string" && val.length > 0) model = val;
-  }
+  const settings = tryReadJson<Record<string, unknown>>(claudeConfigDir("settings.json"))
+    ?? tryReadJson<Record<string, unknown>>(claudeJsonPath());
+  const settingsModel = settings?.["model"];
+  if (typeof settingsModel === "string" && settingsModel.length > 0) model = settingsModel;
 
   // Config paths
   // Claude Code merges user, project (shared) and local (gitignored) settings.
