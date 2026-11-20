@@ -19,6 +19,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   dts: true,
-  splitting: false,
+  // Code splitting keeps the lazily imported TUI (neo-blessed) out of cli.js.
+  splitting: true,
   treeshake: true,
 });
