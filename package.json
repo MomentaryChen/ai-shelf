@@ -15,7 +15,7 @@
     "build": "pnpm build:cli && node scripts/build.mjs",
     "build:cli": "pnpm --filter ai-shelf run build",
     "build:desktop": "pnpm run build",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json && tsc -p src/renderer/tsconfig.json && pnpm --filter ai-shelf run typecheck",
+    "typecheck": "node scripts/typecheck.mjs",
     "test": "tsx --test \"src/**/*.test.ts\" \"packages/cli/src/**/*.test.ts\"",
     "dev": "tsc --watch",
     "dev:cli": "pnpm --filter ai-shelf run dev",
