@@ -9,6 +9,7 @@ import type {
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
+import type { TaskRunOutput, TaskRunRecord, TaskRunStart } from "../shared/task-run-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
 
@@ -21,6 +22,14 @@ export type {
   TaskInput,
   TaskSaveResult,
 } from "../shared/task-types.js";
+export type {
+  TaskRunMessage,
+  TaskRunOutput,
+  TaskRunRecord,
+  TaskRunStart,
+  TaskRunStatus,
+  TaskRunUsage,
+} from "../shared/task-run-types.js";
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -865,6 +874,8 @@ export interface ElectronAPI {
       agentSession?: { resumeId?: string };
       /** Prompt typed into the agent once its TUI is ready (Tasks); ignored for plain shells. */
       initialInput?: string;
+      /** Tasks: record this spawn in the task's run history. */
+      taskRun?: TaskRunStart;
     },
   ) => Promise<{
     success: boolean;
@@ -928,6 +939,7 @@ export interface ElectronAPI {
   ) => Promise<PtySearchResult>;
   ptyGetLogPath: (sessionId: string)                                => Promise<{ path: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;
+  pickFile: (defaultPath?: string)                                  => Promise<string | null>;
   clipboardReadText: ()                                             => Promise<string>;
   clipboardWriteText: (text: string)                                => Promise<boolean>;
   ptyWrite:  (sessionId: string, data: string)             => void;
@@ -1177,6 +1189,14 @@ export interface ElectronAPI {
   tasksDelete: (id: string) => Promise<{ ok: boolean; error?: string }>;
   /** Returns shell.openPath's error string (empty on success). */
   tasksOpenDir: () => Promise<string>;
+  /** Run history of a task, newest first. */
+  tasksRunsList: (taskId: string) => Promise<TaskRunRecord[]>;
+  /** Latest run per task id. */
+  tasksRunsLatest: () => Promise<Record<string, TaskRunRecord>>;
+  tasksRunOutput: (taskId: string, runId: string) => Promise<TaskRunOutput | null>;
+  tasksRunDelete: (taskId: string, runId: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Deletes every finished run of the task. */
+  tasksRunsClear: (taskId: string) => Promise<{ ok: boolean; error?: string }>;
   portsList: (port?: number | null) => Promise<
     | {
         ok: true;

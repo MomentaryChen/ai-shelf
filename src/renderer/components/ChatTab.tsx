@@ -39,6 +39,7 @@ import type {
   RemoteSshConfig,
   RunTaskRequest,
   RunTaskResult,
+  TaskRunStart,
 } from "../types";
 import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
@@ -374,7 +375,9 @@ function ChatTabInner({
       !remote && settings.terminalResumeAgentSessions && agentSessionSupported(tool)
         ? { resumeId: opts?.resumeAgentSessionId }
         : undefined;
-    const initialInput = opts?.initialInput?.trim() ? { initialInput: opts.initialInput } : {};
+    const initialInput = opts?.initialInput?.trim()
+      ? { initialInput: opts.initialInput, ...(opts.taskRun ? { taskRun: opts.taskRun } : {}) }
+      : {};
     const spawnOptions = remote
       ? { remote, ...initialInput }
       : shell === "wsl" || agentSession || opts?.initialInput
@@ -894,7 +897,12 @@ function ChatTabInner({
       cwd?: string,
       splitTargetId?: string,
       direction: SplitDirection = "horizontal",
-      opts?: { keepOthersVisible?: boolean; initialInput?: string; taskId?: string },
+      opts?: {
+        keepOthersVisible?: boolean;
+        initialInput?: string;
+        taskId?: string;
+        taskRun?: TaskRunStart;
+      },
     ): Promise<PaneInfo | null> => {
       if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
@@ -913,7 +921,9 @@ function ChatTabInner({
         tool || "shell",
         resolveCwd(cwd),
         activeRemoteRef.current,
-        opts?.initialInput ? { initialInput: opts.initialInput } : undefined,
+        opts?.initialInput
+          ? { initialInput: opts.initialInput, ...(opts.taskRun ? { taskRun: opts.taskRun } : {}) }
+          : undefined,
       );
       if (!spawned) return null;
       // A shell fallback never got the prompt, so it is not the task's terminal.
@@ -1397,7 +1407,9 @@ function ChatTabInner({
 
   async function startOrShowTask({
     taskId,
+    taskName,
     prompt,
+    variables,
     profileId,
     tool,
   }: RunTaskRequest): Promise<RunTaskResult> {
@@ -1438,7 +1450,16 @@ function ChatTabInner({
       const cwd = profile?.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(launchTool, cwd, undefined, "horizontal", {
         initialInput: prompt,
-        ...(id ? { taskId: id } : {}),
+        ...(id
+          ? {
+              taskId: id,
+              taskRun: {
+                taskId: id,
+                taskName: taskName?.trim() || id,
+                ...(variables && Object.keys(variables).length ? { variables } : {}),
+              },
+            }
+          : {}),
       });
       return created ? { ok: true } : { ok: false, reason: "spawn-failed" };
     } catch (err) {
