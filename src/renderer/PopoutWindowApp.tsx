@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanelLeftClose, PanelLeftOpen, Plus, Undo2, X } from "lucide-react";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Undo2, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EditablePaneTitle } from "./components/EditablePaneTitle";
 import { EmbeddedTerminal } from "./components/EmbeddedTerminal";
@@ -18,8 +25,19 @@ import {
 } from "./chat-settings";
 import { useLocale } from "./i18n/LocaleProvider";
 import { useTerminalNotifications } from "./hooks/useTerminalNotifications";
+import { getActiveKeybindings } from "./shortcuts/active-keybindings";
+import { matchShortcut } from "./shortcuts/keybindings";
+import { shouldIgnoreShortcutForIme } from "./terminal/ime-keys";
 import { profileAccentMarkerStyle } from "./utils/profile-colors";
-import { collectPanes, findPane, updateSplitRatio, type LayoutNode } from "./terminal/split-tree";
+import {
+  collectPanes,
+  findPane,
+  updateSplitRatio,
+  type LayoutNode,
+  type SplitDirection,
+} from "./terminal/split-tree";
+import { toolLabel } from "./utils";
+import { PLAIN_SHELL_TOOL_ID, isPlainShellTool, profileToolLabel } from "./utils/available-tools";
 import type { PaneViewDecl } from "./types";
 
 const NOTICE_MS = 4000;
@@ -205,7 +223,7 @@ export function PopoutWindowApp() {
     [view],
   );
 
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
       try {
@@ -215,10 +233,47 @@ export function PopoutWindowApp() {
       }
       return next;
     });
-  };
+  }, []);
 
-  /** The origin window spawns it (same profile, next to `anchorPaneId`) and updates this view. */
-  const newTerminal = (anchorPaneId: string, paneIds: string[]) => {
+  // Same "toggleSidebar" shortcut as the main window's Terminal mode (default Ctrl/Cmd+S).
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (shouldIgnoreShortcutForIme(ev)) return;
+      if (!matchShortcut(ev, getActiveKeybindings(), ["toggleSidebar"])) return;
+
+      const target = ev.target as HTMLElement | null;
+      // xterm uses a hidden textarea; still allow the toggle from inside a terminal.
+      if (target && !target.closest(".xterm")) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable ||
+          target.closest("[contenteditable='true']")
+        ) {
+          return;
+        }
+      }
+
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      toggleSidebar();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [toggleSidebar]);
+
+  /**
+   * The origin window spawns it (same profile, next to `anchorPaneId`) and updates this view.
+   * No `tool`: same tool as the anchor pane (like a split in the main window).
+   */
+  const newTerminal = (
+    anchorPaneId: string,
+    paneIds: string[],
+    opts?: { tool?: string; direction?: SplitDirection },
+  ) => {
     if (adding) return;
     pendingNewRef.current = new Set(paneIds);
     setAdding(true);
@@ -228,7 +283,12 @@ export function PopoutWindowApp() {
       setAdding(false);
       setNotice(t("pane.popout.newFailed"));
     }, NEW_PANE_WAIT_MS);
-    window.api.paneViewAction({ type: "new-pane", anchorPaneId });
+    window.api.paneViewAction({
+      type: "new-pane",
+      anchorPaneId,
+      tool: opts?.tool,
+      direction: opts?.direction,
+    });
   };
 
   const reportCwd = useCallback((sessionId: string, cwd: string) => {
@@ -277,6 +337,9 @@ export function PopoutWindowApp() {
 
   const panes = collectPanes(layout);
   const focusedPane = panes.find((p) => p.id === focusedPaneId) ?? panes[0] ?? null;
+  const paneIds = panes.map((p) => p.id);
+  // Older origin builds do not send `tools`: plain shell is still offered.
+  const launchTools = (view.tools ?? []).filter((tool) => !isPlainShellTool(tool));
 
   return (
     <TooltipProvider>
@@ -311,6 +374,43 @@ export function PopoutWindowApp() {
             {t("pane.view.paneCount", { count: panes.length })}
           </span>
           <span className="flex-1" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={adding || !focusedPane}
+                title={t("pane.view.newTerminalKind")}
+                className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] text-chrome-text-muted transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text disabled:cursor-default disabled:opacity-50"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                {t("pane.popout.newTerminal")}
+                <ChevronDown className="h-3 w-3" aria-hidden />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[160px]">
+              <DropdownMenuItem
+                title={t("chat.plainShellTitle")}
+                onSelect={() => {
+                  if (focusedPane) newTerminal(focusedPane.id, paneIds, { tool: PLAIN_SHELL_TOOL_ID });
+                }}
+              >
+                <ToolLogo tool={PLAIN_SHELL_TOOL_ID} size={14} />
+                {profileToolLabel(PLAIN_SHELL_TOOL_ID)}
+              </DropdownMenuItem>
+              {launchTools.length > 0 && <DropdownMenuSeparator />}
+              {launchTools.map((tool) => (
+                <DropdownMenuItem
+                  key={tool}
+                  onSelect={() => {
+                    if (focusedPane) newTerminal(focusedPane.id, paneIds, { tool });
+                  }}
+                >
+                  <ToolLogo tool={tool} size={14} />
+                  {toolLabel(tool)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             type="button"
             onClick={() => window.api.paneViewAction({ type: "dock-all" })}
@@ -393,12 +493,7 @@ export function PopoutWindowApp() {
               <button
                 type="button"
                 onClick={() => {
-                  if (focusedPane) {
-                    newTerminal(
-                      focusedPane.id,
-                      panes.map((p) => p.id),
-                    );
-                  }
+                  if (focusedPane) newTerminal(focusedPane.id, paneIds);
                 }}
                 disabled={adding || !focusedPane}
                 title={t("pane.popout.newTerminal")}
@@ -427,6 +522,10 @@ export function PopoutWindowApp() {
             onClosePane={(paneId) => closePane(paneId)}
             onResizeSplit={resizeSplit}
             onRenamePane={renamePane}
+            // Header split buttons: same tool as that pane, like the main window.
+            onSplitPane={(paneId, direction) => {
+              if (!adding) newTerminal(paneId, paneIds, { direction });
+            }}
             onMovePane={(dragPaneId, targetPaneId, zone) =>
               window.api.paneViewAction({ type: "move-in-view", dragPaneId, targetPaneId, zone })
             }

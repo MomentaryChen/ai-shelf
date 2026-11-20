@@ -769,6 +769,7 @@ export const en = {
   "pane.popout.loading": "Opening terminal…",
   "pane.popout.missing": "This terminal is no longer available.",
   "pane.popout.newTerminal": "New terminal",
+  "pane.view.newTerminalKind": "New terminal: pick a tool (header split buttons reuse that pane's tool)",
   "pane.popout.newFailed": "Could not open a new terminal.",
   "pane.popout.sidebarLabel": "Terminals in this window",
   "pane.maximize": "Maximize pane",

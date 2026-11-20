@@ -7,6 +7,7 @@ import {
   movePaneInTree,
   type LayoutNode,
   type PaneInfo,
+  type SplitDirection,
 } from "../terminal/split-tree";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
@@ -880,12 +881,19 @@ export function useProfileWorkspace(
       anchorPaneId: string,
       pane: PaneInfo,
       resolveProfile: (workspaceId: string, profileId: string) => ProfileInfo | null,
+      direction: SplitDirection = "horizontal",
     ): boolean => {
       const active = activeProfileRef.current;
       const activeKey = active ? cacheKey(active.workspaceId, active.id) : null;
       for (const [key, entry] of profileLiveCacheRef.current.entries()) {
         if (key === activeKey || !findPane(entry.layout, anchorPaneId)) continue;
-        const layoutNext = splitNextToPane(entry.layout, anchorPaneId, pane, MAX_GROUP_PANES);
+        const layoutNext = splitNextToPane(
+          entry.layout,
+          anchorPaneId,
+          pane,
+          MAX_GROUP_PANES,
+          direction,
+        );
         if (!layoutNext) return false;
         profileLiveCacheRef.current.set(key, { ...entry, layout: layoutNext });
         const { workspaceId, profileId } = parseProfileCacheKey(key);

@@ -7,6 +7,7 @@ import {
   splitPaneInTree,
   type LayoutNode,
   type PaneInfo,
+  type SplitDirection,
 } from "./split-tree";
 import type { PaneDropZone } from "./pane-drop-zone";
 import type { SerializedLayoutNode } from "./layout-serialize";
@@ -86,8 +87,12 @@ export function removePaneFromViews(views: PaneView[], paneId: string): PaneView
   return changed ? out : views;
 }
 
-/** Add a pane beside the view's focused pane (or its last one) and focus it. */
-export function addPaneToView(view: PaneView, pane: PaneInfo): PaneView {
+/** Add a pane beside the view's focused pane (or its last one), split `direction`, and focus it. */
+export function addPaneToView(
+  view: PaneView,
+  pane: PaneInfo,
+  direction: SplitDirection = "horizontal",
+): PaneView {
   if (findPane(view.layout, pane.id)) return { ...view, focusedPaneId: pane.id };
   const panes = collectPanes(view.layout);
   const anchor =
@@ -95,7 +100,7 @@ export function addPaneToView(view: PaneView, pane: PaneInfo): PaneView {
     panes[panes.length - 1];
   if (!anchor) return { ...view, layout: { kind: "pane", pane }, focusedPaneId: pane.id };
   const layout = equalizeRunAroundPane(
-    splitPaneInTree(view.layout, anchor.id, "horizontal", pane),
+    splitPaneInTree(view.layout, anchor.id, direction, pane),
     pane.id,
   );
   return { ...view, layout, focusedPaneId: pane.id };

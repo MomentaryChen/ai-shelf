@@ -1253,6 +1253,8 @@ export interface PaneViewDecl {
   labels: Record<string, string>;
   busy: Record<string, boolean>;
   bounds: PaneViewRect | null;
+  /** Installed tool ids a new terminal here can launch (plain shell is always offered). */
+  tools: string[];
 }
 
 export interface PaneViewDragEndRequest {
@@ -1274,8 +1276,16 @@ export type PaneViewNotice =
 /** View window → origin, forwarded by main. */
 export type PaneViewAction =
   | { type: "focus"; paneId: string }
-  /** New terminal in this view, beside `anchorPaneId` (the origin spawns it in the view's profile). */
-  | { type: "new-pane"; anchorPaneId: string }
+  /**
+   * New terminal in this view, beside `anchorPaneId` (the origin spawns it in the view's profile).
+   * `tool` defaults to the anchor's tool; `direction` defaults to "horizontal" (split right).
+   */
+  | {
+      type: "new-pane";
+      anchorPaneId: string;
+      tool?: string;
+      direction?: import("./terminal/split-tree").SplitDirection;
+    }
   /** A sidebar terminal of the origin window was dropped on `targetPaneId` here. */
   | { type: "adopt-pane"; paneId: string; targetPaneId: string; zone: import("./terminal/pane-drop-zone").PaneDropZone }
   | { type: "close-pane"; paneId: string }
