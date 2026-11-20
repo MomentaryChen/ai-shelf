@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { ProfileForest, ProfileInfo, RemoteSshConfig } from "../types";
+import type { ProfileForest, ProfileInfo, RemoteSshConfig, TaskRunStart } from "../types";
 import {
   collectPanes,
   findPane,
@@ -46,6 +46,8 @@ export interface SpawnPaneOptions {
   initialInput?: string;
   /** Resume even when the "Resume agent conversations" setting is off (explicit user action). */
   forceAgentSession?: boolean;
+  /** Tasks: record this spawn in the task's run history (only with `initialInput`). */
+  taskRun?: TaskRunStart;
 }
 
 /** Lets the caller keep extra per-profile state (view windows) in step with save / restore. */

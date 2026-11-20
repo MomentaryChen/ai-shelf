@@ -40,6 +40,7 @@ import type {
   RemoteSshConfig,
   RunTaskRequest,
   RunTaskResult,
+  TaskRunStart,
 } from "../types";
 import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
@@ -385,7 +386,9 @@ function ChatTabInner({
       agentSessionSupported(tool)
         ? { resumeId: opts?.resumeAgentSessionId }
         : undefined;
-    const initialInput = opts?.initialInput?.trim() ? { initialInput: opts.initialInput } : {};
+    const initialInput = opts?.initialInput?.trim()
+      ? { initialInput: opts.initialInput, ...(opts.taskRun ? { taskRun: opts.taskRun } : {}) }
+      : {};
     const spawnOptions = remote
       ? { remote, ...initialInput }
       : shell === "wsl" || agentSession || opts?.initialInput
@@ -952,6 +955,7 @@ function ChatTabInner({
         taskId?: string;
         /** Conversation to resume (history "Resume in new pane"); bypasses the resume setting. */
         resumeAgentSessionId?: string;
+        taskRun?: TaskRunStart;
       },
     ): Promise<PaneInfo | null> => {
       if (isRestoring()) {
@@ -973,7 +977,9 @@ function ChatTabInner({
         activeRemoteRef.current,
         opts?.initialInput || opts?.resumeAgentSessionId
           ? {
-              ...(opts.initialInput ? { initialInput: opts.initialInput } : {}),
+              ...(opts.initialInput
+                ? { initialInput: opts.initialInput, ...(opts.taskRun ? { taskRun: opts.taskRun } : {}) }
+                : {}),
               ...(opts.resumeAgentSessionId
                 ? { resumeAgentSessionId: opts.resumeAgentSessionId, forceAgentSession: true }
                 : {}),
@@ -1511,7 +1517,9 @@ function ChatTabInner({
 
   async function startOrShowTask({
     taskId,
+    taskName,
     prompt,
+    variables,
     profileId,
     tool,
   }: RunTaskRequest): Promise<RunTaskResult> {
@@ -1552,7 +1560,16 @@ function ChatTabInner({
       const cwd = profile?.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(launchTool, cwd, undefined, "horizontal", {
         initialInput: prompt,
-        ...(id ? { taskId: id } : {}),
+        ...(id
+          ? {
+              taskId: id,
+              taskRun: {
+                taskId: id,
+                taskName: taskName?.trim() || id,
+                ...(variables && Object.keys(variables).length ? { variables } : {}),
+              },
+            }
+          : {}),
       });
       return created ? { ok: true } : { ok: false, reason: "spawn-failed" };
     } catch (err) {

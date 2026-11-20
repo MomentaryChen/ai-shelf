@@ -145,3 +145,44 @@ export function keepTaskLink(
   if (!prev.agentSessionId || next.agentSessionId !== prev.agentSessionId) return {};
   return { taskId: prev.taskId };
 }
+
+/** `42s`, `3m 05s`, `1h 02m`; null when the end is unknown. */
+export function formatRunDuration(
+  startedAt: string,
+  endedAt: string | undefined,
+  nowMs = Date.now(),
+): string | null {
+  const start = Date.parse(startedAt);
+  const end = endedAt ? Date.parse(endedAt) : nowMs;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  const total = Math.max(0, Math.round((end - start) / 1000));
+  if (total < 60) return `${total}s`;
+  const m = Math.floor(total / 60);
+  if (m < 60) return `${m}m ${String(total % 60).padStart(2, "0")}s`;
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
+/** `$0.0042`, `$0.13`, `$12.40`; amounts under a cent keep 4 decimals. */
+export function formatCostUsd(cost: number | undefined): string | null {
+  if (cost === undefined || !Number.isFinite(cost)) return null;
+  if (cost === 0) return "$0.00";
+  return cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`;
+}
+
+/** `950`, `12.3k`, `4.1M`. */
+export function formatTokenCount(n: number): string {
+  if (n < 1000) return String(Math.round(n));
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`;
+  return `${(n / 1_000_000).toFixed(1)}M`;
+}
+
+/** Visual tone of a run status: open, finished cleanly, or needs a look. */
+export function runStatusTone(
+  status: string,
+  exitCode: number | undefined,
+): "live" | "ok" | "neutral" | "warn" {
+  if (status === "running") return "live";
+  if (status === "exited") return exitCode === 0 ? "ok" : "warn";
+  if (status === "closed") return "neutral";
+  return "warn";
+}
