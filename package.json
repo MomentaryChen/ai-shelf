@@ -12,7 +12,7 @@
     "ai": "dist/cli.js"
   },
   "scripts": {
-    "build": "pnpm build:cli && tsc && node scripts/write-firebase-config.mjs && tsc -p src/renderer/tsconfig.json && vite build && node -e \"const fs=require('fs');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');fs.copyFileSync('src/assets/icon.png','dist/assets/icon.png');\"",
+    "build": "pnpm build:cli && node scripts/build.mjs",
     "build:cli": "pnpm --filter ai-shelf run build",
     "build:desktop": "pnpm run build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json && tsc -p src/renderer/tsconfig.json && pnpm --filter ai-shelf run typecheck",
