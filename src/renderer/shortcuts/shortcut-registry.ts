@@ -62,6 +62,7 @@ export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
   resizePaneUp: "shortcuts.pane.resizeUp",
   resizePaneDown: "shortcuts.pane.resizeDown",
   equalizePanes: "shortcuts.pane.equalize",
+  nextAttentionPane: "shortcuts.pane.nextAttention",
 };
 
 export const SHORTCUT_SECTION_TITLE_KEYS: Record<ShortcutSectionId, MessageKey> = {

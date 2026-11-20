@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { ProfileForest, ProfileInfo, RemoteSshConfig } from "../types";
+import type { ProfileForest, ProfileInfo, RemoteSshConfig, TaskRunStart } from "../types";
 import {
   collectPanes,
   findPane,
@@ -44,6 +44,10 @@ export interface SpawnPaneOptions {
   resumeAgentSessionId?: string;
   /** Task prompt typed into the agent once it starts; never stored with the pane. */
   initialInput?: string;
+  /** Resume even when the "Resume agent conversations" setting is off (explicit user action). */
+  forceAgentSession?: boolean;
+  /** Tasks: record this spawn in the task's run history (only with `initialInput`). */
+  taskRun?: TaskRunStart;
 }
 
 /** Lets the caller keep extra per-profile state (view windows) in step with save / restore. */
@@ -613,6 +617,15 @@ export function useProfileWorkspace(
     [activeProfile],
   );
 
+  /** True when the profile has live panes in the cache (a switch to it only re-shows them). */
+  const hasLiveCachedPanes = useCallback(
+    (profile: { workspaceId: string; id: string }): boolean => {
+      const cached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
+      return cached ? collectPanes(cached.layout).length > 0 : false;
+    },
+    [cacheKey],
+  );
+
   const getProfileFocusedPaneId = useCallback(
     (profileId: string): string | null => {
       if (activeProfileRef.current?.id === profileId) return focusedPaneIdRef.current;
@@ -955,9 +968,22 @@ export function useProfileWorkspace(
     [profileLiveCache, liveCacheVersion, activeProfile, cacheKey],
   );
 
+  /**
+   * Live panes of every cached profile, the active one included. Unlike
+   * `backgroundProfilePanes` this does not drop the incoming profile mid-switch
+   * (while `layout` is briefly null), so kept terminals survive the handoff.
+   */
+  const liveProfilePanes = useMemo(
+    () => collectBackgroundProfilePanes(profileLiveCache.entries(), null).map((b) => b.pane),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profileLiveCache, liveCacheVersion],
+  );
+
   return {
     activeProfile,
     backgroundProfilePanes,
+    liveProfilePanes,
+    hasLiveCachedPanes,
     restoring,
     isRestoring,
     migrationDone,

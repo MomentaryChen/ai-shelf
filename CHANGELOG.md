@@ -9,6 +9,29 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-11-20
+
+Terminals stay put when you switch away, and you can see what an agent changed, resume an old Claude conversation, and read what a pane spent.
+
+### Added
+
+- **Attention inbox** — The title bar lists panes that are waiting for input, finished, or exited with an error, including a pane in another profile or a view window. Choose one to jump there. Ctrl/Cmd+Shift+J goes to the next waiting terminal. A pane you are already looking at is left off the list.
+- **Conversation history** — Search past Claude Code conversations and resume one in a new pane, or focus the pane that already has that conversation. Open it from the command palette.
+- **Pane usage** — A Claude pane with a known conversation shows its tokens and estimated cost in the status bar, with input, output, and cache in the tooltip. Sub-agent calls are included. Panes without a pinned session, including WSL and SSH, show nothing.
+- **Review agent changes** — In a git folder, the status bar counts files changed since the pane's baseline. The review lists added, modified, and deleted files with a diff, and can restore one file. Reset the baseline when you want a fresh start. SSH panes explain why this is unavailable.
+- **Task variables** — A task prompt can use `{{name}}` placeholders. Running it asks for the values first. `{{branch}}` comes from git in the task's folder, `{{selection}}` from the clipboard, and `{{file}}` from a file picker. Other names remember the last value. The "Explain a code snippet" template uses them.
+- **Task run history** — Each run is saved with the prompt that was sent, how it ended, how long it took, and the terminal output. Claude Code runs also store tokens, estimated cost, and the conversation. Open a task's history to read a run or replay the terminal, and delete one run or clear the finished ones. The card shows the last run.
+- **Instructions** — Inventory lists instruction files (CLAUDE.md, AGENTS.md, Cursor rules, Copilot instructions, and the others), for your user account and for a project folder. Edit one, compare two, or copy one into the others after a per-file diff. Existing files get a backup, and a file that changed after the preview is skipped.
+- **Hooks and permissions** — From the Claude Code card in Config, edit allow, ask, and deny rules, the default mode, extra directories, and command hooks for your user, project, and local settings. Save shows a diff first, rewrites only those sections, and keeps a backup.
+- **Help** — A ? button beside Commands, in every mode, opens the app version, links to the repo, release notes, and issues, and the keyboard cheatsheet. The command palette can open it too.
+
+### Changed
+
+- **Scrollbar** — The scrollbar stays visible while a pane has scrollback, so you can see where you are and drag to jump. Full-screen programs still hide it. **Always show scrollbar** in terminal settings is on by default.
+- **Switching terminals** — Changing profile or pane keeps the terminal mounted, so scrollback and a full-screen program stay instead of replaying the backlog. Terminals you have not shown for a while are released. Switching to a profile that already has terminals no longer flashes the empty state.
+
+[5.3.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.3.0
+
 ## [5.2.1] - 2026-11-20
 
 View windows can split, pick a tool for a new terminal, and rename panes.

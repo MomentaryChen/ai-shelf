@@ -92,6 +92,19 @@ contextBridge.exposeInMainWorld("api", {
   syncSkills: (opts) => ipcRenderer.invoke("sync-skills", opts),
   readConfigFile: (filePath) => ipcRenderer.invoke("read-config-file", filePath),
   writeConfigFile: (filePath, content) => ipcRenderer.invoke("write-config-file", filePath, content),
+  instructionsDefaultProject: () => ipcRenderer.invoke("instructions-default-project"),
+  instructionsScan: (projectDir) => ipcRenderer.invoke("instructions-scan", projectDir),
+  instructionsRead: (projectDir, ref) => ipcRenderer.invoke("instructions-read", projectDir, ref),
+  instructionsWrite: (projectDir, ref, content) =>
+    ipcRenderer.invoke("instructions-write", projectDir, ref, content),
+  instructionsPreviewSync: (projectDir, opts) =>
+    ipcRenderer.invoke("instructions-preview-sync", projectDir, opts),
+  instructionsApplySync: (projectDir, opts) =>
+    ipcRenderer.invoke("instructions-apply-sync", projectDir, opts),
+  claudeSettingsListFiles: (projectDir) => ipcRenderer.invoke("claude-settings-list-files", projectDir),
+  claudeSettingsRead: (scope, projectDir) => ipcRenderer.invoke("claude-settings-read", scope, projectDir),
+  claudeSettingsWrite: (scope, projectDir, expectedContent, draft) =>
+    ipcRenderer.invoke("claude-settings-write", scope, projectDir, expectedContent, draft),
   mcpListServers: (tool) => ipcRenderer.invoke("mcp-list-servers", tool),
   mcpUpsertServer: (tool, name, entry, enabled) =>
     ipcRenderer.invoke("mcp-upsert-server", tool, name, entry, enabled),
@@ -127,6 +140,7 @@ contextBridge.exposeInMainWorld("api", {
   ptySearchOutput: (sessionId, query, opts)  => ipcRenderer.invoke("pty-search-output", sessionId, query, opts),
   ptyGetLogPath: (sessionId)                => ipcRenderer.invoke("pty-get-log-path", sessionId),
   pickFolder: (defaultPath)                 => ipcRenderer.invoke("pick-folder", defaultPath),
+  pickFile: (defaultPath)                   => ipcRenderer.invoke("pick-file", defaultPath),
   clipboardReadText: ()                     => ipcRenderer.invoke("clipboard-read-text"),
   clipboardWriteText: (text)                => ipcRenderer.invoke("clipboard-write-text", text),
   ptyWrite:  (sessionId, data)          => ipcRenderer.send("pty-write",  sessionId, data),
@@ -254,6 +268,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("pane-view-focus-pane", handler);
     return () => ipcRenderer.off("pane-view-focus-pane", handler);
   },
+  agentSessionUsage: (sessionId) => ipcRenderer.invoke("agent-session-usage", sessionId),
   usageGetProviders: () => ipcRenderer.invoke("usage-get-providers"),
   usageGetCredentialStatus: () => ipcRenderer.invoke("usage-get-credential-status"),
   usageSetCredential: (tool, fieldKey, value) =>
@@ -305,6 +320,11 @@ contextBridge.exposeInMainWorld("api", {
   tasksSave: (input) => ipcRenderer.invoke("tasks-save", input),
   tasksDelete: (id) => ipcRenderer.invoke("tasks-delete", id),
   tasksOpenDir: () => ipcRenderer.invoke("tasks-open-dir"),
+  tasksRunsList: (taskId) => ipcRenderer.invoke("tasks-runs-list", taskId),
+  tasksRunsLatest: () => ipcRenderer.invoke("tasks-runs-latest"),
+  tasksRunOutput: (taskId, runId) => ipcRenderer.invoke("tasks-run-output", taskId, runId),
+  tasksRunDelete: (taskId, runId) => ipcRenderer.invoke("tasks-run-delete", taskId, runId),
+  tasksRunsClear: (taskId) => ipcRenderer.invoke("tasks-runs-clear", taskId),
   portsList: (port) => ipcRenderer.invoke("ports-list", port),
   portsKill: (pid) => ipcRenderer.invoke("ports-kill", pid),
   portsAnalyzeEnv: (locale) => ipcRenderer.invoke("ports-analyze-env", locale),
@@ -313,4 +333,12 @@ contextBridge.exposeInMainWorld("api", {
   wslDistroIp: (distro) => ipcRenderer.invoke("wsl-distro-ip", distro),
   gitCwdInfo: (cwd) => ipcRenderer.invoke("git-cwd-info", cwd),
   gitWorktreeAdd: (req) => ipcRenderer.invoke("git-worktree-add", req),
+  conversationsList: (opts) => ipcRenderer.invoke("conversations-list", opts),
+  conversationsRead: (provider, sessionId) => ipcRenderer.invoke("conversations-read", provider, sessionId),
+  conversationsSearch: (query) => ipcRenderer.invoke("conversations-search", query),
+  gitChangeReviewEnsure: (req) => ipcRenderer.invoke("git-change-review-ensure", req),
+  gitChangeReviewList: (req) => ipcRenderer.invoke("git-change-review-list", req),
+  gitChangeReviewDiff: (req) => ipcRenderer.invoke("git-change-review-diff", req),
+  gitChangeReviewRevert: (req) => ipcRenderer.invoke("git-change-review-revert", req),
+  gitChangeReviewReset: (req) => ipcRenderer.invoke("git-change-review-reset", req),
 });

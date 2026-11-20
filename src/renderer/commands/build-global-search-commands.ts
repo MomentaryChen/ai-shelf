@@ -8,6 +8,7 @@ type TabId =
   | "models"
   | "skills"
   | "mcp"
+  | "instructions"
   | "config"
   | "doctor"
   | "update"

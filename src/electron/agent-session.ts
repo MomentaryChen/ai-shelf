@@ -14,18 +14,28 @@ export function claudeConfigDirForEnv(env: Record<string, string | undefined>): 
 
 /** True when `<config>/projects/<encoded cwd>/<sessionId>.jsonl` exists. */
 export function claudeTranscriptExists(configDir: string, cwd: string, sessionId: string): boolean {
-  if (!isValidAgentSessionId(sessionId)) return false;
+  return findClaudeTranscript(configDir, cwd, sessionId) !== null;
+}
+
+/** Path of `<config>/projects/<encoded cwd>/<sessionId>.jsonl`, or null when it is missing. */
+export function findClaudeTranscript(
+  configDir: string,
+  cwd: string,
+  sessionId: string,
+): string | null {
+  if (!isValidAgentSessionId(sessionId)) return null;
   const projectsDir = join(configDir, "projects");
   let names: string[];
   try {
     names = readdirSync(projectsDir);
   } catch {
-    return false;
+    return null;
   }
   const caseInsensitive = process.platform === "win32" || process.platform === "darwin";
-  return names.some(
-    (name) =>
-      claudeProjectDirMatches(name, cwd, caseInsensitive) &&
-      existsSync(join(projectsDir, name, `${sessionId}.jsonl`)),
-  );
+  for (const name of names) {
+    if (!claudeProjectDirMatches(name, cwd, caseInsensitive)) continue;
+    const file = join(projectsDir, name, `${sessionId}.jsonl`);
+    if (existsSync(file)) return file;
+  }
+  return null;
 }

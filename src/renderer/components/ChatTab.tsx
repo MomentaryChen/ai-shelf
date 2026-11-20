@@ -8,6 +8,7 @@ import {
   useMemo,
   memo,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -39,6 +40,7 @@ import type {
   RemoteSshConfig,
   RunTaskRequest,
   RunTaskResult,
+  TaskRunStart,
 } from "../types";
 import { isRemotePaneCwd } from "../utils/remote-ssh";
 import { ToolLogo } from "./ToolLogo";
@@ -46,6 +48,8 @@ import { EmptyState } from "./EmptyState";
 import { toolLabel } from "../utils";
 import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
+import { TerminalHostSlot, useTerminalHostNodes } from "./TerminalHostSlot";
+import { selectKeptTerminals } from "../terminal/terminal-keep-alive";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
 import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
@@ -72,10 +76,17 @@ import {
   strongestAttention,
 } from "../../shared/background-agent-attention.js";
 import { BackgroundAgentToasts, type BackgroundAgentToast } from "./BackgroundAgentToasts";
+import { AttentionInbox, type AttentionInboxViewItem } from "./AttentionInbox";
+import { nextAttentionPaneId, sortAttentionInbox } from "../../shared/attention-inbox.js";
 import { isPaneAgentBusy, strongestPaneAgentStatus } from "../../shared/pane-agent-state.js";
 import { usePaneShortcuts } from "../hooks/usePaneShortcuts";
 import { useTerminalNotifications } from "../hooks/useTerminalNotifications";
 import { CommandHistoryPanel, type SaveCommandResult } from "./CommandHistoryPanel";
+import {
+  ConversationHistoryDialog,
+  type ConversationResumeOutcome,
+} from "./ConversationHistoryDialog";
+import type { ConversationSummary } from "../../shared/conversation-history.js";
 import { savedCommandNameFor } from "../terminal/command-history";
 import {
   copySplitRatios,
@@ -296,6 +307,7 @@ function ChatTabInner({
     setViewsState(value);
   }, []);
   const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
+  const [conversationHistoryOpen, setConversationHistoryOpen] = useState(false);
   /** Pane the "new pane in a git worktree" dialog splits from. */
   const [worktreePaneId, setWorktreePaneId] = useState<string | null>(null);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{ id: string; name: string } | null>(
@@ -371,10 +383,14 @@ function ChatTabInner({
     const localCwd = remote || isRemotePaneCwd(cwd) ? "" : cwd;
     // Conversation resume reads the local transcript store, so remote panes skip it.
     const agentSession =
-      !remote && settings.terminalResumeAgentSessions && agentSessionSupported(tool)
+      !remote &&
+      (settings.terminalResumeAgentSessions || opts?.forceAgentSession) &&
+      agentSessionSupported(tool)
         ? { resumeId: opts?.resumeAgentSessionId }
         : undefined;
-    const initialInput = opts?.initialInput?.trim() ? { initialInput: opts.initialInput } : {};
+    const initialInput = opts?.initialInput?.trim()
+      ? { initialInput: opts.initialInput, ...(opts.taskRun ? { taskRun: opts.taskRun } : {}) }
+      : {};
     const spawnOptions = remote
       ? { remote, ...initialInput }
       : shell === "wsl" || agentSession || opts?.initialInput
@@ -463,6 +479,8 @@ function ChatTabInner({
   const {
     activeProfile,
     backgroundProfilePanes,
+    liveProfilePanes,
+    hasLiveCachedPanes,
     restoring,
     isRestoring,
     migrationDone,
@@ -524,6 +542,36 @@ function ChatTabInner({
     () => displayLayoutWithoutPoppedOut(displayLayout, poppedOutPaneIds, focusedPaneId),
     [displayLayout, poppedOutPaneIds, focusedPaneId],
   );
+
+  /*
+   * Kept terminals: every pane's xterm renders from one fixed spot (portaled into
+   * a per-session host node) and the layout only moves that node around. Switching
+   * profile or the displayed pane then re-shows a live terminal instead of
+   * rebuilding xterm + WebGL and replaying the whole PTY backlog.
+   */
+  const terminalHosts = useTerminalHostNodes();
+  const shownSessionIds = useMemo(
+    () => new Set(shownLayout ? collectPanes(shownLayout).map((p) => p.sessionId) : []),
+    [shownLayout],
+  );
+  /** Panes in any view window — that window owns their xterm. */
+  const viewWindowPaneIds = useMemo(() => new Set(views.flatMap(viewPaneIds)), [views]);
+  const terminalLastShownRef = useRef(new Map<string, number>());
+  const terminalShowTickRef = useRef(0);
+  const keptTerminalPanes = useMemo(() => {
+    const selection = selectKeptTerminals({
+      livePanes: [...(layout ? collectPanes(layout) : []), ...liveProfilePanes],
+      shownSessionIds,
+      excludedPaneIds: viewWindowPaneIds,
+      lastShown: terminalLastShownRef.current,
+      tick: ++terminalShowTickRef.current,
+    });
+    terminalLastShownRef.current = selection.lastShown;
+    return selection.panes;
+  }, [layout, liveProfilePanes, shownSessionIds, viewWindowPaneIds]);
+  useEffect(() => {
+    terminalHosts.prune(new Set(keptTerminalPanes.map((p) => p.sessionId)));
+  }, [keptTerminalPanes, terminalHosts]);
 
   /**
    * Maximized pane — view state only, never written to the layout. It lapses on
@@ -594,15 +642,56 @@ function ChatTabInner({
     [backgroundAgentPanes, handleBackgroundNotice],
   );
 
-  const { paneAgentStates, recordPaneAgentInput, backgroundAttention, backgroundPaneAttention } =
-    usePaneAgentAwareness(
-      panes,
-      focusedPaneId,
-      settings,
-      t,
-      windowFocused,
-      backgroundAgentOptions,
-    );
+  const {
+    paneAgentStates,
+    recordPaneAgentInput,
+    backgroundAttention,
+    backgroundPaneAttention,
+    attentionInbox,
+    markPaneSeen,
+  } = usePaneAgentAwareness(
+    panes,
+    focusedPaneId,
+    settings,
+    t,
+    windowFocused,
+    backgroundAgentOptions,
+    active,
+  );
+
+  /** Attention inbox rows, resolved to the pane's current label and profile. */
+  const attentionInboxItems = useMemo<AttentionInboxViewItem[]>(() => {
+    const items: AttentionInboxViewItem[] = [];
+    for (const item of sortAttentionInbox(attentionInbox)) {
+      const local = panes.find((p) => p.id === item.paneId);
+      if (local) {
+        items.push({
+          ...item,
+          paneLabel: paneDisplayLabel(local),
+          profileName: activeProfile?.name ?? null,
+        });
+        continue;
+      }
+      const bg = backgroundAgentPanes.find((b) => b.pane.id === item.paneId);
+      if (bg) {
+        items.push({ ...item, paneLabel: paneDisplayLabel(bg.pane), profileName: bg.profileName });
+      }
+    }
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attentionInbox, layout, backgroundAgentPanes, activeProfile?.name]);
+  const attentionInboxItemsRef = useRef(attentionInboxItems);
+  attentionInboxItemsRef.current = attentionInboxItems;
+  /** Jump to / focus a pane wherever it lives (view window, stashed profile, this layout). */
+  const jumpToPaneRef = useRef((_paneId: string) => {});
+  /** Attention inbox: jump to the oldest pane waiting on the user (skips the one in view). */
+  const jumpNextAttention = useCallback(() => {
+    const current = active && windowFocused ? focusedPaneId : null;
+    const paneId = nextAttentionPaneId(attentionInboxItemsRef.current, current);
+    if (paneId) jumpToPaneRef.current(paneId);
+  }, [active, windowFocused, focusedPaneId]);
+  const jumpNextAttentionRef = useRef(jumpNextAttention);
+  jumpNextAttentionRef.current = jumpNextAttention;
 
   const handleTerminalNotify = useTerminalNotifications({
     panes,
@@ -894,7 +983,14 @@ function ChatTabInner({
       cwd?: string,
       splitTargetId?: string,
       direction: SplitDirection = "horizontal",
-      opts?: { keepOthersVisible?: boolean; initialInput?: string; taskId?: string },
+      opts?: {
+        keepOthersVisible?: boolean;
+        initialInput?: string;
+        taskId?: string;
+        /** Conversation to resume (history "Resume in new pane"); bypasses the resume setting. */
+        resumeAgentSessionId?: string;
+        taskRun?: TaskRunStart;
+      },
     ): Promise<PaneInfo | null> => {
       if (isRestoring()) {
         setTerminalError(t("chat.err.restoringWait"));
@@ -913,7 +1009,16 @@ function ChatTabInner({
         tool || "shell",
         resolveCwd(cwd),
         activeRemoteRef.current,
-        opts?.initialInput ? { initialInput: opts.initialInput } : undefined,
+        opts?.initialInput || opts?.resumeAgentSessionId
+          ? {
+              ...(opts.initialInput
+                ? { initialInput: opts.initialInput, ...(opts.taskRun ? { taskRun: opts.taskRun } : {}) }
+                : {}),
+              ...(opts.resumeAgentSessionId
+                ? { resumeAgentSessionId: opts.resumeAgentSessionId, forceAgentSession: true }
+                : {}),
+            }
+          : undefined,
       );
       if (!spawned) return null;
       // A shell fallback never got the prompt, so it is not the task's terminal.
@@ -1251,22 +1356,28 @@ function ChatTabInner({
     return unsub;
   }, []);
 
+  jumpToPaneRef.current = (paneId: string) => {
+    // A pane in a view window never becomes this window's focused pane, so clear it here.
+    markPaneSeen(paneId);
+    if (findViewOfPane(viewsRef.current, paneId)) {
+      void window.api.paneViewFocus(paneId);
+      return;
+    }
+    const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
+    if (bg) {
+      void openBackgroundPaneRef.current(bg.profileId, paneId);
+      return;
+    }
+    if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
+    else setFocusedPaneId(paneId);
+  };
+
   useEffect(() => {
     const unsub = window.api.onPaneAgentFocus((paneId) => {
-      if (findViewOfPane(viewsRef.current, paneId)) {
-        void window.api.paneViewFocus(paneId);
-        return;
-      }
-      const bg = backgroundAgentPanesRef.current.find((b) => b.pane.id === paneId);
-      if (bg) {
-        void openBackgroundPaneRef.current(bg.profileId, paneId);
-        return;
-      }
-      if (activeProfile) focusPaneInDisplay(activeProfile.id, paneId);
-      else setFocusedPaneId(paneId);
+      jumpToPaneRef.current(paneId);
     });
     return unsub;
-  }, [activeProfile, focusPaneInDisplay]);
+  }, []);
 
   async function restorePaneToDisplay(profile: ProfileInfo, paneId: string) {
     if (findViewOfPane(viewsRef.current, paneId)) {
@@ -1381,6 +1492,49 @@ function ChatTabInner({
   handleNewTerminalRef.current = handleNewTerminal;
 
   /**
+   * Conversation history "Resume in new pane": focus the pane that already holds the
+   * conversation, else open a pane in its cwd that launches `claude --resume <id>`
+   * through the same agent-session path restored panes use.
+   */
+  async function resumeConversation(session: ConversationSummary): Promise<ConversationResumeOutcome> {
+    if (addingTerminal || profileBusy || isRestoring()) return "busy";
+    if (!session.cwd) return "failed";
+    // Two panes writing the same transcript would corrupt it — reuse the open one.
+    for (const profile of allProfiles) {
+      const open = getProfilePanes(profile.id).find((p) => p.agentSessionId === session.sessionId);
+      if (open) {
+        onRequestTerminalMode?.();
+        await restorePaneToDisplayById(profile.id, open.id);
+        return "focused";
+      }
+    }
+    const local = panes.find((p) => p.agentSessionId === session.sessionId);
+    if (local) {
+      onRequestTerminalMode?.();
+      setFocusedPaneId(local.id);
+      return "focused";
+    }
+    // The transcript lives on this machine; a remote (SSH) profile cannot resume it.
+    if (activeRemoteRef.current) return "remote";
+    onRequestTerminalMode?.();
+    setAddingTerminal(true);
+    setTerminalError(null);
+    try {
+      const created = await addPane(session.tool, session.cwd, undefined, "horizontal", {
+        resumeAgentSessionId: session.sessionId,
+      });
+      if (!created) return "failed";
+      // Main starts a fresh conversation when it cannot resume (WSL shell, launch flags
+      // that pick a conversation, transcript not found) — say so instead of hiding it.
+      return created.agentSessionId === session.sessionId ? "ok" : "not-resumed";
+    } catch {
+      return "failed";
+    } finally {
+      setAddingTerminal(false);
+    }
+  }
+
+  /**
    * Tasks: activate the task's profile (by id, or by name for hand-written files), open a
    * pane with its agent tool, and have main type the prompt in once the agent is ready.
    */
@@ -1397,7 +1551,9 @@ function ChatTabInner({
 
   async function startOrShowTask({
     taskId,
+    taskName,
     prompt,
+    variables,
     profileId,
     tool,
   }: RunTaskRequest): Promise<RunTaskResult> {
@@ -1438,7 +1594,16 @@ function ChatTabInner({
       const cwd = profile?.defaultCwd?.trim() || getProfileDefaultCwd() || undefined;
       const created = await addPane(launchTool, cwd, undefined, "horizontal", {
         initialInput: prompt,
-        ...(id ? { taskId: id } : {}),
+        ...(id
+          ? {
+              taskId: id,
+              taskRun: {
+                taskId: id,
+                taskName: taskName?.trim() || id,
+                ...(variables && Object.keys(variables).length ? { variables } : {}),
+              },
+            }
+          : {}),
       });
       return created ? { ok: true } : { ok: false, reason: "spawn-failed" };
     } catch (err) {
@@ -1551,6 +1716,14 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         setCommandHistoryOpen(true);
       },
+      openConversationHistory: () => {
+        onRequestTerminalMode?.();
+        setConversationHistoryOpen(true);
+      },
+      jumpNextAttention: () => {
+        onRequestTerminalMode?.();
+        jumpNextAttentionRef.current();
+      },
     }),
     [
       addPane,
@@ -1579,6 +1752,7 @@ function ChatTabInner({
       currentGroupId: paletteGroupId,
       paneCount: panes.length,
       savedCommands: activeProfile?.savedCommands ?? [],
+      attentionCount: attentionInboxItems.length,
     },
     paletteActions,
   );
@@ -1757,6 +1931,7 @@ function ChatTabInner({
       const next = equalizeAllSplits(shownLayout);
       setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
     },
+    onJumpNextAttention: jumpNextAttention,
   });
 
   // --- Profile view windows -------------------------------------------------
@@ -2467,6 +2642,11 @@ function ChatTabInner({
         onClose={() => setWorktreePaneId(null)}
         onCreated={openWorktreePane}
       />
+      <ConversationHistoryDialog
+        open={conversationHistoryOpen}
+        onClose={() => setConversationHistoryOpen(false)}
+        onResume={(session) => resumeConversation(session)}
+      />
       <CommandHistoryPanel
         open={commandHistoryOpen}
         onClose={() => setCommandHistoryOpen(false)}
@@ -2549,10 +2729,68 @@ function ChatTabInner({
         splitRight: paneShortcutLabels.splitRight ?? t("keybindings.unbound"),
         splitDown: paneShortcutLabels.splitDown ?? t("keybindings.unbound"),
       }}
+      inbox={
+        <AttentionInbox
+          items={attentionInboxItems}
+          onOpen={(paneId) => jumpToPaneRef.current(paneId)}
+          onJumpNext={jumpNextAttention}
+          jumpShortcut={shortcutKeys("nextAttentionPane", keymap)}
+          embedded={Boolean(titleBarSlot)}
+        />
+      }
     />
   );
 
+  /** One kept xterm per session, portaled into its host node (see TerminalHostSlot). */
+  const keptTerminals = keptTerminalPanes.map((pane) => {
+    const shown = shownSessionIds.has(pane.sessionId);
+    return createPortal(
+      <EmbeddedTerminal
+        sessionId={pane.sessionId}
+        bg={useAppThemeBg ? undefined : settings.terminalBg}
+        fontFamily={terminalFontFamily}
+        fontSize={terminalFontSize}
+        scrollback={terminalScrollback}
+        webglEnabled={settings.terminalWebglEnabled}
+        scrollbarAlwaysVisible={settings.terminalScrollbarAlwaysVisible}
+        rightClickPaste={settings.terminalRightClickPaste}
+        copyOnSelect={settings.terminalCopyOnSelect}
+        pasteConfirm={pasteConfirm}
+        getPasteTargets={getPasteTargets}
+        osc52Mode={settings.terminalOsc52}
+        parked={!shown}
+        // Hidden behind a maximized pane: becoming active again refits xterm.
+        active={
+          active && shown && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)
+        }
+        focused={shown && focusedPaneId === pane.id}
+        onWrite={handlePtyWrite}
+        onCwdReport={reportPaneCwd}
+        onTitleReport={reportPaneTitle}
+        cwd={pane.cwd}
+        onTerminalNotify={handleTerminalNotify}
+        onSessionLost={() => {
+          if (respawningPaneIdsRef.current.has(pane.id)) return;
+          void respawnPane(pane.id);
+        }}
+        onRestart={() => void respawnPane(pane.id)}
+        onNewConversation={
+          pane.agentSessionId
+            ? () => void respawnPane(pane.id, { newConversation: true })
+            : undefined
+        }
+        onNewWorktreePane={() => openWorktreeDialog(pane.id)}
+        onOpenInNewWindow={() => popOutPane(pane.id, "menu")}
+        onExit={() => closePane(pane.id, { skipConfirm: true })}
+      />,
+      terminalHosts.get(pane.sessionId),
+      pane.sessionId,
+    );
+  });
+
   const emptyStateTool = resolveInstalledLaunchTool(activeProfile?.defaultTool, data);
+  const switchingToLivePanes =
+    !layout && profileBusy && (activeProfile ? hasLiveCachedPanes(activeProfile) : false);
   const terminalArea = (
     <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${profileStageClass}`}>
       {layout ? (
@@ -2606,42 +2844,8 @@ function ChatTabInner({
           placePaneInDisplay(activeProfile.id, dragPaneId, targetPaneId, zone);
         }}
         onPopOutPane={(paneId, trigger, size) => popOutPane(paneId, trigger, size)}
-        renderTerminal={(pane, paneFocused) => (
-          <EmbeddedTerminal
-            key={pane.sessionId}
-            sessionId={pane.sessionId}
-            bg={useAppThemeBg ? undefined : settings.terminalBg}
-            fontFamily={terminalFontFamily}
-            fontSize={terminalFontSize}
-            scrollback={terminalScrollback}
-            webglEnabled={settings.terminalWebglEnabled}
-            rightClickPaste={settings.terminalRightClickPaste}
-            copyOnSelect={settings.terminalCopyOnSelect}
-            pasteConfirm={pasteConfirm}
-            getPasteTargets={getPasteTargets}
-            osc52Mode={settings.terminalOsc52}
-            // Hidden behind a maximized pane: becoming active again refits xterm.
-            active={active && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)}
-            focused={paneFocused}
-            onWrite={handlePtyWrite}
-            onCwdReport={reportPaneCwd}
-            onTitleReport={reportPaneTitle}
-            cwd={pane.cwd}
-            onTerminalNotify={handleTerminalNotify}
-            onSessionLost={() => {
-              if (respawningPaneIdsRef.current.has(pane.id)) return;
-              void respawnPane(pane.id);
-            }}
-            onRestart={() => void respawnPane(pane.id)}
-            onNewConversation={
-              pane.agentSessionId
-                ? () => void respawnPane(pane.id, { newConversation: true })
-                : undefined
-            }
-            onNewWorktreePane={() => openWorktreeDialog(pane.id)}
-            onOpenInNewWindow={() => popOutPane(pane.id, "menu")}
-            onExit={() => closePane(pane.id, { skipConfirm: true })}
-          />
+        renderTerminal={(pane) => (
+          <TerminalHostSlot key={pane.sessionId} node={terminalHosts.get(pane.sessionId)} />
         )}
       />
       ) : (
@@ -2707,6 +2911,10 @@ function ChatTabInner({
       )}
       </div>
     </div>
+  ) : switchingToLivePanes ? (
+    // Switch to a profile with live panes: `layout` is null only while its
+    // sessions are checked — stay blank instead of flashing the empty state.
+    <div className="flex-1" aria-busy />
   ) : (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-8 py-6">
       {activeProfile ? (
@@ -2843,6 +3051,7 @@ function ChatTabInner({
   return (
     <TooltipProvider>
       <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text" data-surface="chrome">
+        {keptTerminals}
         {sidebarDialogs}
         {sidebar}
         <BackgroundAgentToasts
@@ -2875,7 +3084,7 @@ function ChatTabInner({
             </div>
           )}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{terminalArea}</div>
-          <TerminalStatusBar pane={displayLayout ? focusedPane : null} />
+          <TerminalStatusBar pane={displayLayout ? focusedPane : null} visible={active} />
         </div>
       </div>
     </TooltipProvider>
@@ -2911,9 +3120,12 @@ function WarpTopBar({
   available,
   splitShortcutLabels,
   embedded = false,
+  inbox,
 }: {
   /** Rendered inside the app title bar instead of as its own row. */
   embedded?: boolean;
+  /** Attention inbox entry point (shown first among the right-hand actions). */
+  inbox?: ReactNode;
   profileKey?: string | null;
   profileEnterClass?: string;
   profileLabel: string | null;
@@ -2970,6 +3182,7 @@ function WarpTopBar({
       {restoring && <span className="text-[11px] text-chrome-text-subtle">{t("chat.restoringShort")}</span>}
 
       <div className={`ml-auto flex shrink-0 items-center gap-2 ${embedded ? "app-no-drag" : ""}`}>
+        {inbox}
         {panesLeft <= PANES_LEFT_HINT_THRESHOLD && (
           <span
             role="status"

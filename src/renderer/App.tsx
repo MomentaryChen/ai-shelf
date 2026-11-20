@@ -65,6 +65,9 @@ const SkillsTab = lazy(() =>
   import("./components/SkillsTab").then((m) => ({ default: m.SkillsTab })),
 );
 const McpTab = lazy(() => import("./components/McpTab").then((m) => ({ default: m.McpTab })));
+const InstructionsTab = lazy(() =>
+  import("./components/InstructionsTab").then((m) => ({ default: m.InstructionsTab })),
+);
 const ConfigTab = lazy(() =>
   import("./components/ConfigTab").then((m) => ({ default: m.ConfigTab })),
 );
@@ -147,6 +150,7 @@ type TabId =
   | "models"
   | "skills"
   | "mcp"
+  | "instructions"
   | "config"
   | "doctor"
   | "update"
@@ -240,6 +244,7 @@ const TAB_ICONS: Record<TabId, string> = {
   models: "🧠",
   skills: "⚡",
   mcp: "🔌",
+  instructions: "📜",
   config: "⚙️",
   doctor: "🩺",
   update: "🔄",
@@ -255,6 +260,7 @@ const TAB_LABEL_KEYS: Record<TabId, MessageKey> = {
   models: "app.tab.models",
   skills: "app.tab.skills",
   mcp: "app.tab.mcp",
+  instructions: "app.tab.instructions",
   config: "app.tab.config",
   doctor: "app.tab.doctor",
   update: "app.tab.update",
@@ -966,6 +972,7 @@ export function App() {
                       <SkillsTab data={data} onOpenMcpSync={() => selectTab("mcp")} />
                     )}
                     {activeTab === "mcp" && <McpTab data={data} />}
+                    {activeTab === "instructions" && <InstructionsTab />}
                     {activeTab === "config" && <ConfigTab data={data} onRefresh={reload} />}
                     {activeTab === "doctor" && <DoctorTab data={data} onRefresh={reload} />}
                     {activeTab === "update" && <UpdateTab data={data} onRefresh={reload} />}

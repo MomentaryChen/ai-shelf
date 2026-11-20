@@ -6,11 +6,32 @@ import type {
   GitWorktreeAddRequest,
   GitWorktreeAddResult,
 } from "../shared/git-worktree.js";
+import type {
+  ChangeReviewActionResult,
+  ChangeReviewDiffResult,
+  ChangeReviewListResult,
+  ChangeReviewRequest,
+} from "../shared/git-change-review.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
+import type { TaskRunOutput, TaskRunRecord, TaskRunStart } from "../shared/task-run-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
+import type { AgentSessionUsage } from "../shared/agent-session-usage.js";
+import type {
+  ConversationDetail,
+  ConversationProviderId,
+  ConversationSearchResult,
+  ConversationSummary,
+} from "../shared/conversation-history.js";
+import type {
+  InstructionApplyResultItem,
+  InstructionPreviewResult,
+  InstructionRef,
+  InstructionScanResult,
+} from "../shared/instruction-files.js";
+import type { ClaudeSettingsDraft, ClaudeSettingsScope } from "../shared/claude-settings.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
@@ -21,6 +42,14 @@ export type {
   TaskInput,
   TaskSaveResult,
 } from "../shared/task-types.js";
+export type {
+  TaskRunMessage,
+  TaskRunOutput,
+  TaskRunRecord,
+  TaskRunStart,
+  TaskRunStatus,
+  TaskRunUsage,
+} from "../shared/task-run-types.js";
 
 export type AuthStatus = "ok" | "missing" | "expired" | "unknown";
 
@@ -350,6 +379,27 @@ export interface ConfigFileReadResult {
   success: boolean;
   content: string;
   exists: boolean;
+  error?: string;
+}
+
+export interface ClaudeSettingsFileInfo {
+  scope: ClaudeSettingsScope;
+  path: string;
+  exists: boolean;
+}
+
+export interface ClaudeSettingsReadResult extends ClaudeSettingsFileInfo {
+  ok: boolean;
+  content: string;
+  error?: string;
+}
+
+export interface ClaudeSettingsWriteResult {
+  ok: boolean;
+  path?: string;
+  content?: string;
+  backupPath?: string | null;
+  conflict?: boolean;
   error?: string;
 }
 
@@ -813,6 +863,39 @@ export interface ElectronAPI {
   }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
+  instructionsDefaultProject: () => Promise<string | null>;
+  instructionsScan: (projectDir: string | null) => Promise<InstructionScanResult>;
+  instructionsRead: (projectDir: string | null, ref: InstructionRef) => Promise<ConfigFileReadResult>;
+  instructionsWrite: (
+    projectDir: string | null,
+    ref: InstructionRef,
+    content: string,
+  ) => Promise<{ success: boolean; error?: string; backupPath?: string | null }>;
+  instructionsPreviewSync: (
+    projectDir: string | null,
+    opts: { source: InstructionRef; targets: InstructionRef[] },
+  ) => Promise<InstructionPreviewResult>;
+  instructionsApplySync: (
+    projectDir: string | null,
+    opts: {
+      source: InstructionRef;
+      sourceFingerprint: string;
+      targets: { ref: InstructionRef; fingerprint: string }[];
+    },
+  ) => Promise<{ ok: boolean; error?: string; results: InstructionApplyResultItem[] }>;
+  claudeSettingsListFiles: (
+    projectDir?: string,
+  ) => Promise<{ files: ClaudeSettingsFileInfo[]; knownProjects: string[] }>;
+  claudeSettingsRead: (
+    scope: ClaudeSettingsScope,
+    projectDir?: string,
+  ) => Promise<ClaudeSettingsReadResult>;
+  claudeSettingsWrite: (
+    scope: ClaudeSettingsScope,
+    projectDir: string | undefined,
+    expectedContent: string,
+    draft: ClaudeSettingsDraft,
+  ) => Promise<ClaudeSettingsWriteResult>;
   mcpListServers: (tool: string) => Promise<McpListResult>;
   mcpUpsertServer: (
     tool: string,
@@ -865,6 +948,8 @@ export interface ElectronAPI {
       agentSession?: { resumeId?: string };
       /** Prompt typed into the agent once its TUI is ready (Tasks); ignored for plain shells. */
       initialInput?: string;
+      /** Tasks: record this spawn in the task's run history. */
+      taskRun?: TaskRunStart;
     },
   ) => Promise<{
     success: boolean;
@@ -928,6 +1013,7 @@ export interface ElectronAPI {
   ) => Promise<PtySearchResult>;
   ptyGetLogPath: (sessionId: string)                                => Promise<{ path: string }>;
   pickFolder: (defaultPath?: string)                                => Promise<string | null>;
+  pickFile: (defaultPath?: string)                                  => Promise<string | null>;
   clipboardReadText: ()                                             => Promise<string>;
   clipboardWriteText: (text: string)                                => Promise<boolean>;
   ptyWrite:  (sessionId: string, data: string)             => void;
@@ -1115,6 +1201,8 @@ export interface ElectronAPI {
   onPaneViewConfirmClose: (cb: () => void) => () => void;
   onPaneViewNotice: (cb: (notice: PaneViewNotice) => void) => () => void;
   onPaneViewFocusPane: (cb: (paneId: string) => void) => () => void;
+  /** Token / cost totals of the agent conversation in a PTY (Claude panes); null when unknown. */
+  agentSessionUsage: (ptySessionId: string) => Promise<AgentSessionUsage | null>;
   usageGetProviders: () => Promise<{
     providers: UsageProviderMeta[];
     encryptionAvailable: boolean;
@@ -1177,6 +1265,14 @@ export interface ElectronAPI {
   tasksDelete: (id: string) => Promise<{ ok: boolean; error?: string }>;
   /** Returns shell.openPath's error string (empty on success). */
   tasksOpenDir: () => Promise<string>;
+  /** Run history of a task, newest first. */
+  tasksRunsList: (taskId: string) => Promise<TaskRunRecord[]>;
+  /** Latest run per task id. */
+  tasksRunsLatest: () => Promise<Record<string, TaskRunRecord>>;
+  tasksRunOutput: (taskId: string, runId: string) => Promise<TaskRunOutput | null>;
+  tasksRunDelete: (taskId: string, runId: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Deletes every finished run of the task. */
+  tasksRunsClear: (taskId: string) => Promise<{ ok: boolean; error?: string }>;
   portsList: (port?: number | null) => Promise<
     | {
         ok: true;
@@ -1218,6 +1314,34 @@ export interface ElectronAPI {
   gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
   /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
   gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
+  /** Past agent conversations (Claude Code transcripts), newest first. */
+  conversationsList: (opts?: {
+    /** Re-check cached facts such as whether each session's folder still exists. */
+    refresh?: boolean;
+  }) => Promise<{ success: boolean; sessions?: ConversationSummary[]; error?: string }>;
+  /** One conversation with its messages (capped for preview). */
+  conversationsRead: (
+    provider: ConversationProviderId,
+    sessionId: string,
+  ) => Promise<{ success: boolean; detail?: ConversationDetail; error?: string }>;
+  /** Full-text search across conversations; a newer call cancels an older one. */
+  conversationsSearch: (
+    query: string,
+  ) => Promise<{ success: boolean; result?: ConversationSearchResult; error?: string }>;
+  /** Take a pane's change-review baseline unless it already has one. */
+  gitChangeReviewEnsure: (req: ChangeReviewRequest) => Promise<ChangeReviewActionResult>;
+  /** Files changed in the pane's repo since its baseline (takes the baseline on first call). */
+  gitChangeReviewList: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
+  /** Unified diff of one file, baseline vs the `snapshot` tree from the last list. */
+  gitChangeReviewDiff: (
+    req: ChangeReviewRequest & { path: string; snapshot: string },
+  ) => Promise<ChangeReviewDiffResult>;
+  /** Put one file back as it was at the baseline (deleted when it did not exist then). */
+  gitChangeReviewRevert: (
+    req: ChangeReviewRequest & { path: string },
+  ) => Promise<ChangeReviewActionResult>;
+  /** Make the working tree as it is now the new baseline. */
+  gitChangeReviewReset: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
 }
 
 export type WslDistroRow = {
