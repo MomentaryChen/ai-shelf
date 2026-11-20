@@ -68,9 +68,30 @@ export function getChromeCssVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
+/**
+ * Scrollbar slider colours per theme (rest / hover / drag). xterm's default
+ * grey is near-invisible on these backgrounds once the bar stays shown.
+ */
+const XTERM_SCROLLBAR_COLORS: Record<string, [string, string, string]> = {
+  light: ["#0f172a33", "#0f172a59", "#0f172a80"],
+  contrast: ["#ffffff59", "#ffffff99", "#ffff00cc"],
+  dark: ["#b1bac433", "#b1bac459", "#b1bac480"],
+  warm: ["#e8ddd02e", "#e8ddd052", "rgb(201 123 90 / 0.7)"],
+};
+
 /** xterm.js palette aligned with the active app theme (for embedded terminals). */
 export function getXtermTheme(background: string): Record<string, string> {
   const theme = document.documentElement.dataset.appTheme ?? "warm";
+  const [rest, hover, active] = XTERM_SCROLLBAR_COLORS[theme] ?? XTERM_SCROLLBAR_COLORS.warm!;
+  return {
+    ...getXtermPalette(theme, background),
+    scrollbarSliderBackground: rest,
+    scrollbarSliderHoverBackground: hover,
+    scrollbarSliderActiveBackground: active,
+  };
+}
+
+function getXtermPalette(theme: string, background: string): Record<string, string> {
   if (theme === "light") {
     return {
       background,

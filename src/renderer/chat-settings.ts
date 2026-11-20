@@ -74,6 +74,8 @@ export interface ChatSettings {
   terminalCopyOnSelect: boolean;
   /** Prefer WebGL terminal renderer; falls back to canvas if unavailable. */
   terminalWebglEnabled: boolean;
+  /** Keep the terminal scrollbar shown while there is scrollback; false = show on hover / scroll. */
+  terminalScrollbarAlwaysVisible: boolean;
   /** Reopen AI agent panes (Claude Code) with their previous conversation after a restart. */
   terminalResumeAgentSessions: boolean;
   /** Ask before pasting text over the line / size thresholds below. */
@@ -276,6 +278,7 @@ const DEFAULTS: ChatSettings = {
   terminalRightClickPaste: true,
   terminalCopyOnSelect: true,
   terminalWebglEnabled: true,
+  terminalScrollbarAlwaysVisible: true,
   terminalResumeAgentSessions: true,
   terminalPasteConfirm: true,
   terminalPasteConfirmMaxLines: DEFAULT_PASTE_CONFIRM_MAX_LINES,
@@ -339,6 +342,7 @@ export function loadSettings(): ChatSettings {
       terminalRightClickPaste: normalizeRightClickPaste(stored.terminalRightClickPaste),
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       terminalWebglEnabled: normalizeWebglEnabled(stored.terminalWebglEnabled),
+      terminalScrollbarAlwaysVisible: normalizePaneAgentBool(stored.terminalScrollbarAlwaysVisible, true),
       terminalResumeAgentSessions: normalizePaneAgentBool(stored.terminalResumeAgentSessions, true),
       terminalPasteConfirm: normalizePaneAgentBool(stored.terminalPasteConfirm, true),
       terminalPasteConfirmMaxLines: normalizePasteConfirmMaxLines(stored.terminalPasteConfirmMaxLines),
