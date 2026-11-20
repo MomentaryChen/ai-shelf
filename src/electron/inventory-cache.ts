@@ -69,14 +69,16 @@ export function createInventoryCache(
           /* skip failed detectors (same as detectAll) */
         }
       }),
-    ).then(() => {
-      const entries = sortProviderEntries([...shared.found]);
-      if (gen === generation) set(entries);
-      return entries;
-    }).finally(() => {
-      shared.listeners.clear();
-      if (current === shared) current = null;
-    });
+    )
+      .then(() => {
+        const entries = sortProviderEntries([...shared.found]);
+        if (gen === generation) set(entries);
+        return entries;
+      })
+      .finally(() => {
+        shared.listeners.clear();
+        if (current === shared) current = null;
+      });
     return shared;
   }
 
