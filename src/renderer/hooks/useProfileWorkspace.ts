@@ -957,9 +957,21 @@ export function useProfileWorkspace(
     [profileLiveCache, liveCacheVersion, activeProfile, cacheKey],
   );
 
+  /**
+   * Live panes of every cached profile, the active one included. Unlike
+   * `backgroundProfilePanes` this does not drop the incoming profile mid-switch
+   * (while `layout` is briefly null), so kept terminals survive the handoff.
+   */
+  const liveProfilePanes = useMemo(
+    () => collectBackgroundProfilePanes(profileLiveCache.entries(), null).map((b) => b.pane),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profileLiveCache, liveCacheVersion],
+  );
+
   return {
     activeProfile,
     backgroundProfilePanes,
+    liveProfilePanes,
     restoring,
     isRestoring,
     migrationDone,
