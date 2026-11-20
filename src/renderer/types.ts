@@ -11,6 +11,7 @@ import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../sha
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
+import type { ClaudeSettingsDraft, ClaudeSettingsScope } from "../shared/claude-settings.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
@@ -350,6 +351,27 @@ export interface ConfigFileReadResult {
   success: boolean;
   content: string;
   exists: boolean;
+  error?: string;
+}
+
+export interface ClaudeSettingsFileInfo {
+  scope: ClaudeSettingsScope;
+  path: string;
+  exists: boolean;
+}
+
+export interface ClaudeSettingsReadResult extends ClaudeSettingsFileInfo {
+  ok: boolean;
+  content: string;
+  error?: string;
+}
+
+export interface ClaudeSettingsWriteResult {
+  ok: boolean;
+  path?: string;
+  content?: string;
+  backupPath?: string | null;
+  conflict?: boolean;
   error?: string;
 }
 
@@ -813,6 +835,19 @@ export interface ElectronAPI {
   }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
+  claudeSettingsListFiles: (
+    projectDir?: string,
+  ) => Promise<{ files: ClaudeSettingsFileInfo[]; knownProjects: string[] }>;
+  claudeSettingsRead: (
+    scope: ClaudeSettingsScope,
+    projectDir?: string,
+  ) => Promise<ClaudeSettingsReadResult>;
+  claudeSettingsWrite: (
+    scope: ClaudeSettingsScope,
+    projectDir: string | undefined,
+    expectedContent: string,
+    draft: ClaudeSettingsDraft,
+  ) => Promise<ClaudeSettingsWriteResult>;
   mcpListServers: (tool: string) => Promise<McpListResult>;
   mcpUpsertServer: (
     tool: string,

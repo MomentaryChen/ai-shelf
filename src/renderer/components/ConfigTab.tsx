@@ -1,4 +1,4 @@
-import { Settings } from "lucide-react";
+import { Settings, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import type { ProviderEntry } from "../types";
 import { Card } from "./Card";
@@ -9,6 +9,8 @@ import { InventorySectionHeader } from "./InventorySection";
 import { SectionHeading } from "./SectionHeading";
 import { ConfigFileEditorModal } from "./ConfigFileEditorModal";
 import { ConfigSnapshotPanel } from "./ConfigSnapshotPanel";
+import { ClaudeHooksPermissionsDialog } from "./ClaudeHooksPermissionsDialog";
+import { Button } from "@/components/ui/button";
 import { partitionByInstalled, installedCardClass } from "../utils/inventory-display";
 import { useLocale } from "../i18n/LocaleProvider";
 import { StaggerStack } from "./StaggerStack";
@@ -19,9 +21,11 @@ const EDITABLE_RE = /\.(json|jsonc|toml|ya?ml|md|txt)$/i;
 function ConfigCards({
   entries,
   onEdit,
+  onEditClaudeSettings,
 }: {
   entries: ProviderEntry[];
   onEdit: (path: string) => void;
+  onEditClaudeSettings: () => void;
 }) {
   const { t } = useLocale();
   return (
@@ -41,6 +45,14 @@ function ConfigCards({
             className={installedCardClass(e.available)}
             title={<ToolNameCell entry={e} />}
           >
+            {e.tool === "claude" && (
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <Button size="sm" variant="outline" onClick={onEditClaudeSettings}>
+                  <ShieldCheck aria-hidden /> {t("claudeSettings.open")}
+                </Button>
+                <span className="text-xs text-text-tertiary">{t("claudeSettings.openHint")}</span>
+              </div>
+            )}
             {!e.available ? (
               <p className="text-[13px] text-text-tertiary">
                 {allPaths.length > 0 ? t("inventory.configResidual") : t("inventory.configNone")}
@@ -88,6 +100,8 @@ export function ConfigTab({ data, onRefresh }: { data: ProviderEntry[]; onRefres
   const { t } = useLocale();
   const { installed, notInstalled } = partitionByInstalled(data);
   const [editPath, setEditPath] = useState<string | null>(null);
+  const [claudeSettingsOpen, setClaudeSettingsOpen] = useState(false);
+  const openClaudeSettings = () => setClaudeSettingsOpen(true);
 
   return (
     <>
@@ -97,16 +111,34 @@ export function ConfigTab({ data, onRefresh }: { data: ProviderEntry[]; onRefres
 
       <InventorySectionHeader count={installed.length} variant="installed" />
       <StaggerStack>
-        <ConfigCards entries={installed} onEdit={setEditPath} />
+        <ConfigCards
+          entries={installed}
+          onEdit={setEditPath}
+          onEditClaudeSettings={openClaudeSettings}
+        />
       </StaggerStack>
 
       <InventorySectionHeader count={notInstalled.length} variant="notInstalled" />
       <StaggerStack>
-        <ConfigCards entries={notInstalled} onEdit={setEditPath} />
+        <ConfigCards
+          entries={notInstalled}
+          onEdit={setEditPath}
+          onEditClaudeSettings={openClaudeSettings}
+        />
       </StaggerStack>
 
       {editPath && (
         <ConfigFileEditorModal path={editPath} onClose={() => setEditPath(null)} />
+      )}
+
+      {claudeSettingsOpen && (
+        <ClaudeHooksPermissionsDialog
+          onClose={() => setClaudeSettingsOpen(false)}
+          onEditRaw={(path) => {
+            setClaudeSettingsOpen(false);
+            setEditPath(path);
+          }}
+        />
       )}
     </>
   );
