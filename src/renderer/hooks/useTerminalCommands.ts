@@ -4,6 +4,7 @@ import {
   FolderGit2,
   History,
   MessagesSquare,
+  Inbox,
   Monitor,
   Radio,
   Terminal,
@@ -31,6 +32,8 @@ export interface TerminalCommandActions {
   openCommandHistory?: () => void;
   /** Open the past agent conversations (Claude Code) browser. */
   openConversationHistory?: () => void;
+  /** Jump to the next pane in the attention inbox (any profile). */
+  jumpNextAttention?: () => void;
 }
 
 export interface TerminalCommandOptions {
@@ -40,6 +43,8 @@ export interface TerminalCommandOptions {
   paneCount: number;
   /** Saved snippets for the active profile (palette quick-run). */
   savedCommands: SavedCommandSnippet[];
+  /** Panes in the attention inbox (waiting on the user, any profile). */
+  attentionCount?: number;
 }
 
 /** Plain .ts file — build lucide icon elements without JSX. */
@@ -55,8 +60,8 @@ export function useTerminalCommands(
 ): Command[] {
   const { addPane, openExternal, activateProfile, broadcastCommand, runSavedCommand, newWorktreePane } =
     actions;
-  const { openCommandHistory, openConversationHistory } = actions;
-  const { currentGroupId, paneCount, savedCommands } = options;
+  const { openCommandHistory, openConversationHistory, jumpNextAttention } = actions;
+  const { currentGroupId, paneCount, savedCommands, attentionCount = 0 } = options;
 
   return useMemo(() => {
     const available = data.filter((e) => e.available);
@@ -109,6 +114,21 @@ export function useTerminalCommands(
         icon: icon(MessagesSquare),
         keywords: "conversation history resume past session claude transcript search chat",
         run: () => openConversationHistory(),
+      });
+    }
+
+    if (jumpNextAttention) {
+      cmds.push({
+        id: "attention-next",
+        title:
+          attentionCount > 0
+            ? t("pane.agent.inbox.jumpNextCount", { count: attentionCount })
+            : t("pane.agent.inbox.jumpNext"),
+        group: t("cmd.group.agents"),
+        icon: icon(Inbox),
+        keywords: "attention inbox waiting input next pane agent permission finished jump",
+        shortcut: shortcutKeys("nextAttentionPane"),
+        run: () => jumpNextAttention(),
       });
     }
 
@@ -214,6 +234,7 @@ export function useTerminalCommands(
     currentGroupId,
     paneCount,
     savedCommands,
+    attentionCount,
     addPane,
     openExternal,
     activateProfile,
@@ -222,5 +243,6 @@ export function useTerminalCommands(
     newWorktreePane,
     openCommandHistory,
     openConversationHistory,
+    jumpNextAttention,
   ]);
 }

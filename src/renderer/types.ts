@@ -6,6 +6,12 @@ import type {
   GitWorktreeAddRequest,
   GitWorktreeAddResult,
 } from "../shared/git-worktree.js";
+import type {
+  ChangeReviewActionResult,
+  ChangeReviewDiffResult,
+  ChangeReviewListResult,
+  ChangeReviewRequest,
+} from "../shared/git-change-review.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
@@ -17,6 +23,7 @@ import type {
   ConversationSearchResult,
   ConversationSummary,
 } from "../shared/conversation-history.js";
+import type { ClaudeSettingsDraft, ClaudeSettingsScope } from "../shared/claude-settings.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
 export type { SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
@@ -356,6 +363,27 @@ export interface ConfigFileReadResult {
   success: boolean;
   content: string;
   exists: boolean;
+  error?: string;
+}
+
+export interface ClaudeSettingsFileInfo {
+  scope: ClaudeSettingsScope;
+  path: string;
+  exists: boolean;
+}
+
+export interface ClaudeSettingsReadResult extends ClaudeSettingsFileInfo {
+  ok: boolean;
+  content: string;
+  error?: string;
+}
+
+export interface ClaudeSettingsWriteResult {
+  ok: boolean;
+  path?: string;
+  content?: string;
+  backupPath?: string | null;
+  conflict?: boolean;
   error?: string;
 }
 
@@ -819,6 +847,19 @@ export interface ElectronAPI {
   }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
+  claudeSettingsListFiles: (
+    projectDir?: string,
+  ) => Promise<{ files: ClaudeSettingsFileInfo[]; knownProjects: string[] }>;
+  claudeSettingsRead: (
+    scope: ClaudeSettingsScope,
+    projectDir?: string,
+  ) => Promise<ClaudeSettingsReadResult>;
+  claudeSettingsWrite: (
+    scope: ClaudeSettingsScope,
+    projectDir: string | undefined,
+    expectedContent: string,
+    draft: ClaudeSettingsDraft,
+  ) => Promise<ClaudeSettingsWriteResult>;
   mcpListServers: (tool: string) => Promise<McpListResult>;
   mcpUpsertServer: (
     tool: string,
@@ -1238,6 +1279,20 @@ export interface ElectronAPI {
   conversationsSearch: (
     query: string,
   ) => Promise<{ success: boolean; result?: ConversationSearchResult; error?: string }>;
+  /** Take a pane's change-review baseline unless it already has one. */
+  gitChangeReviewEnsure: (req: ChangeReviewRequest) => Promise<ChangeReviewActionResult>;
+  /** Files changed in the pane's repo since its baseline (takes the baseline on first call). */
+  gitChangeReviewList: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
+  /** Unified diff of one file, baseline vs the `snapshot` tree from the last list. */
+  gitChangeReviewDiff: (
+    req: ChangeReviewRequest & { path: string; snapshot: string },
+  ) => Promise<ChangeReviewDiffResult>;
+  /** Put one file back as it was at the baseline (deleted when it did not exist then). */
+  gitChangeReviewRevert: (
+    req: ChangeReviewRequest & { path: string },
+  ) => Promise<ChangeReviewActionResult>;
+  /** Make the working tree as it is now the new baseline. */
+  gitChangeReviewReset: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
 }
 
 export type WslDistroRow = {

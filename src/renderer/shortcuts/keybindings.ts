@@ -71,6 +71,7 @@ export const SHORTCUT_IDS = [
   "resizePaneUp",
   "resizePaneDown",
   "equalizePanes",
+  "nextAttentionPane",
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_IDS)[number];
@@ -128,6 +129,7 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "resizePaneUp", section: "pane" },
   { id: "resizePaneDown", section: "pane" },
   { id: "equalizePanes", section: "pane" },
+  { id: "nextAttentionPane", section: "pane" },
 ];
 
 const DEF_BY_ID = new Map(SHORTCUT_DEFS.map((d) => [d.id, d]));
@@ -201,6 +203,8 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
     resizePaneUp: { key: "arrowup", alt: true, shift: true },
     resizePaneDown: { key: "arrowdown", alt: true, shift: true },
     equalizePanes: { key: "=", alt: true, shift: true },
+    // Attention inbox: jump to the next pane waiting on the user (any profile).
+    nextAttentionPane: { key: "j", mod: true, shift: true },
   };
 }
 

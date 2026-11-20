@@ -23,7 +23,8 @@ export type PaneShortcutAction =
   | { type: "command-history" }
   | { type: "swap-pane"; direction: PaneDirection }
   | { type: "resize-pane"; direction: PaneDirection }
-  | { type: "equalize-panes" };
+  | { type: "equalize-panes" }
+  | { type: "next-attention" };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -61,6 +62,12 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
   // group switch) so focus can jump back across profiles/workspaces.
   if (action.type === "focus-next" && onFocusRecentTerminal) {
     onFocusRecentTerminal();
+    return;
+  }
+
+  // The waiting pane may live in another profile, so this runs with zero local panes too.
+  if (action.type === "next-attention") {
+    h.onJumpNextAttention?.();
     return;
   }
 
@@ -140,6 +147,8 @@ export interface PaneShortcutHandlers {
   onResizePane?: (paneId: string, direction: PaneDirection) => void;
   /** Give every pane in each row / column the same size. */
   onEqualizePanes?: () => void;
+  /** Jump to the next pane in the attention inbox (any profile). */
+  onJumpNextAttention?: () => void;
 }
 
 let getHandlers: (() => PaneShortcutHandlers | null) | null = null;
@@ -173,6 +182,7 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "resizePaneUp",
   "resizePaneDown",
   "equalizePanes",
+  "nextAttentionPane",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -291,6 +301,8 @@ export function matchPaneShortcutWithBindings(
       return { type: "resize-pane", direction: "down" };
     case "equalizePanes":
       return { type: "equalize-panes" };
+    case "nextAttentionPane":
+      return { type: "next-attention" };
     default:
       return null;
   }
@@ -332,10 +344,16 @@ export function shouldConsumePaneShortcut(
     Partial<
       Pick<
         PaneShortcutHandlers,
-        "onOpenCommandHistory" | "onSwapPane" | "onResizePane" | "onEqualizePanes"
+        | "onOpenCommandHistory"
+        | "onSwapPane"
+        | "onResizePane"
+        | "onEqualizePanes"
+        | "onJumpNextAttention"
       >
     >,
 ): boolean {
+  // Cross-profile jump: consumed whenever a handler exists, even with no local panes.
+  if (action.type === "next-attention") return Boolean(h.onJumpNextAttention);
   // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
   // split keys — those may belong to profile quick-switch or should no-op cleanly.
   if (h.panes.length === 0) {
