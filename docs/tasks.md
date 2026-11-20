@@ -27,7 +27,7 @@ List bugs first, then risky changes, then style nits.
 | `profile`     | no       | Profile id, or a profile name. Empty: the active profile                                      |
 | `tool`        | no       | Agent CLI id (`claude`, `codex`, `gemini`, `cursor`, …). Empty: the profile's default tool    |
 
-The body after the frontmatter is the prompt, sent unchanged as the agent's first message.
+The body after the frontmatter is the prompt. `{{name}}` placeholders are filled in when you run the task; everything else is sent as written.
 
 ## How a run works
 
@@ -36,6 +36,23 @@ The body after the frontmatter is the prompt, sent unchanged as the agent's firs
 3. If the screen shows a start-up dialog (folder trust, login, API key), nothing is sent until you answer it. After 10 minutes on the dialog, the prompt is dropped.
 
 A plain-shell profile (no agent CLI installed) cannot run tasks.
+
+## Placeholders
+
+A prompt can contain `{{name}}` placeholders (`name` is letters, digits, `_` or `-`, up to 40 characters). Running the task opens a form first.
+
+| Placeholder     | Filled from                                      |
+| --------------- | ------------------------------------------------ |
+| `{{branch}}`    | The git branch in the task's folder              |
+| `{{selection}}` | The clipboard                                    |
+| `{{file}}`      | A file picker                                    |
+| any other name  | The last value you typed, which is remembered    |
+
+A value is inserted once and is not expanded again, so a value that itself contains `{{…}}` stays literal. Text that is not this shape, such as `${{ secrets.TOKEN }}`, is left alone.
+
+## Run history
+
+Each run is saved under the app data `tasks/runs/<taskId>/`: when it started, how it ended, how long it took, the prompt and values that were sent, and the terminal output (capped). Claude Code runs also store tokens, estimated cost, and the conversation text. Open a task's history to read a run, replay the terminal, or delete finished runs. The card shows the last run.
 
 ## One terminal per task
 

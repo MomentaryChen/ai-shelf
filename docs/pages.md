@@ -14,12 +14,13 @@
 3. [Models](#3-models)
 4. [Skills](#4-skills)
 5. [MCP Servers](#5-mcp-servers)
-6. [Config Files](#6-config-files)
-7. [Doctor](#7-doctor)
-8. [Update](#8-update)
-9. [Usage](#9-usage)
-10. [Tools](#10-tools)
-11. [Tasks](#11-tasks)
+6. [Instructions](#6-instructions)
+7. [Config Files](#7-config-files)
+8. [Doctor](#8-doctor)
+9. [Update](#9-update)
+10. [Costs](#10-costs)
+11. [Tools](#11-tools)
+12. [Tasks](#12-tasks)
 
 ---
 
@@ -30,15 +31,15 @@ The desktop app has **four** top-level modes in the header:
 | Mode                   | Role                                                                                                                          |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **Terminal** (default) | Profiles sidebar, embedded multi-pane terminals, external launch                                                              |
-| **Inventory**          | Tabbed dashboard: Overview, Models, Skills, MCP, Config, Doctor, Update, **Usage**                                            |
+| **Inventory**          | Tabbed dashboard: Overview, Models, Skills, MCP, Instructions, Config, Doctor, Update, **Costs**                              |
 | **Tools**              | Local utilities (Codec, Crypto, Time, Cron, Regex, JSON, Markdown, Mermaid, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL) |
 | **Tasks**              | Saved prompts that open a pane in a profile and send the prompt to its agent CLI                                              |
 
-Use the header tabs to switch modes at any time. Command palette (`Cmd/Ctrl+K`) can jump to any mode or Inventory / Tools section.
+Use the header tabs to switch modes at any time. **?** beside Commands opens Help: the app version, links to the repo, release notes, and issues, and the keyboard cheatsheet. On Terminal, the attention inbox sits in that same bar and lists panes that are waiting, finished, or failed, including a pane in another profile or a view window. Command palette (`Cmd/Ctrl+K`) can jump to any mode or Inventory / Tools section.
 
 ### Inventory footer
 
-While **Inventory** mode is open, the window footer shows **🔄 Refresh** to re-run detection and reload inventory tabs (Usage has its own refresh controls).
+While **Inventory** mode is open, the window footer shows **🔄 Refresh** to re-run detection and reload inventory tabs (Costs has its own refresh controls).
 
 ---
 
@@ -91,6 +92,10 @@ Shows which AI-related environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_K
 
 **Terminal** mode is the profile-based workspace: SQLite-backed profiles, multi-pane **node-pty** sessions, optional external launches, and a dedicated **Terminal Settings** window.
 
+The title bar holds the profile, **Folder**, **+ Pane**, **Commands**, the attention inbox, and **?**. The scrollbar stays visible while a pane has scrollback (**Always show scrollbar** in terminal settings; full-screen programs still hide it). A Claude pane with a known conversation shows tokens and estimated cost in the status bar. In a git folder the status bar also counts files changed since the pane opened, and the review can show the diff and restore one file.
+
+A profile view window lists its terminals in a sidebar: the folder under the title, and the same running, waiting, or stalled light as the main sidebar. Pane headers have split right and split down, and **New terminal** can open a plain shell or an installed AI CLI. Double-click a header or sidebar title to rename the terminal.
+
 ### Profiles sidebar
 
 - Create, rename, delete, and reorder profiles
@@ -140,6 +145,7 @@ Ignored while typing in inputs (e.g. profile rename). Every app shortcut (these,
 | **Ctrl+Shift+W**    | Close focused pane (plain **Ctrl+W** also closes outside the terminal; inside the terminal **Ctrl+W** is passed to the shell) |
 | **Ctrl+\\**         | Split right (horizontal)                                                                                                      |
 | **Ctrl+Shift+\\**   | Split down (vertical)                                                                                                         |
+| **Ctrl+Shift+J**    | Jump to the next terminal that is waiting for input                                                                          |
 
 ---
 
@@ -257,11 +263,21 @@ Inside the MCP matrix card, a compact line reports **servers total**, how many *
 
 ---
 
-## 6. Config Files
+## 6. Instructions
+
+**Instructions** is an Inventory tab (no dedicated screenshot yet). It lists instruction files the agents read — `CLAUDE.md`, `AGENTS.md`, Cursor rules, Copilot instructions, and the others — for your user account and for a project folder you choose.
+
+- Edit or create a file in place
+- Compare any two files with a line diff
+- Copy one file into others: each target shows a diff first, existing files get a backup, and a file that changed after the preview is skipped
+
+---
+
+## 7. Config Files
 
 ![Config](../tests/screenshots/en/06.config.png)
 
-The **Config** tab lists every configuration file used by each tool, grouped by type.
+The **Config** tab lists every configuration file used by each tool, grouped by type. On the Claude Code card, **Hooks & permissions** edits allow, ask, and deny rules and command hooks for your user, project, and local settings. Save shows a diff first and rewrites only those sections.
 
 ### File Types
 
@@ -281,7 +297,7 @@ Each row shows:
 
 ---
 
-## 7. Doctor
+## 8. Doctor
 
 ![Doctor](../tests/screenshots/en/07.doctor.png)
 
@@ -310,7 +326,7 @@ Each tool card runs the following checks:
 
 ---
 
-## 8. Update
+## 9. Update
 
 ![Update](../tests/screenshots/en/08.update.png)
 
@@ -348,9 +364,9 @@ The **Re-check All** button at the top re-runs the version scan for all tools wi
 
 ---
 
-## 9. Usage
+## 10. Costs
 
-**Usage** is an Inventory left-rail section (no dedicated screenshot asset yet). It aggregates spend and budgets across supported paid CLI providers so you can decide where cost goes—not only see totals.
+**Costs** is an Inventory left-rail section (no dedicated screenshot asset yet). It aggregates spend and budgets across supported paid CLI providers so you can decide where cost goes—not only see totals.
 
 Typical capabilities:
 
@@ -358,11 +374,11 @@ Typical capabilities:
 - Weekly budget targets and attribution by tool and profile
 - Credentials stored via OS `safeStorage` when available; some providers need API keys or account cookies configured in-app
 
-Open **Inventory → Usage** from the header, or jump via the command palette.
+Open **Inventory → Costs** from the header, or jump via the command palette.
 
 ---
 
-## 10. Tools
+## 11. Tools
 
 **Tools** is a top-level mode (left rail of utility panels). No dedicated screenshot assets yet; regenerate later via `pnpm gen:docs-assets` when capture coverage expands.
 
@@ -388,15 +404,17 @@ Dual-pane Tools layouts adapt with container queries on narrower windows.
 
 ---
 
-## 11. Tasks
+## 12. Tasks
 
 **Tasks** is a top-level mode for prompts you run again and again. No dedicated screenshot assets yet.
 
 What you can do:
 
 - Create a task from scratch or from a **built-in template**: a name, a prompt, and optionally a profile and an agent tool
+- A prompt can use `{{name}}` placeholders. Running it asks for the values first. `{{branch}}` comes from git in the task's folder, `{{selection}}` from the clipboard, and `{{file}}` from a file picker. Other names remember the last value
 - Click a task card: AI Shelf switches to that profile, opens a new pane with the agent CLI (the profile's default tool unless the task overrides it), and sends the prompt once the agent is ready
 - A task keeps one terminal: while it is open the card shows **Terminal open**, and a click switches to it instead of sending the prompt again
+- Each run is saved with the prompt that was sent, how it ended, and the terminal output. Claude Code runs also store tokens and estimated cost. Open a task's history to read a run or replay the terminal
 - The session is an ordinary interactive terminal, so you can answer questions, approve tools, or take over at any point
 - Edit, duplicate, or delete tasks; **Open tasks folder** shows the files
 
@@ -406,6 +424,6 @@ If the agent stops on a start-up dialog (folder trust, login), the prompt waits 
 
 ## Notes
 
-- Screenshot order and filenames for Overview–Update are generated by `tests/e2e/screenshot.spec.ts` into `tests/screenshots/en/` (this page) and `tests/screenshots/zh/` ([pages.zh-TW.md](pages.zh-TW.md)). Usage / Tools / Tasks sections above are documented without PNGs until capture coverage expands.
+- Screenshot order and filenames for Overview–Update are generated by `tests/e2e/screenshot.spec.ts` into `tests/screenshots/en/` (this page) and `tests/screenshots/zh/` ([pages.zh-TW.md](pages.zh-TW.md)). Instructions, Costs, Tools, and Tasks are documented without PNGs until capture coverage expands.
 - Regenerate all README/docs images before a release: `pnpm gen:docs-assets` on Windows (see [RELEASE.md](RELEASE.md)).
 - If tab labels or order change, update this document (`pages.md`, `pages.zh-TW.md`) and screenshot tests together to keep docs and automation aligned.
