@@ -12,10 +12,10 @@
     "ai": "dist/cli.js"
   },
   "scripts": {
-    "build": "pnpm build:cli && tsc && node scripts/write-firebase-config.mjs && tsc -p src/renderer/tsconfig.json && vite build && node -e \"const fs=require('fs');fs.copyFileSync('src/electron/preload.cjs','dist/electron/preload.cjs');fs.mkdirSync('dist/assets',{recursive:true});fs.copyFileSync('src/assets/icon.ico','dist/assets/icon.ico');fs.copyFileSync('src/assets/icon.png','dist/assets/icon.png');\"",
+    "build": "pnpm build:cli && node scripts/build.mjs",
     "build:cli": "pnpm --filter ai-shelf run build",
     "build:desktop": "pnpm run build",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json && tsc -p src/renderer/tsconfig.json && pnpm --filter ai-shelf run typecheck",
+    "typecheck": "node scripts/typecheck.mjs",
     "test": "tsx --test \"src/**/*.test.ts\" \"packages/cli/src/**/*.test.ts\"",
     "dev": "tsc --watch",
     "dev:cli": "pnpm --filter ai-shelf run dev",
@@ -30,6 +30,7 @@
     "dist:mac": "pnpm build && electron-builder --mac --publish never -c.mac.identity=null",
     "dist:linux": "pnpm build && electron-builder --linux --publish never",
     "test:e2e": "pnpm build && playwright test",
+    "test:e2e:nobuild": "playwright test",
     "gen:terminal-demo-gif": "pnpm build && node scripts/run-terminal-demo-gif.mjs",
     "gen:docs-assets": "node scripts/gen-docs-assets.mjs",
     "verify:firebase": "node scripts/verify-firebase-env.mjs",

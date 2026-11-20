@@ -1,14 +1,4 @@
-import type { ProviderEntry } from "../inventory/types.js";
-import { detectAll } from "../inventory/index.js";
-import { detectClaude } from "../inventory/claude.js";
-import { detectCopilot } from "../inventory/copilot.js";
-import { detectCursor } from "../inventory/cursor.js";
-import { detectCodex } from "../inventory/codex.js";
-import { detectGemini } from "../inventory/gemini.js";
-import { detectAider } from "../inventory/aider.js";
-import { detectOpenCode } from "../inventory/opencode.js";
-import { detectCrush } from "../inventory/crush.js";
-import { detectGoose } from "../inventory/goose.js";
+import { detectAll, detectTool } from "../inventory/index.js";
 
 type Options = { json: boolean };
 
@@ -35,7 +25,9 @@ export async function runInventory(args: string[], opts: Options) {
 }
 
 async function showOverview(opts: Options) {
-  const entries = await detectAll();
+  // The table never lists `models`, so skip remote model-list fetches; --json
+  // prints whole entries (including `models`) and keeps the full detect.
+  const entries = await detectAll({ quick: !opts.json });
   if (opts.json) {
     console.log(JSON.stringify(entries, null, 2));
     return;
@@ -123,7 +115,7 @@ async function showModels(opts: Options) {
 }
 
 async function showSkills(opts: Options) {
-  const entries = await detectAll();
+  const entries = await detectAll({ quick: true });
   if (opts.json) {
     console.log(JSON.stringify(entries.map((e) => ({ tool: e.tool, skills: e.skills })), null, 2));
     return;
@@ -139,7 +131,7 @@ async function showSkills(opts: Options) {
 }
 
 async function showMcp(opts: Options) {
-  const entries = await detectAll();
+  const entries = await detectAll({ quick: true });
   if (opts.json) {
     console.log(JSON.stringify(entries.map((e) => ({ tool: e.tool, mcp: e.mcp })), null, 2));
     return;
@@ -171,7 +163,7 @@ async function showMcp(opts: Options) {
 }
 
 async function showConfig(opts: Options) {
-  const entries = await detectAll();
+  const entries = await detectAll({ quick: true });
   if (opts.json) {
     console.log(JSON.stringify(entries.map((e) => ({ tool: e.tool, config: e.config })), null, 2));
     return;
@@ -196,23 +188,12 @@ async function showConfig(opts: Options) {
 }
 
 async function showToolDetail(tool: string, opts: Options) {
-  const detectors: Record<string, () => Promise<ProviderEntry>> = {
-    claude: detectClaude,
-    copilot: detectCopilot,
-    cursor: detectCursor,
-    codex: detectCodex,
-    gemini: detectGemini,
-    aider: detectAider,
-    opencode: detectOpenCode,
-    crush: detectCrush,
-    goose: detectGoose,
-  };
-  const detect = detectors[tool];
-  if (!detect) {
+  // Text output shows only the current model; --json includes `models`.
+  const entry = await detectTool(tool, { quick: !opts.json });
+  if (!entry) {
     console.error(`Unknown tool: ${tool}`);
     return;
   }
-  const entry = await detect();
   if (opts.json) {
     console.log(JSON.stringify(entry, null, 2));
     return;
