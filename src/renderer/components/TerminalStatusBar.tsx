@@ -5,6 +5,7 @@ import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 import { TerminalCommandStatus } from "./TerminalCommandStatus";
 import { TerminalSessionUsage } from "./TerminalSessionUsage";
+import { ChangeReviewStatus } from "./ChangeReviewStatus";
 
 type SessionStatus = "live" | "exited" | "stale";
 
@@ -189,6 +190,7 @@ export function TerminalStatusBar({
           agentSessionId={pane.agentSessionId}
           live={status === "live" && visible}
         />
+        <ChangeReviewStatus sessionId={pane.sessionId} cwd={pane.cwd} />
         <TerminalCommandStatus sessionId={pane.sessionId} />
         <span title={shellTitle}>{shell}</span>
         {showExit ? (

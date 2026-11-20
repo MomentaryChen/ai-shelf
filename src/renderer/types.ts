@@ -6,12 +6,24 @@ import type {
   GitWorktreeAddRequest,
   GitWorktreeAddResult,
 } from "../shared/git-worktree.js";
+import type {
+  ChangeReviewActionResult,
+  ChangeReviewDiffResult,
+  ChangeReviewListResult,
+  ChangeReviewRequest,
+} from "../shared/git-change-review.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
 import type { AgentSessionUsage } from "../shared/agent-session-usage.js";
+import type {
+  InstructionApplyResultItem,
+  InstructionPreviewResult,
+  InstructionRef,
+  InstructionScanResult,
+} from "../shared/instruction-files.js";
 import type { ClaudeSettingsDraft, ClaudeSettingsScope } from "../shared/claude-settings.js";
 
 export type { AuthSessionReport, AuthStatePublic, AuthUserPublic } from "../shared/auth-types.js";
@@ -836,6 +848,26 @@ export interface ElectronAPI {
   }) => Promise<SkillSyncResult[]>;
   readConfigFile: (filePath: string) => Promise<ConfigFileReadResult>;
   writeConfigFile: (filePath: string, content: string) => Promise<McpEditResult>;
+  instructionsDefaultProject: () => Promise<string | null>;
+  instructionsScan: (projectDir: string | null) => Promise<InstructionScanResult>;
+  instructionsRead: (projectDir: string | null, ref: InstructionRef) => Promise<ConfigFileReadResult>;
+  instructionsWrite: (
+    projectDir: string | null,
+    ref: InstructionRef,
+    content: string,
+  ) => Promise<{ success: boolean; error?: string; backupPath?: string | null }>;
+  instructionsPreviewSync: (
+    projectDir: string | null,
+    opts: { source: InstructionRef; targets: InstructionRef[] },
+  ) => Promise<InstructionPreviewResult>;
+  instructionsApplySync: (
+    projectDir: string | null,
+    opts: {
+      source: InstructionRef;
+      sourceFingerprint: string;
+      targets: { ref: InstructionRef; fingerprint: string }[];
+    },
+  ) => Promise<{ ok: boolean; error?: string; results: InstructionApplyResultItem[] }>;
   claudeSettingsListFiles: (
     projectDir?: string,
   ) => Promise<{ files: ClaudeSettingsFileInfo[]; knownProjects: string[] }>;
@@ -1256,6 +1288,20 @@ export interface ElectronAPI {
   gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
   /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
   gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
+  /** Take a pane's change-review baseline unless it already has one. */
+  gitChangeReviewEnsure: (req: ChangeReviewRequest) => Promise<ChangeReviewActionResult>;
+  /** Files changed in the pane's repo since its baseline (takes the baseline on first call). */
+  gitChangeReviewList: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
+  /** Unified diff of one file, baseline vs the `snapshot` tree from the last list. */
+  gitChangeReviewDiff: (
+    req: ChangeReviewRequest & { path: string; snapshot: string },
+  ) => Promise<ChangeReviewDiffResult>;
+  /** Put one file back as it was at the baseline (deleted when it did not exist then). */
+  gitChangeReviewRevert: (
+    req: ChangeReviewRequest & { path: string },
+  ) => Promise<ChangeReviewActionResult>;
+  /** Make the working tree as it is now the new baseline. */
+  gitChangeReviewReset: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
 }
 
 export type WslDistroRow = {
