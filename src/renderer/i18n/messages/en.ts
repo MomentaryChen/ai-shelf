@@ -224,6 +224,9 @@ export const en = {
   "settings.pasteConfirmBroadcastHint":
     "When “Sync input to all terminals” is on, ask before every paste that would reach more than one terminal.",
   "settings.webgl": "WebGL renderer",
+  "settings.scrollbarAlways": "Always show scrollbar",
+  "settings.scrollbarAlwaysHint":
+    "Keep the terminal scrollbar visible while there is history to scroll, so you can see where you are and drag to jump. Off = show it only while hovering or scrolling. Full-screen apps on the alternate screen have no scrollback.",
   "settings.webglHint":
     "Faster drawing with the GPU — helps with many panes and large scrollback. Falls back to canvas if WebGL is unavailable. Open panes reload on change.",
   "settings.systemTray": "System tray",

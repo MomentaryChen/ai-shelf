@@ -75,6 +75,8 @@ interface Props {
   scrollback: number;
   /** Use WebGL renderer when the GPU allows it (falls back to canvas). */
   webglEnabled?: boolean;
+  /** Keep the scrollbar shown while there is scrollback (default); false = show on hover / scroll only. */
+  scrollbarAlwaysVisible?: boolean;
   rightClickPaste?: boolean;
   copyOnSelect?: boolean;
   /** Confirm multi-line / large / broadcast pastes; omitted = never confirm. */
@@ -156,6 +158,7 @@ function EmbeddedTerminalInner({
   fontSize,
   scrollback,
   webglEnabled = true,
+  scrollbarAlwaysVisible = true,
   rightClickPaste = true,
   copyOnSelect = true,
   pasteConfirm,
@@ -763,6 +766,23 @@ function EmbeddedTerminalInner({
 
     const offScroll = term.onScroll(syncNewOutputHint);
 
+    /*
+     * xterm's scrollbar auto-hides, and its hidden state looks the same whether
+     * there is history or not. Mark the container when the active buffer has
+     * scrollback so CSS can keep the bar shown only when it has somewhere to go
+     * (the alternate screen, e.g. full-screen TUIs, has none).
+     */
+    let hasScrollback = false;
+    const syncScrollbackFlag = () => {
+      const next = term.buffer.active.baseY > 0;
+      if (next === hasScrollback) return;
+      hasScrollback = next;
+      el.toggleAttribute("data-has-scrollback", next);
+    };
+    const offScrollbackScroll = term.onScroll(syncScrollbackFlag);
+    const offScrollbackWrite = term.onWriteParsed(syncScrollbackFlag);
+    const offScrollbackBuffer = term.buffer.onBufferChange(syncScrollbackFlag);
+
     /** Ensure mouse wheel scrolls history in Electron (xterm viewport may not receive the event). */
     const onWheel = (ev: WheelEvent) => {
       if (ev.ctrlKey || ev.metaKey) return;
@@ -932,6 +952,9 @@ function EmbeddedTerminalInner({
       termRef.current = null;
       searchRef.current = null;
       offScroll.dispose();
+      offScrollbackScroll.dispose();
+      offScrollbackWrite.dispose();
+      offScrollbackBuffer.dispose();
       offData();
       offExit();
       el.removeEventListener("wheel", onWheel, { capture: true });
@@ -1044,6 +1067,7 @@ function EmbeddedTerminalInner({
     <div
       className="ui-view-rise absolute inset-0 isolate"
       data-terminal-overlay-open={findOpen ? "" : undefined}
+      data-scrollbar-always={scrollbarAlwaysVisible ? "" : undefined}
     >
       <div ref={containerRef} className="absolute inset-0 z-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 z-10">
