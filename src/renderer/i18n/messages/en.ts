@@ -1386,6 +1386,7 @@ export const en = {
   "tasks.vars.title": "Run “{name}”",
   "tasks.vars.desc": "Fill in the values for this run. Each one replaces its {{placeholder}} in the prompt.",
   "tasks.vars.branchHint": "Current git branch of the folder the task runs in.",
+  "tasks.vars.branchFrom": "Current git branch of {path}. Change it if the task runs somewhere else.",
   "tasks.vars.branchUnknown": "No git branch detected for the task's folder. Type one in.",
   "tasks.vars.selectionHint": "Pre-filled from the clipboard. Copy the text you want before running.",
   "tasks.vars.fileHint": "Path of a file for the agent to work on.",

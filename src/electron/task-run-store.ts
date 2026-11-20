@@ -210,10 +210,7 @@ export function markTaskRunPromptNotSent(sessionId: string): void {
   writeRecord(run.record);
 }
 
-async function readTranscript(rec: StoredRun): Promise<string | null> {
-  if (!rec.agentSessionId || !rec.claudeConfigDir) return null;
-  const file = findClaudeTranscript(rec.claudeConfigDir, rec.cwd, rec.agentSessionId);
-  if (!file) return null;
+async function readCapped(file: string): Promise<string | null> {
   try {
     const text = await readFile(file, "utf8");
     return text.length > MAX_TRANSCRIPT_BYTES ? text.slice(-MAX_TRANSCRIPT_BYTES) : text;
@@ -222,10 +219,38 @@ async function readTranscript(rec: StoredRun): Promise<string | null> {
   }
 }
 
+function transcriptPath(rec: StoredRun): string | null {
+  if (!rec.agentSessionId || !rec.claudeConfigDir) return null;
+  return findClaudeTranscript(rec.claudeConfigDir, rec.cwd, rec.agentSessionId);
+}
+
+/** The session's own transcript. */
+async function readTranscript(rec: StoredRun): Promise<string | null> {
+  const file = transcriptPath(rec);
+  return file ? readCapped(file) : null;
+}
+
+/** The session's transcript followed by its sub-agents' (`<sessionId>/subagents/*.jsonl`). */
+async function readTranscriptsWithSubagents(rec: StoredRun): Promise<string[] | null> {
+  const file = transcriptPath(rec);
+  if (!file) return null;
+  const main = await readCapped(file);
+  if (main === null) return null;
+  const subDir = join(file.slice(0, -".jsonl".length), "subagents");
+  let subFiles: string[] = [];
+  try {
+    subFiles = readdirSync(subDir).filter((f) => f.endsWith(".jsonl"));
+  } catch {
+    /* no sub-agents */
+  }
+  const subs = await Promise.all(subFiles.map((f) => readCapped(join(subDir, f))));
+  return [main, ...subs.filter((s): s is string => s !== null)];
+}
+
 async function refreshUsage(rec: StoredRun): Promise<boolean> {
-  const transcript = await readTranscript(rec);
-  if (transcript === null) return false;
-  const usage = summarizeClaudeTranscriptUsage(transcript);
+  const transcripts = await readTranscriptsWithSubagents(rec);
+  if (transcripts === null) return false;
+  const usage = summarizeClaudeTranscriptUsage(transcripts);
   if (!usage) return false;
   rec.usage = usage;
   return true;
@@ -294,38 +319,47 @@ export async function listTaskRuns(taskId: string): Promise<TaskRunRecord[]> {
     if (rec) out.push(rec);
   }
   out.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-  await Promise.all(
-    out
-      .filter((r) => r.status === "running" || r.status === "prompt-not-sent" || !r.usage)
-      .filter((r) => r.agentSessionId)
-      .map(async (r) => {
-        const live = liveRecord(taskId, r.id) !== undefined;
-        if ((await refreshUsage(r)) && !live) writeRecord(r);
-      }),
-  );
+  await refreshStaleUsage(out);
   return out.map(publicRecord);
 }
 
+/**
+ * Re-read usage for open runs and for finished ones that have none yet (usage is filled in
+ * asynchronously after a run ends, or never for runs interrupted by a quit).
+ */
+async function refreshStaleUsage(runs: StoredRun[]): Promise<void> {
+  await Promise.all(
+    runs
+      .filter((r) => r.agentSessionId)
+      .filter((r) => liveRecord(r.taskId, r.id) !== undefined || !r.usage)
+      .map(async (r) => {
+        const live = liveRecord(r.taskId, r.id) !== undefined;
+        if ((await refreshUsage(r)) && !live) writeRecord(r);
+      }),
+  );
+}
+
 /** Latest run per task (for card badges). */
-export function latestTaskRuns(): Record<string, TaskRunRecord> {
-  const out: Record<string, TaskRunRecord> = {};
+export async function latestTaskRuns(): Promise<Record<string, TaskRunRecord>> {
+  const latest: StoredRun[] = [];
   let taskIds: string[];
   try {
     taskIds = readdirSync(join(getTasksDir(), "runs")).filter(isSafeTaskId);
   } catch {
-    return out;
+    return {};
   }
   for (const taskId of taskIds) {
     const ids = listRecordIds(taskId).sort();
     for (let i = ids.length - 1; i >= 0; i--) {
       const rec = liveRecord(taskId, ids[i]!) ?? readRecord(taskId, ids[i]!);
       if (rec) {
-        out[taskId] = publicRecord(rec);
+        latest.push(rec);
         break;
       }
     }
   }
-  return out;
+  await refreshStaleUsage(latest);
+  return Object.fromEntries(latest.map((r) => [r.taskId, publicRecord(r)]));
 }
 
 export async function readTaskRunOutput(

@@ -93,3 +93,33 @@ test("extractClaudeConversation: user + assistant text, joins blocks of one mess
     { role: "assistant", text: "Done" },
   ]);
 });
+
+test("summarize: 1-hour cache writes cost 2× input; sub-agent transcripts add up", () => {
+  const main = JSON.stringify({
+    type: "assistant",
+    message: {
+      id: "m1",
+      model: "claude-opus-5-5",
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_input_tokens: 1_000_000,
+        cache_creation: { ephemeral_1h_input_tokens: 1_000_000, ephemeral_5m_input_tokens: 0 },
+      },
+      content: [],
+    },
+  });
+  const sub = assistant("s1", "claude-haiku-5-5", { output_tokens: 1_000_000 }, []);
+  const u = summarizeClaudeTranscriptUsage([main, sub])!;
+  // 1M × $4 × 2 + 1M × $0.5
+  assert.equal(u.costUsd, 8.5);
+  assert.equal(u.model, "claude-opus-5-5");
+  assert.equal(u.messages, 2);
+});
+
+test("claudeModelPrice: a newer model never borrows an older one's price", () => {
+  assert.equal(claudeModelPrice("claude-opus-5-6"), null);
+  assert.equal(claudeModelPrice("claude-sonnet-4-7"), null);
+  assert.equal(claudeModelPrice("claude-fable-5-1")?.cacheRead, 0.25);
+  assert.equal(claudeModelPrice("anthropic.claude-sonnet-4-5-20250929-v1:0")?.input, 3);
+});

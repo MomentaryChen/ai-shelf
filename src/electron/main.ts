@@ -2068,7 +2068,10 @@ ipcMain.handle(
       if (taskRun) {
         startTaskRun(sessionId, taskRun, {
           tool,
-          cwd: workDir,
+          // Remote panes run on the other host; record `[user@]host:dir` like the status bar.
+          cwd: remote
+            ? `${remote.user ? `${remote.user}@` : ""}${remote.host}:${remote.cwd || "~"}`
+            : workDir,
           prompt: initialInput,
           cols: ptyOpts.cols,
           rows: ptyOpts.rows,

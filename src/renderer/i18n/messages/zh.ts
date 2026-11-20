@@ -1335,6 +1335,7 @@ export const zh: Record<MessageKey, string> = {
   "tasks.vars.title": "執行「{name}」",
   "tasks.vars.desc": "填入這次執行要用的值，會取代提示詞中對應的 {{變數}}。",
   "tasks.vars.branchHint": "任務執行資料夾目前的 git 分支。",
+  "tasks.vars.branchFrom": "取自 {path} 目前的 git 分支。任務若在別處執行請自行修改。",
   "tasks.vars.branchUnknown": "偵測不到任務資料夾的 git 分支，請自行輸入。",
   "tasks.vars.selectionHint": "已從剪貼簿帶入。執行前先複製想要的文字即可。",
   "tasks.vars.fileHint": "要讓 AI 處理的檔案路徑。",

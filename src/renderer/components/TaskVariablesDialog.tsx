@@ -223,7 +223,11 @@ export function TaskVariablesDialog({
                 )}
                 {key === "branch" && (
                   <p className={branchMissing && !value ? "mt-1 text-[11px] text-warn" : hintClass}>
-                    {branchMissing && !value ? t("tasks.vars.branchUnknown") : t("tasks.vars.branchHint")}
+                    {branchMissing && !value
+                      ? t("tasks.vars.branchUnknown")
+                      : shown.cwd
+                        ? t("tasks.vars.branchFrom", { path: shown.cwd })
+                        : t("tasks.vars.branchHint")}
                   </p>
                 )}
                 {key === "selection" && <p className={hintClass}>{t("tasks.vars.selectionHint")}</p>}
