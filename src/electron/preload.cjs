@@ -317,4 +317,9 @@ contextBridge.exposeInMainWorld("api", {
   wslDistroIp: (distro) => ipcRenderer.invoke("wsl-distro-ip", distro),
   gitCwdInfo: (cwd) => ipcRenderer.invoke("git-cwd-info", cwd),
   gitWorktreeAdd: (req) => ipcRenderer.invoke("git-worktree-add", req),
+  gitChangeReviewEnsure: (req) => ipcRenderer.invoke("git-change-review-ensure", req),
+  gitChangeReviewList: (req) => ipcRenderer.invoke("git-change-review-list", req),
+  gitChangeReviewDiff: (req) => ipcRenderer.invoke("git-change-review-diff", req),
+  gitChangeReviewRevert: (req) => ipcRenderer.invoke("git-change-review-revert", req),
+  gitChangeReviewReset: (req) => ipcRenderer.invoke("git-change-review-reset", req),
 });
