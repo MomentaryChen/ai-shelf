@@ -10,7 +10,8 @@ interface DiagnosticResult {
 }
 
 export async function runDoctor(opts: Options) {
-  const entries = await detectAll();
+  // Diagnostics never read model lists; skip the remote fetches.
+  const entries = await detectAll({ quick: true });
   const results: DiagnosticResult[] = [];
 
   for (const entry of entries) {

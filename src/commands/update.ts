@@ -35,7 +35,7 @@ export async function runUpdate(args: string[]) {
   if (target === "self" || !target) {
     if (!target) {
       // Update all detected tools + self
-      const entries = await detectAll();
+      const entries = await detectAll({ quick: true });
       for (const entry of entries) {
         if (entry.available && TOOL_UPDATE[entry.tool]) {
           await updateTool(entry.tool);
