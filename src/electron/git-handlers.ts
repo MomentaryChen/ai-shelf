@@ -15,15 +15,16 @@ import {
   type GitWorktreeAddResult,
 } from "../shared/git-worktree.js";
 import { listRunningWslDistros } from "./wsl-exec.js";
+import { registerChangeReviewHandlers } from "./git-change-review.js";
 
-const PROBE_TIMEOUT_MS = 2_500;
+export const PROBE_TIMEOUT_MS = 2_500;
 const DIRTY_TIMEOUT_MS = 1_500;
 const WORKTREE_ADD_TIMEOUT_MS = 120_000;
 /** Probes for the same cwd within this window share one result. */
 const INFO_CACHE_MS = 2_000;
 const WSL_RUNNING_CACHE_MS = 30_000;
 
-type GitRun = {
+export type GitRun = {
   ok: boolean;
   stdout: string;
   stderr: string;
@@ -35,11 +36,16 @@ type GitRun = {
  * Run git without a shell. Background probes pass `--no-optional-locks` so
  * they never take `index.lock` out from under an agent running git in a pane.
  */
-function runGit(
+export function runGit(
   target: GitCwdTarget,
   args: string[],
   timeoutMs: number,
-  opts?: { allowLocks?: boolean },
+  opts?: {
+    allowLocks?: boolean;
+    /** Use this index file instead of the repo's (`GIT_INDEX_FILE`); a Linux path for WSL. */
+    indexFile?: string;
+    maxBuffer?: number;
+  },
 ): Promise<GitRun> {
   const gitArgs = [
     ...(opts?.allowLocks ? [] : ["--no-optional-locks"]),
@@ -48,7 +54,11 @@ function runGit(
     ...args,
   ];
   const file = target.kind === "wsl" ? "wsl.exe" : "git";
-  const argv = target.kind === "wsl" ? ["-d", target.distro, "-e", "git", ...gitArgs] : gitArgs;
+  // Env vars do not cross wsl.exe, so a WSL index override goes through `env`.
+  const wslGit = opts?.indexFile ? ["env", `GIT_INDEX_FILE=${opts.indexFile}`, "git"] : ["git"];
+  const argv = target.kind === "wsl" ? ["-d", target.distro, "-e", ...wslGit, ...gitArgs] : gitArgs;
+  const indexEnv =
+    opts?.indexFile && target.kind === "native" ? { GIT_INDEX_FILE: opts.indexFile } : {};
   return new Promise((resolve) => {
     execFile(
       file,
@@ -58,8 +68,8 @@ function runGit(
         windowsHide: true,
         shell: false,
         encoding: "utf8",
-        maxBuffer: 4 * 1024 * 1024,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" },
+        maxBuffer: opts?.maxBuffer ?? 4 * 1024 * 1024,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", ...indexEnv },
       },
       (err, stdout, stderr) => {
         if (!err) {
@@ -90,7 +100,7 @@ async function isWslDistroRunning(distro: string): Promise<boolean> {
   return names.some((n) => n.toLowerCase() === distro.toLowerCase());
 }
 
-async function resolveTarget(cwd: unknown): Promise<GitCwdTarget | null> {
+export async function resolveTarget(cwd: unknown): Promise<GitCwdTarget | null> {
   if (typeof cwd !== "string") return null;
   const target = classifyGitCwd(cwd, platform());
   if (!target) return null;
@@ -98,7 +108,7 @@ async function resolveTarget(cwd: unknown): Promise<GitCwdTarget | null> {
   return target;
 }
 
-async function probeRepo(target: GitCwdTarget): Promise<GitRevParseProbe | null> {
+export async function probeRepo(target: GitCwdTarget): Promise<GitRevParseProbe | null> {
   const r = await runGit(
     target,
     ["rev-parse", "--show-toplevel", "--git-dir", "--git-common-dir"],
@@ -148,6 +158,11 @@ async function computeGitInfo(cwd: unknown): Promise<GitCwdInfo | null> {
 }
 
 const infoCache = new Map<string, { at: number; result: Promise<GitCwdInfo | null> }>();
+
+/** Drop cached branch / dirty answers after a command changed the working tree. */
+export function clearGitInfoCache(): void {
+  infoCache.clear();
+}
 
 function getGitInfo(cwd: unknown): Promise<GitCwdInfo | null> {
   if (typeof cwd !== "string" || !cwd.trim()) return Promise.resolve(null);
@@ -234,4 +249,5 @@ async function addWorktree(req: unknown): Promise<GitWorktreeAddResult> {
 export function registerGitHandlers(): void {
   ipcMain.handle("git-cwd-info", (_event, cwd: unknown) => getGitInfo(cwd));
   ipcMain.handle("git-worktree-add", (_event, req: unknown) => addWorktree(req));
+  registerChangeReviewHandlers();
 }

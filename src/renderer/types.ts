@@ -6,6 +6,12 @@ import type {
   GitWorktreeAddRequest,
   GitWorktreeAddResult,
 } from "../shared/git-worktree.js";
+import type {
+  ChangeReviewActionResult,
+  ChangeReviewDiffResult,
+  ChangeReviewListResult,
+  ChangeReviewRequest,
+} from "../shared/git-change-review.js";
 import type { CloudSyncStateDoc, SyncBundle, SyncMeta, SyncStatus } from "../shared/sync-types.js";
 
 import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js";
@@ -1218,6 +1224,20 @@ export interface ElectronAPI {
   gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
   /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
   gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
+  /** Take a pane's change-review baseline unless it already has one. */
+  gitChangeReviewEnsure: (req: ChangeReviewRequest) => Promise<ChangeReviewActionResult>;
+  /** Files changed in the pane's repo since its baseline (takes the baseline on first call). */
+  gitChangeReviewList: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
+  /** Unified diff of one file, baseline vs the `snapshot` tree from the last list. */
+  gitChangeReviewDiff: (
+    req: ChangeReviewRequest & { path: string; snapshot: string },
+  ) => Promise<ChangeReviewDiffResult>;
+  /** Put one file back as it was at the baseline (deleted when it did not exist then). */
+  gitChangeReviewRevert: (
+    req: ChangeReviewRequest & { path: string },
+  ) => Promise<ChangeReviewActionResult>;
+  /** Make the working tree as it is now the new baseline. */
+  gitChangeReviewReset: (req: ChangeReviewRequest) => Promise<ChangeReviewListResult>;
 }
 
 export type WslDistroRow = {

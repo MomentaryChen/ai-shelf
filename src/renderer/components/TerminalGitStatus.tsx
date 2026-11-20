@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { FolderGit2, GitBranch } from "lucide-react";
 import type { GitCwdInfo } from "../../shared/git-worktree.js";
 import { useLocale } from "../i18n/LocaleProvider";
 import { usePaneGitInfo } from "../terminal/git-info-store";
+import { ensureChangeBaseline } from "../terminal/change-review-store";
 
 function useGitTitle(info: GitCwdInfo): string {
   const { t } = useLocale();
@@ -24,12 +26,19 @@ function useGitTitle(info: GitCwdInfo): string {
  */
 export function PaneGitBranch({
   cwd,
+  sessionId,
   onClick,
 }: {
   cwd: string | undefined;
+  /** When set, the pane's change-review baseline is taken as soon as it is known to be in a repo. */
+  sessionId?: string;
   onClick?: () => void;
 }) {
   const info = usePaneGitInfo(cwd);
+  const inRepo = info !== null;
+  useEffect(() => {
+    if (inRepo && sessionId && cwd) ensureChangeBaseline(sessionId, cwd);
+  }, [inRepo, sessionId, cwd]);
   if (!info) return null;
   return <PaneGitBranchLabel info={info} onClick={onClick} />;
 }
