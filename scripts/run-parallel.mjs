@@ -25,7 +25,12 @@ function runStep({ name, script, args = [], cwd }) {
     const chunks = [];
     const child = spawn(process.execPath, [script, ...args], {
       cwd,
-      env: { ...process.env, FORCE_COLOR: process.env.FORCE_COLOR ?? "1" },
+      // Children see a pipe; keep colors only when we print to a terminal (CI
+      // problem matchers need plain `error TS` lines).
+      env:
+        process.stdout.isTTY && process.env.FORCE_COLOR === undefined
+          ? { ...process.env, FORCE_COLOR: "1" }
+          : process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
     child.stdout.on("data", (d) => chunks.push(d));
