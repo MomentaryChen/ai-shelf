@@ -90,6 +90,12 @@ interface Props {
   osc52Mode?: Osc52Mode;
   active?: boolean;
   focused?: boolean;
+  /**
+   * Kept mounted off screen (another profile, or a pane not on display). The
+   * terminal keeps parsing output but does not fit, notify, broadcast input or
+   * hold a WebGL context; cwd / title reports wait until it is shown again.
+   */
+  parked?: boolean;
   onExit: () => void;
   onSessionLost?: (sessionId: string) => void;
   onWrite?: (data: string, sessionId: string) => void;
@@ -130,6 +136,9 @@ type InnerProps = Omit<Props, keyof TerminalCallbacks> & {
   callbacksRef: MutableRefObject<TerminalCallbacks>;
 };
 
+/** How long a parked pane keeps its WebGL context before releasing it. */
+const PARKED_WEBGL_RELEASE_MS = 5000;
+
 /** True when the viewport is pinned to the latest output (ydisp === ybase). */
 function isTerminalAtBottom(term: Terminal): boolean {
   const buffer = term.buffer.active;
@@ -166,6 +175,7 @@ function EmbeddedTerminalInner({
   osc52Mode = "off",
   active = true,
   focused = true,
+  parked = false,
   cwd,
   callbacksRef,
 }: InnerProps) {
@@ -181,6 +191,10 @@ function EmbeddedTerminalInner({
   cwdRef.current = cwd;
   const focusedRef = useRef(focused);
   focusedRef.current = focused;
+  const parkedRef = useRef(parked);
+  parkedRef.current = parked;
+  /** Set by the xterm effect: release / restore what a parked pane does not need. */
+  const applyParkedRef = useRef<((parked: boolean) => void) | null>(null);
   const fitRef = useRef<((forceMetrics?: boolean) => void) | null>(null);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
   const [hasNewOutput, setHasNewOutput] = useState(false);
@@ -471,7 +485,8 @@ function EmbeddedTerminalInner({
     termRef.current = term;
     // Assigned once fit() exists. WebGL loads async, so the callback runs later.
     let scheduleFit = (_forceMetrics = false) => {};
-    const webgl = webglEnabled
+    // Released while parked (Chromium caps live WebGL contexts per renderer).
+    let webgl = webglEnabled && !parkedRef.current
       ? attachTerminalWebgl(term, () => scheduleFit(true))
       : null;
     const searchAddon = attachTerminalSearch(term);
@@ -543,6 +558,8 @@ function EmbeddedTerminalInner({
     const commandMarks = bindTerminalCommandMarks(term, {
       getCwd: () => currentCwd,
       onCommandFinished: (info) => {
+        // Off screen behaves like an unmounted pane: no live notifications.
+        if (parkedRef.current) return;
         callbacksRef.current.onTerminalNotify?.(sessionId, {
           kind: "command",
           command: info.command,
@@ -592,7 +609,7 @@ function EmbeddedTerminalInner({
       onPaste: (text) => requestPasteRef.current(text),
       // Programs writing the clipboard (never on replay; reads are never supported).
       onOsc52: (data) => {
-        if (!commandMarks.isLive()) return;
+        if (!commandMarks.isLive() || parkedRef.current) return;
         const req = parseOsc52(data);
         if (req.kind !== "write") return;
         const gate = osc52GateRef.current!;
@@ -640,14 +657,28 @@ function EmbeddedTerminalInner({
     // Dropped CJK input has no live repro; see terminal/ime-input-log.
     const unbindImeTrace = attachImeInputTrace(term, sessionId);
     const unbindLinks = bindTerminalLinks(term, { getCwd: () => cwdRef.current });
+    // Parked: the pane may belong to a background profile, so hold the latest
+    // report and deliver it once the pane is on screen again.
+    let pendingCwd: string | null = null;
+    let pendingTitle: string | null = null;
+    let pendingSessionLost = false;
     const unbindCwd = bindTerminalCwd(term, (cwd) => {
       currentCwd = cwd;
+      if (parkedRef.current) {
+        pendingCwd = cwd;
+        return;
+      }
       callbacksRef.current.onCwdReport?.(sessionId, cwd);
     });
     const unbindTitle = bindTerminalTitle(term, (title) => {
+      if (parkedRef.current) {
+        pendingTitle = title;
+        return;
+      }
       callbacksRef.current.onTitleReport?.(sessionId, title);
     });
     const unbindNotify = bindTerminalNotifications(term, commandMarks.isLive, (event) => {
+      if (parkedRef.current) return;
       callbacksRef.current.onTerminalNotify?.(sessionId, event);
     });
 
@@ -719,7 +750,8 @@ function EmbeddedTerminalInner({
     // Fitting first (often the default 80x24, or a not-yet-laid-out pane)
     // wraps Claude's cursor-addressed frame so one row paints as many.
     const fit = (forceMetrics = false) => {
-      if (cancelled || !replayed) return;
+      // Parked: the box is display:none — never resize the PTY to it.
+      if (cancelled || !replayed || parkedRef.current) return;
       const target = containerRef.current;
       if (!target) return;
       let proposal: { cols: number; rows: number } | undefined;
@@ -763,6 +795,45 @@ function EmbeddedTerminalInner({
       }, 50);
     };
     fitRef.current = scheduleFit;
+
+    // Quick back-and-forth switches keep the context; a pane left parked
+    // gives it up so many kept panes never exceed the browser's WebGL cap.
+    let webglReleaseTimer = 0;
+    applyParkedRef.current = (nowParked) => {
+      if (cancelled) return;
+      window.clearTimeout(webglReleaseTimer);
+      webglReleaseTimer = 0;
+      if (nowParked) {
+        if (webgl) {
+          webglReleaseTimer = window.setTimeout(() => {
+            webglReleaseTimer = 0;
+            if (cancelled || !parkedRef.current) return;
+            webgl?.dispose();
+            webgl = null;
+          }, PARKED_WEBGL_RELEASE_MS);
+        }
+        return;
+      }
+      if (webglEnabled && !webgl) {
+        webgl = attachTerminalWebgl(term, () => scheduleFit(true));
+      }
+      if (pendingCwd !== null) {
+        const next = pendingCwd;
+        pendingCwd = null;
+        callbacksRef.current.onCwdReport?.(sessionId, next);
+      }
+      if (pendingTitle !== null) {
+        const next = pendingTitle;
+        pendingTitle = null;
+        callbacksRef.current.onTitleReport?.(sessionId, next);
+      }
+      if (pendingSessionLost) {
+        pendingSessionLost = false;
+        callbacksRef.current.onSessionLost?.(sessionId);
+      }
+      // Size may have changed while parked (window resize, other split).
+      scheduleFit(true);
+    };
 
     const offScroll = term.onScroll(syncNewOutputHint);
 
@@ -817,7 +888,8 @@ function EmbeddedTerminalInner({
     term.onData((data) => {
       if (cancelled || exited) return;
       recordImeInputData(sessionId, data);
-      if (pasteToThisPaneOnly) {
+      // Parked: only xterm's own replies (DA, cursor reports) — never broadcast them.
+      if (pasteToThisPaneOnly || parkedRef.current) {
         writePty(data);
         return;
       }
@@ -867,7 +939,9 @@ function EmbeddedTerminalInner({
             pid: r.pid,
           })
         ) {
-          callbacksRef.current.onSessionLost?.(sessionId);
+          // Parked: the host may be showing another profile — respawn on show.
+          if (parkedRef.current) pendingSessionLost = true;
+          else callbacksRef.current.onSessionLost?.(sessionId);
         }
         return;
       }
@@ -947,7 +1021,9 @@ function EmbeddedTerminalInner({
       window.clearTimeout(statusTimer);
       window.clearTimeout(ptySizeTimer);
       window.clearTimeout(fitTimer);
+      window.clearTimeout(webglReleaseTimer);
       fitRef.current = null;
+      applyParkedRef.current = null;
       scrollToBottomRef.current = null;
       termRef.current = null;
       searchRef.current = null;
@@ -1035,6 +1111,13 @@ function EmbeddedTerminalInner({
   useEffect(() => {
     if (!focused && findOpen) closeFind();
   }, [focused, findOpen, closeFind]);
+
+  const wasParkedRef = useRef(parked);
+  useEffect(() => {
+    if (wasParkedRef.current === parked) return;
+    wasParkedRef.current = parked;
+    applyParkedRef.current?.(parked);
+  }, [parked]);
 
   useEffect(() => {
     if (!active) return;

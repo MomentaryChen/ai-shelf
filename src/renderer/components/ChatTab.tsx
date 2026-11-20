@@ -48,6 +48,8 @@ import { EmptyState } from "./EmptyState";
 import { toolLabel } from "../utils";
 import { AuthBadge } from "./Badge";
 import { EmbeddedTerminal } from "./EmbeddedTerminal";
+import { TerminalHostSlot, useTerminalHostNodes } from "./TerminalHostSlot";
+import { selectKeptTerminals } from "../terminal/terminal-keep-alive";
 import { TerminalStatusBar } from "./TerminalStatusBar";
 import { Sidebar } from "./Sidebar";
 import { BusyPaneCloseDialog } from "./BusyPaneCloseDialog";
@@ -477,6 +479,8 @@ function ChatTabInner({
   const {
     activeProfile,
     backgroundProfilePanes,
+    liveProfilePanes,
+    hasLiveCachedPanes,
     restoring,
     isRestoring,
     migrationDone,
@@ -538,6 +542,36 @@ function ChatTabInner({
     () => displayLayoutWithoutPoppedOut(displayLayout, poppedOutPaneIds, focusedPaneId),
     [displayLayout, poppedOutPaneIds, focusedPaneId],
   );
+
+  /*
+   * Kept terminals: every pane's xterm renders from one fixed spot (portaled into
+   * a per-session host node) and the layout only moves that node around. Switching
+   * profile or the displayed pane then re-shows a live terminal instead of
+   * rebuilding xterm + WebGL and replaying the whole PTY backlog.
+   */
+  const terminalHosts = useTerminalHostNodes();
+  const shownSessionIds = useMemo(
+    () => new Set(shownLayout ? collectPanes(shownLayout).map((p) => p.sessionId) : []),
+    [shownLayout],
+  );
+  /** Panes in any view window — that window owns their xterm. */
+  const viewWindowPaneIds = useMemo(() => new Set(views.flatMap(viewPaneIds)), [views]);
+  const terminalLastShownRef = useRef(new Map<string, number>());
+  const terminalShowTickRef = useRef(0);
+  const keptTerminalPanes = useMemo(() => {
+    const selection = selectKeptTerminals({
+      livePanes: [...(layout ? collectPanes(layout) : []), ...liveProfilePanes],
+      shownSessionIds,
+      excludedPaneIds: viewWindowPaneIds,
+      lastShown: terminalLastShownRef.current,
+      tick: ++terminalShowTickRef.current,
+    });
+    terminalLastShownRef.current = selection.lastShown;
+    return selection.panes;
+  }, [layout, liveProfilePanes, shownSessionIds, viewWindowPaneIds]);
+  useEffect(() => {
+    terminalHosts.prune(new Set(keptTerminalPanes.map((p) => p.sessionId)));
+  }, [keptTerminalPanes, terminalHosts]);
 
   /**
    * Maximized pane — view state only, never written to the layout. It lapses on
@@ -2707,7 +2741,56 @@ function ChatTabInner({
     />
   );
 
+  /** One kept xterm per session, portaled into its host node (see TerminalHostSlot). */
+  const keptTerminals = keptTerminalPanes.map((pane) => {
+    const shown = shownSessionIds.has(pane.sessionId);
+    return createPortal(
+      <EmbeddedTerminal
+        sessionId={pane.sessionId}
+        bg={useAppThemeBg ? undefined : settings.terminalBg}
+        fontFamily={terminalFontFamily}
+        fontSize={terminalFontSize}
+        scrollback={terminalScrollback}
+        webglEnabled={settings.terminalWebglEnabled}
+        scrollbarAlwaysVisible={settings.terminalScrollbarAlwaysVisible}
+        rightClickPaste={settings.terminalRightClickPaste}
+        copyOnSelect={settings.terminalCopyOnSelect}
+        pasteConfirm={pasteConfirm}
+        getPasteTargets={getPasteTargets}
+        osc52Mode={settings.terminalOsc52}
+        parked={!shown}
+        // Hidden behind a maximized pane: becoming active again refits xterm.
+        active={
+          active && shown && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)
+        }
+        focused={shown && focusedPaneId === pane.id}
+        onWrite={handlePtyWrite}
+        onCwdReport={reportPaneCwd}
+        onTitleReport={reportPaneTitle}
+        cwd={pane.cwd}
+        onTerminalNotify={handleTerminalNotify}
+        onSessionLost={() => {
+          if (respawningPaneIdsRef.current.has(pane.id)) return;
+          void respawnPane(pane.id);
+        }}
+        onRestart={() => void respawnPane(pane.id)}
+        onNewConversation={
+          pane.agentSessionId
+            ? () => void respawnPane(pane.id, { newConversation: true })
+            : undefined
+        }
+        onNewWorktreePane={() => openWorktreeDialog(pane.id)}
+        onOpenInNewWindow={() => popOutPane(pane.id, "menu")}
+        onExit={() => closePane(pane.id, { skipConfirm: true })}
+      />,
+      terminalHosts.get(pane.sessionId),
+      pane.sessionId,
+    );
+  });
+
   const emptyStateTool = resolveInstalledLaunchTool(activeProfile?.defaultTool, data);
+  const switchingToLivePanes =
+    !layout && profileBusy && (activeProfile ? hasLiveCachedPanes(activeProfile) : false);
   const terminalArea = (
     <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${profileStageClass}`}>
       {layout ? (
@@ -2761,43 +2844,8 @@ function ChatTabInner({
           placePaneInDisplay(activeProfile.id, dragPaneId, targetPaneId, zone);
         }}
         onPopOutPane={(paneId, trigger, size) => popOutPane(paneId, trigger, size)}
-        renderTerminal={(pane, paneFocused) => (
-          <EmbeddedTerminal
-            key={pane.sessionId}
-            sessionId={pane.sessionId}
-            bg={useAppThemeBg ? undefined : settings.terminalBg}
-            fontFamily={terminalFontFamily}
-            fontSize={terminalFontSize}
-            scrollback={terminalScrollback}
-            webglEnabled={settings.terminalWebglEnabled}
-            scrollbarAlwaysVisible={settings.terminalScrollbarAlwaysVisible}
-            rightClickPaste={settings.terminalRightClickPaste}
-            copyOnSelect={settings.terminalCopyOnSelect}
-            pasteConfirm={pasteConfirm}
-            getPasteTargets={getPasteTargets}
-            osc52Mode={settings.terminalOsc52}
-            // Hidden behind a maximized pane: becoming active again refits xterm.
-            active={active && (!shownMaximizedPaneId || shownMaximizedPaneId === pane.id)}
-            focused={paneFocused}
-            onWrite={handlePtyWrite}
-            onCwdReport={reportPaneCwd}
-            onTitleReport={reportPaneTitle}
-            cwd={pane.cwd}
-            onTerminalNotify={handleTerminalNotify}
-            onSessionLost={() => {
-              if (respawningPaneIdsRef.current.has(pane.id)) return;
-              void respawnPane(pane.id);
-            }}
-            onRestart={() => void respawnPane(pane.id)}
-            onNewConversation={
-              pane.agentSessionId
-                ? () => void respawnPane(pane.id, { newConversation: true })
-                : undefined
-            }
-            onNewWorktreePane={() => openWorktreeDialog(pane.id)}
-            onOpenInNewWindow={() => popOutPane(pane.id, "menu")}
-            onExit={() => closePane(pane.id, { skipConfirm: true })}
-          />
+        renderTerminal={(pane) => (
+          <TerminalHostSlot key={pane.sessionId} node={terminalHosts.get(pane.sessionId)} />
         )}
       />
       ) : (
@@ -2863,6 +2911,10 @@ function ChatTabInner({
       )}
       </div>
     </div>
+  ) : switchingToLivePanes ? (
+    // Switch to a profile with live panes: `layout` is null only while its
+    // sessions are checked — stay blank instead of flashing the empty state.
+    <div className="flex-1" aria-busy />
   ) : (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-8 py-6">
       {activeProfile ? (
@@ -2999,6 +3051,7 @@ function ChatTabInner({
   return (
     <TooltipProvider>
       <div className="flex min-h-0 flex-1 overflow-hidden bg-chrome-bg text-chrome-text" data-surface="chrome">
+        {keptTerminals}
         {sidebarDialogs}
         {sidebar}
         <BackgroundAgentToasts
