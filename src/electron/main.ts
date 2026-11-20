@@ -183,6 +183,7 @@ import { registerPortsHandlers } from "./ports-handlers.js";
 import { registerOpenInEditorHandlers } from "./open-in-editor.js";
 import { registerWslHandlers } from "./wsl-handlers.js";
 import { registerGitHandlers } from "./git-handlers.js";
+import { registerConversationHistoryHandlers } from "./conversation-history-handlers.js";
 import { registerInstructionFilesHandlers } from "./instruction-files-handlers.js";
 import { initSystemResume } from "./system-resume.js";
 import {
@@ -253,6 +254,7 @@ registerPortsHandlers();
 registerOpenInEditorHandlers();
 registerWslHandlers();
 registerGitHandlers();
+registerConversationHistoryHandlers();
 registerInstructionFilesHandlers();
 
 /** Update commands for each AI tool */

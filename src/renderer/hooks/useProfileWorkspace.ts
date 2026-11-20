@@ -44,6 +44,8 @@ export interface SpawnPaneOptions {
   resumeAgentSessionId?: string;
   /** Task prompt typed into the agent once it starts; never stored with the pane. */
   initialInput?: string;
+  /** Resume even when the "Resume agent conversations" setting is off (explicit user action). */
+  forceAgentSession?: boolean;
   /** Tasks: record this spawn in the task's run history (only with `initialInput`). */
   taskRun?: TaskRunStart;
 }

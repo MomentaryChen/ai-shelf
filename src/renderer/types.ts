@@ -19,6 +19,12 @@ import type { TaskRunOutput, TaskRunRecord, TaskRunStart } from "../shared/task-
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
 import type {
+  ConversationDetail,
+  ConversationProviderId,
+  ConversationSearchResult,
+  ConversationSummary,
+} from "../shared/conversation-history.js";
+import type {
   InstructionApplyResultItem,
   InstructionPreviewResult,
   InstructionRef,
@@ -1305,6 +1311,20 @@ export interface ElectronAPI {
   gitCwdInfo: (cwd: string) => Promise<GitCwdInfo | null>;
   /** `git worktree add` next to the main checkout of the repo at `req.cwd`. */
   gitWorktreeAdd: (req: GitWorktreeAddRequest) => Promise<GitWorktreeAddResult>;
+  /** Past agent conversations (Claude Code transcripts), newest first. */
+  conversationsList: (opts?: {
+    /** Re-check cached facts such as whether each session's folder still exists. */
+    refresh?: boolean;
+  }) => Promise<{ success: boolean; sessions?: ConversationSummary[]; error?: string }>;
+  /** One conversation with its messages (capped for preview). */
+  conversationsRead: (
+    provider: ConversationProviderId,
+    sessionId: string,
+  ) => Promise<{ success: boolean; detail?: ConversationDetail; error?: string }>;
+  /** Full-text search across conversations; a newer call cancels an older one. */
+  conversationsSearch: (
+    query: string,
+  ) => Promise<{ success: boolean; result?: ConversationSearchResult; error?: string }>;
   /** Take a pane's change-review baseline unless it already has one. */
   gitChangeReviewEnsure: (req: ChangeReviewRequest) => Promise<ChangeReviewActionResult>;
   /** Files changed in the pane's repo since its baseline (takes the baseline on first call). */
