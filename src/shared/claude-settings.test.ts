@@ -229,3 +229,55 @@ describe("sanitizeClaudeSettingsDraft", () => {
     );
   });
 });
+
+describe("data the draft cannot express", () => {
+  const RAW = {
+    permissions: { allow: ["Read"], deny: [], ask: [42] },
+    hooks: {
+      PreToolUse: [
+        {
+          matcher: "",
+          hooks: [
+            { type: "prompt", prompt: "Is this safe? $ARGUMENTS" },
+            { type: "command", command: "./log.sh" },
+          ],
+        },
+      ],
+      PermissionRequest: [{ matcher: "Bash", hooks: [{ type: "agent", prompt: "check" }] }],
+      Weird: "not-an-array",
+    },
+  };
+  const text = `${JSON.stringify(RAW, null, 2)}\n`;
+
+  it("leaves the hooks section byte-identical on a permissions-only edit", () => {
+    const parsed = parseClaudeSettingsText(text);
+    assert.ok(parsed.ok);
+    parsed.draft.permissions.allow.push("Bash(ls)");
+    const out = JSON.parse(renderClaudeSettingsEdit(text, parsed.draft)) as Record<string, unknown>;
+    assert.deepEqual(out["hooks"], RAW.hooks);
+    assert.deepEqual((out["permissions"] as { allow: string[] }).allow, ["Read", "Bash(ls)"]);
+  });
+
+  it("leaves the permissions section untouched on a hooks-only edit", () => {
+    const parsed = parseClaudeSettingsText(text);
+    assert.ok(parsed.ok);
+    parsed.draft.hooks[0]!.groups[0]!.commands[1]!.command = "./log2.sh";
+    const out = JSON.parse(renderClaudeSettingsEdit(text, parsed.draft)) as Record<string, unknown>;
+    assert.deepEqual(out["permissions"], RAW.permissions);
+  });
+
+  it("passes prompt / agent hooks through a hooks edit", () => {
+    const parsed = parseClaudeSettingsText(text);
+    assert.ok(parsed.ok);
+    parsed.draft.hooks[0]!.groups[0]!.commands[1]!.command = "./log2.sh";
+    const out = JSON.parse(renderClaudeSettingsEdit(text, parsed.draft)) as {
+      hooks: Record<string, Array<{ hooks: unknown[] }>>;
+    };
+    assert.deepEqual(out.hooks["PreToolUse"]![0]!.hooks, [
+      { type: "prompt", prompt: "Is this safe? $ARGUMENTS" },
+      { type: "command", command: "./log2.sh" },
+    ]);
+    assert.deepEqual(out.hooks["PermissionRequest"], RAW.hooks.PermissionRequest);
+    assert.equal(validateHookCommand(parsed.draft.hooks[0]!.groups[0]!.commands[0]!), null);
+  });
+});

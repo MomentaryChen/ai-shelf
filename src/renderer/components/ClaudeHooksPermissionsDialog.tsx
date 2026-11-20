@@ -28,6 +28,7 @@ import {
   findPermissionConflicts,
   parseClaudeSettingsText,
   renderClaudeSettingsEdit,
+  isOpaqueHook,
   validateHookCommand,
   validateHookEvent,
   validateHookMatcher,
@@ -495,6 +496,16 @@ function HooksEditor({
                               >
                                 {type}
                               </span>
+                              {isOpaqueHook(c) ? (
+                                <span
+                                  className="min-w-0 flex-1 truncate rounded-md border border-dashed border-border px-2 py-1.5 font-mono text-xs text-text-tertiary"
+                                  title={`${t("claudeSettings.hooks.opaque")}
+${JSON.stringify(c.extra, null, 2)}`}
+                                >
+                                  {JSON.stringify(c.extra)}
+                                </span>
+                              ) : (
+                              <>
                               <Input
                                 value={c.command}
                                 placeholder={t("claudeSettings.hooks.commandPlaceholder")}
@@ -520,6 +531,8 @@ function HooksEditor({
                                 }
                                 className={`${fieldClass} w-24 shrink-0`}
                               />
+                              </>
+                              )}
                               {cmdWarning && <WarningIcon text={t(HOOK_WARNING_KEY[cmdWarning])} />}
                               <button
                                 type="button"
@@ -672,6 +685,12 @@ export function ClaudeHooksPermissionsDialog({
 
   /** Switching scope / project reloads the draft — confirm before dropping edits. */
   const confirmDiscard = () => !dirty || window.confirm(t("claudeSettings.discardConfirm"));
+  const requestClose = () => {
+    if (confirmDiscard()) onClose();
+  };
+  const requestRaw = (path: string) => {
+    if (confirmDiscard()) onEditRaw(path);
+  };
 
   const chooseScope = (s: ClaudeSettingsScope) => {
     if (s === scope || !confirmDiscard()) return;
@@ -729,7 +748,7 @@ export function ClaudeHooksPermissionsDialog({
     projectDir && !knownProjects.includes(projectDir) ? [projectDir, ...knownProjects] : knownProjects;
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && requestClose()}>
       <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col border-border bg-bg-card text-text-primary">
         <DialogHeader>
           <DialogTitle className="text-sm text-text-primary">{t("claudeSettings.title")}</DialogTitle>
@@ -822,7 +841,7 @@ export function ClaudeHooksPermissionsDialog({
                 <span className="break-all font-mono text-xs">{invalidJson}</span>
               }
               action={
-                <Button size="sm" onClick={() => onEditRaw(file.path)}>
+                <Button size="sm" onClick={() => requestRaw(file.path)}>
                   <FileCode2 aria-hidden /> {t("claudeSettings.openRaw")}
                 </Button>
               }
@@ -888,7 +907,7 @@ export function ClaudeHooksPermissionsDialog({
           </div>
           <div className="flex items-center gap-2">
             {file?.path && file.exists && !preview && (
-              <Button size="sm" variant="ghost" onClick={() => onEditRaw(file.path)}>
+              <Button size="sm" variant="ghost" onClick={() => requestRaw(file.path)}>
                 <FileCode2 aria-hidden /> {t("claudeSettings.openRaw")}
               </Button>
             )}
@@ -904,7 +923,7 @@ export function ClaudeHooksPermissionsDialog({
               </>
             ) : (
               <>
-                <Button size="sm" variant="ghost" onClick={onClose}>
+                <Button size="sm" variant="ghost" onClick={requestClose}>
                   {t("configEditor.cancel")}
                 </Button>
                 <Button

@@ -16,59 +16,100 @@ export type PermissionListKey = "allow" | "ask" | "deny";
 
 export const PERMISSION_LISTS: readonly PermissionListKey[] = ["allow", "ask", "deny"];
 
-/** `permissions.defaultMode` values documented by Claude Code. */
+/** `permissions.defaultMode` values in the Claude Code settings schema. */
 export const CLAUDE_DEFAULT_MODES = [
   "default",
   "acceptEdits",
   "plan",
+  "auto",
+  "dontAsk",
   "bypassPermissions",
 ] as const;
 
-/** Hook events documented by Claude Code (unknown events in a file are kept as-is). */
+/**
+ * Hook events in the Claude Code settings schema (common ones first). Unknown
+ * events found in a file are kept as-is and only flagged with a warning.
+ */
 export const CLAUDE_HOOK_EVENTS = [
   "PreToolUse",
   "PostToolUse",
+  "PostToolUseFailure",
+  "PermissionRequest",
   "UserPromptSubmit",
   "Notification",
   "Stop",
+  "SubagentStart",
   "SubagentStop",
   "PreCompact",
+  "PostCompact",
   "SessionStart",
   "SessionEnd",
+  "PostToolBatch",
+  "UserPromptExpansion",
+  "StopFailure",
+  "PreModelSwitch",
+  "PostModelSwitch",
+  "PermissionDenied",
+  "Setup",
+  "TeammateIdle",
+  "TaskCreated",
+  "TaskCompleted",
+  "Elicitation",
+  "ElicitationResult",
+  "ConfigChange",
+  "WorktreeCreate",
+  "WorktreeRemove",
+  "InstructionsLoaded",
+  "CwdChanged",
+  "FileChanged",
+  "DirectoryAdded",
+  "MessageDisplay",
 ] as const;
 
-/** Events whose `matcher` is evaluated (tool name / trigger / source). Others ignore it. */
-export const MATCHER_HOOK_EVENTS: readonly string[] = [
-  "PreToolUse",
-  "PostToolUse",
-  "Notification",
-  "PreCompact",
-  "SessionStart",
-];
+/** Events documented as not using a `matcher` (a matcher there is ignored). */
+export const MATCHERLESS_HOOK_EVENTS: readonly string[] = ["UserPromptSubmit", "Stop"];
 
-/** Built-in Claude Code tool names accepted as a permission-rule prefix. */
+/**
+ * Common built-in Claude Code tool names used as a permission-rule prefix. The
+ * tool set changes between releases, so an unlisted name is only a soft hint.
+ */
 export const CLAUDE_KNOWN_TOOLS: readonly string[] = [
   "Agent",
+  "AskUserQuestion",
   "Bash",
   "BashOutput",
   "Edit",
+  "EnterWorktree",
   "ExitPlanMode",
+  "ExitWorktree",
   "Glob",
   "Grep",
   "KillShell",
   "LS",
+  "LSP",
+  "Monitor",
   "MultiEdit",
   "NotebookEdit",
   "NotebookRead",
+  "PowerShell",
   "Read",
+  "SendMessage",
   "SlashCommand",
   "Skill",
   "Task",
+  "TaskStop",
   "TodoWrite",
+  "ToolSearch",
   "WebFetch",
   "WebSearch",
   "Write",
 ];
+
+/** True for hook entries the editor treats as opaque (`prompt`, `agent`, `http`, `mcp_tool`, …). */
+export function isOpaqueHook(cmd: HookCommandDraft): boolean {
+  const type = cmd.extra["type"];
+  return typeof type === "string" && type !== "command";
+}
 
 export interface PermissionsDraft {
   allow: string[];
@@ -215,8 +256,10 @@ function buildHooks(draft: HooksDraft): Record<string, unknown> | undefined {
     const groups: Record<string, unknown>[] = [];
     for (const g of ev.groups) {
       const hooks = g.commands
-        .filter((c) => c.command.trim())
+        .filter((c) => isOpaqueHook(c) || c.command.trim())
         .map((c) => {
+          // Non-command hooks (prompt / agent / http / …) pass through untouched.
+          if (isOpaqueHook(c)) return { ...c.extra };
           const h: Record<string, unknown> = { type: "command", ...c.extra };
           h["command"] = c.command;
           setKey(
@@ -254,8 +297,15 @@ export function applyClaudeSettingsDraft(
   draft: ClaudeSettingsDraft,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...data };
-  setKey(out, "permissions", buildPermissions(data["permissions"], draft.permissions));
-  setKey(out, "hooks", buildHooks(draft.hooks));
+  // A section the user did not touch is left exactly as it was in the file
+  // (keeps empty arrays, `"matcher": ""`, odd values the draft cannot express).
+  const before = draftFromSettings(data);
+  if (JSON.stringify(before.permissions) !== JSON.stringify(draft.permissions)) {
+    setKey(out, "permissions", buildPermissions(data["permissions"], draft.permissions));
+  }
+  if (JSON.stringify(before.hooks) !== JSON.stringify(draft.hooks)) {
+    setKey(out, "hooks", buildHooks(draft.hooks));
+  }
   return out;
 }
 
@@ -335,12 +385,7 @@ export function validateHookEvent(event: string): HookWarning | null {
 
 export function validateHookMatcher(event: string, matcher: string): HookWarning | null {
   if (!matcher.trim()) return null;
-  if (
-    (CLAUDE_HOOK_EVENTS as readonly string[]).includes(event) &&
-    !MATCHER_HOOK_EVENTS.includes(event)
-  ) {
-    return "matcherIgnored";
-  }
+  if (MATCHERLESS_HOOK_EVENTS.includes(event)) return "matcherIgnored";
   if (matcher === "*") return null;
   try {
     new RegExp(matcher);
@@ -351,6 +396,7 @@ export function validateHookMatcher(event: string, matcher: string): HookWarning
 }
 
 export function validateHookCommand(cmd: HookCommandDraft): HookWarning | null {
+  if (isOpaqueHook(cmd)) return null;
   if (!cmd.command.trim()) return "emptyCommand";
   if (cmd.timeout !== undefined && (!Number.isFinite(cmd.timeout) || cmd.timeout <= 0))
     return "badTimeout";
