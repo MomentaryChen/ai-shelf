@@ -225,6 +225,7 @@ import {
   onAppUpdateStateChanged,
   runHealthCheck,
 } from "./health-monitor.js";
+import { createInventoryCache } from "./inventory-cache.js";
 import { runPtyLogGc, type PtyLogGcResult, type PtyLogRetentionPrefs } from "./pty-log-gc.js";
 import {
   readPtyLogRetentionPrefs,
@@ -354,7 +355,11 @@ if (app.isPackaged) {
 }
 
 const INVENTORY_CACHE_TTL_MS = 30_000;
-let inventoryCache: { at: number; entries: ProviderEntry[] } | null = null;
+/** 30s TTL cache + one shared scan for concurrent get-inventory / scans / health checks. */
+const inventory = createInventoryCache(
+  () => DETECTORS.map((detect) => () => detect({ quick: true })),
+  INVENTORY_CACHE_TTL_MS,
+);
 
 type PtyModule = typeof import("node-pty");
 let ptyModule: PtyModule | null = null;
@@ -374,14 +379,11 @@ async function getPty(): Promise<PtyModule> {
 }
 
 function getCachedInventory(): ProviderEntry[] | null {
-  if (inventoryCache && Date.now() - inventoryCache.at < INVENTORY_CACHE_TTL_MS) {
-    return inventoryCache.entries;
-  }
-  return null;
+  return inventory.get();
 }
 
 function setInventoryCache(entries: ProviderEntry[]) {
-  inventoryCache = { at: Date.now(), entries };
+  inventory.set(entries);
 }
 
 function mergeInventoryEntry(entries: ProviderEntry[], entry: ProviderEntry): ProviderEntry[] {
@@ -658,13 +660,7 @@ ipcMain.handle("toggle-devtools", (event) => {
 });
 
 // IPC handlers
-ipcMain.handle("get-inventory", async () => {
-  const cached = getCachedInventory();
-  if (cached) return cached;
-  const entries = await detectAll({ quick: true });
-  setInventoryCache(entries);
-  return entries;
-});
+ipcMain.handle("get-inventory", () => inventory.load());
 
 ipcMain.handle("start-inventory-scan", async (event) => {
   const push = (channel: string, payload: unknown) => {
@@ -675,16 +671,8 @@ ipcMain.handle("start-inventory-scan", async (event) => {
   if (entries.length > 0) {
     for (const entry of entries) push("inventory-entry", entry);
   } else {
-    await Promise.all(
-      DETECTORS.map(async (detect) => {
-        try {
-          const entry = await detect({ quick: true });
-          entries = mergeInventoryEntry(entries, entry);
-          push("inventory-entry", entry);
-        } catch { /* skip failed detectors */ }
-      }),
-    );
-    setInventoryCache(entries);
+    // Joins a scan already running (another window, get-inventory, health check).
+    entries = await inventory.scan((entry) => push("inventory-entry", entry));
   }
 
   const enrichCount = entries.filter(shouldEnrichModels).length;
@@ -704,7 +692,7 @@ ipcMain.handle("start-inventory-scan", async (event) => {
 });
 
 ipcMain.handle("clear-inventory-cache", () => {
-  inventoryCache = null;
+  inventory.invalidate();
 });
 
 /** Shared: run doctor checks for a single inventory entry */
@@ -713,8 +701,7 @@ async function runDoctorForEntry(entry: Awaited<ReturnType<typeof detectAll>>[nu
 }
 
 ipcMain.handle("run-doctor", async () => {
-  const entries = getCachedInventory() ?? await detectAll({ quick: true });
-  if (!getCachedInventory()) setInventoryCache(entries);
+  const entries = await inventory.load();
   return Promise.all(entries.map(runDoctorForEntry));
 });
 
@@ -781,8 +768,8 @@ ipcMain.handle("check-update", async () => {
 
   let entries: Awaited<ReturnType<typeof detectAll>> = [];
   try {
-    entries = await detectAll({ quick: true });
-    setInventoryCache(entries);
+    // Always re-detect installed versions, but share a scan already in flight.
+    entries = await inventory.scan();
   } catch {
     entries = getCachedInventory() ?? [];
   }
@@ -867,8 +854,7 @@ ipcMain.handle("get-tools-list", async () => {
     updateCommand: string;
   }[] = [];
 
-  const entries = getCachedInventory() ?? await detectAll({ quick: true });
-  if (!getCachedInventory()) setInventoryCache(entries);
+  const entries = await inventory.load();
   for (const entry of entries) {
     const cfg = TOOL_UPDATE_COMMANDS[entry.tool];
     results.push({
@@ -1005,7 +991,7 @@ ipcMain.handle("run-install", async (_event, tool: string) => {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
   });
   if (result.ok) {
-    inventoryCache = null;
+    inventory.invalidate();
     return { success: true, message: result.stdout || "Install completed" };
   }
   return { success: false, message: result.stderr || result.stdout || "Install failed" };
@@ -2877,12 +2863,8 @@ ipcMain.handle("import-backup", async () => {
 
 // --- Config snapshots (MCP / .claude.json / skills) ---
 
-async function inventoryForSnapshot(): Promise<ProviderEntry[]> {
-  const cached = getCachedInventory();
-  if (cached) return cached;
-  const entries = await detectAll({ quick: true });
-  setInventoryCache(entries);
-  return entries;
+function inventoryForSnapshot(): Promise<ProviderEntry[]> {
+  return inventory.load();
 }
 
 ipcMain.handle("config-snapshot-list", () => {
@@ -3095,7 +3077,7 @@ app.whenReady().then(async () => {
 
   initAppUpdater(() => mainWindow);
   scheduleStartupUpdateCheck();
-  initHealthMonitor(() => mainWindow);
+  initHealthMonitor(() => mainWindow, () => inventory.load());
   initPtyLogGc();
   initTaskService();
   initTaskRunStore();
