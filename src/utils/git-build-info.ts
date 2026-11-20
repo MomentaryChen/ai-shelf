@@ -31,6 +31,23 @@ export function readGitBuildInfo(startDir: string): GitBuildInfo {
   };
 }
 
+const gitBuildInfoCache = new Map<string, GitBuildInfo>();
+
+/**
+ * `readGitBuildInfo` memoized per directory for the life of the process.
+ * It shells out four times (incl. `git status`), so window-title updates and
+ * About/self-info requests must not re-run it. Branch / dirty flag reflect
+ * the state at first read.
+ */
+export function readGitBuildInfoCached(startDir: string): GitBuildInfo {
+  let info = gitBuildInfoCache.get(startDir);
+  if (!info) {
+    info = readGitBuildInfo(startDir);
+    gitBuildInfoCache.set(startDir, info);
+  }
+  return info;
+}
+
 export function formatGitBuildLabel(info: GitBuildInfo): string | null {
   if (!info.branch) return null;
   const commit = info.commitShort ? `@${info.commitShort}` : "";

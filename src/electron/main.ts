@@ -42,7 +42,7 @@ import {
   trackAgentSessionUsage,
 } from "./agent-session-usage.js";
 import { run } from "../utils/exec.js";
-import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
+import { formatGitBuildLabel, readGitBuildInfoCached } from "../utils/git-build-info.js";
 import {
   fetchRemoteLatestVersion,
   resolveToolLatestVersion,
@@ -322,7 +322,7 @@ function formatWindowTitle(base: string): string {
     /* keep base */
   }
   const gitRoot = app.isPackaged ? app.getAppPath() : process.cwd();
-  const gitLabel = formatGitBuildLabel(readGitBuildInfo(gitRoot));
+  const gitLabel = formatGitBuildLabel(readGitBuildInfoCached(gitRoot));
   if (gitLabel) {
     title += ` — ${gitLabel}`;
   }
@@ -1011,18 +1011,25 @@ ipcMain.handle("run-install", async (_event, tool: string) => {
   return { success: false, message: result.stderr || result.stdout || "Install failed" };
 });
 
+/** Memoized: probing package managers spawns up to three blocking processes. */
+let selfUpdateCmdCache: string | null = null;
+
 function detectSelfUpdateCmd(): string {
+  if (selfUpdateCmdCache != null) return selfUpdateCmdCache;
+  selfUpdateCmdCache = "npm update -g ai-shelf";
   for (const pm of ["pnpm", "yarn", "npm"] as const) {
     try {
       execSync(`${pm} --version`, { stdio: "ignore" });
-      return pm === "pnpm"
-        ? "pnpm update -g ai-shelf"
-        : pm === "yarn"
-          ? "yarn global upgrade ai-shelf"
-          : "npm update -g ai-shelf";
+      selfUpdateCmdCache =
+        pm === "pnpm"
+          ? "pnpm update -g ai-shelf"
+          : pm === "yarn"
+            ? "yarn global upgrade ai-shelf"
+            : "npm update -g ai-shelf";
+      break;
     } catch { /* not available */ }
   }
-  return "npm update -g ai-shelf";
+  return selfUpdateCmdCache;
 }
 
 type SelfUpdateEntry = {
@@ -1077,7 +1084,7 @@ ipcMain.handle("get-self-info", () => {
   try { version = app.getVersion(); } catch { /* ok */ }
   const git = app.isPackaged
     ? { branch: null, commitShort: null, dirty: false }
-    : readGitBuildInfo(app.getAppPath());
+    : readGitBuildInfoCached(app.getAppPath());
   return {
     version,
     updateCommand: app.isPackaged ? "" : detectSelfUpdateCmd(),
@@ -2400,6 +2407,21 @@ ipcMain.on("pty-kill", (_e, sessionId: string) => {
 
 // --- Launch in Terminal ---
 
+/** Memoized `where.exe wt` probe (blocking spawn) — answer is stable for the process. */
+let hasWindowsTerminalCache: boolean | null = null;
+
+function hasWindowsTerminal(): boolean {
+  if (hasWindowsTerminalCache == null) {
+    try {
+      execSync("where.exe wt", { stdio: "ignore" });
+      hasWindowsTerminalCache = true;
+    } catch {
+      hasWindowsTerminalCache = false;
+    }
+  }
+  return hasWindowsTerminalCache;
+}
+
 ipcMain.handle(
   "launch-in-terminal",
   (_event, tool: string, terminal: string = "auto", cwd?: string, extraArgs?: string) => {
@@ -2417,14 +2439,7 @@ ipcMain.handle(
   try {
     const plat = process.platform;
     if (plat === "win32") {
-      const hasWt = (() => {
-        try {
-          execSync("where.exe wt", { stdio: "ignore" });
-          return true;
-        } catch {
-          return false;
-        }
-      })();
+      const hasWt = hasWindowsTerminal();
       if (terminal === "wt" || terminal === "auto") {
         if (hasWt) {
           const wtArgs = cwd
