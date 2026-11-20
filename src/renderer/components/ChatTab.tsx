@@ -472,6 +472,7 @@ function ChatTabInner({
     activeProfile,
     backgroundProfilePanes,
     liveProfilePanes,
+    hasLiveCachedPanes,
     restoring,
     isRestoring,
     migrationDone,
@@ -2719,6 +2720,8 @@ function ChatTabInner({
   });
 
   const emptyStateTool = resolveInstalledLaunchTool(activeProfile?.defaultTool, data);
+  const switchingToLivePanes =
+    !layout && profileBusy && (activeProfile ? hasLiveCachedPanes(activeProfile) : false);
   const terminalArea = (
     <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${profileStageClass}`}>
       {layout ? (
@@ -2839,6 +2842,10 @@ function ChatTabInner({
       )}
       </div>
     </div>
+  ) : switchingToLivePanes ? (
+    // Switch to a profile with live panes: `layout` is null only while its
+    // sessions are checked — stay blank instead of flashing the empty state.
+    <div className="flex-1" aria-busy />
   ) : (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-8 py-6">
       {activeProfile ? (

@@ -615,6 +615,15 @@ export function useProfileWorkspace(
     [activeProfile],
   );
 
+  /** True when the profile has live panes in the cache (a switch to it only re-shows them). */
+  const hasLiveCachedPanes = useCallback(
+    (profile: { workspaceId: string; id: string }): boolean => {
+      const cached = profileLiveCacheRef.current.get(cacheKey(profile.workspaceId, profile.id));
+      return cached ? collectPanes(cached.layout).length > 0 : false;
+    },
+    [cacheKey],
+  );
+
   const getProfileFocusedPaneId = useCallback(
     (profileId: string): string | null => {
       if (activeProfileRef.current?.id === profileId) return focusedPaneIdRef.current;
@@ -972,6 +981,7 @@ export function useProfileWorkspace(
     activeProfile,
     backgroundProfilePanes,
     liveProfilePanes,
+    hasLiveCachedPanes,
     restoring,
     isRestoring,
     migrationDone,
