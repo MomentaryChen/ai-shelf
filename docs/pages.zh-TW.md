@@ -14,12 +14,13 @@
 3. [模型](#3-模型)
 4. [技能](#4-技能)
 5. [MCP 伺服器](#5-mcp-伺服器)
-6. [設定檔](#6-設定檔)
-7. [診斷](#7-診斷)
-8. [更新](#8-更新)
-9. [Usage（用量）](#9-usage用量)
-10. [Tools（工具）](#10-tools工具)
-11. [Tasks](#11-tasks)
+6. [指令檔](#6-指令檔)
+7. [設定檔](#7-設定檔)
+8. [診斷](#8-診斷)
+9. [更新](#9-更新)
+10. [成本](#10-成本)
+11. [Tools（工具）](#11-tools工具)
+12. [Tasks](#12-tasks)
 
 ---
 
@@ -30,15 +31,15 @@
 | 模式                 | 用途                                                                                                                    |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | **Terminal**（預設） | Profile 側欄、內嵌多窗格終端機、外部啟動                                                                                |
-| **Inventory**        | 儀表板：Overview、Models、Skills、MCP、Config、Doctor、Update、**Usage**                                                |
+| **Inventory**        | 儀表板：Overview、Models、Skills、MCP、Instructions、Config、Doctor、Update、**成本**                                   |
 | **Tools**            | 本機工具（Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL） |
 | **Tasks**            | 存好的 prompt：在 Profile 開新 pane，並把 prompt 送給代理 CLI                                                           |
 
-隨時可用標題列切換模式。命令面板（`Cmd/Ctrl+K`）也可跳到任一模式或 Inventory／Tools 分頁。
+隨時可用標題列切換模式。Commands 旁的 **?** 會開啟說明：應用版本、儲存庫、發行說明、問題回報，以及鍵盤快捷鍵。在 Terminal，同一個標題列還有待處理收件匣，列出正在等待、已完成或失敗的窗格，包含其他 Profile 或檢視視窗裡的窗格。命令面板（`Cmd/Ctrl+K`）也可跳到任一模式或 Inventory／Tools 分頁。
 
 ### Inventory 頁尾
 
-在 **Inventory** 模式時，視窗底部有 **🔄 Refresh**，會重新執行偵測並刷新清單分頁（Usage 有自己的重新整理控制）。
+在 **Inventory** 模式時，視窗底部有 **🔄 Refresh**，會重新執行偵測並刷新清單分頁（成本有自己的重新整理控制）。
 
 ---
 
@@ -89,6 +90,10 @@
 
 **Terminal** 模式是 Profile 化工作區：Profile 與版面存於 SQLite、內嵌 **node-pty** 工作階段、可開啟獨立的 **Terminal Settings** 視窗調整共用偏好。
 
+標題列有 Profile、**資料夾**、**+ 窗格**、**Commands**、待處理收件匣與 **?**。窗格有捲動紀錄時，捲軸會保持可見（終端機設定裡的 **常駐顯示捲軸**；全螢幕程式仍會隱藏）。有對應對話的 Claude 窗格會在狀態列顯示 token 與估算費用。在 git 資料夾裡，狀態列也會計算這個窗格開啟後變更的檔案，檢視裡可以看 diff 並還原單一檔案。
+
+Profile 的檢視視窗用側欄列出自己的終端機：標題下是資料夾，圖示上是與主視窗相同的執行中、等待輸入或停滯燈號。窗格標題有向右與向下分割，**新增終端機**可以開純 shell 或已安裝的 AI CLI。在標題或側欄名稱上按兩下可以重新命名。
+
 ### Profile 側欄
 
 - 建立、重新命名、刪除與排序 Profile
@@ -138,6 +143,7 @@
 | **Ctrl+Shift+W**    | 關閉目前焦點窗格（終端機外也可用 **Ctrl+W**；終端機內 **Ctrl+W** 會傳給 shell 作為刪除前一個單字） |
 | **Ctrl+\\**         | 向右分割（水平）                                                                                   |
 | **Ctrl+Shift+\\**   | 向下分割（垂直）                                                                                   |
+| **Ctrl+Shift+J**    | 跳到下一個正在等待輸入的終端機                                                                     |
 
 ---
 
@@ -241,11 +247,21 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ---
 
-## 6. 設定檔
+## 6. 指令檔
+
+**Instructions（指令檔）** 是 Inventory 的一個分頁（目前尚無專用截圖）。它列出代理會讀的指令檔（`CLAUDE.md`、`AGENTS.md`、Cursor rules、Copilot instructions 等），分為使用者帳號與你選的專案資料夾。
+
+- 就地編輯或建立檔案
+- 用行差分比較任意兩個檔案
+- 把一個檔案抄到其他檔案：每個目標先顯示 diff，既有檔案會留備份，預覽之後又被改過的檔案會略過
+
+---
+
+## 7. 設定檔
 
 ![Config](../tests/screenshots/zh/06.config.png)
 
-**Config** 分頁依類型列出各工具用到的檔案路徑。
+**Config** 分頁依類型列出各工具用到的檔案路徑。Claude Code 卡片上的 **Hooks 與權限** 可編輯使用者、專案與本機設定裡的允許、詢問、拒絕規則與指令 hooks。儲存前會先顯示 diff，而且只改寫這兩個區段。
 
 ### 類型徽章
 
@@ -261,7 +277,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ---
 
-## 7. 診斷
+## 8. 診斷
 
 ![Doctor](../tests/screenshots/zh/07.doctor.png)
 
@@ -286,7 +302,7 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ---
 
-## 8. 更新
+## 9. 更新
 
 ![Update](../tests/screenshots/zh/08.update.png)
 
@@ -311,9 +327,9 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ---
 
-## 9. Usage（用量）
+## 10. 成本
 
-**Usage** 是 Inventory 左側導覽的一個區塊（目前尚無專用截圖）。彙整已支援的付費 CLI 花費與預算，讓你決定成本投向何處，而不只是看總額。
+**成本** 是 Inventory 左側導覽的一個區塊（目前尚無專用截圖）。彙整已支援的付費 CLI 花費與預算，讓你決定成本投向何處，而不只是看總額。
 
 常見能力：
 
@@ -321,11 +337,11 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 - 每週預算目標；依工具與 Profile 歸因花費
 - 憑證在可用時以 OS `safeStorage` 保存；部分供應商需在 App 內設定 API 金鑰或帳號 cookie
 
-從標題列開啟 **Inventory → Usage**，或用命令面板跳轉。
+從標題列開啟 **Inventory → 成本**，或用命令面板跳轉。
 
 ---
 
-## 10. Tools（工具）
+## 11. Tools（工具）
 
 **Tools** 是頂層模式（左側為工具面板列表）。目前尚無專用截圖；日後擴大截圖涵蓋範圍後可用 `pnpm gen:docs-assets` 補齊。
 
@@ -351,15 +367,17 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ---
 
-## 11. Tasks
+## 12. Tasks
 
 **Tasks（任務）** 是頂層模式，用來存放會重複使用的 prompt。目前尚無專用截圖。
 
 你可以：
 
 - 從空白或 **內建範本** 建立任務：名稱、prompt，以及可選的 Profile 與代理工具
+- prompt 可以用 `{{name}}` 佔位符。執行時會先詢問值。`{{branch}}` 取自任務資料夾的 git 分支，`{{selection}}` 取自剪貼簿，`{{file}}` 用檔案選擇器。其他名稱會記住上次的值
 - 點一下任務卡片：AI Shelf 會切到該 Profile、開一個新 pane 啟動代理 CLI（預設用 Profile 的預設工具，任務可另外指定），等代理就緒後送出 prompt
 - 每個任務只有一個終端機：終端機還開著時，卡片會顯示 **終端機已開啟**，再點一次是切換過去，不會重送 prompt
+- 每次執行都會留下送出的 prompt、結束狀態與終端機輸出。Claude Code 還會記下 token 與估算費用。可以打開任務的執行紀錄閱讀或重播終端機
 - 執行的是一般互動終端機，可以隨時回答問題、核准工具或直接接手
 - 編輯、複製或刪除任務；**開啟任務資料夾** 可看到檔案
 
@@ -369,6 +387,6 @@ Quick scan 會先回傳基本資料，再在背景 enrich。例：**Cursor** 可
 
 ## 備註
 
-- Overview–Update 的截圖順序由 `tests/e2e/screenshot.spec.ts` 產出至 `tests/screenshots/zh/`（本頁）與 `tests/screenshots/en/`（[pages.md](pages.md)）。上方 Usage／Tools／Tasks 章節目前無 PNG，待截圖涵蓋範圍擴大後再補。
+- Overview–Update 的截圖順序由 `tests/e2e/screenshot.spec.ts` 產出至 `tests/screenshots/zh/`（本頁）與 `tests/screenshots/en/`（[pages.md](pages.md)）。指令檔、成本、Tools、Tasks 目前無 PNG，待截圖涵蓋範圍擴大後再補。
 - Release 前重產 README/docs 圖片：在 Windows 本地執行 `pnpm gen:docs-assets`（見 [RELEASE.md](RELEASE.md)）。
 - 若 Inventory 分頁標籤或順序異動，請同步更新中英文頁面與前述測試常數。
