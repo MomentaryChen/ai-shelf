@@ -26,6 +26,9 @@ export type ViewLayoutDecl =
       second: ViewLayoutDecl;
     };
 
+/** Mirrors `PaneAgentStatus` in src/shared/pane-agent-state.ts. */
+export type ViewPaneAgentStatus = "idle" | "running" | "waiting_input" | "stalled";
+
 /** What the origin window says one view should look like. */
 export interface PaneViewDecl {
   viewId: string;
@@ -39,6 +42,8 @@ export interface PaneViewDecl {
   labels: Record<string, string>;
   /** Pane id → agent running / waiting (drives the close confirm). */
   busy: Partial<Record<string, boolean>>;
+  /** Pane id → live agent status light (non-idle only; same as the origin sidebar). */
+  agentStatus?: Partial<Record<string, ViewPaneAgentStatus>>;
   /** Saved window bounds (used only when the window is created). */
   bounds: Rect | null;
   /** Installed tool ids the view's "New terminal" menu offers (plain shell is always offered). */

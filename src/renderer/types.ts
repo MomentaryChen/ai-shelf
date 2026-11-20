@@ -1376,6 +1376,8 @@ export interface PaneViewDecl {
   focusedPaneId: string | null;
   labels: Record<string, string>;
   busy: Record<string, boolean>;
+  /** Pane id → live agent status light (non-idle panes only; older builds omit it). */
+  agentStatus?: Record<string, import("../shared/pane-agent-state.js").PaneAgentStatus>;
   bounds: PaneViewRect | null;
   /** Installed tool ids a new terminal here can launch (plain shell is always offered). */
   tools: string[];
