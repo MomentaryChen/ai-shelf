@@ -52,9 +52,9 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 
 - **Four modes** — **Terminal** (default) · **Inventory** · **Tools** · **Tasks**
 - **Terminal** — profiles sidebar, embedded multi-pane xterm.js + node-pty, broadcast input, external launch
-- **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage** (spend / budgets)
+- **Inventory** — Overview · Models · Skills · MCP · Instructions · Config · Doctor · Update · **Costs** (spend / budgets)
 - **Tools** — everyday utilities: Codec, Crypto, Time, Cron, Regex, JSON, Markdown, Mermaid, YAML ↔ JSON, JWT, UUID, Diff, System, Ports, WSL
-- **Tasks** — saved prompts: pick a profile, click the card, and a new pane starts its agent CLI and sends the prompt; a task keeps one terminal, so a second click switches to it (built-in templates)
+- **Tasks** — saved prompts: pick a profile, click the card, and a new pane starts its agent CLI and sends the prompt; a task keeps one terminal, so a second click switches to it. Prompts can use `{{name}}` placeholders, and each run is kept with its output (built-in templates)
 - **Profiles sidebar** — create/rename/delete profiles; each profile stores split-pane layout in SQLite
 - **External launch** — Windows Terminal / PowerShell / CMD on Windows; `$SHELL` (bash / zsh / fish / sh) on macOS and Linux
 - **Cloud backup** — optional Google sign-in to back up profiles (manual sync; see in-app Account settings)
@@ -81,7 +81,7 @@ The desktop app and `ai-shelf` share one SQLite database. **Profile Groups** spl
 
 ![Overview](tests/screenshots/en/01.overview.png)
 
-Switch **Terminal**, **Inventory**, **Tools**, and **Tasks** from the header. Inventory opens the tabbed dashboard above (including Usage); Terminal is the embedded multi-pane launcher with a profiles sidebar; Tools holds local utilities; Tasks runs saved prompts in a profile's terminal.
+Switch **Terminal**, **Inventory**, **Tools**, and **Tasks** from the header. **?** beside Commands opens Help. Inventory opens the tabbed dashboard above (including Instructions and Costs); Terminal is the embedded multi-pane launcher with a profiles sidebar; Tools holds local utilities; Tasks runs saved prompts in a profile's terminal.
 
 → **[Full page-by-page guide with screenshots](docs/pages.md)** · [繁體中文版](docs/pages.zh-TW.md)
 

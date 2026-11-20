@@ -50,9 +50,9 @@
 
 - **四種模式** — **Terminal**（預設）· **Inventory** · **Tools** · **Tasks**
 - **Terminal** — Profile 側欄、內嵌多窗格 xterm.js + node-pty、廣播輸入、外部啟動
-- **Inventory** — Overview · Models · Skills · MCP · Config · Doctor · Update · **Usage**（花費／預算）
+- **Inventory** — Overview · Models · Skills · MCP · Instructions · Config · Doctor · Update · **成本**（花費／預算）
 - **Tools** — 日常工具：Codec、Crypto、Time、Cron、Regex、JSON、Markdown、Mermaid、YAML ↔ JSON、JWT、UUID、Diff、System、Ports、WSL
-- **Tasks（任務）** — 存好的 prompt：選一個 Profile、點一下卡片，就會開新 pane 啟動代理 CLI 並送出 prompt；每個任務只有一個終端機，再點一次會切換過去（附內建範本）
+- **Tasks（任務）** — 存好的 prompt：選一個 Profile、點一下卡片，就會開新 pane 啟動代理 CLI 並送出 prompt；每個任務只有一個終端機，再點一次會切換過去。prompt 可用 `{{name}}` 佔位符，每次執行會留下輸出（附內建範本）
 - **Profile 側欄** — 建立 / 重新命名 / 刪除 Profile；每個 Profile 的分割版面存入 SQLite
 - **外部啟動** — Windows 上為 Windows Terminal / PowerShell / CMD；macOS／Linux 依 `$SHELL`（bash / zsh / fish / sh）
 - **雲端備份** — 可選 Google 登入備份 Profile（手動同步；見 App 內帳戶設定）
@@ -79,7 +79,7 @@
 
 ![Overview](tests/screenshots/zh/01.overview.png)
 
-在標題列切換 **Terminal**、**Inventory**、**Tools**、**Tasks**。Inventory 為上圖的分頁儀表板（含 Usage）；Terminal 為內嵌多窗格啟動器與 Profile 側欄；Tools 為本機工具集；Tasks 在 Profile 終端機執行存好的 prompt。
+在標題列切換 **Terminal**、**Inventory**、**Tools**、**Tasks**。Commands 旁的 **?** 會開啟說明。Inventory 為上圖的分頁儀表板（含 Instructions 與成本）；Terminal 為內嵌多窗格啟動器與 Profile 側欄；Tools 為本機工具集；Tasks 在 Profile 終端機執行存好的 prompt。
 
 → **[完整頁面介紹（含截圖 · 繁中）](docs/pages.zh-TW.md)** · [English](docs/pages.md)
 
