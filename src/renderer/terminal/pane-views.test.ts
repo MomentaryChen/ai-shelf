@@ -62,6 +62,12 @@ describe("addPaneToView", () => {
     assert.equal(v.layout.kind === "split" && v.layout.ratio, 0.5);
   });
 
+  it("splits down when asked", () => {
+    const v = addPaneToView(view("v", "w:a", [a]), b, "vertical");
+    assert.deepEqual(ids(v.layout), ["a", "b"]);
+    assert.equal(v.layout.kind === "split" && v.layout.direction, "vertical");
+  });
+
   it("does not duplicate a pane already in the view", () => {
     const v = addPaneToView(view("v", "w:a", [a, b]), a);
     assert.deepEqual(ids(v.layout), ["a", "b"]);

@@ -99,6 +99,12 @@ describe("splitNextToPane", () => {
     assert.deepEqual(ids(next), ["a", "b", "n", "c"]);
   });
 
+  it("splits down when asked", () => {
+    const next = splitNextToPane(leaf("a"), "a", pane("n"), 8, "vertical");
+    assert.deepEqual(ids(next), ["a", "n"]);
+    assert.equal(next?.kind === "split" && next.direction, "vertical");
+  });
+
   it("refuses when the anchor is gone or the profile is full", () => {
     assert.equal(splitNextToPane(tree, "zzz", pane("n"), 8), null);
     assert.equal(splitNextToPane(tree, "b", pane("n"), 3), null);

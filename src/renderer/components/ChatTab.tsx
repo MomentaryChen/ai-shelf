@@ -491,6 +491,7 @@ function ChatTabInner({
     closePaneInStashedProfile,
     getProfileLayoutByKey,
     insertPaneInStashedProfile,
+    renamePaneInStashedProfile,
   } = useProfileWorkspace(
     layout,
     setLayout,
@@ -1844,13 +1845,14 @@ function ChatTabInner({
         labels,
         busy,
         bounds: v.bounds,
+        tools: availableTools,
       };
     });
     const serialized = JSON.stringify(decls);
     if (serialized === lastViewSyncRef.current) return;
     lastViewSyncRef.current = serialized;
     window.api.paneViewSync(decls);
-  }, [views, profileByKey, paneLabels, paneAgentStates]);
+  }, [views, profileByKey, paneLabels, paneAgentStates, availableTools]);
 
   /** Drag released off this window, or "Open in new window": main decides, then sends a move intent. */
   function popOutPane(paneId: string, trigger: PanePopOutTrigger, size?: PanePopOutSize) {
@@ -1901,6 +1903,17 @@ function ChatTabInner({
     );
   }
 
+  /** Rename a pane wherever its profile is (active layout or stashed). */
+  function renameProfilePane(profileKey: string, paneId: string, title: string) {
+    if (activeProfileKey === profileKey && layoutRef.current && findPane(layoutRef.current, paneId)) {
+      renamePane(paneId, title);
+      return;
+    }
+    renamePaneInStashedProfile(paneId, title, (workspaceId, profileId) =>
+      profileByKey(`${workspaceId}:${profileId}`),
+    );
+  }
+
   /** Same array back when `fn` changes nothing (keeps syncs / store writes quiet). */
   function updateView(viewId: string, fn: (view: PaneView) => PaneView) {
     setViews((prev) => {
@@ -1921,7 +1934,12 @@ function ChatTabInner({
    * `anchorPaneId` and is shown in that view, never here.
    * Returns a localized error, or null on success.
    */
-  async function spawnPaneForView(viewId: string, anchorPaneId: string): Promise<string | null> {
+  async function spawnPaneForView(
+    viewId: string,
+    anchorPaneId: string,
+    tool?: string,
+    direction: SplitDirection = "horizontal",
+  ): Promise<string | null> {
     if (isRestoring()) return t("chat.err.restoringWait");
     const view = viewsRef.current.find((v) => v.id === viewId);
     if (!view) return t("pane.popout.missing");
@@ -1939,7 +1957,7 @@ function ChatTabInner({
     const remote = isActive ? activeRemoteRef.current : (profile?.remote ?? null);
     const cwd = anchor.cwd || (isActive ? resolveCwd() : (profile?.defaultCwd?.trim() ?? ""));
     const pane = await spawnPaneResilient(
-      resolveLaunchTool(anchor.tool, availableTools),
+      resolveLaunchTool(tool || anchor.tool, availableTools),
       cwd,
       remote,
     );
@@ -1949,10 +1967,13 @@ function ChatTabInner({
     // profile layout and the view change in the same tick, so the view never holds a
     // pane its profile lacks and this window never mounts the new terminal.
     if (layoutRef.current && findPane(layoutRef.current, anchor.id)) {
-      setLayout((prev) => splitNextToPane(prev, anchor.id, pane, Infinity) ?? prev);
+      setLayout((prev) => splitNextToPane(prev, anchor.id, pane, Infinity, direction) ?? prev);
     } else if (
-      !insertPaneInStashedProfile(anchor.id, pane, (workspaceId, profileId) =>
-        profileByKey(`${workspaceId}:${profileId}`),
+      !insertPaneInStashedProfile(
+        anchor.id,
+        pane,
+        (workspaceId, profileId) => profileByKey(`${workspaceId}:${profileId}`),
+        direction,
       )
     ) {
       window.api.ptyKill(pane.sessionId);
@@ -1960,7 +1981,7 @@ function ChatTabInner({
     }
     setViews((prev) =>
       prev.map((v) =>
-        v.id === viewId ? addPaneToView({ ...v, focusedPaneId: anchor.id }, pane) : v,
+        v.id === viewId ? addPaneToView({ ...v, focusedPaneId: anchor.id }, pane, direction) : v,
       ),
     );
     return null;
@@ -2023,7 +2044,9 @@ function ChatTabInner({
         return;
       case "new-pane": {
         const viewId = view.id;
-        void spawnPaneForView(viewId, action.anchorPaneId)
+        const direction = action.direction === "vertical" ? "vertical" : "horizontal";
+        const tool = typeof action.tool === "string" ? action.tool : undefined;
+        void spawnPaneForView(viewId, action.anchorPaneId, tool, direction)
           .catch((err: unknown) => (err instanceof Error ? err.message : String(err)))
           .then((error) => {
             if (error) window.api.paneViewNotify(viewId, error);
@@ -2082,6 +2105,9 @@ function ChatTabInner({
         return;
       case "title":
         reportPaneTitle(action.sessionId, action.title);
+        return;
+      case "rename":
+        renameProfilePane(view.profileKey, action.paneId, action.title);
         return;
       case "bounds":
         updateView(view.id, (v) => ({ ...v, bounds: action.bounds }));

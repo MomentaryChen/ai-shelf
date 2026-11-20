@@ -5,6 +5,7 @@ import {
   splitPaneInTree,
   type LayoutNode,
   type PaneInfo,
+  type SplitDirection,
 } from "./split-tree";
 import { buildDisplayLayout } from "./profile-pane-display";
 
@@ -58,10 +59,11 @@ export function splitNextToPane(
   anchorPaneId: string,
   pane: PaneInfo,
   maxPanes: number,
+  direction: SplitDirection = "horizontal",
 ): LayoutNode | null {
   if (!layout || !findPane(layout, anchorPaneId)) return null;
   if (collectPanes(layout).length >= maxPanes) return null;
-  return splitPaneInTree(layout, anchorPaneId, "horizontal", pane);
+  return splitPaneInTree(layout, anchorPaneId, direction, pane);
 }
 
 /**
