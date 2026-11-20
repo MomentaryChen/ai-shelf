@@ -283,6 +283,20 @@ describe("font zoom shortcuts", () => {
     assert.equal(shouldConsumePaneShortcut({ type: "toggle-maximize" }, { panes: [pane("a")] }), false);
   });
 
+  it("maps Ctrl+Shift+J to the attention inbox jump, even with no local panes", () => {
+    const chord = key("J", { ctrlKey: true, shiftKey: true, code: "KeyJ" });
+    assert.deepEqual(matchPaneShortcutWithBindings(chord, map), { type: "next-attention" });
+    let jumps = 0;
+    const h = handlers({ onJumpNextAttention: () => (jumps += 1) });
+    assert.equal(shouldConsumePaneShortcut({ type: "next-attention" }, h), true);
+    applyPaneShortcutAction({ type: "next-attention" }, h);
+    assert.equal(jumps, 1);
+    assert.equal(
+      shouldConsumePaneShortcut({ type: "next-attention" }, { panes: [pane("a")] }),
+      false,
+    );
+  });
+
   it("runs the zoom handler", () => {
     const seen: string[] = [];
     applyPaneShortcutAction(

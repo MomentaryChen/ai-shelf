@@ -4,6 +4,7 @@ import type { PaneInfo } from "../terminal/split-tree";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 import { TerminalCommandStatus } from "./TerminalCommandStatus";
+import { ChangeReviewStatus } from "./ChangeReviewStatus";
 
 type SessionStatus = "live" | "exited" | "stale";
 
@@ -175,6 +176,7 @@ export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
         <span className="font-mono">—</span>
       )}
       <span className="ml-auto flex shrink-0 items-center gap-3 font-mono tabular-nums text-chrome-text-subtle">
+        <ChangeReviewStatus sessionId={pane.sessionId} cwd={pane.cwd} />
         <TerminalCommandStatus sessionId={pane.sessionId} />
         <span title={shellTitle}>{shell}</span>
         {showExit ? (

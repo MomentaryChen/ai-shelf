@@ -101,6 +101,10 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("instructions-preview-sync", projectDir, opts),
   instructionsApplySync: (projectDir, opts) =>
     ipcRenderer.invoke("instructions-apply-sync", projectDir, opts),
+  claudeSettingsListFiles: (projectDir) => ipcRenderer.invoke("claude-settings-list-files", projectDir),
+  claudeSettingsRead: (scope, projectDir) => ipcRenderer.invoke("claude-settings-read", scope, projectDir),
+  claudeSettingsWrite: (scope, projectDir, expectedContent, draft) =>
+    ipcRenderer.invoke("claude-settings-write", scope, projectDir, expectedContent, draft),
   mcpListServers: (tool) => ipcRenderer.invoke("mcp-list-servers", tool),
   mcpUpsertServer: (tool, name, entry, enabled) =>
     ipcRenderer.invoke("mcp-upsert-server", tool, name, entry, enabled),
@@ -322,4 +326,9 @@ contextBridge.exposeInMainWorld("api", {
   wslDistroIp: (distro) => ipcRenderer.invoke("wsl-distro-ip", distro),
   gitCwdInfo: (cwd) => ipcRenderer.invoke("git-cwd-info", cwd),
   gitWorktreeAdd: (req) => ipcRenderer.invoke("git-worktree-add", req),
+  gitChangeReviewEnsure: (req) => ipcRenderer.invoke("git-change-review-ensure", req),
+  gitChangeReviewList: (req) => ipcRenderer.invoke("git-change-review-list", req),
+  gitChangeReviewDiff: (req) => ipcRenderer.invoke("git-change-review-diff", req),
+  gitChangeReviewRevert: (req) => ipcRenderer.invoke("git-change-review-revert", req),
+  gitChangeReviewReset: (req) => ipcRenderer.invoke("git-change-review-reset", req),
 });

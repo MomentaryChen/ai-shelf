@@ -628,7 +628,7 @@ function WarpPaneShell({
             {t("pane.maximizedBadge")}
           </button>
         )}
-        <PaneGitBranch cwd={pane.cwd} onClick={onBranchClick} />
+        <PaneGitBranch cwd={pane.cwd} sessionId={pane.sessionId} onClick={onBranchClick} />
         {onCwdClick ? (
           <button
             type="button"
