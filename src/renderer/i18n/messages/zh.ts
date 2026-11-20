@@ -741,6 +741,7 @@ export const zh: Record<MessageKey, string> = {
   "pane.popout.loading": "正在開啟終端機…",
   "pane.popout.missing": "這個終端機已不存在。",
   "pane.popout.newTerminal": "新增終端機",
+  "pane.view.newTerminalKind": "新增終端機：選擇工具（窗格右上的分割按鈕沿用該窗格的工具）",
   "pane.popout.newFailed": "無法開啟新的終端機。",
   "pane.popout.sidebarLabel": "此視窗中的終端機",
   "pane.maximize": "最大化窗格",
