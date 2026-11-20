@@ -3,6 +3,7 @@ import {
   AppWindow,
   FolderGit2,
   History,
+  Inbox,
   Monitor,
   Radio,
   Terminal,
@@ -28,6 +29,8 @@ export interface TerminalCommandActions {
   newWorktreePane: () => void;
   /** Open the OSC 133 command history panel. */
   openCommandHistory?: () => void;
+  /** Jump to the next pane in the attention inbox (any profile). */
+  jumpNextAttention?: () => void;
 }
 
 export interface TerminalCommandOptions {
@@ -37,6 +40,8 @@ export interface TerminalCommandOptions {
   paneCount: number;
   /** Saved snippets for the active profile (palette quick-run). */
   savedCommands: SavedCommandSnippet[];
+  /** Panes in the attention inbox (waiting on the user, any profile). */
+  attentionCount?: number;
 }
 
 /** Plain .ts file — build lucide icon elements without JSX. */
@@ -52,8 +57,8 @@ export function useTerminalCommands(
 ): Command[] {
   const { addPane, openExternal, activateProfile, broadcastCommand, runSavedCommand, newWorktreePane } =
     actions;
-  const { openCommandHistory } = actions;
-  const { currentGroupId, paneCount, savedCommands } = options;
+  const { openCommandHistory, jumpNextAttention } = actions;
+  const { currentGroupId, paneCount, savedCommands, attentionCount = 0 } = options;
 
   return useMemo(() => {
     const available = data.filter((e) => e.available);
@@ -95,6 +100,21 @@ export function useTerminalCommands(
         keywords: "command history recent commands rerun search osc 133 shell",
         shortcut: shortcutKeys("commandHistory"),
         run: () => openCommandHistory(),
+      });
+    }
+
+    if (jumpNextAttention) {
+      cmds.push({
+        id: "attention-next",
+        title:
+          attentionCount > 0
+            ? t("pane.agent.inbox.jumpNextCount", { count: attentionCount })
+            : t("pane.agent.inbox.jumpNext"),
+        group: t("cmd.group.agents"),
+        icon: icon(Inbox),
+        keywords: "attention inbox waiting input next pane agent permission finished jump",
+        shortcut: shortcutKeys("nextAttentionPane"),
+        run: () => jumpNextAttention(),
       });
     }
 
@@ -200,6 +220,7 @@ export function useTerminalCommands(
     currentGroupId,
     paneCount,
     savedCommands,
+    attentionCount,
     addPane,
     openExternal,
     activateProfile,
@@ -207,5 +228,6 @@ export function useTerminalCommands(
     runSavedCommand,
     newWorktreePane,
     openCommandHistory,
+    jumpNextAttention,
   ]);
 }
