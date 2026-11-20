@@ -17,6 +17,9 @@ import {
 } from "./chat-settings";
 import { useLocale } from "./i18n/LocaleProvider";
 import { useTerminalNotifications } from "./hooks/useTerminalNotifications";
+import { getActiveKeybindings } from "./shortcuts/active-keybindings";
+import { matchShortcut } from "./shortcuts/keybindings";
+import { shouldIgnoreShortcutForIme } from "./terminal/ime-keys";
 import { profileAccentMarkerStyle } from "./utils/profile-colors";
 import { collectPanes, findPane, updateSplitRatio, type LayoutNode } from "./terminal/split-tree";
 import type { PaneViewDecl } from "./types";
@@ -204,7 +207,7 @@ export function PopoutWindowApp() {
     [view],
   );
 
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
       try {
@@ -214,7 +217,37 @@ export function PopoutWindowApp() {
       }
       return next;
     });
-  };
+  }, []);
+
+  // Same "toggleSidebar" shortcut as the main window's Terminal mode (default Ctrl/Cmd+S).
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (shouldIgnoreShortcutForIme(ev)) return;
+      if (!matchShortcut(ev, getActiveKeybindings(), ["toggleSidebar"])) return;
+
+      const target = ev.target as HTMLElement | null;
+      // xterm uses a hidden textarea; still allow the toggle from inside a terminal.
+      if (target && !target.closest(".xterm")) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable ||
+          target.closest("[contenteditable='true']")
+        ) {
+          return;
+        }
+      }
+
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      toggleSidebar();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [toggleSidebar]);
 
   /** The origin window spawns it (same profile, next to `anchorPaneId`) and updates this view. */
   const newTerminal = (anchorPaneId: string, paneIds: string[]) => {
