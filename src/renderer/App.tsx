@@ -9,6 +9,7 @@ import {
   useTransition,
 } from "react";
 import {
+  CircleHelp,
   ListChecks,
   FileText,
   Monitor,
@@ -130,6 +131,9 @@ const OnboardingModal = lazy(() =>
 const ChatTab = lazy(() => import("./components/ChatTab").then((m) => ({ default: m.ChatTab })));
 const TasksTab = lazy(() =>
   import("./components/TasksTab").then((m) => ({ default: m.TasksTab })),
+);
+const HelpDialog = lazy(() =>
+  import("./components/HelpDialog").then((m) => ({ default: m.HelpDialog })),
 );
 const CommandPalette = lazy(() =>
   import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
@@ -352,6 +356,7 @@ export function App() {
   const [activeTool, setActiveTool] = useState<ToolId>("codec");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   /** Bumped when the palette opens so `commands` re-reads the latest terminal ref. */
   const [paletteCommandsRev, setPaletteCommandsRev] = useState(0);
@@ -393,6 +398,19 @@ export function App() {
   }, []);
 
   const closeCheatsheet = useCallback(() => setCheatsheetOpen(false), []);
+
+  const openHelp = useCallback(() => {
+    setPaletteOpen(false);
+    setCheatsheetOpen(false);
+    setHelpOpen(true);
+  }, []);
+
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
+
+  const openShortcutsFromHelp = useCallback(() => {
+    setHelpOpen(false);
+    setCheatsheetOpen(true);
+  }, []);
 
   const handleModeChange = useCallback((mode: AppMode) => {
     startTransition(() => setAppMode(mode));
@@ -579,10 +597,18 @@ export function App() {
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
       },
+      {
+        id: "show-help",
+        title: t("cmd.action.help"),
+        group: t("cmd.group.actions"),
+        icon: <CircleHelp className="h-4 w-4" />,
+        keywords: "help about author version github momentary",
+        run: () => openHelp(),
+      },
     ];
     return [...navigate, ...actions];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, openCheatsheet]);
+  }, [t, openCheatsheet, openHelp]);
 
   const toolsCommands = useMemo<Command[]>(() => {
     const navigate: Command[] = TOOLS.map((it) => ({
@@ -634,10 +660,18 @@ export function App() {
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
       },
+      {
+        id: "show-help",
+        title: t("cmd.action.help"),
+        group: t("cmd.group.actions"),
+        icon: <CircleHelp className="h-4 w-4" />,
+        keywords: "help about author version github momentary",
+        run: () => openHelp(),
+      },
     ];
     return [...navigate, ...actions];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, openCheatsheet]);
+  }, [t, openCheatsheet, openHelp]);
 
   const sharedModeCommands = useMemo<Command[]>(
     () => [
@@ -681,8 +715,16 @@ export function App() {
         shortcut: cheatsheetToggleKeys(),
         run: () => openCheatsheet(),
       },
+      {
+        id: "show-help",
+        title: t("cmd.action.help"),
+        group: t("cmd.group.actions"),
+        icon: <CircleHelp className="h-4 w-4" />,
+        keywords: "help about author version github momentary",
+        run: () => openHelp(),
+      },
     ],
-    [t, openCheatsheet],
+    [t, openCheatsheet, openHelp],
   );
 
   const requestTerminalMode = useCallback(() => {
@@ -767,6 +809,16 @@ export function App() {
           />
         </Suspense>
       )}
+      {helpOpen && (
+        <Suspense fallback={null}>
+          <HelpDialog
+            open
+            tone={appMode === "terminal" ? "chrome" : "default"}
+            onClose={closeHelp}
+            onOpenShortcuts={openShortcutsFromHelp}
+          />
+        </Suspense>
+      )}
 
       <header
         className={`app-title-bar app-drag flex h-10 shrink-0 items-center gap-2 border-b transition-colors duration-300 ${
@@ -824,6 +876,20 @@ export function App() {
             >
               {IS_MAC ? "⌘K" : "Ctrl K"}
             </kbd>
+          </button>
+
+          <button
+            type="button"
+            onClick={openHelp}
+            title={t("app.help")}
+            aria-label={t("app.help")}
+            className={`flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-full border transition-colors duration-150 ${
+              appMode === "terminal"
+                ? "border-chrome-border-strong bg-chrome-surface text-chrome-text-secondary hover:border-chrome-border-hover hover:bg-chrome-hover hover:text-chrome-text"
+                : "border-border bg-bg-secondary text-text-secondary hover:border-border-strong hover:text-text-primary"
+            }`}
+          >
+            <CircleHelp aria-hidden className="h-3.5 w-3.5" />
           </button>
 
           {appMode === "inventory" && (
