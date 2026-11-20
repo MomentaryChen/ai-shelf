@@ -30,7 +30,7 @@ AI Shelf is a pnpm monorepo with two workspaces:
 
 ### Non-obvious caveats
 
-1. **Native module ABI mismatch**: `postinstall` rebuilds `better-sqlite3` and `node-pty` for **Electron's** ABI (NODE_MODULE_VERSION 145). Running `packages/cli` directly via Node.js (e.g. `node packages/cli/dist/cli.js profile list`) will fail with `ERR_DLOPEN_FAILED` because Node.js uses a different ABI (127). The profile CLI is designed to run inside the Electron process.
+1. **Native module ABI mismatch**: `postinstall` rebuilds `better-sqlite3` and `node-pty` for **Electron's** ABI (NODE_MODULE_VERSION 145). Running `packages/cli` directly via Node.js (e.g. `node packages/cli/dist/cli.js profile list`) will fail with `ERR_DLOPEN_FAILED` because Node.js uses a different ABI (127). The profile CLI is designed to run inside the Electron process. The rebuild is skipped while its stamp (`node_modules/.cache/ai-shelf-native/*.json`: Electron version, platform/arch, module, `.node` size+mtime) still matches; force it with `pnpm rebuild:native:all` or `AISHELF_FORCE_NATIVE_REBUILD=1`.
 
 2. **E2E tests require a display server**: On headless Linux, use `xvfb-run --auto-servernum pnpm exec playwright test`. The tests launch Electron, navigate tabs, and take screenshots.
 
