@@ -874,7 +874,7 @@ function EmbeddedTerminalInner({
     };
     el.addEventListener("wheel", onWheel, { passive: false, capture: true });
 
-    const offData = window.api.onPtyData(({ sessionId: sid, data, endSeq }) => {
+    const offData = window.api.onPtyDataFor(sessionId, ({ sessionId: sid, data, endSeq }) => {
       if (sid !== sessionId) return;
       const text = pushPtyChunk(replayGate, { data, endSeq });
       if (text) writeSafe(text);

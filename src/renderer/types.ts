@@ -1021,7 +1021,13 @@ export interface ElectronAPI {
   ptyKill:   (sessionId: string)                           => void;
   /** OSC 133 command state per live session (true running, false at prompt, null unknown). */
   ptyCommandStates: (sessionIds: string[]) => Promise<Record<string, boolean | null>>;
+  /** Output of every session (one shared ipc listener per window). */
   onPtyData: (
+    cb: (p: { sessionId: string; data: string; endSeq?: number }) => void,
+  ) => () => void;
+  /** Output of a single session; other sessions' chunks are not delivered. */
+  onPtyDataFor: (
+    sessionId: string,
     cb: (p: { sessionId: string; data: string; endSeq?: number }) => void,
   ) => () => void;
   onPtyExit: (cb: (p: { sessionId: string; exitCode: number }) => void) => (() => void);
