@@ -36,6 +36,11 @@ import { resolveToolLaunchCommand } from "../tool-launch.js";
 import { testSshConnection } from "./ssh-test.js";
 import { planAgentSessionLaunch } from "../shared/agent-session-resume.js";
 import { claudeConfigDirForEnv, claudeTranscriptExists } from "./agent-session.js";
+import {
+  agentSessionUsageSupported,
+  forgetAgentSessionUsage,
+  trackAgentSessionUsage,
+} from "./agent-session-usage.js";
 import { run } from "../utils/exec.js";
 import { formatGitBuildLabel, readGitBuildInfo } from "../utils/git-build-info.js";
 import {
@@ -2039,6 +2044,15 @@ ipcMain.handle(
 
       PTY_OUTPUT_BUFFERS.set(sessionId, createPtyChunkBuffer());
       PTY_SESSIONS.set(sessionId, proc);
+      // Per-pane token / cost in the status bar (read from the agent's transcript).
+      if (agentSessionId && agentSessionUsageSupported(tool)) {
+        trackAgentSessionUsage(sessionId, {
+          tool,
+          agentSessionId,
+          configDir: claudeConfigDir,
+          cwd: workDir,
+        });
+      }
       PTY_META.set(sessionId, {
         pid: typeof proc.pid === "number" ? proc.pid : null,
         shell: remote
@@ -2370,6 +2384,7 @@ function killPtySession(sessionId: string): void {
   }
   PTY_SESSIONS.delete(sessionId);
   clearPtyBuffer(sessionId);
+  forgetAgentSessionUsage(sessionId);
   // Keep PTY_META so the status bar can still show shell / last size / exit.
   // Emit exit immediately so the UI never sits in a stale "live" gap waiting
   // for node-pty's onExit (which may arrive later with the real code).

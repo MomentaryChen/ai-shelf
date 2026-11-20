@@ -268,6 +268,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("pane-view-focus-pane", handler);
     return () => ipcRenderer.off("pane-view-focus-pane", handler);
   },
+  agentSessionUsage: (sessionId) => ipcRenderer.invoke("agent-session-usage", sessionId),
   usageGetProviders: () => ipcRenderer.invoke("usage-get-providers"),
   usageGetCredentialStatus: () => ipcRenderer.invoke("usage-get-credential-status"),
   usageSetCredential: (tool, fieldKey, value) =>

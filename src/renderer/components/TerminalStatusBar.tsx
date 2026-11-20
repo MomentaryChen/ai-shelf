@@ -4,6 +4,7 @@ import type { PaneInfo } from "../terminal/split-tree";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 import { TerminalCommandStatus } from "./TerminalCommandStatus";
+import { TerminalSessionUsage } from "./TerminalSessionUsage";
 import { ChangeReviewStatus } from "./ChangeReviewStatus";
 
 type SessionStatus = "live" | "exited" | "stale";
@@ -47,8 +48,16 @@ const COPIED_FLASH_MS = 1400;
  * Bottom status strip for the focused pane — session state, full cwd (click to
  * copy), last command, shell, exit code. The branch is in the pane header, and
  * pid / grid size are diagnostics, so those two live in the shell tooltip.
+ * Claude panes also show the conversation's tokens and estimated cost.
  */
-export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
+export function TerminalStatusBar({
+  pane,
+  visible = true,
+}: {
+  pane: PaneInfo | null;
+  /** False while the terminal view is hidden (another app mode); pauses usage polling. */
+  visible?: boolean;
+}) {
   const { t } = useLocale();
   const [status, setStatus] = useState<SessionStatus>("live");
   const [meta, setMeta] = useState<PtyMetaView>(EMPTY_META);
@@ -176,6 +185,11 @@ export function TerminalStatusBar({ pane }: { pane: PaneInfo | null }) {
         <span className="font-mono">—</span>
       )}
       <span className="ml-auto flex shrink-0 items-center gap-3 font-mono tabular-nums text-chrome-text-subtle">
+        <TerminalSessionUsage
+          sessionId={pane.sessionId}
+          agentSessionId={pane.agentSessionId}
+          live={status === "live" && visible}
+        />
         <ChangeReviewStatus sessionId={pane.sessionId} cwd={pane.cwd} />
         <TerminalCommandStatus sessionId={pane.sessionId} />
         <span title={shellTitle}>{shell}</span>

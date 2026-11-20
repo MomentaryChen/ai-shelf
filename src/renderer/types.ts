@@ -18,6 +18,7 @@ import type { TaskDef, TaskInput, TaskSaveResult } from "../shared/task-types.js
 import type { TaskRunOutput, TaskRunRecord, TaskRunStart } from "../shared/task-run-types.js";
 import type { PortListenerRow, WslPortScan } from "../shared/port-listeners.js";
 import type { HostResourceSnapshot } from "../shared/host-env.js";
+import type { AgentSessionUsage } from "../shared/agent-session-usage.js";
 import type {
   ConversationDetail,
   ConversationProviderId,
@@ -1200,6 +1201,8 @@ export interface ElectronAPI {
   onPaneViewConfirmClose: (cb: () => void) => () => void;
   onPaneViewNotice: (cb: (notice: PaneViewNotice) => void) => () => void;
   onPaneViewFocusPane: (cb: (paneId: string) => void) => () => void;
+  /** Token / cost totals of the agent conversation in a PTY (Claude panes); null when unknown. */
+  agentSessionUsage: (ptySessionId: string) => Promise<AgentSessionUsage | null>;
   usageGetProviders: () => Promise<{
     providers: UsageProviderMeta[];
     encryptionAvailable: boolean;
