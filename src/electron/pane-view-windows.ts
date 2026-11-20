@@ -141,6 +141,18 @@ function parseRecord<T>(raw: unknown, pick: (v: unknown) => T | null): Record<st
   return out;
 }
 
+/** Tool ids for the view's "New terminal" menu (deduped, bounded). */
+function parseToolIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out = new Set<string>();
+  for (const v of raw) {
+    const id = str(v);
+    if (id && id.length <= 64) out.add(id);
+    if (out.size >= 64) break;
+  }
+  return [...out];
+}
+
 function parseDecl(raw: unknown): PaneViewDecl | null {
   if (!raw || typeof raw !== "object") return null;
   const d = raw as Record<string, unknown>;
@@ -158,6 +170,7 @@ function parseDecl(raw: unknown): PaneViewDecl | null {
     labels: parseRecord(d.labels, (v) => (typeof v === "string" ? v : null)),
     busy: parseRecord(d.busy, (v) => (typeof v === "boolean" ? v : null)),
     bounds: parseRect(d.bounds),
+    tools: parseToolIds(d.tools),
   };
 }
 

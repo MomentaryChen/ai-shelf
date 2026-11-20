@@ -26,6 +26,7 @@ function decl(
     labels: {},
     busy,
     bounds: null,
+    tools: [],
   };
 }
 

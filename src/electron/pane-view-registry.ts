@@ -41,6 +41,8 @@ export interface PaneViewDecl {
   busy: Partial<Record<string, boolean>>;
   /** Saved window bounds (used only when the window is created). */
   bounds: Rect | null;
+  /** Installed tool ids the view's "New terminal" menu offers (plain shell is always offered). */
+  tools: string[];
 }
 
 export interface PaneViewEntry {
