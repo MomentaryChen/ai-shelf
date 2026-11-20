@@ -92,6 +92,10 @@ contextBridge.exposeInMainWorld("api", {
   syncSkills: (opts) => ipcRenderer.invoke("sync-skills", opts),
   readConfigFile: (filePath) => ipcRenderer.invoke("read-config-file", filePath),
   writeConfigFile: (filePath, content) => ipcRenderer.invoke("write-config-file", filePath, content),
+  claudeSettingsListFiles: (projectDir) => ipcRenderer.invoke("claude-settings-list-files", projectDir),
+  claudeSettingsRead: (scope, projectDir) => ipcRenderer.invoke("claude-settings-read", scope, projectDir),
+  claudeSettingsWrite: (scope, projectDir, expectedContent, draft) =>
+    ipcRenderer.invoke("claude-settings-write", scope, projectDir, expectedContent, draft),
   mcpListServers: (tool) => ipcRenderer.invoke("mcp-list-servers", tool),
   mcpUpsertServer: (tool, name, entry, enabled) =>
     ipcRenderer.invoke("mcp-upsert-server", tool, name, entry, enabled),

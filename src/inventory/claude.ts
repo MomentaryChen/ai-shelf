@@ -83,17 +83,18 @@ export async function detectClaude(opts: DetectOptions = {}): Promise<ProviderEn
   }
 
   // Config paths
+  // Claude Code merges user, project (shared) and local (gitignored) settings.
   const configCandidates = [
     claudeConfigDir("settings.json"),
     claudeJsonPath(),
+    cwd(".claude", "settings.json"),
+    cwd(".claude", "settings.local.json"),
   ];
   const instructionCandidates = [
     claudeConfigDir("CLAUDE.md"),
     cwd("CLAUDE.md"),
     cwd(".claude", "CLAUDE.md"),
     cwd("CLAUDE.local.md"),
-    cwd(".claude", "settings.json"),
-    cwd(".claude", "settings.local.json"),
   ];
   // MCP servers: user + local (per-project) scopes from ~/.claude.json, and
   // project-scoped `.mcp.json` at the cwd and every known project root.
