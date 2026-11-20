@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +45,8 @@ export function AttentionInbox({
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  /** Closed by choosing a pane: keep focus on that terminal, not the trigger. */
+  const selectedRef = useRef(false);
 
   // Tick the "waiting for" labels only while the list is open.
   useEffect(() => {
@@ -85,7 +87,14 @@ export function AttentionInbox({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[min(360px,calc(100vw-1.5rem))] p-1">
+      <DropdownMenuContent
+        align="end"
+        className="w-[min(360px,calc(100vw-1.5rem))] p-1"
+        onCloseAutoFocus={(e) => {
+          if (selectedRef.current) e.preventDefault();
+          selectedRef.current = false;
+        }}
+      >
         <DropdownMenuLabel className="flex items-center gap-2">
           <span className="flex-1">{t("pane.agent.inbox.title")}</span>
           {count > 0 && <span className="tabular-nums">{count}</span>}
@@ -105,7 +114,10 @@ export function AttentionInbox({
               {items.map((item) => (
                 <DropdownMenuItem
                   key={item.paneId}
-                  onSelect={() => onOpen(item.paneId)}
+                  onSelect={() => {
+                    selectedRef.current = true;
+                    onOpen(item.paneId);
+                  }}
                   title={t("pane.agent.inbox.openPane")}
                   className="items-start gap-2 py-2"
                 >
@@ -139,7 +151,13 @@ export function AttentionInbox({
               ))}
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onJumpNext} className="text-[12px]">
+            <DropdownMenuItem
+              onSelect={() => {
+                selectedRef.current = true;
+                onJumpNext();
+              }}
+              className="text-[12px]"
+            >
               {t("pane.agent.inbox.jumpNext")}
               {jumpShortcut && <DropdownMenuShortcut>{jumpShortcut}</DropdownMenuShortcut>}
             </DropdownMenuItem>

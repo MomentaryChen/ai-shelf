@@ -45,6 +45,14 @@ describe("attention-inbox reducer", () => {
     assert.equal(m.a, undefined);
     m = reduceAttentionInbox(m, { type: "finished", paneId: "b", at: 4, viewing: true });
     assert.equal(m.b, undefined);
+    m = reduceAttentionInbox(m, {
+      type: "exited",
+      paneId: "c",
+      exitCode: 1,
+      at: 5,
+      viewing: true,
+    });
+    assert.equal(m.c, undefined);
   });
 
   it("idle clears waiting/stall but keeps finished and exit errors", () => {

@@ -56,6 +56,8 @@ export interface BackgroundAgentOptions {
 const NO_BACKGROUND: BackgroundAgentOptions = { panes: [] };
 
 const NOTIFY_COOLDOWN_MS = 30_000;
+/** Grace before inbox entries of panes that left the tracked set are dropped. */
+const INBOX_RETAIN_DELAY_MS = 3_000;
 
 function playAttentionSound(): void {
   try {
@@ -177,8 +179,16 @@ export function usePaneAgentAwareness(
     [],
   );
 
+  // Drop entries of closed panes. Debounced: during a profile switch a pane can be in
+  // neither the active layout nor the stashed set for a few renders.
+  const trackedPanesRef = useRef(trackedPanes);
+  trackedPanesRef.current = trackedPanes;
   useEffect(() => {
-    dispatchInbox({ type: "retain", paneIds: new Set(trackedPanes.map((p) => p.id)) });
+    const id = window.setTimeout(() => {
+      const paneIds = new Set(trackedPanesRef.current.map((p) => p.id));
+      dispatchInbox({ type: "retain", paneIds });
+    }, INBOX_RETAIN_DELAY_MS);
+    return () => window.clearTimeout(id);
   }, [trackedPanes, dispatchInbox]);
 
   // Looking at a pane clears its inbox entry.
@@ -550,6 +560,7 @@ export function usePaneAgentAwareness(
             exitCode,
             at: Date.now(),
             line: paneTailLine(pane.id),
+            viewing: isViewingPane(pane.id),
           });
         }
         const bg = backgroundByPaneRef.current.get(pane.id);
@@ -599,6 +610,7 @@ export function usePaneAgentAwareness(
     dispatchAttention,
     dispatchInbox,
     flushPendingOutput,
+    isViewingPane,
     notify,
     paneTailLine,
     scheduleOutputFlush,

@@ -37,7 +37,14 @@ export type AttentionInboxEvent =
       viewing?: boolean;
     }
   | { type: "finished"; paneId: string; at: number; line?: string; viewing?: boolean }
-  | { type: "exited"; paneId: string; exitCode: number; at: number; line?: string }
+  | {
+      type: "exited";
+      paneId: string;
+      exitCode: number;
+      at: number;
+      line?: string;
+      viewing?: boolean;
+    }
   /** The user focused / opened this pane. */
   | { type: "seen"; paneId: string }
   /** Keep only entries whose pane is still tracked (closed panes drop out). */
@@ -101,7 +108,7 @@ export function reduceAttentionInbox(
       return setEntry(map, event.paneId, "finished", event.at, event.line);
     }
     case "exited": {
-      if (event.exitCode === 0) return map;
+      if (event.exitCode === 0 || event.viewing) return map;
       return setEntry(map, event.paneId, "error", event.at, event.line, event.exitCode);
     }
     case "seen":
@@ -167,8 +174,8 @@ export function lastMeaningfulLine(tail: string, maxChars = MAX_LINE_CHARS): str
   if (!tail) return "";
   const lines = tail.split(/\r?\n|\r/);
   for (let i = lines.length - 1; i >= 0; i -= 1) {
-    const cleaned = lines[i]!// Strip leading/trailing box frame characters (TUI boxes: "│ text │").
-    .replace(/^[\s─-╿]+|[\s─-╿]+$/g, "")
+    const cleaned = lines[i]! // Strip leading/trailing box frame characters (TUI boxes: "│ text │").
+      .replace(/^[\s─-╿]+|[\s─-╿]+$/g, "")
       .replace(/\s+/g, " ")
       .trim();
     if (!cleaned || DECORATION_ONLY.test(cleaned)) continue;
