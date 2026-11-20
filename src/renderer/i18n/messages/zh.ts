@@ -218,6 +218,9 @@ export const zh: Record<MessageKey, string> = {
   "settings.pasteConfirmBroadcastHint":
     "開啟「同步輸入至所有 terminal」時，只要貼上會送到多個終端機就先詢問。",
   "settings.webgl": "WebGL 渲染",
+  "settings.scrollbarAlways": "常駐顯示捲軸",
+  "settings.scrollbarAlwaysHint":
+    "有歷史可捲時一直顯示終端捲軸，看得出目前位置，也能拖曳跳轉。關閉則只在滑鼠移上或捲動時顯示。使用 alternate screen 的全螢幕程式沒有捲動緩衝。",
   "settings.webglHint":
     "用 GPU 加速繪製——多分屏與大捲動緩衝時較順。WebGL 不可用時會退回 canvas。變更後已開啟的窗格會重新載入。",
   "settings.systemTray": "系統匣",

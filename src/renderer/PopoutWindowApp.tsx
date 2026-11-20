@@ -551,6 +551,7 @@ export function PopoutWindowApp() {
                 fontSize={settings.terminalFontSize}
                 scrollback={settings.terminalScrollback}
                 webglEnabled={settings.terminalWebglEnabled}
+                scrollbarAlwaysVisible={settings.terminalScrollbarAlwaysVisible}
                 rightClickPaste={settings.terminalRightClickPaste}
                 copyOnSelect={settings.terminalCopyOnSelect}
                 pasteConfirm={pasteConfirm}

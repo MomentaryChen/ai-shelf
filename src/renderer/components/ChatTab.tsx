@@ -2615,6 +2615,7 @@ function ChatTabInner({
             fontSize={terminalFontSize}
             scrollback={terminalScrollback}
             webglEnabled={settings.terminalWebglEnabled}
+            scrollbarAlwaysVisible={settings.terminalScrollbarAlwaysVisible}
             rightClickPaste={settings.terminalRightClickPaste}
             copyOnSelect={settings.terminalCopyOnSelect}
             pasteConfirm={pasteConfirm}
