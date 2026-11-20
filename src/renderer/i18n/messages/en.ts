@@ -224,6 +224,9 @@ export const en = {
   "settings.pasteConfirmBroadcastHint":
     "When “Sync input to all terminals” is on, ask before every paste that would reach more than one terminal.",
   "settings.webgl": "WebGL renderer",
+  "settings.scrollbarAlways": "Always show scrollbar",
+  "settings.scrollbarAlwaysHint":
+    "Keep the terminal scrollbar visible while there is history to scroll, so you can see where you are and drag to jump. Off = show it only while hovering or scrolling. Full-screen apps on the alternate screen have no scrollback.",
   "settings.webglHint":
     "Faster drawing with the GPU — helps with many panes and large scrollback. Falls back to canvas if WebGL is unavailable. Open panes reload on change.",
   "settings.systemTray": "System tray",
@@ -811,6 +814,20 @@ export const en = {
   "pane.agent.bg.badgeHint": "{kind} · {count} background terminal(s)",
   "pane.agent.bg.toastOpen": "Open",
   "pane.agent.bg.toastDismiss": "Dismiss",
+  "pane.agent.inbox.button": "Attention inbox",
+  "pane.agent.inbox.buttonCount": "{count} terminal(s) waiting on you",
+  "pane.agent.inbox.title": "Waiting on you",
+  "pane.agent.inbox.empty": "Nothing is waiting",
+  "pane.agent.inbox.emptyHint":
+    "Terminals that ask for input, finish, or fail stay here until you open them.",
+  "pane.agent.inbox.jumpNext": "Jump to next waiting terminal",
+  "pane.agent.inbox.jumpNextCount": "Jump to next waiting terminal ({count} waiting)",
+  "pane.agent.inbox.openPane": "Open this terminal",
+  "pane.agent.inbox.exitCode": "exit code {code}",
+  "pane.agent.inbox.wait.now": "just now",
+  "pane.agent.inbox.wait.s": "{n}s",
+  "pane.agent.inbox.wait.m": "{n}m",
+  "pane.agent.inbox.wait.h": "{n}h",
   "terminal.scrollToBottom": "Scroll to bottom",
   "terminal.newOutput": "New output",
   "terminal.ssh.exitedPrompt": "[SSH session ended — press R to reconnect, any other key to close]",
@@ -919,6 +936,7 @@ export const en = {
   "shortcuts.pane.resizeUp": "Move pane divider up",
   "shortcuts.pane.resizeDown": "Move pane divider down",
   "shortcuts.pane.equalize": "Make all panes the same size",
+  "shortcuts.pane.nextAttention": "Jump to next terminal waiting on you",
   "terminal.ctx.newConversation": "Start new conversation",
   "settings.agentSessions.title": "AI agent conversations",
   "settings.resumeAgentSessions": "Resume agent conversations",

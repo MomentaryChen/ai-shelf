@@ -70,6 +70,19 @@ input:focus-visible,
   height: 100%;
 }
 
+/* xterm auto-hides its scrollbar; with "always show" on, keep it up while the
+   buffer has scrollback (EmbeddedTerminal sets data-has-scrollback). Slider
+   colours come from the xterm theme (getXtermTheme). */
+[data-scrollbar-always]
+  [data-has-scrollback]
+  .xterm
+  .xterm-scrollable-element
+  > .xterm-scrollbar.xterm-vertical.xterm-invisible {
+  opacity: 1;
+  pointer-events: auto;
+  transition: none;
+}
+
 /* Clickable paths / URLs (Ctrl+click / Cmd+click) */
 .xterm .xterm-link {
   cursor: pointer;
