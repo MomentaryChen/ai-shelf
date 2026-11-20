@@ -1709,12 +1709,31 @@ function appendPtyBuffer(sessionId: string, data: string) {
   else mirrorPtyLogAppend(sessionId, data);
 }
 
+/**
+ * Windows that may host terminals: renderer pages (main, #chat, popout / pane
+ * views) except the settings dialog. Auth popups, the hidden claude.ai usage
+ * window and other external pages never listen for PTY events, so skip the
+ * per-chunk IPC copy to them.
+ */
+function ptyBroadcastTargets(): BrowserWindow[] {
+  let rendererPage: string | null = null;
+  try {
+    rendererPage = getRendererPageUrl();
+  } catch {
+    /* renderer server not up — fall back to every window */
+  }
+  return BrowserWindow.getAllWindows().filter((win) => {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return false;
+    if (win === settingsWindow) return false;
+    if (!rendererPage) return true;
+    return win.webContents.getURL().startsWith(rendererPage);
+  });
+}
+
 function sendPtyData(sessionId: string, data: string, endSeq: number) {
   if (!data) return;
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send("pty-data", { sessionId, data, endSeq });
-    }
+  for (const win of ptyBroadcastTargets()) {
+    win.webContents.send("pty-data", { sessionId, data, endSeq });
   }
 }
 
@@ -1777,10 +1796,8 @@ function broadcastPtyData(sessionId: string, data: string) {
 function broadcastPtyExit(sessionId: string, exitCode: number) {
   // Finish the output slices before the exit event so the banner stays at the tail.
   flushPtyDataBroadcast(sessionId, () => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) {
-        win.webContents.send("pty-exit", { sessionId, exitCode });
-      }
+    for (const win of ptyBroadcastTargets()) {
+      win.webContents.send("pty-exit", { sessionId, exitCode });
     }
   });
 }
@@ -1816,10 +1833,8 @@ function wakePtySessions(): void {
 function broadcastPtyMeta(sessionId: string) {
   const payload = ptyMetaPayload(sessionId);
   if (!payload) return;
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send("pty-meta", payload);
-    }
+  for (const win of ptyBroadcastTargets()) {
+    win.webContents.send("pty-meta", payload);
   }
 }
 
