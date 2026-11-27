@@ -48,6 +48,8 @@ export interface PaneViewDecl {
   bounds: Rect | null;
   /** Installed tool ids the view's "New terminal" menu offers (plain shell is always offered). */
   tools: string[];
+  /** Panes closed in this view that can be reopened (enables its "Reopen closed pane"). */
+  closedPaneCount?: number;
 }
 
 export interface PaneViewEntry {

@@ -67,6 +67,7 @@ export const SHORTCUT_LABEL_KEYS: Record<ShortcutId, MessageKey> = {
   layoutRows: "shortcuts.pane.layoutRows",
   layoutGrid: "shortcuts.pane.layoutGrid",
   layoutMainSide: "shortcuts.pane.layoutMainSide",
+  reopenClosedPane: "shortcuts.pane.reopenClosed",
 };
 
 export const SHORTCUT_SECTION_TITLE_KEYS: Record<ShortcutSectionId, MessageKey> = {

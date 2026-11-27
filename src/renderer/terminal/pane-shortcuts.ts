@@ -26,7 +26,8 @@ export type PaneShortcutAction =
   | { type: "resize-pane"; direction: PaneDirection }
   | { type: "equalize-panes" }
   | { type: "layout-preset"; preset: LayoutPreset }
-  | { type: "next-attention" };
+  | { type: "next-attention" }
+  | { type: "reopen-closed" };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
 function shouldIgnoreShortcutTarget(target: EventTarget | null): boolean {
@@ -70,6 +71,12 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
   // The waiting pane may live in another profile, so this runs with zero local panes too.
   if (action.type === "next-attention") {
     h.onJumpNextAttention?.();
+    return;
+  }
+
+  // Closing the last pane by mistake leaves zero panes — reopen must still run.
+  if (action.type === "reopen-closed") {
+    h.onReopenClosedPane?.();
     return;
   }
 
@@ -156,6 +163,10 @@ export interface PaneShortcutHandlers {
   onApplyLayoutPreset?: (preset: LayoutPreset) => void;
   /** Jump to the next pane in the attention inbox (any profile). */
   onJumpNextAttention?: () => void;
+  /** Reopen the most recently closed pane. */
+  onReopenClosedPane?: () => void;
+  /** Something to reopen; otherwise the key passes through to the terminal. */
+  canReopenClosedPane?: boolean;
 }
 
 let getHandlers: (() => PaneShortcutHandlers | null) | null = null;
@@ -194,6 +205,7 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "layoutRows",
   "layoutGrid",
   "layoutMainSide",
+  "reopenClosedPane",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -322,6 +334,8 @@ export function matchPaneShortcutWithBindings(
       return { type: "layout-preset", preset: "grid" };
     case "layoutMainSide":
       return { type: "layout-preset", preset: "main-side" };
+    case "reopenClosedPane":
+      return { type: "reopen-closed" };
     default:
       return null;
   }
@@ -369,11 +383,17 @@ export function shouldConsumePaneShortcut(
         | "onEqualizePanes"
         | "onApplyLayoutPreset"
         | "onJumpNextAttention"
+        | "onReopenClosedPane"
+        | "canReopenClosedPane"
       >
     >,
 ): boolean {
   // Cross-profile jump: consumed whenever a handler exists, even with no local panes.
   if (action.type === "next-attention") return Boolean(h.onJumpNextAttention);
+  // Works with no panes; an empty stack leaves the key to the terminal.
+  if (action.type === "reopen-closed") {
+    return Boolean(h.onReopenClosedPane) && h.canReopenClosedPane === true;
+  }
   // Empty layout: only Ctrl+Tab MRU is meaningful. Do not swallow Ctrl+W / 1–9 /
   // split keys — those may belong to profile quick-switch or should no-op cleanly.
   if (h.panes.length === 0) {

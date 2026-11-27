@@ -1387,6 +1387,8 @@ export interface PaneViewDecl {
   bounds: PaneViewRect | null;
   /** Installed tool ids a new terminal here can launch (plain shell is always offered). */
   tools: string[];
+  /** Panes closed in this view that "reopen closed pane" can bring back (older builds omit it). */
+  closedPaneCount?: number;
 }
 
 export interface PaneViewDragEndRequest {
@@ -1421,6 +1423,8 @@ export type PaneViewAction =
   /** A sidebar terminal of the origin window was dropped on `targetPaneId` here. */
   | { type: "adopt-pane"; paneId: string; targetPaneId: string; zone: import("./terminal/pane-drop-zone").PaneDropZone }
   | { type: "close-pane"; paneId: string }
+  /** Bring back the newest pane closed in this view; `anchorPaneId` (focused pane) is the fallback spot. */
+  | { type: "reopen-closed-pane"; anchorPaneId?: string }
   | { type: "dock-pane"; paneId: string }
   | { type: "dock-all" }
   | { type: "close-view" }
