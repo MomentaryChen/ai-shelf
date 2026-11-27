@@ -92,8 +92,9 @@ interface Props {
   focused?: boolean;
   /**
    * Kept mounted off screen (another profile, or a pane not on display). The
-   * terminal keeps parsing output but does not fit, notify, broadcast input or
-   * hold a WebGL context; cwd / title reports wait until it is shown again.
+   * terminal keeps parsing output (and still raises long-command / bell / OSC
+   * notifications) but does not fit, broadcast input or hold a WebGL context;
+   * cwd / title reports wait until it is shown again.
    */
   parked?: boolean;
   onExit: () => void;
@@ -558,8 +559,8 @@ function EmbeddedTerminalInner({
     const commandMarks = bindTerminalCommandMarks(term, {
       getCwd: () => currentCwd,
       onCommandFinished: (info) => {
-        // Off screen behaves like an unmounted pane: no live notifications.
-        if (parkedRef.current) return;
+        // Parked panes notify too (minimized, background profile): the receiver
+        // decides, and an off-screen pane is the one the user cannot watch.
         callbacksRef.current.onTerminalNotify?.(sessionId, {
           kind: "command",
           command: info.command,
@@ -678,7 +679,6 @@ function EmbeddedTerminalInner({
       callbacksRef.current.onTitleReport?.(sessionId, title);
     });
     const unbindNotify = bindTerminalNotifications(term, commandMarks.isLive, (event) => {
-      if (parkedRef.current) return;
       callbacksRef.current.onTerminalNotify?.(sessionId, event);
     });
 

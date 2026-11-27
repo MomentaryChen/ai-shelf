@@ -7,6 +7,7 @@ import {
   PaneNotifyDedupe,
   parseOsc777,
   parseOsc9,
+  resolveNotifyPane,
   sanitizeNotifyText,
 } from "./terminal-notify";
 
@@ -62,6 +63,29 @@ describe("isPaneUnattended", () => {
     assert.equal(isPaneUnattended("p2", base), true);
     assert.equal(isPaneUnattended("p1", { ...base, windowFocused: false }), true);
     assert.equal(isPaneUnattended("p1", { ...base, viewActive: false }), true);
+  });
+  it("is true for an off-screen pane even when it holds focus", () => {
+    assert.equal(isPaneUnattended("p1", { ...base, onScreen: false }), true);
+    assert.equal(isPaneUnattended("p1", { ...base, onScreen: true }), false);
+  });
+});
+
+describe("resolveNotifyPane", () => {
+  const p = (id: string) => ({ id, sessionId: `s-${id}` });
+  it("finds an active-profile pane without a profile name", () => {
+    assert.deepEqual(resolveNotifyPane("s-a", [p("a")], [{ pane: p("b"), profileName: "Work" }]), {
+      pane: p("a"),
+      profileName: null,
+    });
+  });
+  it("falls back to a background profile pane with its profile name", () => {
+    assert.deepEqual(resolveNotifyPane("s-b", [p("a")], [{ pane: p("b"), profileName: "Work" }]), {
+      pane: p("b"),
+      profileName: "Work",
+    });
+  });
+  it("returns null for an unknown session", () => {
+    assert.equal(resolveNotifyPane("s-x", [p("a")]), null);
   });
 });
 
