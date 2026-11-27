@@ -119,6 +119,8 @@ interface Props {
   maximizeShortcutKeys?: string;
   /** View windows: put the pane back into its origin window. */
   onDockPane?: (paneId: string) => void;
+  /** Body opacity of unfocused panes while one pane has focus (default 0.8). */
+  unfocusedDimOpacity?: number;
 }
 
 export type PanePopOutTrigger = "drag" | "menu";
@@ -134,6 +136,7 @@ type PaneDragState = {
   canReorder: boolean;
   /** Several panes are on screen and one of them has focus: fade the others back. */
   dimUnfocused: boolean;
+  unfocusedDimOpacity: number;
   setDraggingPaneId: (id: string | null) => void;
   setDragOverPaneId: (id: string | null) => void;
   setDropZone: (zone: PaneDropZone | null) => void;
@@ -226,6 +229,7 @@ export function SplitPaneLayout(props: Props) {
     profileDragOver,
     canReorder,
     dimUnfocused,
+    unfocusedDimOpacity: props.unfocusedDimOpacity ?? 0.8,
     setDraggingPaneId,
     setDragOverPaneId,
     setDropZone,
@@ -881,9 +885,8 @@ function WarpPaneShell({
         </Tooltip>
       </div>
       <div
-        className={`warp-pane-body relative z-0 min-h-0 flex-1 overflow-hidden transition-opacity duration-200 ${
-          dimmed ? "opacity-80" : "opacity-100"
-        }`}
+        className="warp-pane-body relative z-0 min-h-0 flex-1 overflow-hidden transition-opacity duration-200"
+        style={{ opacity: dimmed ? drag.unfocusedDimOpacity : 1 }}
       >
         {/*
           Plain drag target over xterm while a sidebar pane is dragged, so the

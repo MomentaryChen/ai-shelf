@@ -21,8 +21,13 @@ import {
   normalizePasteConfirmMaxLines,
 } from "./terminal/paste-confirm";
 import { DEFAULT_OSC52_MODE, normalizeOsc52Mode, type Osc52Mode } from "./terminal/osc52";
+import {
+  DEFAULT_UNFOCUSED_PANE_DIM,
+  normalizeUnfocusedPaneDim,
+  type UnfocusedPaneDim,
+} from "./terminal/pane-dim";
 
-export type { AppColorTheme, AppLocale, LocalePreference };
+export type { AppColorTheme, AppLocale, LocalePreference, UnfocusedPaneDim };
 
 export type ExternalTerminal = "auto" | "wt" | "pwsh" | "powershell" | "cmd";
 
@@ -76,6 +81,8 @@ export interface ChatSettings {
   terminalWebglEnabled: boolean;
   /** Keep the terminal scrollbar shown while there is scrollback; false = show on hover / scroll. */
   terminalScrollbarAlwaysVisible: boolean;
+  /** How much unfocused split panes fade back (see terminal/pane-dim.ts). */
+  terminalUnfocusedPaneDim: UnfocusedPaneDim;
   /** Reopen AI agent panes (Claude Code) with their previous conversation after a restart. */
   terminalResumeAgentSessions: boolean;
   /** Ask before pasting text over the line / size thresholds below. */
@@ -279,6 +286,7 @@ const DEFAULTS: ChatSettings = {
   terminalCopyOnSelect: true,
   terminalWebglEnabled: true,
   terminalScrollbarAlwaysVisible: true,
+  terminalUnfocusedPaneDim: DEFAULT_UNFOCUSED_PANE_DIM,
   terminalResumeAgentSessions: true,
   terminalPasteConfirm: true,
   terminalPasteConfirmMaxLines: DEFAULT_PASTE_CONFIRM_MAX_LINES,
@@ -343,6 +351,7 @@ export function loadSettings(): ChatSettings {
       terminalCopyOnSelect: normalizeCopyOnSelect(stored.terminalCopyOnSelect),
       terminalWebglEnabled: normalizeWebglEnabled(stored.terminalWebglEnabled),
       terminalScrollbarAlwaysVisible: normalizePaneAgentBool(stored.terminalScrollbarAlwaysVisible, true),
+      terminalUnfocusedPaneDim: normalizeUnfocusedPaneDim(stored.terminalUnfocusedPaneDim),
       terminalResumeAgentSessions: normalizePaneAgentBool(stored.terminalResumeAgentSessions, true),
       terminalPasteConfirm: normalizePaneAgentBool(stored.terminalPasteConfirm, true),
       terminalPasteConfirmMaxLines: normalizePasteConfirmMaxLines(stored.terminalPasteConfirmMaxLines),

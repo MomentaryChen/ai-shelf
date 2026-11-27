@@ -181,6 +181,7 @@ import {
   subscribeSettingsChanges,
   type ChatSettings,
 } from "../chat-settings";
+import { unfocusedPaneDimOpacity } from "../terminal/pane-dim";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 import { agentSessionSupported } from "../../shared/agent-session-resume.js";
 import {
@@ -2897,6 +2898,7 @@ function ChatTabInner({
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
         broadcastActive={broadcastActive}
+        unfocusedDimOpacity={unfocusedPaneDimOpacity(settings.terminalUnfocusedPaneDim)}
         broadcastPaneCount={dockedPanes.length}
         paneAgentStates={paneAgentStates}
         paneLabels={paneLabels}

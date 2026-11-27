@@ -25,6 +25,7 @@ import {
   subscribeSettingsChanges,
   type ChatSettings,
 } from "./chat-settings";
+import { unfocusedPaneDimOpacity } from "./terminal/pane-dim";
 import { useLocale } from "./i18n/LocaleProvider";
 import { useTerminalNotifications } from "./hooks/useTerminalNotifications";
 import { getActiveKeybindings } from "./shortcuts/active-keybindings";
@@ -607,6 +608,7 @@ export function PopoutWindowApp() {
             focusedPaneId={focusedPane?.id ?? null}
             bg={bg}
             profileAccentColor={view.accentColor}
+            unfocusedDimOpacity={unfocusedPaneDimOpacity(settings.terminalUnfocusedPaneDim)}
             paneLabels={view.labels}
             paneAgentStates={view.agentStatus}
             onFocusPane={focusPane}
