@@ -257,7 +257,7 @@ export function ConfigPolicyPanel() {
         </Button>
       </div>
 
-      {status && <p className="mb-3 text-xs text-text-secondary">{status}</p>}
+      {status && <p className="ui-view-fade mb-3 text-xs text-text-secondary">{status}</p>}
 
       <div className="rounded-lg border border-border bg-bg-primary px-3 py-2.5">
         <div className="mb-2 flex items-center gap-2">

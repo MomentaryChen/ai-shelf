@@ -356,7 +356,7 @@ export function ProfileRemoteSshSection({ value, onChange, invalid, disabled = f
   const seconds = (ms: number) => (ms / 1000).toFixed(1);
 
   return (
-    <div role="tabpanel" id="profile-tabpanel-remote" aria-labelledby="profile-tab-remote" className="mb-2 space-y-3">
+    <div role="tabpanel" id="profile-tabpanel-remote" aria-labelledby="profile-tab-remote" className="ui-view-fade mb-2 space-y-3">
       <label
         className={cn(
           "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",

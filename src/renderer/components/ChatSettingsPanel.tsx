@@ -422,7 +422,14 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
 
   return (
     <>
-    <div className={compact ? "flex flex-col gap-5" : "flex flex-col gap-6"}>
+    {/* Keyed by category so switching settings sections replays the fade.
+        Panel-level state lives above this div and survives the remount. */}
+    <div
+      key={category ?? "all"}
+      className={`flex flex-col ${compact ? "gap-5" : "gap-6"}${
+        category !== undefined ? " ui-view-fade" : ""
+      }`}
+    >
       {show("appearance") && (
         <>
       {/* Language */}

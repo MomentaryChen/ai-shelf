@@ -155,7 +155,7 @@ export function ProfileSettingsDialog({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 pb-4">
         {tab === "general" ? (
-        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general">
+        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general" className="ui-view-fade">
         <Label className="mb-3 block">
           <span className="mb-1 block text-[11px] font-normal text-chrome-text-subtle">
             {t("profile.dialog.name")}

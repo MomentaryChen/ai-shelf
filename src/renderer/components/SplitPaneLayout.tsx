@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   SplitSquareHorizontal,
   SplitSquareVertical,
@@ -28,6 +28,7 @@ import {
   type SplitDirection,
 } from "../terminal/split-tree";
 import { formatPaneCwdShort } from "../utils/pane-cwd";
+import { enteringPaneIds, PANE_ENTER_MS } from "../terminal/pane-enter";
 import { useLocale } from "../i18n/LocaleProvider";
 import {
   profilePaneChromeStyle,
@@ -120,14 +121,59 @@ type PaneDragState = {
   onProfilePaneDrop?: (dragPaneId: string, targetPaneId: string, zone: PaneDropZone) => void;
   onPopOutPane?: Props["onPopOutPane"];
   onDockPane?: Props["onDockPane"];
+  /** Panes that just appeared (split, restore, dock) and play the enter fade. */
+  enteringPaneIds: ReadonlySet<string>;
 };
+
+const NO_ENTERING_PANES: ReadonlySet<string> = new Set();
+
+/**
+ * Tracks which pane ids are new since the last layout and keeps them marked
+ * for the length of the enter fade. A layout effect so the class is on before
+ * the first paint of the new pane.
+ */
+function useEnteringPanes(paneIds: readonly string[]): ReadonlySet<string> {
+  const [entering, setEntering] = useState(NO_ENTERING_PANES);
+  const prevIdsRef = useRef<readonly string[] | null>(null);
+  const timersRef = useRef<number[]>([]);
+  const idsKey = paneIds.join("\n");
+
+  useLayoutEffect(() => {
+    const added = enteringPaneIds(prevIdsRef.current, paneIds);
+    prevIdsRef.current = paneIds;
+    if (added.length === 0) return;
+    setEntering((prev) => new Set([...prev, ...added]));
+    // Not cleared when the ids change again: a pane left marked would replay
+    // the fade the next time the tree reshapes and remounts its frame.
+    const timer = window.setTimeout(() => {
+      setEntering((prev) => {
+        const next = new Set(prev);
+        for (const id of added) next.delete(id);
+        return next.size === 0 ? NO_ENTERING_PANES : next;
+      });
+    }, PANE_ENTER_MS + 80);
+    timersRef.current.push(timer);
+    // idsKey stands in for paneIds (a new array every render).
+  }, [idsKey]);
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, []);
+
+  return entering;
+}
 
 export function SplitPaneLayout(props: Props) {
   const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
   const [dragOverPaneId, setDragOverPaneId] = useState<string | null>(null);
   const [dropZone, setDropZone] = useState<PaneDropZone | null>(null);
   const [profileDragOver, setProfileDragOver] = useState<ProfileDragOver | null>(null);
-  const paneCount = collectPanes(props.node).length;
+  const panes = collectPanes(props.node);
+  const paneCount = panes.length;
+  const entering = useEnteringPanes(panes.map((p) => p.id));
 
   useEffect(() => {
     if (!props.sidebarPaneDragActive) setProfileDragOver(null);
@@ -156,6 +202,7 @@ export function SplitPaneLayout(props: Props) {
     onProfilePaneDrop: props.onProfilePaneDrop,
     onPopOutPane: props.onPopOutPane,
     onDockPane: props.onDockPane,
+    enteringPaneIds: entering,
   };
 
   return (
@@ -395,6 +442,7 @@ function WarpPaneShell({
     onPopOutPane,
     onDockPane,
   } = drag;
+  const entering = drag.enteringPaneIds.has(pane.id);
   const dimmed = dimUnfocused && !focused;
   const titleClass = `min-w-0 max-w-[45%] shrink truncate text-[12px] font-medium transition-colors ${
     dimmed ? "text-chrome-text-muted" : "text-chrome-text"
@@ -453,7 +501,7 @@ function WarpPaneShell({
       data-pane-id={pane.id}
       className={`group/pane relative flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-xl border transition-all duration-150 ${
         broadcastActive ? "broadcast-pane-sync" : ""
-      } ${broadcastEnter ? "broadcast-pane-sync-enter" : ""} ${
+      } ${broadcastEnter ? "broadcast-pane-sync-enter" : ""} ${entering ? "ui-pane-enter" : ""} ${
         isDragOver || isProfileDragOver
           ? "ring-2 ring-chrome-ui-accent/35"
           : isDragging

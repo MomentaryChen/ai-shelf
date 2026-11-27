@@ -366,6 +366,13 @@ input:focus-visible,
   animation: ui-view-rise-in 320ms var(--ease-in) both;
 }
 
+/* A pane that just appeared in the split layout (split / restore / dock).
+   Opacity only: pane size feeds xterm fit and the PTY resize, so no scale.
+   Duration matches PANE_ENTER_MS in terminal/pane-enter.ts. */
+.ui-pane-enter {
+  animation: ui-view-fade-in 240ms var(--ease-in) both;
+}
+
 /* Profile / workspace switches — short horizontal enter, or a fade for a long jump.
    `-alt` duplicates the class so the same direction restarts on the next switch. */
 @keyframes profile-slide-next-in {

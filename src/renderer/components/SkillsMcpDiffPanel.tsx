@@ -213,7 +213,7 @@ export function SkillsMcpDiffPanel({ onOpenMcpSync }: SkillsMcpDiffPanelProps) {
           )}
 
           {alignResult && (
-            <div className="mb-4 rounded-lg border border-border bg-bg-primary p-3 text-sm">
+            <div className="ui-view-rise mb-4 rounded-lg border border-border bg-bg-primary p-3 text-sm">
               {[...alignResult.mcpResults, ...alignResult.skillResults].map((r, idx) => (
                 <div key={`${r.tool}-${idx}`} className="mb-1">
                   <strong className="inline-flex items-center gap-1.5">
