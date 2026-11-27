@@ -18,6 +18,7 @@ import {
   Terminal,
   FolderOpen,
   Hand,
+  LayoutGrid,
   SquareTerminal,
 } from "lucide-react";
 import { TITLE_BAR_TERMINAL_SLOT_ID } from "./TitleBarBrand";
@@ -113,6 +114,8 @@ import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import { matchShortcut, resolveKeybindings } from "../shortcuts/keybindings";
 import { shortcutKeys } from "../shortcuts/shortcut-registry";
+import { applyLayoutPreset, isLayoutPreset, type LayoutPreset } from "../terminal/layout-presets";
+import { LayoutPresetMenu } from "./LayoutPresetMenu";
 import {
   collectPanes,
   equalizeRunAroundPane,
@@ -598,6 +601,34 @@ function ChatTabInner({
     },
     [shownLayout],
   );
+  /** Panes on screen here (minimized / popped-out excluded) — layout presets need two. */
+  const shownPaneCount = useMemo(() => collectPanes(shownLayout).length, [shownLayout]);
+  /**
+   * Rearrange the panes on screen into a preset. Built on the full layout so
+   * minimized / popped-out panes stay in the tree (in a strip the display drops).
+   */
+  const applyLayoutPresetToShown = useCallback(
+    (preset: LayoutPreset) => {
+      if (!shownLayout) return;
+      const shownIds = new Set(collectPanes(shownLayout).map((p) => p.id));
+      if (shownIds.size < 2) return;
+      // A maximized pane would hide the new arrangement.
+      setMaximizedPaneId(null);
+      setLayout((prev) => {
+        if (!prev) return prev;
+        const hiddenPaneIds = new Set(
+          collectPanes(prev)
+            .map((p) => p.id)
+            .filter((id) => !shownIds.has(id)),
+        );
+        return applyLayoutPreset(prev, preset, { hiddenPaneIds, focusedPaneId });
+      });
+    },
+    [shownLayout, focusedPaneId],
+  );
+  /** Stable entry for the command palette (its command list should not rebuild on every focus change). */
+  const applyLayoutPresetRef = useRef(applyLayoutPresetToShown);
+  applyLayoutPresetRef.current = applyLayoutPresetToShown;
 
   /** Live panes of non-active profiles, labelled for notifications. */
   const backgroundAgentPanes = useMemo<BackgroundAgentPane[]>(() => {
@@ -1731,6 +1762,10 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         jumpNextAttentionRef.current();
       },
+      applyLayoutPreset: (preset: LayoutPreset) => {
+        onRequestTerminalMode?.();
+        applyLayoutPresetRef.current(preset);
+      },
     }),
     [
       addPane,
@@ -1760,6 +1795,7 @@ function ChatTabInner({
       paneCount: panes.length,
       savedCommands: activeProfile?.savedCommands ?? [],
       attentionCount: attentionInboxItems.length,
+      shownPaneCount,
     },
     paletteActions,
   );
@@ -1938,6 +1974,7 @@ function ChatTabInner({
       const next = equalizeAllSplits(shownLayout);
       setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
     },
+    onApplyLayoutPreset: applyLayoutPresetToShown,
     onJumpNextAttention: jumpNextAttention,
   });
 
@@ -2291,6 +2328,16 @@ function ChatTabInner({
           layout: equalizeRunAtSplit(v.layout, action.splitId),
         }));
         return;
+      case "apply-layout-preset": {
+        // IPC data: only known presets.
+        const preset: unknown = action.preset;
+        if (!isLayoutPreset(preset)) return;
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: applyLayoutPreset(v.layout, preset, { focusedPaneId: v.focusedPaneId }),
+        }));
+        return;
+      }
       case "cwd":
         reportPaneCwd(action.sessionId, action.cwd);
         return;
@@ -2745,6 +2792,24 @@ function ChatTabInner({
         splitRight: paneShortcutLabels.splitRight ?? t("keybindings.unbound"),
         splitDown: paneShortcutLabels.splitDown ?? t("keybindings.unbound"),
       }}
+      layoutMenu={
+        <LayoutPresetMenu
+          paneCount={shownPaneCount}
+          onSelect={applyLayoutPresetToShown}
+          trigger={
+            <Button
+              variant="chromeOutline"
+              size="sm"
+              className={titleBarSlot ? "min-h-7 px-2.5 text-[12px]" : undefined}
+              aria-label={t("pane.layout.menu")}
+            >
+              <LayoutGrid />
+              <span className={titleBarSlot ? "max-lg:hidden" : undefined}>{t("pane.layout.menu")}</span>
+              <ChevronDown aria-hidden className="opacity-70" />
+            </Button>
+          }
+        />
+      }
       inbox={
         <AttentionInbox
           items={attentionInboxItems}
@@ -3144,11 +3209,14 @@ function WarpTopBar({
   splitShortcutLabels,
   embedded = false,
   inbox,
+  layoutMenu,
 }: {
   /** Rendered inside the app title bar instead of as its own row. */
   embedded?: boolean;
   /** Attention inbox entry point (shown first among the right-hand actions). */
   inbox?: ReactNode;
+  /** Layout presets dropdown (shown before the pane buttons). */
+  layoutMenu?: ReactNode;
   profileKey?: string | null;
   profileEnterClass?: string;
   profileLabel: string | null;
@@ -3229,6 +3297,7 @@ function WarpTopBar({
               : t("chat.panesFull", { max: maxPanes })}
           </span>
         )}
+        {layoutMenu}
         <span title={canAddPane ? undefined : limitTitle}>
           <Button
             variant="chromeOutline"
