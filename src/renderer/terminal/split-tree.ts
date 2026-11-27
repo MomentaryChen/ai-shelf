@@ -1,6 +1,7 @@
 import { buildHorizontalLayout, buildVerticalLayout } from "./layout-serialize";
 import type { PaneDropZone } from "./pane-drop-zone";
 import { reorderById } from "../utils/reorder-by-id";
+import { clampSplitRatio } from "./split-resize";
 
 export interface PaneInfo {
   id: string;
@@ -165,7 +166,7 @@ export function updateSplitRatio(
   splitId: string,
   ratio: number,
 ): LayoutNode {
-  const clamped = Math.min(0.9, Math.max(0.1, ratio));
+  const clamped = clampSplitRatio(ratio);
   if (root.kind === "pane") return root;
   if (root.id === splitId) return { ...root, ratio: clamped };
   return {
@@ -525,7 +526,7 @@ export function resizePaneInDirection(
   }
   if (!split) return root;
   const delta = direction === "right" || direction === "down" ? step : -step;
-  const ratio = Math.min(0.9, Math.max(0.1, split.ratio + delta));
+  const ratio = clampSplitRatio(split.ratio + delta);
   if (Math.abs(ratio - split.ratio) < EPS) return root;
   return updateSplitRatio(root, split.id, ratio);
 }

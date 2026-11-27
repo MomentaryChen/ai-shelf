@@ -1,11 +1,21 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { rawRatioFromPointer } from "../terminal/split-resize";
 
 type Orientation = "horizontal" | "vertical";
 
 interface RatioProps {
   mode: "ratio";
   orientation: Orientation;
-  onResize: (ratio: number) => void;
+  /**
+   * Live drag preview, at most once per animation frame. Gets the raw
+   * (unclamped) pointer ratio and the split container size on the split axis.
+   * Meant for direct DOM writes — setting React state here re-renders per frame.
+   */
+  onResizePreview: (rawRatio: number, containerPx: number) => void;
+  /** Drag released: final raw ratio. Not called when the pointer never moved. */
+  onResizeCommit: (rawRatio: number, containerPx: number) => void;
+  /** Drag aborted (pointercancel / lost capture / unmount): undo the preview. */
+  onResizeCancel: () => void;
 }
 
 interface DeltaProps {
@@ -20,6 +30,14 @@ type Props = RatioProps | DeltaProps;
 export function ResizeDivider(props: Props) {
   const dividerRef = useRef<HTMLDivElement>(null);
   const horizontal = props.orientation === "horizontal";
+  // Latest props for listeners attached at pointerdown (the parent may
+  // re-render mid-drag with new callbacks / basis values).
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  /** Aborts the drag in progress, if any (used on unmount). */
+  const abortDragRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => abortDragRef.current?.(), []);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -31,33 +49,70 @@ export function ResizeDivider(props: Props) {
       if (!el) return;
       el.setPointerCapture(e.pointerId);
 
-      if (props.mode === "ratio") {
+      const setDragCursor = (on: boolean) => {
+        document.body.style.cursor = on ? (horizontal ? "col-resize" : "row-resize") : "";
+        document.body.style.userSelect = on ? "none" : "";
+      };
+
+      if (propsRef.current.mode === "ratio") {
         // Divider sits in a narrow wrapper; measure the full split container (grandparent).
         const splitContainer = el.parentElement?.parentElement ?? el.parentElement;
         if (!splitContainer) return;
 
-        const onMove = (ev: PointerEvent) => {
+        let frame = 0;
+        let latest: { ratio: number; size: number } | null = null;
+
+        const measure = (ev: PointerEvent) => {
           const rect = splitContainer.getBoundingClientRect();
           const size = horizontal ? rect.width : rect.height;
-          if (size <= 0) return;
           const pos = horizontal ? ev.clientX - rect.left : ev.clientY - rect.top;
-          props.onResize(Math.min(0.9, Math.max(0.1, pos / size)));
+          const ratio = rawRatioFromPointer(pos, size);
+          return ratio === null ? null : { ratio, size };
         };
 
-        const onEnd = (ev: PointerEvent) => {
-          el.releasePointerCapture(ev.pointerId);
+        const flushPreview = () => {
+          frame = 0;
+          const p = propsRef.current;
+          if (latest && p.mode === "ratio") p.onResizePreview(latest.ratio, latest.size);
+        };
+
+        const onMove = (ev: PointerEvent) => {
+          const m = measure(ev);
+          if (!m) return;
+          latest = m;
+          if (!frame) frame = requestAnimationFrame(flushPreview);
+        };
+
+        const finish = (outcome: "commit" | "cancel", ev?: PointerEvent) => {
+          abortDragRef.current = null;
+          if (frame) cancelAnimationFrame(frame);
+          frame = 0;
           el.removeEventListener("pointermove", onMove);
-          el.removeEventListener("pointerup", onEnd);
-          el.removeEventListener("pointercancel", onEnd);
-          document.body.style.cursor = "";
-          document.body.style.userSelect = "";
+          el.removeEventListener("pointerup", onUp);
+          el.removeEventListener("pointercancel", onCancel);
+          el.removeEventListener("lostpointercapture", onCancel);
+          if (ev && el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
+          setDragCursor(false);
+
+          const p = propsRef.current;
+          if (p.mode !== "ratio" || !latest) return; // never moved: nothing to commit or undo
+          if (outcome === "commit") {
+            const m = (ev && measure(ev)) ?? latest;
+            p.onResizeCommit(m.ratio, m.size);
+          } else {
+            p.onResizeCancel();
+          }
         };
 
-        document.body.style.cursor = horizontal ? "col-resize" : "row-resize";
-        document.body.style.userSelect = "none";
+        const onUp = (ev: PointerEvent) => finish("commit", ev);
+        const onCancel = (ev: PointerEvent) => finish("cancel", ev);
+
+        abortDragRef.current = () => finish("cancel");
+        setDragCursor(true);
         el.addEventListener("pointermove", onMove);
-        el.addEventListener("pointerup", onEnd);
-        el.addEventListener("pointercancel", onEnd);
+        el.addEventListener("pointerup", onUp);
+        el.addEventListener("pointercancel", onCancel);
+        el.addEventListener("lostpointercapture", onCancel);
         return;
       }
 
@@ -68,7 +123,8 @@ export function ResizeDivider(props: Props) {
         const delta = horizontal ? ev.clientX - lastX : ev.clientY - lastY;
         lastX = ev.clientX;
         lastY = ev.clientY;
-        if (delta !== 0) props.onResize(delta);
+        const p = propsRef.current;
+        if (delta !== 0 && p.mode === "delta") p.onResize(delta);
       };
 
       const onEnd = (ev: PointerEvent) => {
@@ -76,17 +132,15 @@ export function ResizeDivider(props: Props) {
         el.removeEventListener("pointermove", onMove);
         el.removeEventListener("pointerup", onEnd);
         el.removeEventListener("pointercancel", onEnd);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
+        setDragCursor(false);
       };
 
-      document.body.style.cursor = horizontal ? "col-resize" : "row-resize";
-      document.body.style.userSelect = "none";
+      setDragCursor(true);
       el.addEventListener("pointermove", onMove);
       el.addEventListener("pointerup", onEnd);
       el.addEventListener("pointercancel", onEnd);
     },
-    [horizontal, props],
+    [horizontal],
   );
 
   return (

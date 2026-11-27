@@ -16,6 +16,7 @@ import { DragHandle } from "./ProfileSidebarUI";
 import { PaneDropOverlay } from "./PaneDropOverlay";
 import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
+import { clampSplitRatio, splitFlexPair } from "../terminal/split-resize";
 import { hitPaneDropZone, type PaneDropZone } from "../terminal/pane-drop-zone";
 import { hasProfilePaneDrag, readProfilePaneDrag } from "../terminal/profile-pane-display";
 import { formatDroppedPaths, isOsFileDrag } from "../terminal/file-drop";
@@ -41,10 +42,6 @@ import { PaneGitBranch } from "./TerminalGitStatus";
 const DIVIDER_PX = 10;
 /** How long the in-pane broadcast hint stays up after broadcast turns on. */
 const BROADCAST_HINT_MS = 4000;
-
-function clampRatio(ratio: number): number {
-  return Math.min(0.9, Math.max(0.1, ratio));
-}
 
 /**
  * Pixels taken by dividers nested along `direction`. Used as flex-basis so the
@@ -240,7 +237,6 @@ function SplitPaneLayoutInner({ node, ...shared }: SplitPaneLayoutInnerProps) {
     onClosePane,
     onMinimizePane,
     onSplitPane,
-    onResizeSplit,
     onRenamePane,
     onPaneCwdClick,
     onPaneBranchClick,
@@ -296,18 +292,48 @@ function SplitPaneLayoutInner({ node, ...shared }: SplitPaneLayoutInnerProps) {
     );
   }
 
+  return <SplitBranch {...shared} node={node} />;
+}
+
+type SplitNode = Extract<LayoutNode, { kind: "split" }>;
+
+/**
+ * One split: two sides and the divider between them. While the divider is
+ * dragged the sides' `flex` is written straight to the DOM (no React state, so
+ * nothing re-renders per pointermove); the final ratio is committed once on
+ * release through `onResizeSplit`. Preview and render both build the style via
+ * `splitFlexPair`, so the committed render matches what the DOM already shows.
+ */
+function SplitBranch({ node, ...shared }: SplitPaneLayoutInnerProps & { node: SplitNode }) {
+  const { onResizeSplit, maximizedPaneId = null } = shared;
+  const firstRef = useRef<HTMLDivElement>(null);
+  const secondRef = useRef<HTMLDivElement>(null);
+
   const horizontal = node.direction === "horizontal";
-  const ratio = clampRatio(node.ratio);
-  const rest = 1 - ratio;
+  const ratio = clampSplitRatio(node.ratio);
+  const firstBasisPx = nestedDividerPx(node.first, node.direction);
+  const secondBasisPx = nestedDividerPx(node.second, node.direction);
+  const flex = splitFlexPair(ratio, firstBasisPx, secondBasisPx);
   // Maximized: same element tree (nothing unmounts), the other side and the
   // divider are display:none and the kept side takes the full split.
   const keep = maximizedSplitSide(node, maximizedPaneId);
-  const sideStyle = (side: "first" | "second", grow: number, basisPx: number) =>
+  const sideStyle = (side: "first" | "second") =>
     keep === null
-      ? { flex: `${grow} 1 ${basisPx}px` }
+      ? { flex: flex[side] }
       : keep === side
         ? { flex: "1 1 0px" }
         : { display: "none" };
+
+  /** Write both sides' flex for `nextRatio` (clamped) directly on the DOM. */
+  const applyFlex = (nextRatio: number) => {
+    const first = firstRef.current;
+    const second = secondRef.current;
+    // Maximized (e.g. toggled mid-drag): React owns the 1 1 0px / none styles.
+    if (!first || !second || keep !== null) return;
+    const pair = splitFlexPair(nextRatio, firstBasisPx, secondBasisPx);
+    first.style.flex = pair.first;
+    second.style.flex = pair.second;
+  };
 
   return (
     <div
@@ -316,8 +342,9 @@ function SplitPaneLayoutInner({ node, ...shared }: SplitPaneLayoutInnerProps) {
       }`}
     >
       <div
+        ref={firstRef}
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={sideStyle("first", ratio, nestedDividerPx(node.first, node.direction))}
+        style={sideStyle("first")}
       >
         <SplitPaneLayoutInner {...shared} node={node.first} />
       </div>
@@ -335,13 +362,24 @@ function SplitPaneLayoutInner({ node, ...shared }: SplitPaneLayoutInnerProps) {
         <ResizeDivider
           mode="ratio"
           orientation={node.direction}
-          onResize={(r) => onResizeSplit(node.id, r)}
+          onResizePreview={(raw) => applyFlex(clampSplitRatio(raw))}
+          onResizeCommit={(raw) => {
+            const next = clampSplitRatio(raw);
+            // Leave the DOM at the committed value; React's next render writes
+            // the identical string. If the ratio is unchanged React skips the
+            // write, which is fine because the DOM already holds that value.
+            applyFlex(next);
+            if (next !== ratio) onResizeSplit(node.id, next);
+          }}
+          // Back to what React last rendered (state never changed mid-drag).
+          onResizeCancel={() => applyFlex(ratio)}
         />
       </div>
 
       <div
+        ref={secondRef}
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
-        style={sideStyle("second", rest, nestedDividerPx(node.second, node.direction))}
+        style={sideStyle("second")}
       >
         <SplitPaneLayoutInner {...shared} node={node.second} />
       </div>
