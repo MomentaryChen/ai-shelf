@@ -226,6 +226,30 @@ describe("matchPaneShortcutWithBindings", () => {
     }
     assert.deepEqual(calls, ["swap b left", "resize b down", "equalize"]);
   });
+
+  it("maps Alt+Shift+1-4 to layout presets (by physical key) and needs several panes", () => {
+    const map = resolveKeybindings({}, "win");
+    const expected = ["columns", "rows", "grid", "main-side"] as const;
+    const glyphs = ["!", "@", "#", "$"];
+    const calls: string[] = [];
+    const multi = handlers({
+      panes: [pane("a"), pane("b")],
+      focusedPaneId: "a",
+      onApplyLayoutPreset: (preset) => calls.push(preset),
+    });
+    expected.forEach((preset, i) => {
+      const action = matchPaneShortcutWithBindings(
+        key(glyphs[i]!, { altKey: true, shiftKey: true, code: `Digit${i + 1}` }),
+        map,
+        xterm(),
+      );
+      assert.deepEqual(action, { type: "layout-preset", preset });
+      assert.equal(shouldConsumePaneShortcut(action!, multi), true);
+      assert.equal(shouldConsumePaneShortcut(action!, { ...multi, panes: [pane("a")] }), false);
+      applyPaneShortcutAction(action!, multi);
+    });
+    assert.deepEqual(calls, [...expected]);
+  });
 });
 
 describe("font zoom shortcuts", () => {
@@ -293,6 +317,24 @@ describe("font zoom shortcuts", () => {
     assert.equal(jumps, 1);
     assert.equal(
       shouldConsumePaneShortcut({ type: "next-attention" }, { panes: [pane("a")] }),
+      false,
+    );
+  });
+
+  it("maps Ctrl+Shift+T to reopen closed pane, only while there is one to reopen", () => {
+    const chord = key("T", { ctrlKey: true, shiftKey: true, code: "KeyT" });
+    assert.deepEqual(matchPaneShortcutWithBindings(chord, map), { type: "reopen-closed" });
+    let reopened = 0;
+    const h = handlers({ onReopenClosedPane: () => (reopened += 1), canReopenClosedPane: true });
+    // No panes left (the last one was closed) still reopens.
+    assert.equal(shouldConsumePaneShortcut({ type: "reopen-closed" }, h), true);
+    applyPaneShortcutAction({ type: "reopen-closed" }, h);
+    assert.equal(reopened, 1);
+    assert.equal(
+      shouldConsumePaneShortcut(
+        { type: "reopen-closed" },
+        { panes: [pane("a")], onReopenClosedPane: () => {}, canReopenClosedPane: false },
+      ),
       false,
     );
   });

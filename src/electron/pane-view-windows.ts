@@ -174,6 +174,7 @@ function parseDecl(raw: unknown): PaneViewDecl | null {
     ),
     bounds: parseRect(d.bounds),
     tools: parseToolIds(d.tools),
+    closedPaneCount: Math.max(0, Math.min(1000, Math.floor(finite(d.closedPaneCount) ?? 0))),
   };
 }
 

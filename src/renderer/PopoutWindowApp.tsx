@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Undo2, X } from "lucide-react";
+import { ChevronDown, LayoutGrid, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Undo2, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EditablePaneTitle } from "./components/EditablePaneTitle";
 import { EmbeddedTerminal } from "./components/EmbeddedTerminal";
+import { LayoutPresetMenu } from "./components/LayoutPresetMenu";
 import { PaneAgentStatusLight } from "./components/PaneAgentStatusDot";
 import { BusyPaneCloseDialog } from "./components/BusyPaneCloseDialog";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -24,14 +25,18 @@ import {
   subscribeSettingsChanges,
   type ChatSettings,
 } from "./chat-settings";
+import { unfocusedPaneDimOpacity } from "./terminal/pane-dim";
 import { useLocale } from "./i18n/LocaleProvider";
 import { useTerminalNotifications } from "./hooks/useTerminalNotifications";
 import { getActiveKeybindings } from "./shortcuts/active-keybindings";
+import { shortcutKeys } from "./shortcuts/shortcut-registry";
 import { matchShortcut } from "./shortcuts/keybindings";
 import { shouldIgnoreShortcutForIme } from "./terminal/ime-keys";
+import type { LayoutPreset } from "./terminal/layout-presets";
 import { profileAccentMarkerStyle } from "./utils/profile-colors";
 import {
   collectPanes,
+  equalizeRunAtSplit,
   findPane,
   updateSplitRatio,
   type LayoutNode,
@@ -42,6 +47,13 @@ import { PLAIN_SHELL_TOOL_ID, isPlainShellTool, profileToolLabel } from "./utils
 import type { PaneViewDecl } from "./types";
 
 const NOTICE_MS = 4000;
+const LAYOUT_SHORTCUT_IDS = ["layoutColumns", "layoutRows", "layoutGrid", "layoutMainSide"] as const;
+const LAYOUT_SHORTCUT_PRESETS: Record<(typeof LAYOUT_SHORTCUT_IDS)[number], LayoutPreset> = {
+  layoutColumns: "columns",
+  layoutRows: "rows",
+  layoutGrid: "grid",
+  layoutMainSide: "main-side",
+};
 /** "New terminal" stays disabled until the pane shows up, a notice arrives, or this long. */
 const NEW_PANE_WAIT_MS = 30_000;
 const SIDEBAR_COLLAPSED_KEY = "aishelf.view.sidebarCollapsed";
@@ -79,6 +91,8 @@ export function PopoutWindowApp() {
   /** Pane ids present when "new terminal" was pressed: the id that appears next gets focus. */
   const pendingNewRef = useRef<Set<string> | null>(null);
   const addingTimerRef = useRef(0);
+  /** Latest "reopen closed pane" (needs the current panes); called from the key handler. */
+  const reopenClosedPaneRef = useRef<() => void>(() => {});
   useAppThemeRevision();
 
   useEffect(() => {
@@ -193,6 +207,8 @@ export function PopoutWindowApp() {
     ],
   );
 
+  const viewRef = useRef(view);
+  viewRef.current = view;
   const focusedPaneIdRef = useRef(focusedPaneId);
   focusedPaneIdRef.current = focusedPaneId;
   const focusPane = useCallback((paneId: string) => {
@@ -212,6 +228,29 @@ export function PopoutWindowApp() {
     }, RESIZE_SEND_MS);
   }, []);
   useEffect(() => () => window.clearTimeout(resizeTimerRef.current), []);
+
+  const equalizeSplit = useCallback((splitId: string) => {
+    // Flush a divider ratio still waiting to be sent so the origin applies it first.
+    window.clearTimeout(resizeTimerRef.current);
+    const pending = pendingResizeRef.current;
+    pendingResizeRef.current = null;
+    if (pending) window.api.paneViewAction({ type: "resize", ...pending });
+    setLayout((prev) => (prev ? equalizeRunAtSplit(prev, splitId) : prev));
+    window.api.paneViewAction({ type: "equalize-split", splitId });
+  }, []);
+
+  /** The origin rebuilds the layout (new split ids) and echoes it back; no local guess. */
+  const applyLayoutPreset = useCallback((preset: LayoutPreset) => {
+    // Flush a divider ratio still waiting to be sent, and let the echo replace the layout.
+    window.clearTimeout(resizeTimerRef.current);
+    const pending = pendingResizeRef.current;
+    pendingResizeRef.current = null;
+    if (pending) window.api.paneViewAction({ type: "resize", ...pending });
+    // "Main + side" uses the origin's focus for this view: make sure it is the pane highlighted here.
+    const focused = focusedPaneIdRef.current;
+    if (focused) window.api.paneViewAction({ type: "focus", paneId: focused });
+    window.api.paneViewAction({ type: "apply-layout-preset", preset });
+  }, []);
 
   const closePane = useCallback(
     (paneId: string, opts?: { skipConfirm?: boolean }) => {
@@ -240,7 +279,11 @@ export function PopoutWindowApp() {
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
       if (shouldIgnoreShortcutForIme(ev)) return;
-      if (!matchShortcut(ev, getActiveKeybindings(), ["toggleSidebar"])) return;
+      const match = matchShortcut(ev, getActiveKeybindings(), [
+        "toggleSidebar",
+        "reopenClosedPane",
+      ]);
+      if (!match) return;
 
       const target = ev.target as HTMLElement | null;
       // xterm uses a hidden textarea; still allow the toggle from inside a terminal.
@@ -257,6 +300,14 @@ export function PopoutWindowApp() {
         }
       }
 
+      if (match.id === "reopenClosedPane") {
+        // Nothing to reopen: leave the key to the terminal, like the main window.
+        if (!(viewRef.current?.closedPaneCount ?? 0)) return;
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        reopenClosedPaneRef.current();
+        return;
+      }
       ev.preventDefault();
       ev.stopImmediatePropagation();
       toggleSidebar();
@@ -265,6 +316,42 @@ export function PopoutWindowApp() {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [toggleSidebar]);
+
+  // Layout preset shortcuts (default Alt+Shift+1–4), like the main window; only with 2+ panes.
+  const paneCountRef = useRef(0);
+  paneCountRef.current = layout ? collectPanes(layout).length : 0;
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.type !== "keydown" || shouldIgnoreShortcutForIme(ev)) return;
+      if (paneCountRef.current < 2) return;
+      const target = ev.target as HTMLElement | null;
+      if (target && !target.closest(".xterm")) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) return;
+      }
+      const match = matchShortcut(ev, getActiveKeybindings(), LAYOUT_SHORTCUT_IDS);
+      if (!match) return;
+      const preset = LAYOUT_SHORTCUT_PRESETS[match.id as (typeof LAYOUT_SHORTCUT_IDS)[number]];
+      if (!preset) return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      applyLayoutPreset(preset);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [applyLayoutPreset]);
+
+  /** The pane id that shows up next (not in `paneIds`) takes focus; give up after a while. */
+  const awaitNewPane = (paneIds: string[]) => {
+    pendingNewRef.current = new Set(paneIds);
+    setAdding(true);
+    window.clearTimeout(addingTimerRef.current);
+    addingTimerRef.current = window.setTimeout(() => {
+      pendingNewRef.current = null;
+      setAdding(false);
+      setNotice(t("pane.popout.newFailed"));
+    }, NEW_PANE_WAIT_MS);
+  };
 
   /**
    * The origin window spawns it (same profile, next to `anchorPaneId`) and updates this view.
@@ -276,14 +363,7 @@ export function PopoutWindowApp() {
     opts?: { tool?: string; direction?: SplitDirection },
   ) => {
     if (adding) return;
-    pendingNewRef.current = new Set(paneIds);
-    setAdding(true);
-    window.clearTimeout(addingTimerRef.current);
-    addingTimerRef.current = window.setTimeout(() => {
-      pendingNewRef.current = null;
-      setAdding(false);
-      setNotice(t("pane.popout.newFailed"));
-    }, NEW_PANE_WAIT_MS);
+    awaitNewPane(paneIds);
     window.api.paneViewAction({
       type: "new-pane",
       anchorPaneId,
@@ -341,6 +421,19 @@ export function PopoutWindowApp() {
   const paneIds = panes.map((p) => p.id);
   // Older origin builds do not send `tools`: plain shell is still offered.
   const launchTools = (view.tools ?? []).filter((tool) => !isPlainShellTool(tool));
+  const canReopenClosed = (view.closedPaneCount ?? 0) > 0;
+  const reopenClosedPane = () => {
+    if (adding || !canReopenClosed) return;
+    awaitNewPane(paneIds);
+    window.api.paneViewAction({ type: "reopen-closed-pane", anchorPaneId: focusedPane?.id });
+  };
+  reopenClosedPaneRef.current = reopenClosedPane;
+  const reopenKeys = shortcutKeys("reopenClosedPane");
+  const reopenTitle = canReopenClosed
+    ? reopenKeys
+      ? `${t("shortcuts.pane.reopenClosed")} (${reopenKeys})`
+      : t("shortcuts.pane.reopenClosed")
+    : t("pane.reopenClosed.empty");
 
   return (
     <TooltipProvider>
@@ -375,6 +468,20 @@ export function PopoutWindowApp() {
             {t("pane.view.paneCount", { count: panes.length })}
           </span>
           <span className="flex-1" />
+          <LayoutPresetMenu
+            paneCount={panes.length}
+            onSelect={applyLayoutPreset}
+            trigger={
+              <button
+                type="button"
+                className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] text-chrome-text-muted transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text disabled:cursor-default disabled:opacity-50"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
+                {t("pane.layout.menu")}
+                <ChevronDown className="h-3 w-3" aria-hidden />
+              </button>
+            }
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -412,6 +519,16 @@ export function PopoutWindowApp() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <button
+            type="button"
+            onClick={reopenClosedPane}
+            disabled={adding || !canReopenClosed}
+            title={reopenTitle}
+            aria-label={t("shortcuts.pane.reopenClosed")}
+            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-chrome-text-muted transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text disabled:cursor-default disabled:opacity-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+          </button>
           <button
             type="button"
             onClick={() => window.api.paneViewAction({ type: "dock-all" })}
@@ -536,11 +653,13 @@ export function PopoutWindowApp() {
             focusedPaneId={focusedPane?.id ?? null}
             bg={bg}
             profileAccentColor={view.accentColor}
+            unfocusedDimOpacity={unfocusedPaneDimOpacity(settings.terminalUnfocusedPaneDim)}
             paneLabels={view.labels}
             paneAgentStates={view.agentStatus}
             onFocusPane={focusPane}
             onClosePane={(paneId) => closePane(paneId)}
             onResizeSplit={resizeSplit}
+            onEqualizeSplit={equalizeSplit}
             onRenamePane={renamePane}
             // Header split buttons: same tool as that pane, like the main window.
             onSplitPane={(paneId, direction) => {

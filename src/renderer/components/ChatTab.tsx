@@ -18,6 +18,8 @@ import {
   Terminal,
   FolderOpen,
   Hand,
+  LayoutGrid,
+  RotateCcw,
   SquareTerminal,
 } from "lucide-react";
 import { TITLE_BAR_TERMINAL_SLOT_ID } from "./TitleBarBrand";
@@ -95,6 +97,7 @@ import { savedCommandNameFor } from "../terminal/command-history";
 import {
   copySplitRatios,
   equalizeAllSplits,
+  equalizeRunAtSplit,
   findPaneInDirection,
   resizePaneInDirection,
   swapPaneLeaves,
@@ -112,6 +115,8 @@ import { openShortcutCheatsheet } from "../shortcuts/open-shortcuts";
 import { clearTerminalSession } from "../terminal/terminal-session-actions";
 import { matchShortcut, resolveKeybindings } from "../shortcuts/keybindings";
 import { shortcutKeys } from "../shortcuts/shortcut-registry";
+import { applyLayoutPreset, isLayoutPreset, type LayoutPreset } from "../terminal/layout-presets";
+import { LayoutPresetMenu } from "./LayoutPresetMenu";
 import {
   collectPanes,
   equalizeRunAroundPane,
@@ -156,6 +161,17 @@ import {
 } from "../terminal/pane-views";
 import type { PaneDropZone } from "../terminal/pane-drop-zone";
 import {
+  closedPaneEntry,
+  countClosedPanes,
+  peekClosedPane,
+  pushClosedPane,
+  reinsertClosedPane,
+  remapClosedPaneAnchor,
+  removeClosedPane,
+  type ClosedPaneEntry,
+  type ClosedPaneStacks,
+} from "../terminal/closed-panes";
+import {
   hasProfilePaneDrag,
   readProfilePaneDrag,
   shouldShowSavedTerminalPreview,
@@ -177,6 +193,7 @@ import {
   subscribeSettingsChanges,
   type ChatSettings,
 } from "../chat-settings";
+import { unfocusedPaneDimOpacity } from "../terminal/pane-dim";
 import { resolveToolLaunchExtraArgs } from "../../tool-launch.js";
 import { agentSessionSupported } from "../../shared/agent-session-resume.js";
 import {
@@ -310,6 +327,21 @@ function ChatTabInner({
     viewsRef.current = value;
     setViewsState(value);
   }, []);
+  /**
+   * Recently closed panes per profile (Ctrl+Shift+T "reopen closed pane"), in memory only.
+   * The ref is read in close / reopen handlers so a re-render never double-records.
+   */
+  const [closedPanes, setClosedPanesState] = useState<ClosedPaneStacks>({});
+  const closedPanesRef = useRef(closedPanes);
+  const setClosedPanes = useCallback((fn: (prev: ClosedPaneStacks) => ClosedPaneStacks) => {
+    const next = fn(closedPanesRef.current);
+    if (next === closedPanesRef.current) return;
+    closedPanesRef.current = next;
+    setClosedPanesState(next);
+  }, []);
+  /** Set once the reopen handler exists (it is defined further down, with the view code). */
+  const reopenClosedPaneRef = useRef<() => void>(() => {});
+  const reopenInFlightRef = useRef(false);
   const [commandHistoryOpen, setCommandHistoryOpen] = useState(false);
   const [conversationHistoryOpen, setConversationHistoryOpen] = useState(false);
   /** Pane the "new pane in a git worktree" dialog splits from. */
@@ -361,6 +393,7 @@ function ChatTabInner({
       splitDown: shortcutKeys("splitVertical", keymap),
       commandPalette: shortcutKeys("commandPalette", keymap),
       toggleMaximize: shortcutKeys("toggleMaximizePane", keymap),
+      reopenClosed: shortcutKeys("reopenClosedPane", keymap),
     }),
     [keymap],
   );
@@ -525,6 +558,8 @@ function ChatTabInner({
     viewHooks,
   );
   const activeProfileKey = activeProfile ? profileKeyOf(activeProfile) : null;
+  const activeProfileKeyRef = useRef(activeProfileKey);
+  activeProfileKeyRef.current = activeProfileKey;
   /** Active-profile panes living in a view window (hidden here). */
   const poppedOutPaneIds = useMemo(
     () => hiddenPaneIds(views, activeProfileKey),
@@ -597,6 +632,34 @@ function ChatTabInner({
     },
     [shownLayout],
   );
+  /** Panes on screen here (minimized / popped-out excluded) — layout presets need two. */
+  const shownPaneCount = useMemo(() => collectPanes(shownLayout).length, [shownLayout]);
+  /**
+   * Rearrange the panes on screen into a preset. Built on the full layout so
+   * minimized / popped-out panes stay in the tree (in a strip the display drops).
+   */
+  const applyLayoutPresetToShown = useCallback(
+    (preset: LayoutPreset) => {
+      if (!shownLayout) return;
+      const shownIds = new Set(collectPanes(shownLayout).map((p) => p.id));
+      if (shownIds.size < 2) return;
+      // A maximized pane would hide the new arrangement.
+      setMaximizedPaneId(null);
+      setLayout((prev) => {
+        if (!prev) return prev;
+        const hiddenPaneIds = new Set(
+          collectPanes(prev)
+            .map((p) => p.id)
+            .filter((id) => !shownIds.has(id)),
+        );
+        return applyLayoutPreset(prev, preset, { hiddenPaneIds, focusedPaneId });
+      });
+    },
+    [shownLayout, focusedPaneId],
+  );
+  /** Stable entry for the command palette (its command list should not rebuild on every focus change). */
+  const applyLayoutPresetRef = useRef(applyLayoutPresetToShown);
+  applyLayoutPresetRef.current = applyLayoutPresetToShown;
 
   /** Live panes of non-active profiles, labelled for notifications. */
   const backgroundAgentPanes = useMemo<BackgroundAgentPane[]>(() => {
@@ -699,6 +762,8 @@ function ChatTabInner({
 
   const handleTerminalNotify = useTerminalNotifications({
     panes,
+    backgroundPanes: backgroundAgentPanes,
+    shownSessionIds,
     focusedPaneId,
     windowFocused,
     viewActive: active,
@@ -1251,6 +1316,20 @@ function ChatTabInner({
     [activeProfile, forgetMinimizedPane],
   );
 
+  /** A user closing one pane: remember it for "reopen closed pane", then close it. */
+  const closePaneAndRemember = useCallback(
+    (paneId: string) => {
+      const tree = layoutRef.current;
+      const pane = tree ? findPane(tree, paneId) : null;
+      const key = activeProfileKeyRef.current;
+      if (pane && key) {
+        setClosedPanes((prev) => pushClosedPane(prev, key, closedPaneEntry(pane, tree, null)));
+      }
+      performClosePane(paneId);
+    },
+    [performClosePane, setClosedPanes],
+  );
+
   const closePane = useCallback(
     (paneId: string, opts?: { skipConfirm?: boolean }) => {
       if (!opts?.skipConfirm) {
@@ -1260,9 +1339,9 @@ function ChatTabInner({
           return;
         }
       }
-      performClosePane(paneId);
+      closePaneAndRemember(paneId);
     },
-    [paneAgentStates, performClosePane],
+    [paneAgentStates, closePaneAndRemember],
   );
 
   const splitPane = useCallback(
@@ -1687,6 +1766,12 @@ function ChatTabInner({
     [settings.toolLaunchArgs, settings.externalTerminal, resolveCwd],
   );
 
+  /** Newest pane this window can reopen for the active profile (view windows reopen their own). */
+  const nextClosedPane = useMemo(
+    () => peekClosedPane(closedPanes, activeProfileKey, null, new Set(views.map((v) => v.id))),
+    [closedPanes, activeProfileKey, views],
+  );
+
   const paletteActions = useMemo(
     () => ({
       addPane: (tool: string) => {
@@ -1728,6 +1813,14 @@ function ChatTabInner({
         onRequestTerminalMode?.();
         jumpNextAttentionRef.current();
       },
+      applyLayoutPreset: (preset: LayoutPreset) => {
+        onRequestTerminalMode?.();
+        applyLayoutPresetRef.current(preset);
+      },
+      reopenClosedPane: () => {
+        onRequestTerminalMode?.();
+        reopenClosedPaneRef.current();
+      },
     }),
     [
       addPane,
@@ -1757,6 +1850,8 @@ function ChatTabInner({
       paneCount: panes.length,
       savedCommands: activeProfile?.savedCommands ?? [],
       attentionCount: attentionInboxItems.length,
+      shownPaneCount,
+      reopenClosedLabel: nextClosedPane ? paneDisplayLabel(nextClosedPane) : null,
     },
     paletteActions,
   );
@@ -1935,7 +2030,10 @@ function ChatTabInner({
       const next = equalizeAllSplits(shownLayout);
       setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
     },
+    onApplyLayoutPreset: applyLayoutPresetToShown,
     onJumpNextAttention: jumpNextAttention,
+    onReopenClosedPane: () => reopenClosedPaneRef.current(),
+    canReopenClosedPane: nextClosedPane !== null,
   });
 
   // --- Profile view windows -------------------------------------------------
@@ -2028,13 +2126,14 @@ function ChatTabInner({
         agentStatus,
         bounds: v.bounds,
         tools: availableTools,
+        closedPaneCount: countClosedPanes(closedPanes, v.profileKey, v.id),
       };
     });
     const serialized = JSON.stringify(decls);
     if (serialized === lastViewSyncRef.current) return;
     lastViewSyncRef.current = serialized;
     window.api.paneViewSync(decls);
-  }, [views, profileByKey, paneLabels, paneAgentStates, availableTools]);
+  }, [views, profileByKey, paneLabels, paneAgentStates, availableTools, closedPanes]);
 
   /** Drag released off this window, or "Open in new window": main decides, then sends a move intent. */
   function popOutPane(paneId: string, trigger: PanePopOutTrigger, size?: PanePopOutSize) {
@@ -2121,13 +2220,21 @@ function ChatTabInner({
     anchorPaneId: string,
     tool?: string,
     direction: SplitDirection = "horizontal",
+    /** "Reopen closed pane": start this closed pane again where it was in the view. */
+    reopen?: ClosedPaneEntry,
   ): Promise<string | null> {
     if (isRestoring()) return t("chat.err.restoringWait");
     const view = viewsRef.current.find((v) => v.id === viewId);
     if (!view) return t("pane.popout.missing");
     const profileKey = view.profileKey;
     const inView = viewPaneIds(view);
-    const anchorId = inView.includes(anchorPaneId) ? anchorPaneId : inView[0];
+    const reopenAnchor = reopen?.position?.anchorPaneId;
+    const anchorId =
+      reopenAnchor && inView.includes(reopenAnchor)
+        ? reopenAnchor
+        : inView.includes(anchorPaneId)
+          ? anchorPaneId
+          : inView[0];
     const tree = getProfileLayoutByKey(profileKey);
     const anchor = anchorId ? findPane(tree, anchorId) : null;
     if (!tree || !anchor) return t("pane.popout.missing");
@@ -2137,12 +2244,11 @@ function ChatTabInner({
     const profile = profileByKey(profileKey);
     if (!isActive && !profile) return t("pane.popout.missing");
     const remote = isActive ? activeRemoteRef.current : (profile?.remote ?? null);
-    const cwd = anchor.cwd || (isActive ? resolveCwd() : (profile?.defaultCwd?.trim() ?? ""));
-    const pane = await spawnPaneResilient(
-      resolveLaunchTool(tool || anchor.tool, availableTools),
-      cwd,
-      remote,
-    );
+    const cwd =
+      reopen?.cwd || anchor.cwd || (isActive ? resolveCwd() : (profile?.defaultCwd?.trim() ?? ""));
+    const pane = reopen
+      ? await spawnClosedPane(reopen, remote, cwd)
+      : await spawnPaneResilient(resolveLaunchTool(tool || anchor.tool, availableTools), cwd, remote);
     if (!pane) return t("chat.err.cannotOpen");
 
     // The profile may have been switched while spawning: find the anchor again. The
@@ -2162,11 +2268,153 @@ function ChatTabInner({
       return t("pane.popout.missing");
     }
     setViews((prev) =>
-      prev.map((v) =>
-        v.id === viewId ? addPaneToView({ ...v, focusedPaneId: anchor.id }, pane, direction) : v,
+      prev.map((v) => {
+        if (v.id !== viewId) return v;
+        if (!reopen) return addPaneToView({ ...v, focusedPaneId: anchor.id }, pane, direction);
+        const { layout } = reinsertClosedPane(v.layout, pane, reopen.position, anchor.id);
+        return { ...v, layout, focusedPaneId: pane.id };
+      }),
+    );
+    if (reopen) forgetReopenedPane(profileKey, reopen, pane.id);
+    return null;
+  }
+
+  // --- Reopen closed pane (Ctrl+Shift+T) -------------------------------------
+
+  /** A live pane already holding this agent conversation (two writers corrupt its transcript). */
+  function findOpenConversationPane(
+    entry: ClosedPaneEntry,
+  ): { profileId: string; paneId: string } | null {
+    // The closed pane itself never counts (in case a layout snapshot still lists it).
+    const holds = (p: PaneInfo) => p.agentSessionId === entry.agentSessionId && p.id !== entry.paneId;
+    for (const profile of allProfiles) {
+      const open = getProfilePanes(profile.id).find(holds);
+      if (open) return { profileId: profile.id, paneId: open.id };
+    }
+    const local = collectPanes(layoutRef.current).find(holds);
+    return local && activeProfile ? { profileId: activeProfile.id, paneId: local.id } : null;
+  }
+
+  function isTaskOpen(taskId: string): boolean {
+    if (collectPanes(layoutRef.current).some((p) => p.taskId === taskId)) return true;
+    return allProfiles.some((profile) =>
+      getProfilePanes(profile.id).some((p) => p.taskId === taskId),
+    );
+  }
+
+  /**
+   * Start a closed pane again: same tool and cwd, its user title, and for agent panes the
+   * old conversation through the normal restart path (main resumes only when the resume
+   * setting is on, the transcript exists and the shell supports it; else a fresh one).
+   */
+  async function spawnClosedPane(
+    entry: ClosedPaneEntry,
+    remote: RemoteSshConfig | null,
+    cwd: string,
+  ): Promise<PaneInfo | null> {
+    const spawned = await spawnPaneResilient(
+      entry.tool,
+      cwd,
+      remote,
+      entry.agentSessionId ? { resumeAgentSessionId: entry.agentSessionId } : undefined,
+    );
+    if (!spawned) return null;
+    const taskLink = entry.taskId && !isTaskOpen(entry.taskId) ? keepTaskLink(entry, spawned) : {};
+    return { ...spawned, ...(entry.title ? { title: entry.title } : {}), ...taskLink };
+  }
+
+  /** Drop the reopened entry; entries that sat beside the old pane now point at the new one. */
+  function forgetReopenedPane(profileKey: string, entry: ClosedPaneEntry, newPaneId: string) {
+    setClosedPanes((prev) =>
+      remapClosedPaneAnchor(
+        removeClosedPane(prev, profileKey, entry),
+        profileKey,
+        entry.paneId,
+        newPaneId,
       ),
     );
-    return null;
+  }
+
+  /** Reopen the newest pane closed in this window (or in a view window that is gone). */
+  async function reopenClosedPane(): Promise<void> {
+    const key = activeProfileKey;
+    const profile = activeProfile;
+    if (reopenInFlightRef.current || !key || !profile) return;
+    const liveViewIds = new Set(viewsRef.current.map((v) => v.id));
+    const entry = peekClosedPane(closedPanesRef.current, key, null, liveViewIds);
+    if (!entry) return;
+    if (isRestoring() || profileBusy) {
+      setTerminalError(t("chat.err.restoringWait"));
+      return;
+    }
+    if (!canAddPane) {
+      setTerminalError(t("chat.err.maxPanes", { max: maxPanes }));
+      return;
+    }
+    if (entry.agentSessionId) {
+      const open = findOpenConversationPane(entry);
+      if (open) {
+        setClosedPanes((prev) => removeClosedPane(prev, key, entry));
+        await restorePaneToDisplayById(open.profileId, open.paneId);
+        return;
+      }
+    }
+    const fallbackPaneId = focusedPaneId;
+    reopenInFlightRef.current = true;
+    try {
+      const pane = await spawnClosedPane(entry, activeRemoteRef.current, entry.cwd || resolveCwd());
+      if (!pane) {
+        setTerminalError((prev) => prev ?? t("chat.err.cannotOpen"));
+        return;
+      }
+      // Profile switched while spawning: the pane would land in the wrong layout.
+      if (activeProfileKeyRef.current !== key) {
+        window.api.ptyKill(pane.sessionId);
+        return;
+      }
+      const { anchorPaneId } = reinsertClosedPane(
+        layoutRef.current,
+        pane,
+        entry.position,
+        fallbackPaneId,
+      );
+      setLayout((prev) => reinsertClosedPane(prev, pane, entry.position, fallbackPaneId).layout);
+      setFocusedPaneId(pane.id);
+      // Show it next to its old neighbour without hiding what is on screen.
+      unminimizePanes(profile.id, anchorPaneId ? [pane.id, anchorPaneId] : [pane.id]);
+      forgetReopenedPane(key, entry, pane.id);
+    } finally {
+      reopenInFlightRef.current = false;
+    }
+  }
+  reopenClosedPaneRef.current = () => void reopenClosedPane();
+
+  /** "Reopen closed pane" pressed in a view window: bring back the newest pane closed there. */
+  async function reopenClosedPaneInView(
+    viewId: string,
+    anchorPaneId?: string,
+  ): Promise<string | null> {
+    const view = viewsRef.current.find((v) => v.id === viewId);
+    if (!view) return t("pane.popout.missing");
+    const entry = peekClosedPane(closedPanesRef.current, view.profileKey, viewId);
+    if (!entry) return t("pane.reopenClosed.empty");
+    if (entry.agentSessionId && findOpenConversationPane(entry)) {
+      setClosedPanes((prev) => removeClosedPane(prev, view.profileKey, entry));
+      return t("pane.reopenClosed.alreadyOpen");
+    }
+    if (reopenInFlightRef.current) return t("chat.err.restoringWait");
+    reopenInFlightRef.current = true;
+    try {
+      return await spawnPaneForView(
+        viewId,
+        anchorPaneId ?? view.focusedPaneId ?? "",
+        undefined,
+        "horizontal",
+        entry,
+      );
+    } finally {
+      reopenInFlightRef.current = false;
+    }
   }
 
   const handleViewIntentRef = useRef((_intent: PaneViewIntent) => {});
@@ -2254,9 +2502,30 @@ function ChatTabInner({
         );
         return;
       }
-      case "close-pane":
+      case "close-pane": {
+        // A user closing one pane in the view: remember it there. When it was the view's
+        // last pane the window goes away, so this window's reopen takes it (profile position).
+        const pane = lookupProfilePane(view.profileKey, action.paneId);
+        if (pane && findPane(view.layout, pane.id)) {
+          const lastInView = viewPaneIds(view).length <= 1;
+          const entry = lastInView
+            ? closedPaneEntry(pane, getProfileLayoutByKey(view.profileKey), null)
+            : closedPaneEntry(pane, view.layout, view.id);
+          setClosedPanes((prev) => pushClosedPane(prev, view.profileKey, entry));
+        }
         closeProfilePane(view.profileKey, action.paneId);
         return;
+      }
+      case "reopen-closed-pane": {
+        const viewId = view.id;
+        const anchor = typeof action.anchorPaneId === "string" ? action.anchorPaneId : undefined;
+        void reopenClosedPaneInView(viewId, anchor)
+          .catch((err: unknown) => (err instanceof Error ? err.message : String(err)))
+          .then((error) => {
+            if (error) window.api.paneViewNotify(viewId, error);
+          });
+        return;
+      }
       case "dock-pane":
         dockPane(action.paneId);
         return;
@@ -2282,6 +2551,22 @@ function ChatTabInner({
           layout: updateSplitRatio(v.layout, action.splitId, action.ratio),
         }));
         return;
+      case "equalize-split":
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: equalizeRunAtSplit(v.layout, action.splitId),
+        }));
+        return;
+      case "apply-layout-preset": {
+        // IPC data: only known presets.
+        const preset: unknown = action.preset;
+        if (!isLayoutPreset(preset)) return;
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: applyLayoutPreset(v.layout, preset, { focusedPaneId: v.focusedPaneId }),
+        }));
+        return;
+      }
       case "cwd":
         reportPaneCwd(action.sessionId, action.cwd);
         return;
@@ -2674,7 +2959,7 @@ function ChatTabInner({
         onConfirm={() => {
           const paneId = busyClosePaneId;
           setBusyClosePaneId(null);
-          if (paneId) performClosePane(paneId);
+          if (paneId) closePaneAndRemember(paneId);
         }}
       />
       <ConfirmDialog
@@ -2736,6 +3021,24 @@ function ChatTabInner({
         splitRight: paneShortcutLabels.splitRight ?? t("keybindings.unbound"),
         splitDown: paneShortcutLabels.splitDown ?? t("keybindings.unbound"),
       }}
+      layoutMenu={
+        <LayoutPresetMenu
+          paneCount={shownPaneCount}
+          onSelect={applyLayoutPresetToShown}
+          trigger={
+            <Button
+              variant="chromeOutline"
+              size="sm"
+              className={titleBarSlot ? "min-h-7 px-2.5 text-[12px]" : undefined}
+              aria-label={t("pane.layout.menu")}
+            >
+              <LayoutGrid />
+              <span className={titleBarSlot ? "max-lg:hidden" : undefined}>{t("pane.layout.menu")}</span>
+              <ChevronDown aria-hidden className="opacity-70" />
+            </Button>
+          }
+        />
+      }
       inbox={
         <AttentionInbox
           items={attentionInboxItems}
@@ -2817,11 +3120,13 @@ function ChatTabInner({
       {shownLayout ? (
       <SplitPaneLayout
         node={shownLayout}
+        paneMotionScope={activeProfile?.id ?? null}
         focusedPaneId={focusedPaneId}
         bg={bg}
         sidebarPaneDragActive={profileSidebarDrag}
         profileAccentColor={activeProfile?.accentColor ?? null}
         broadcastActive={broadcastActive}
+        unfocusedDimOpacity={unfocusedPaneDimOpacity(settings.terminalUnfocusedPaneDim)}
         broadcastPaneCount={dockedPanes.length}
         paneAgentStates={paneAgentStates}
         paneLabels={paneLabels}
@@ -2843,6 +3148,12 @@ function ChatTabInner({
         onResizeSplit={(splitId, ratio) =>
           setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
         }
+        onEqualizeSplit={(splitId) => {
+          // Slot counts come from the visible tree (minimized panes excluded), like onEqualizePanes.
+          const next = equalizeRunAtSplit(shownLayout, splitId);
+          if (next === shownLayout) return;
+          setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+        }}
         onMovePane={(dragPaneId, targetPaneId, zone) => {
           setLayout((prev) => (prev ? movePaneInTree(prev, dragPaneId, targetPaneId, zone) : prev));
         }}
@@ -2974,6 +3285,21 @@ function ChatTabInner({
                   <FolderOpen />
                   {t("chat.emptyPanes.pickFolder")}
                 </Button>
+                {nextClosedPane && (
+                  <Button
+                    variant="chromeOutline"
+                    disabled={!canAddPane || restoring || profileBusy}
+                    onClick={() => reopenClosedPaneRef.current()}
+                    title={
+                      paneShortcutLabels.reopenClosed
+                        ? `${t("shortcuts.pane.reopenClosed")} (${paneShortcutLabels.reopenClosed})`
+                        : t("shortcuts.pane.reopenClosed")
+                    }
+                  >
+                    <RotateCcw />
+                    {t("pane.reopenClosed.named", { name: paneDisplayLabel(nextClosedPane) })}
+                  </Button>
+                )}
               </div>
               <dl className="grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-1.5 text-[12px] text-chrome-text-muted">
                 {[
@@ -3128,11 +3454,14 @@ function WarpTopBar({
   splitShortcutLabels,
   embedded = false,
   inbox,
+  layoutMenu,
 }: {
   /** Rendered inside the app title bar instead of as its own row. */
   embedded?: boolean;
   /** Attention inbox entry point (shown first among the right-hand actions). */
   inbox?: ReactNode;
+  /** Layout presets dropdown (shown before the pane buttons). */
+  layoutMenu?: ReactNode;
   profileKey?: string | null;
   profileEnterClass?: string;
   profileLabel: string | null;
@@ -3213,6 +3542,7 @@ function WarpTopBar({
               : t("chat.panesFull", { max: maxPanes })}
           </span>
         )}
+        {layoutMenu}
         <span title={canAddPane ? undefined : limitTitle}>
           <Button
             variant="chromeOutline"

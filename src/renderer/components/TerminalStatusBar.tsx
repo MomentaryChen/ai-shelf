@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, FolderOpen } from "lucide-react";
 import type { PaneInfo } from "../terminal/split-tree";
 import { useLocale } from "../i18n/LocaleProvider";
 import type { MessageKey } from "../i18n/messages/en";
 import { TerminalCommandStatus } from "./TerminalCommandStatus";
 import { TerminalSessionUsage } from "./TerminalSessionUsage";
 import { ChangeReviewStatus } from "./ChangeReviewStatus";
+import { isRemotePaneCwd } from "../utils/remote-ssh";
 
 type SessionStatus = "live" | "exited" | "stale";
 
@@ -133,6 +134,8 @@ export function TerminalStatusBar({
   if (!pane) return null;
 
   const cwdPath = pane.cwd?.trim() || "";
+  // A remote pane's cwd (`host:dir`) does not exist on this machine.
+  const canOpenCwd = cwdPath !== "" && !isRemotePaneCwd(cwdPath);
   const shell = meta.shell?.trim() || "—";
   const size = formatSize(meta.cols, meta.rows);
   const showExit = status === "exited" || meta.exitCode != null;
@@ -184,6 +187,17 @@ export function TerminalStatusBar({
       ) : (
         <span className="font-mono">—</span>
       )}
+      {canOpenCwd ? (
+        <button
+          type="button"
+          onClick={() => void window.api.openPath(cwdPath)}
+          className="-ml-2 inline-flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text"
+          title={t("status.openCwdFolder")}
+          aria-label={t("status.openCwdFolder")}
+        >
+          <FolderOpen className="h-3 w-3" aria-hidden />
+        </button>
+      ) : null}
       <span className="ml-auto flex shrink-0 items-center gap-3 font-mono tabular-nums text-chrome-text-subtle">
         <TerminalSessionUsage
           sessionId={pane.sessionId}

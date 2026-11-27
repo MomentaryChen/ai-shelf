@@ -53,11 +53,38 @@ export interface NotifyFocusState {
   viewActive: boolean;
   windowFocused: boolean;
   focusedPaneId: string | null;
+  /** False for a pane that is not drawn (minimized, background profile). Default true. */
+  onScreen?: boolean;
 }
 
-/** Only notify when the user cannot see the pane: other pane focused, or app not in front. */
+/**
+ * Only notify when the user cannot see the pane: it is off screen, another pane
+ * is focused, or the app is not in front.
+ */
 export function isPaneUnattended(paneId: string, s: NotifyFocusState): boolean {
-  return !s.viewActive || !s.windowFocused || s.focusedPaneId !== paneId;
+  return s.onScreen === false || !s.viewActive || !s.windowFocused || s.focusedPaneId !== paneId;
+}
+
+/** A live pane of a profile that is not the active one. */
+export interface BackgroundNotifyPane<P extends { sessionId: string }> {
+  pane: P;
+  profileName: string;
+}
+
+/**
+ * The pane a terminal event belongs to: the active profile's panes first
+ * (minimized ones included), then background profiles, which carry their
+ * profile name for the notification label. Null when the session is unknown.
+ */
+export function resolveNotifyPane<P extends { sessionId: string }>(
+  sessionId: string,
+  panes: readonly P[],
+  background: readonly BackgroundNotifyPane<P>[] = [],
+): { pane: P; profileName: string | null } | null {
+  const local = panes.find((p) => p.sessionId === sessionId);
+  if (local) return { pane: local, profileName: null };
+  const bg = background.find((b) => b.pane.sessionId === sessionId);
+  return bg ? { pane: bg.pane, profileName: bg.profileName } : null;
 }
 
 /** Whether a finished command is long enough to notify about. */

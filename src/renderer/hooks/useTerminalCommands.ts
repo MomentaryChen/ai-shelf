@@ -1,12 +1,17 @@
 import { createElement, useMemo } from "react";
 import {
   AppWindow,
+  Columns3,
   FolderGit2,
   History,
   MessagesSquare,
   Inbox,
+  LayoutGrid,
+  LayoutPanelLeft,
   Monitor,
   Radio,
+  Rows3,
+  RotateCcw,
   Terminal,
   User,
   Zap,
@@ -17,6 +22,7 @@ import type { ProfileForest, ProviderEntry, SavedCommandSnippet } from "../types
 import { findProviderEntry } from "../utils/claude-cursor-diff";
 import { digitShortcutKeys, shortcutKeys } from "../shortcuts/shortcut-registry";
 import { toolLabel } from "../utils";
+import type { LayoutPreset } from "../terminal/layout-presets";
 
 export interface TerminalCommandActions {
   addPane: (tool: string) => void | Promise<void>;
@@ -34,6 +40,10 @@ export interface TerminalCommandActions {
   openConversationHistory?: () => void;
   /** Jump to the next pane in the attention inbox (any profile). */
   jumpNextAttention?: () => void;
+  /** Rearrange the panes on screen into a preset. */
+  applyLayoutPreset?: (preset: LayoutPreset) => void;
+  /** Reopen the most recently closed pane (Ctrl+Shift+T). */
+  reopenClosedPane?: () => void;
 }
 
 export interface TerminalCommandOptions {
@@ -45,6 +55,10 @@ export interface TerminalCommandOptions {
   savedCommands: SavedCommandSnippet[];
   /** Panes in the attention inbox (waiting on the user, any profile). */
   attentionCount?: number;
+  /** Panes on screen (minimized / popped-out excluded); layout presets need two. */
+  shownPaneCount?: number;
+  /** Label of the pane "reopen closed pane" would bring back; null hides the command. */
+  reopenClosedLabel?: string | null;
 }
 
 /** Plain .ts file — build lucide icon elements without JSX. */
@@ -60,8 +74,21 @@ export function useTerminalCommands(
 ): Command[] {
   const { addPane, openExternal, activateProfile, broadcastCommand, runSavedCommand, newWorktreePane } =
     actions;
-  const { openCommandHistory, openConversationHistory, jumpNextAttention } = actions;
-  const { currentGroupId, paneCount, savedCommands, attentionCount = 0 } = options;
+  const {
+    openCommandHistory,
+    openConversationHistory,
+    jumpNextAttention,
+    applyLayoutPreset,
+    reopenClosedPane,
+  } = actions;
+  const {
+    currentGroupId,
+    paneCount,
+    savedCommands,
+    attentionCount = 0,
+    shownPaneCount = 0,
+    reopenClosedLabel = null,
+  } = options;
 
   return useMemo(() => {
     const available = data.filter((e) => e.available);
@@ -80,6 +107,18 @@ export function useTerminalCommands(
           placeholder: t("cmd.input.broadcastPlaceholder"),
           onSubmit: (value) => broadcastCommand(value),
         },
+      });
+    }
+
+    if (reopenClosedLabel !== null && reopenClosedPane) {
+      cmds.push({
+        id: "reopen-closed-pane",
+        title: t("pane.reopenClosed.named", { name: reopenClosedLabel }),
+        group: t("cmd.group.agents"),
+        icon: icon(RotateCcw),
+        keywords: "reopen closed pane terminal undo close restore last recently",
+        shortcut: shortcutKeys("reopenClosedPane"),
+        run: () => reopenClosedPane(),
       });
     }
 
@@ -130,6 +169,26 @@ export function useTerminalCommands(
         shortcut: shortcutKeys("nextAttentionPane"),
         run: () => jumpNextAttention(),
       });
+    }
+
+    if (shownPaneCount > 1 && applyLayoutPreset) {
+      const presets = [
+        ["columns", "layoutColumns", Columns3, "columns side by side horizontal"],
+        ["rows", "layoutRows", Rows3, "rows stacked vertical"],
+        ["grid", "layoutGrid", LayoutGrid, "grid tile square"],
+        ["main-side", "layoutMainSide", LayoutPanelLeft, "main side master focus large"],
+      ] as const;
+      for (const [preset, shortcutId, Icon, keywords] of presets) {
+        cmds.push({
+          id: `layout-preset-${preset}`,
+          title: t(`shortcuts.pane.${shortcutId}`),
+          group: t("pane.layout.menu"),
+          icon: icon(Icon),
+          keywords: `layout preset arrange panes split ${keywords}`,
+          shortcut: shortcutKeys(shortcutId),
+          run: () => applyLayoutPreset(preset),
+        });
+      }
     }
 
     if (paneCount > 0 && savedCommands.length > 0) {
@@ -235,6 +294,8 @@ export function useTerminalCommands(
     paneCount,
     savedCommands,
     attentionCount,
+    shownPaneCount,
+    reopenClosedLabel,
     addPane,
     openExternal,
     activateProfile,
@@ -244,5 +305,7 @@ export function useTerminalCommands(
     openCommandHistory,
     openConversationHistory,
     jumpNextAttention,
+    applyLayoutPreset,
+    reopenClosedPane,
   ]);
 }

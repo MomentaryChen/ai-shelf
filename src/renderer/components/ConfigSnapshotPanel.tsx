@@ -276,7 +276,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
           </div>
 
           {diffResult && (
-            <div className="max-h-64 overflow-auto rounded border border-border bg-bg-primary p-2">
+            <div className="ui-view-rise max-h-64 overflow-auto rounded border border-border bg-bg-primary p-2">
               {visibleDiffItems.length === 0 ? (
                 <p className="text-xs text-text-tertiary">{t("configSnapshot.diffNone")}</p>
               ) : (
@@ -304,7 +304,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
 
       {message && (
         <p
-          className={`mt-3 text-xs ${message.kind === "ok" ? "text-ok" : "text-fail"}`}
+          className={`ui-view-rise mt-3 text-xs ${message.kind === "ok" ? "text-ok" : "text-fail"}`}
           role="status"
         >
           {message.text}

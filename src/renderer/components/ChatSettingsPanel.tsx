@@ -47,6 +47,7 @@ import type { MessageKey } from "../i18n/messages/en";
 import { syncMainProcessFromSettings } from "../system-tray-sync";
 import { useHealthMonitor } from "../hooks/useHealthMonitor";
 import { installPlatform } from "../utils/install-platform";
+import { isUnfocusedPaneDim, UNFOCUSED_PANE_DIM_LEVELS } from "../terminal/pane-dim";
 import type { PtyLogRetentionPrefs, WslDistroRow } from "../types";
 
 export const SETTINGS_CATEGORIES = [
@@ -422,7 +423,14 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
 
   return (
     <>
-    <div className={compact ? "flex flex-col gap-5" : "flex flex-col gap-6"}>
+    {/* Keyed by category so switching settings sections replays the fade.
+        Panel-level state lives above this div and survives the remount. */}
+    <div
+      key={category ?? "all"}
+      className={`flex flex-col ${compact ? "gap-5" : "gap-6"}${
+        category !== undefined ? " ui-view-rise" : ""
+      }`}
+    >
       {show("appearance") && (
         <>
       {/* Language */}
@@ -1022,6 +1030,27 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
               </span>
             </span>
           </Label>
+
+          <div className="rounded-lg border border-border px-3.5 py-3">
+            <p className="text-[13px] text-text-primary">{t("settings.unfocusedPaneDim")}</p>
+            <p className="mb-2 text-[11px] leading-snug text-text-tertiary">
+              {t("settings.unfocusedPaneDimHint")}
+            </p>
+            <ToggleGroup
+              type="single"
+              value={settings.terminalUnfocusedPaneDim}
+              onValueChange={(v) => {
+                if (isUnfocusedPaneDim(v)) updateSettings({ terminalUnfocusedPaneDim: v });
+              }}
+              className="flex flex-wrap justify-start gap-1"
+            >
+              {UNFOCUSED_PANE_DIM_LEVELS.map((level) => (
+                <ToggleGroupItem key={level} value={level} size="sm" className="text-xs">
+                  {t(`settings.unfocusedPaneDim.${level}`)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
         </div>
       </div>
         </>

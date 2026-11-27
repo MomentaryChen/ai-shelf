@@ -9,7 +9,9 @@ import {
   NOTIFY_MIN_GAP_MS,
   NotifyRateLimiter,
   paneNotifyDedupe,
+  resolveNotifyPane,
   sanitizeNotifyText,
+  type BackgroundNotifyPane,
   type TerminalNotifyEvent,
 } from "../terminal/terminal-notify";
 import { paneDisplayLabel } from "../utils/pane-label";
@@ -17,7 +19,12 @@ import { paneDisplayLabel } from "../utils/pane-label";
 type T = (key: MessageKey, params?: Record<string, string | number>) => string;
 
 interface Options {
+  /** Active profile's panes, minimized ones included. */
   panes: PaneInfo[];
+  /** Live panes of the other profiles; their xterms stay mounted off screen. */
+  backgroundPanes?: readonly BackgroundNotifyPane<PaneInfo>[];
+  /** Sessions drawn right now; a pane outside it is off screen. Omit when all are. */
+  shownSessionIds?: ReadonlySet<string>;
   focusedPaneId: string | null;
   windowFocused: boolean;
   /** Terminal view is showing (not Inventory / Tools / Tasks). */
@@ -28,7 +35,8 @@ interface Options {
 
 /**
  * Desktop notifications for long commands, BEL and OSC 9 / 777 in panes the
- * user is not looking at. Clicking one focuses the window and the pane
+ * user is not looking at: another pane, a minimized pane, or a pane of a
+ * background profile. Clicking one focuses the window and the pane
  * (shared pane-agent notification path). Returns the EmbeddedTerminal callback.
  */
 export function useTerminalNotifications(opts: Options) {
@@ -38,16 +46,19 @@ export function useTerminalNotifications(opts: Options) {
   limiterRef.current ??= new NotifyRateLimiter();
 
   return useCallback((sessionId: string, event: TerminalNotifyEvent) => {
-    const { panes, focusedPaneId, windowFocused, viewActive, settings, t } = ref.current;
+    const { panes, backgroundPanes, shownSessionIds, focusedPaneId, windowFocused, viewActive, settings, t } =
+      ref.current;
     if (event.kind === "command" ? !settings.terminalNotifyLongCommand : !settings.terminalNotifyBell) {
       return;
     }
     if (event.kind === "command" && !isLongCommand(event, settings.terminalNotifyLongCommandSec)) {
       return;
     }
-    const pane = panes.find((p) => p.sessionId === sessionId);
-    if (!pane) return;
-    if (!isPaneUnattended(pane.id, { viewActive, windowFocused, focusedPaneId })) return;
+    const target = resolveNotifyPane(sessionId, panes, backgroundPanes);
+    if (!target) return;
+    const { pane, profileName } = target;
+    const onScreen = profileName === null && (!shownSessionIds || shownSessionIds.has(sessionId));
+    if (!isPaneUnattended(pane.id, { viewActive, windowFocused, focusedPaneId, onScreen })) return;
 
     const now = Date.now();
     if (!limiterRef.current!.allow(`${pane.id}:${event.kind}`, NOTIFY_MIN_GAP_MS[event.kind], now)) {
@@ -55,7 +66,10 @@ export function useTerminalNotifications(opts: Options) {
     }
     if (!paneNotifyDedupe.claim(pane.id, "terminal", now)) return;
 
-    const label = paneDisplayLabel(pane);
+    const label =
+      profileName === null
+        ? paneDisplayLabel(pane)
+        : t("pane.agent.bg.paneLabel", { profile: profileName, pane: paneDisplayLabel(pane) });
     let title: string;
     let body: string;
     switch (event.kind) {
