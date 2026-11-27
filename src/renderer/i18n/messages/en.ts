@@ -92,6 +92,7 @@ export const en = {
   "status.exit": "exit",
   "status.copyCwd": "Click to copy the path",
   "status.cwdCopied": "Path copied",
+  "status.openCwdFolder": "Open folder in file explorer",
   "status.usage.title": "Claude session usage",
   "status.usage.tokensUnit": "tok",
   "status.usage.input": "Input",
