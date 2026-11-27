@@ -266,7 +266,7 @@ export function AppUpdateModal() {
         <DialogHeader className="relative shrink-0 space-y-0 overflow-hidden border-b border-border px-6 pb-5 pt-6 text-left">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 -top-20 h-36 bg-[radial-gradient(65%_100%_at_50%_100%,var(--color-accent-soft),transparent)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(90%_100%_at_50%_0%,var(--color-accent-soft),transparent)]"
           />
           <div className="relative flex items-start gap-4">
             <span
@@ -292,7 +292,7 @@ export function AppUpdateModal() {
                   <ArrowRight className="size-3.5 shrink-0 text-text-secondary" />
                 </>
               )}
-              <span className="rounded-full bg-accent-soft px-2.5 py-1 font-mono font-semibold text-accent">
+              <span className="rounded-full border border-transparent bg-accent-soft px-2.5 py-1 font-mono font-semibold text-accent">
                 v{version}
               </span>
             </div>
