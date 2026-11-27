@@ -133,8 +133,11 @@ export function equalizeRunAroundPane(root: LayoutNode, paneId: string): LayoutN
   const direction = path[path.length - 1]!.direction;
   let top = path.length - 1;
   while (top > 0 && path[top - 1]!.direction === direction) top--;
-  const runRootId = path[top]!.id;
+  return equalizeRunAt(root, path[top]!.id, direction);
+}
 
+/** Equalize the same-direction run rooted at split `runRootId`; the rest of the tree is kept. */
+function equalizeRunAt(root: LayoutNode, runRootId: string, direction: SplitDirection): LayoutNode {
   function walk(node: LayoutNode): LayoutNode {
     if (node.kind === "pane") return node;
     if (node.id === runRootId) return equalizeRun(node, direction);
@@ -293,18 +296,36 @@ function insertPaneRelative(
   });
 }
 
-function swapPanesInTree(root: LayoutNode, paneIdA: string, paneIdB: string): LayoutNode {
-  const a = findPane(root, paneIdA);
-  const b = findPane(root, paneIdB);
-  if (!a || !b || paneIdA === paneIdB) return root;
-  return mapPanesInTree(root, (p) => {
-    if (p.id === paneIdA) return { ...b, id: p.id, sessionId: b.sessionId };
-    if (p.id === paneIdB) return { ...a, id: p.id, sessionId: a.sessionId };
-    return p;
-  });
+/**
+ * Remove `paneId` and re-equalize what is left of the row / column it sat in,
+ * so taking a pane out of a 3-column row leaves 50/50, not 33/67.
+ */
+function removePaneAndEqualizeRun(root: LayoutNode, paneId: string): LayoutNode | null {
+  const path = splitPathToPane(root, paneId);
+  const tree = removePaneFromTree(root, paneId);
+  if (!tree || !path || path.length === 0) return tree;
+  const parent = path[path.length - 1]!;
+  const direction = parent.direction;
+  let top = path.length - 1;
+  while (top > 0 && path[top - 1]!.direction === direction) top--;
+  if (top < path.length - 1) {
+    // An ancestor of the removed pane's parent roots the run; it survives removal.
+    return equalizeRunAt(tree, path[top]!.id, direction);
+  }
+  // The parent was the run root and is gone: the sibling took its place.
+  const sibling = parent.first.kind === "pane" && parent.first.pane.id === paneId ? parent.second : parent.first;
+  if (sibling.kind === "split" && sibling.direction === direction) {
+    return equalizeRunAt(tree, sibling.id, direction);
+  }
+  return tree;
 }
 
-/** Move a pane onto a target using edge/center drop zones (works with complex multi-pane layouts). */
+/**
+ * Move a pane onto a target using edge/center drop zones (works with complex multi-pane layouts).
+ * The centre zone swaps whole panes like {@link swapPaneLeaves}, so state keyed by pane id
+ * (focus, labels, minimized ids) follows the terminal. Edge zones equalize the row / column
+ * the pane lands in and the one it left, matching the split buttons.
+ */
 export function movePaneInTree(
   root: LayoutNode,
   dragPaneId: string,
@@ -313,16 +334,16 @@ export function movePaneInTree(
 ): LayoutNode {
   if (dragPaneId === targetPaneId) return root;
   if (!findPane(root, targetPaneId)) return root;
-  if (zone === "swap") return swapPanesInTree(root, dragPaneId, targetPaneId);
+  if (zone === "swap") return swapPaneLeaves(root, dragPaneId, targetPaneId);
 
   const dragged = findPane(root, dragPaneId);
   if (!dragged) return root;
 
-  let tree = removePaneFromTree(root, dragPaneId);
+  const tree = removePaneAndEqualizeRun(root, dragPaneId);
   if (!tree) return { kind: "pane", pane: dragged };
 
   const inserted = insertPaneRelative(tree, targetPaneId, dragged, zone);
-  return inserted ?? root;
+  return inserted ? equalizeRunAroundPane(inserted, dragPaneId) : root;
 }
 
 // ---------------------------------------------------------------------------
