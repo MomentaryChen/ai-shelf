@@ -137,6 +137,35 @@ export function equalizeRunAroundPane(root: LayoutNode, paneId: string): LayoutN
   return equalizeRunAt(root, path[top]!.id, direction);
 }
 
+function splitPathToSplit(
+  node: LayoutNode,
+  splitId: string,
+): Extract<LayoutNode, { kind: "split" }>[] | null {
+  if (node.kind === "pane") return null;
+  if (node.id === splitId) return [node];
+  for (const child of [node.first, node.second]) {
+    const rest = splitPathToSplit(child, splitId);
+    if (rest) return [node, ...rest];
+  }
+  return null;
+}
+
+/**
+ * Give every slot in the row / column that split `splitId` belongs to the same
+ * size (divider double-click). The run extends up through same-direction
+ * ancestors and down through same-direction descendants; perpendicular splits
+ * count as one slot and keep their ratios. Returns `root` itself when the id
+ * is unknown.
+ */
+export function equalizeRunAtSplit(root: LayoutNode, splitId: string): LayoutNode {
+  const path = splitPathToSplit(root, splitId);
+  if (!path) return root;
+  const direction = path[path.length - 1]!.direction;
+  let top = path.length - 1;
+  while (top > 0 && path[top - 1]!.direction === direction) top--;
+  return equalizeRunAt(root, path[top]!.id, direction);
+}
+
 /** Equalize the same-direction run rooted at split `runRootId`; the rest of the tree is kept. */
 function equalizeRunAt(root: LayoutNode, runRootId: string, direction: SplitDirection): LayoutNode {
   function walk(node: LayoutNode): LayoutNode {
@@ -526,6 +555,7 @@ export function resizePaneInDirection(
   }
   if (!split) return root;
   const delta = direction === "right" || direction === "down" ? step : -step;
+  // No pixel info here: plain ratio clamp only.
   const ratio = clampSplitRatio(split.ratio + delta);
   if (Math.abs(ratio - split.ratio) < EPS) return root;
   return updateSplitRatio(root, split.id, ratio);

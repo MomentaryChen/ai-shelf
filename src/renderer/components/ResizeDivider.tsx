@@ -16,7 +16,17 @@ interface RatioProps {
   onResizeCommit: (rawRatio: number, containerPx: number) => void;
   /** Drag aborted (pointercancel / lost capture / unmount): undo the preview. */
   onResizeCancel: () => void;
+  /** Current (committed) ratio of the first side: aria-valuenow and keyboard steps. */
+  ratio: number;
+  /** Accessible name of the separator. */
+  ariaLabel: string;
+  /** Double-click / Enter / `=`: even out the row or column. Omitted = no-op. */
+  onEqualize?: () => void;
 }
+
+/** Arrow-key step on a focused ratio divider; Shift = fine step. */
+export const DIVIDER_KEY_STEP = 0.05;
+export const DIVIDER_KEY_STEP_FINE = 0.01;
 
 interface DeltaProps {
   mode: "delta";
@@ -143,20 +153,84 @@ export function ResizeDivider(props: Props) {
     [horizontal],
   );
 
+  /**
+   * Ratio mode keyboard: arrows along the split axis move by 5% (Shift: 1%),
+   * Home / End jump to the limits, Enter / `=` equalize. Every press commits
+   * once through `onResizeCommit`, so the pixel clamp applies like a drag.
+   * Modified presses (Ctrl / Alt / Meta) are left to the global pane shortcuts.
+   */
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const p = propsRef.current;
+    if (p.mode !== "ratio" || e.ctrlKey || e.altKey || e.metaKey) return;
+    const el = dividerRef.current;
+    const splitContainer = el?.parentElement?.parentElement ?? el?.parentElement;
+    if (!splitContainer) return;
+    const step = e.shiftKey ? DIVIDER_KEY_STEP_FINE : DIVIDER_KEY_STEP;
+    const [dec, inc] = horizontal ? ["ArrowLeft", "ArrowRight"] : ["ArrowUp", "ArrowDown"];
+    let next: number | null = null;
+    switch (e.key) {
+      case dec:
+        next = p.ratio - step;
+        break;
+      case inc:
+        next = p.ratio + step;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = 1;
+        break;
+      case "Enter":
+      case "=":
+        e.preventDefault();
+        e.stopPropagation();
+        p.onEqualize?.();
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = splitContainer.getBoundingClientRect();
+    p.onResizeCommit(next, horizontal ? rect.width : rect.height);
+  };
+
+  const ratioProps =
+    props.mode === "ratio"
+      ? {
+          tabIndex: 0,
+          "aria-label": props.ariaLabel,
+          "aria-valuemin": 0,
+          "aria-valuemax": 100,
+          "aria-valuenow": Math.round(props.ratio * 100),
+          onKeyDown,
+          // Mouse drags / double-clicks must not pull focus off the terminal;
+          // the divider takes focus from Tab only.
+          onMouseDown: (e: React.MouseEvent) => e.preventDefault(),
+          onDoubleClick: (e: React.MouseEvent) => {
+            e.stopPropagation();
+            const p = propsRef.current;
+            if (p.mode === "ratio") p.onEqualize?.();
+          },
+        }
+      : {};
+
   return (
     <div
       ref={dividerRef}
       role="separator"
       aria-orientation={horizontal ? "vertical" : "horizontal"}
       onPointerDown={onPointerDown}
-      className={`group relative z-20 touch-none select-none ${
+      {...ratioProps}
+      className={`group relative z-20 touch-none select-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-chrome-ui-accent/60 ${
         horizontal
           ? "flex h-full w-full min-w-0 cursor-col-resize items-stretch justify-center"
           : "flex h-full w-full min-h-0 cursor-row-resize flex-col items-stretch justify-center"
       }`}
     >
       <div
-        className={`m-auto rounded-full bg-chrome-border-strong transition-colors group-hover:bg-chrome-text-subtle group-active:bg-accent ${
+        className={`m-auto rounded-full bg-chrome-border-strong transition-colors group-hover:bg-chrome-text-subtle group-focus-visible:bg-accent group-active:bg-accent ${
           horizontal ? "h-12 w-0.5" : "h-0.5 w-12"
         }`}
       />

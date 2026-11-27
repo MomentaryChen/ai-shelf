@@ -95,6 +95,7 @@ import { savedCommandNameFor } from "../terminal/command-history";
 import {
   copySplitRatios,
   equalizeAllSplits,
+  equalizeRunAtSplit,
   findPaneInDirection,
   resizePaneInDirection,
   swapPaneLeaves,
@@ -2284,6 +2285,12 @@ function ChatTabInner({
           layout: updateSplitRatio(v.layout, action.splitId, action.ratio),
         }));
         return;
+      case "equalize-split":
+        updateView(view.id, (v) => ({
+          ...v,
+          layout: equalizeRunAtSplit(v.layout, action.splitId),
+        }));
+        return;
       case "cwd":
         reportPaneCwd(action.sessionId, action.cwd);
         return;
@@ -2846,6 +2853,12 @@ function ChatTabInner({
         onResizeSplit={(splitId, ratio) =>
           setLayout((prev) => (prev ? updateSplitRatio(prev, splitId, ratio) : prev))
         }
+        onEqualizeSplit={(splitId) => {
+          // Slot counts come from the visible tree (minimized panes excluded), like onEqualizePanes.
+          const next = equalizeRunAtSplit(shownLayout, splitId);
+          if (next === shownLayout) return;
+          setLayout((prev) => (prev ? copySplitRatios(prev, next) : prev));
+        }}
         onMovePane={(dragPaneId, targetPaneId, zone) => {
           setLayout((prev) => (prev ? movePaneInTree(prev, dragPaneId, targetPaneId, zone) : prev));
         }}

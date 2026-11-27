@@ -32,6 +32,7 @@ import { shouldIgnoreShortcutForIme } from "./terminal/ime-keys";
 import { profileAccentMarkerStyle } from "./utils/profile-colors";
 import {
   collectPanes,
+  equalizeRunAtSplit,
   findPane,
   updateSplitRatio,
   type LayoutNode,
@@ -212,6 +213,16 @@ export function PopoutWindowApp() {
     }, RESIZE_SEND_MS);
   }, []);
   useEffect(() => () => window.clearTimeout(resizeTimerRef.current), []);
+
+  const equalizeSplit = useCallback((splitId: string) => {
+    // Flush a divider ratio still waiting to be sent so the origin applies it first.
+    window.clearTimeout(resizeTimerRef.current);
+    const pending = pendingResizeRef.current;
+    pendingResizeRef.current = null;
+    if (pending) window.api.paneViewAction({ type: "resize", ...pending });
+    setLayout((prev) => (prev ? equalizeRunAtSplit(prev, splitId) : prev));
+    window.api.paneViewAction({ type: "equalize-split", splitId });
+  }, []);
 
   const closePane = useCallback(
     (paneId: string, opts?: { skipConfirm?: boolean }) => {
@@ -541,6 +552,7 @@ export function PopoutWindowApp() {
             onFocusPane={focusPane}
             onClosePane={(paneId) => closePane(paneId)}
             onResizeSplit={resizeSplit}
+            onEqualizeSplit={equalizeSplit}
             onRenamePane={renamePane}
             // Header split buttons: same tool as that pane, like the main window.
             onSplitPane={(paneId, direction) => {

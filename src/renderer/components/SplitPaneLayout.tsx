@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   SplitSquareHorizontal,
   SplitSquareVertical,
@@ -7,16 +7,30 @@ import {
   ExternalLink,
   Maximize2,
   Minimize2,
+  MoreHorizontal,
   PanelLeftOpen,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ToolLogo } from "./ToolLogo";
 import { EditablePaneTitle } from "./EditablePaneTitle";
 import { DragHandle } from "./ProfileSidebarUI";
 import { PaneDropOverlay } from "./PaneDropOverlay";
 import { paneDisplayLabel } from "../utils/pane-label";
 import { ResizeDivider } from "./ResizeDivider";
-import { clampSplitRatio, splitFlexPair } from "../terminal/split-resize";
+import {
+  SPLIT_DIVIDER_PX,
+  clampSplitRatio,
+  clampSplitRatioPx,
+  minNodePx,
+  splitFlexPair,
+} from "../terminal/split-resize";
 import { hitPaneDropZone, type PaneDropZone } from "../terminal/pane-drop-zone";
 import { hasProfilePaneDrag, readProfilePaneDrag } from "../terminal/profile-pane-display";
 import { formatDroppedPaths, isOsFileDrag } from "../terminal/file-drop";
@@ -39,7 +53,7 @@ import { PaneAgentStatusDot } from "./PaneAgentStatusDot";
 import type { PaneAgentStatus } from "../../shared/pane-agent-state.js";
 import { PaneGitBranch } from "./TerminalGitStatus";
 
-const DIVIDER_PX = 10;
+const DIVIDER_PX = SPLIT_DIVIDER_PX;
 /** How long the in-pane broadcast hint stays up after broadcast turns on. */
 const BROADCAST_HINT_MS = 4000;
 
@@ -70,6 +84,11 @@ interface Props {
   /** Omitted = no split buttons (view windows). */
   onSplitPane?: (paneId: string, direction: SplitDirection) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
+  /**
+   * Divider double-click / Enter: even out the row or column that split
+   * `splitId` belongs to. Omitted = the gesture does nothing.
+   */
+  onEqualizeSplit?: (splitId: string) => void;
   onRenamePane?: (paneId: string, title: string) => void;
   onPaneCwdClick?: (paneId: string) => void;
   /** Click on a pane header's git branch (main window: worktree dialog). */
@@ -305,7 +324,8 @@ type SplitNode = Extract<LayoutNode, { kind: "split" }>;
  * `splitFlexPair`, so the committed render matches what the DOM already shows.
  */
 function SplitBranch({ node, ...shared }: SplitPaneLayoutInnerProps & { node: SplitNode }) {
-  const { onResizeSplit, maximizedPaneId = null } = shared;
+  const { onResizeSplit, onEqualizeSplit, maximizedPaneId = null } = shared;
+  const { t } = useLocale();
   const firstRef = useRef<HTMLDivElement>(null);
   const secondRef = useRef<HTMLDivElement>(null);
 
@@ -314,6 +334,16 @@ function SplitBranch({ node, ...shared }: SplitPaneLayoutInnerProps & { node: Sp
   const firstBasisPx = nestedDividerPx(node.first, node.direction);
   const secondBasisPx = nestedDividerPx(node.second, node.direction);
   const flex = splitFlexPair(ratio, firstBasisPx, secondBasisPx);
+  /** Drag / key ratio → clamped so neither side drops below its pixel minimum. */
+  const clampPx = (raw: number, containerPx: number) =>
+    clampSplitRatioPx(raw, {
+      containerPx,
+      dividerPx: DIVIDER_PX,
+      firstBasisPx,
+      secondBasisPx,
+      firstMinPx: minNodePx(node.first, node.direction),
+      secondMinPx: minNodePx(node.second, node.direction),
+    });
   // Maximized: same element tree (nothing unmounts), the other side and the
   // divider are display:none and the kept side takes the full split.
   const keep = maximizedSplitSide(node, maximizedPaneId);
@@ -362,9 +392,12 @@ function SplitBranch({ node, ...shared }: SplitPaneLayoutInnerProps & { node: Sp
         <ResizeDivider
           mode="ratio"
           orientation={node.direction}
-          onResizePreview={(raw) => applyFlex(clampSplitRatio(raw))}
-          onResizeCommit={(raw) => {
-            const next = clampSplitRatio(raw);
+          ratio={ratio}
+          ariaLabel={t(horizontal ? "pane.divider.resizeColumns" : "pane.divider.resizeRows")}
+          onEqualize={onEqualizeSplit ? () => onEqualizeSplit(node.id) : undefined}
+          onResizePreview={(raw, containerPx) => applyFlex(clampPx(raw, containerPx))}
+          onResizeCommit={(raw, containerPx) => {
+            const next = clampPx(raw, containerPx);
             // Leave the DOM at the committed value; React's next render writes
             // the identical string. If the ratio is unchanged React skips the
             // write, which is fine because the DOM already holds that value.
@@ -466,6 +499,9 @@ function WarpPaneShell({
       height: rect?.height ?? 0,
     });
   };
+  const hasSecondaryActions = Boolean(
+    onSplit || onToggleMaximize || onMinimize || onPopOutPane || onDockPane,
+  );
   const isDragOver = dragOverPaneId === pane.id && draggingPaneId !== pane.id;
   const isProfileDragOver = profileDragOver?.targetPaneId === pane.id;
   const activeDropZone = isProfileDragOver ? profileDragOver.zone : dropZone;
@@ -600,8 +636,13 @@ function WarpPaneShell({
         clearDrag();
       }}
     >
+      {/*
+        `@container/pane-header`: narrow panes collapse the secondary actions
+        into a "⋯" menu (below 420px) and then drop the git branch / cwd
+        (below 260px). The px values live in the classes below.
+      */}
       <div
-        className="relative z-20 flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
+        className="@container/pane-header relative z-20 flex h-9 shrink-0 items-center gap-1 border-b px-1.5"
         style={headerStyle}
       >
         {(canReorder || onPopOutPane) && (
@@ -656,7 +697,7 @@ function WarpPaneShell({
             title={t("chat.broadcastSyncTitle", { count: broadcastPaneCount })}
           >
             <span className="broadcast-sync-dot h-1 w-1 rounded-full bg-chrome-ui-accent" aria-hidden />
-            {t("pane.broadcastSyncBadge")}
+            <span className="@max-[260px]/pane-header:hidden">{t("pane.broadcastSyncBadge")}</span>
           </span>
         )}
         {maximized && onToggleMaximize && (
@@ -675,7 +716,9 @@ function WarpPaneShell({
             {t("pane.maximizedBadge")}
           </button>
         )}
-        <PaneGitBranch cwd={pane.cwd} sessionId={pane.sessionId} onClick={onBranchClick} />
+        <span className="contents @max-[260px]/pane-header:hidden">
+          <PaneGitBranch cwd={pane.cwd} sessionId={pane.sessionId} onClick={onBranchClick} />
+        </span>
         {onCwdClick ? (
           <button
             type="button"
@@ -684,65 +727,141 @@ function WarpPaneShell({
               e.stopPropagation();
               onCwdClick();
             }}
-            className="relative z-10 min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text-secondary"
+            className="relative z-10 min-w-0 flex-1 cursor-pointer truncate rounded px-1 text-left text-[11px] text-chrome-text-subtle transition-colors hover:bg-chrome-hover-strong hover:text-chrome-text-secondary @max-[260px]/pane-header:hidden"
             title={pane.cwd ? `${pane.cwd}\n\n${t("pane.clickChangeCwd")}` : t("pane.clickPickCwd")}
 
           >
             {cwdShort || "~"}
           </button>
         ) : (
-          <span className="min-w-0 flex-1 truncate text-[11px] text-chrome-text-subtle" title={pane.cwd}>
+          <span
+            className="min-w-0 flex-1 truncate text-[11px] text-chrome-text-subtle @max-[260px]/pane-header:hidden"
+            title={pane.cwd}
+          >
             {cwdShort || "~"}
           </span>
         )}
         {/* Always shown on the focused pane; other panes reveal them on hover or keyboard focus. */}
         <div
-          className={`flex items-center gap-0.5 transition-opacity ${
+          className={`ml-auto flex items-center gap-0.5 transition-opacity ${
             focused
               ? "opacity-100"
-              : "opacity-0 focus-within:opacity-100 group-hover/pane:opacity-100"
+              : "opacity-0 focus-within:opacity-100 group-hover/pane:opacity-100 has-[[data-state=open]]:opacity-100"
           }`}
         >
-          {onSplit && (
-            <>
-              <IconBtn title={t("pane.splitRight")} onClick={() => onSplit("horizontal")}>
-                <SplitSquareHorizontal className="h-3.5 w-3.5" />
+          {hasSecondaryActions && (
+            <div className="hidden @max-[420px]/pane-header:flex">
+              <PaneActionsMenu
+                label={t("pane.moreActions")}
+                onBeforeSelect={onFocus}
+                items={[
+                  ...(onSplit
+                    ? [
+                        {
+                          key: "split-right",
+                          label: t("pane.splitRight"),
+                          icon: <SplitSquareHorizontal />,
+                          onSelect: () => onSplit("horizontal"),
+                        },
+                        {
+                          key: "split-down",
+                          label: t("pane.splitDown"),
+                          icon: <SplitSquareVertical />,
+                          onSelect: () => onSplit("vertical"),
+                        },
+                      ]
+                    : []),
+                  ...(onToggleMaximize
+                    ? [
+                        {
+                          key: "maximize",
+                          label: withKeys(
+                            maximized ? t("pane.restoreLayout") : t("pane.maximize"),
+                            maximizeShortcutKeys,
+                          ),
+                          icon: maximized ? <Minimize2 /> : <Maximize2 />,
+                          onSelect: onToggleMaximize,
+                          separatorBefore: Boolean(onSplit),
+                        },
+                      ]
+                    : []),
+                  ...(onMinimize
+                    ? [
+                        {
+                          key: "minimize",
+                          label: t("pane.minimize"),
+                          icon: <Minus />,
+                          onSelect: onMinimize,
+                          separatorBefore: Boolean(onSplit) && !onToggleMaximize,
+                        },
+                      ]
+                    : []),
+                  ...(onPopOutPane
+                    ? [
+                        {
+                          key: "popout",
+                          label: t("pane.popout.open"),
+                          icon: <ExternalLink />,
+                          onSelect: () => popOut("menu"),
+                        },
+                      ]
+                    : []),
+                  ...(onDockPane
+                    ? [
+                        {
+                          key: "dock",
+                          label: t("pane.popout.dock"),
+                          icon: <PanelLeftOpen />,
+                          onSelect: () => onDockPane(pane.id),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-0.5 @max-[420px]/pane-header:hidden">
+            {onSplit && (
+              <>
+                <IconBtn title={t("pane.splitRight")} onClick={() => onSplit("horizontal")}>
+                  <SplitSquareHorizontal className="h-3.5 w-3.5" />
+                </IconBtn>
+                <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
+                  <SplitSquareVertical className="h-3.5 w-3.5" />
+                </IconBtn>
+              </>
+            )}
+            {onToggleMaximize && (
+              <IconBtn
+                title={withKeys(
+                  maximized ? t("pane.restoreLayout") : t("pane.maximize"),
+                  maximizeShortcutKeys,
+                )}
+                onClick={onToggleMaximize}
+              >
+                {maximized ? (
+                  <Minimize2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" />
+                )}
               </IconBtn>
-              <IconBtn title={t("pane.splitDown")} onClick={() => onSplit("vertical")}>
-                <SplitSquareVertical className="h-3.5 w-3.5" />
+            )}
+            {onMinimize && (
+              <IconBtn title={t("pane.minimize")} onClick={onMinimize}>
+                <Minus className="h-3.5 w-3.5" />
               </IconBtn>
-            </>
-          )}
-          {onToggleMaximize && (
-            <IconBtn
-              title={withKeys(
-                maximized ? t("pane.restoreLayout") : t("pane.maximize"),
-                maximizeShortcutKeys,
-              )}
-              onClick={onToggleMaximize}
-            >
-              {maximized ? (
-                <Minimize2 className="h-3.5 w-3.5" />
-              ) : (
-                <Maximize2 className="h-3.5 w-3.5" />
-              )}
-            </IconBtn>
-          )}
-          {onMinimize && (
-            <IconBtn title={t("pane.minimize")} onClick={onMinimize}>
-              <Minus className="h-3.5 w-3.5" />
-            </IconBtn>
-          )}
-          {onPopOutPane && (
-            <IconBtn title={t("pane.popout.open")} onClick={() => popOut("menu")}>
-              <ExternalLink className="h-3.5 w-3.5" />
-            </IconBtn>
-          )}
-          {onDockPane && (
-            <IconBtn title={t("pane.popout.dock")} onClick={() => onDockPane(pane.id)}>
-              <PanelLeftOpen className="h-3.5 w-3.5" />
-            </IconBtn>
-          )}
+            )}
+            {onPopOutPane && (
+              <IconBtn title={t("pane.popout.open")} onClick={() => popOut("menu")}>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </IconBtn>
+            )}
+            {onDockPane && (
+              <IconBtn title={t("pane.popout.dock")} onClick={() => onDockPane(pane.id)}>
+                <PanelLeftOpen className="h-3.5 w-3.5" />
+              </IconBtn>
+            )}
+          </div>
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -850,5 +969,81 @@ function IconBtn({
       </TooltipTrigger>
       <TooltipContent>{title}</TooltipContent>
     </Tooltip>
+  );
+}
+
+type PaneMenuItem = {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  onSelect: () => void;
+  separatorBefore?: boolean;
+};
+
+/**
+ * "⋯" menu holding the header's secondary actions on narrow panes. The content
+ * is portaled, but React events still bubble to the pane shell, so mouse /
+ * click events are stopped like `IconBtn` does (no pane focus / drag start).
+ */
+function PaneActionsMenu({
+  label,
+  items,
+  onBeforeSelect,
+}: {
+  label: string;
+  items: PaneMenuItem[];
+  /**
+   * Focuses the pane before an item runs: the trigger's mousedown is stopped
+   * (so opening the menu does not let the terminal grab focus and dismiss it),
+   * and maximize only applies to the focused pane.
+   */
+  onBeforeSelect?: () => void;
+}) {
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <DropdownMenu>
+      {/* Dropdown trigger outside: its data-state (open/closed) must win over the tooltip's. */}
+      <Tooltip>
+        <DropdownMenuTrigger asChild>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={label}
+              onMouseDown={stop}
+              onClick={stop}
+              className="flex cursor-pointer items-center justify-center rounded-md p-1 text-chrome-text-muted hover:bg-chrome-hover-strong hover:text-chrome-text data-[state=open]:bg-chrome-hover-strong data-[state=open]:text-chrome-text"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+        </DropdownMenuTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent
+        align="end"
+        className="min-w-[180px]"
+        onMouseDown={stop}
+        onClick={stop}
+        onPointerDown={stop}
+      >
+        {items.map((item) => (
+          <Fragment key={item.key}>
+            {item.separatorBefore && <DropdownMenuSeparator />}
+            <DropdownMenuItem
+              className="text-[12px]"
+              onSelect={() => {
+                onBeforeSelect?.();
+                item.onSelect();
+              }}
+            >
+              <span className="flex h-3.5 w-3.5 items-center justify-center [&_svg]:size-3.5" aria-hidden>
+                {item.icon}
+              </span>
+              {item.label}
+            </DropdownMenuItem>
+          </Fragment>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

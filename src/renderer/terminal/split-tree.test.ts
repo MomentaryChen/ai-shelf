@@ -4,6 +4,7 @@ import {
   collectPanes,
   effectiveMaximizedPaneId,
   equalizeRunAroundPane,
+  equalizeRunAtSplit,
   maximizedSplitSide,
   removePaneFromTree,
   splitPaneInTree,
@@ -98,6 +99,66 @@ describe("equalizeRunAroundPane", () => {
     assert.equal(next.kind === "split" && next.ratio, 0.3);
     const column = next.kind === "split" ? next.second : next;
     assertShares(shares(column, "vertical"), { right: 1 / 3, r2: 1 / 3, r3: 1 / 3 });
+  });
+});
+
+describe("equalizeRunAtSplit", () => {
+  const leaf = (id: string): LayoutNode => ({ kind: "pane", pane: pane(id) });
+  // a | b | (c / d) | e  as nested horizontal splits, column (c / d) at 0.8.
+  const build = (): LayoutNode => ({
+    kind: "split",
+    id: "h1",
+    direction: "horizontal",
+    ratio: 0.1,
+    first: leaf("a"),
+    second: {
+      kind: "split",
+      id: "h2",
+      direction: "horizontal",
+      ratio: 0.7,
+      first: leaf("b"),
+      second: {
+        kind: "split",
+        id: "h3",
+        direction: "horizontal",
+        ratio: 0.2,
+        first: {
+          kind: "split",
+          id: "v1",
+          direction: "vertical",
+          ratio: 0.8,
+          first: leaf("c"),
+          second: leaf("d"),
+        },
+        second: leaf("e"),
+      },
+    },
+  });
+
+  it("evens the whole row from any of its dividers", () => {
+    for (const id of ["h1", "h2", "h3"]) {
+      const next = equalizeRunAtSplit(build(), id);
+      assertShares(shares(next, "horizontal"), { a: 0.25, b: 0.25, c: 0.25, d: 0.25, e: 0.25 });
+      const column = next.kind === "split" && next.second.kind === "split" && next.second.second.kind === "split"
+        ? next.second.second.first
+        : null;
+      assert.equal(column?.kind === "split" && column.ratio, 0.8, "perpendicular split kept");
+    }
+  });
+
+  it("a perpendicular divider only evens its own column", () => {
+    const next = equalizeRunAtSplit(build(), "v1");
+    assert.equal(next.kind === "split" && next.ratio, 0.1);
+    const column = next.kind === "split" && next.second.kind === "split" && next.second.second.kind === "split"
+      ? next.second.second.first
+      : null;
+    assert.equal(column?.kind === "split" && column.ratio, 0.5);
+  });
+
+  it("returns the same tree for an unknown split id", () => {
+    const root = build();
+    assert.equal(equalizeRunAtSplit(root, "nope"), root);
+    assert.equal(equalizeRunAtSplit(leaf("a"), "h1").kind, "pane");
   });
 });
 
