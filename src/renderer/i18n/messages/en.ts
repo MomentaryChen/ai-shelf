@@ -243,6 +243,13 @@ export const en = {
   "settings.scrollbarAlways": "Always show scrollbar",
   "settings.scrollbarAlwaysHint":
     "Keep the terminal scrollbar visible while there is history to scroll, so you can see where you are and drag to jump. Off = show it only while hovering or scrolling. Full-screen apps on the alternate screen have no scrollback.",
+  "settings.unfocusedPaneDim": "Dim unfocused panes",
+  "settings.unfocusedPaneDimHint":
+    "With several terminals split side by side, fade the ones you are not typing in. Not applied while syncing input to all terminals or with a pane maximized.",
+  "settings.unfocusedPaneDim.off": "Off",
+  "settings.unfocusedPaneDim.subtle": "Subtle",
+  "settings.unfocusedPaneDim.normal": "Normal",
+  "settings.unfocusedPaneDim.strong": "Strong",
   "settings.webglHint":
     "Faster drawing with the GPU — helps with many panes and large scrollback. Falls back to canvas if WebGL is unavailable. Open panes reload on change.",
   "settings.systemTray": "System tray",
