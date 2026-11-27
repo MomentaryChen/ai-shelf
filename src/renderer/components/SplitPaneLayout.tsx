@@ -201,7 +201,7 @@ export function SplitPaneLayout(props: Props) {
     paneCount > 1 &&
     !props.broadcastActive &&
     !props.maximizedPaneId &&
-    collectPanes(props.node).some((p) => p.id === props.focusedPaneId);
+    panes.some((p) => p.id === props.focusedPaneId);
 
   const drag: PaneDragState = {
     draggingPaneId,
@@ -230,30 +230,33 @@ export function SplitPaneLayout(props: Props) {
   );
 }
 
-function SplitPaneLayoutInner({
-  node,
-  focusedPaneId,
-  bg,
-  onFocusPane,
-  onClosePane,
-  onMinimizePane,
-  onSplitPane,
-  onResizeSplit,
-  onRenamePane,
-  onPaneCwdClick,
-  onPaneBranchClick,
-  renderTerminal,
-  sidebarPaneDragActive = false,
-  profileAccentColor = null,
-  broadcastActive = false,
-  broadcastPaneCount = 0,
-  paneAgentStates,
-  paneLabels,
-  maximizedPaneId = null,
-  onToggleMaximizePane,
-  maximizeShortcutKeys,
-  drag,
-}: Props & { drag: PaneDragState }) {
+type SplitPaneLayoutInnerProps = Props & { drag: PaneDragState };
+
+function SplitPaneLayoutInner({ node, ...shared }: SplitPaneLayoutInnerProps) {
+  const {
+    focusedPaneId,
+    bg,
+    onFocusPane,
+    onClosePane,
+    onMinimizePane,
+    onSplitPane,
+    onResizeSplit,
+    onRenamePane,
+    onPaneCwdClick,
+    onPaneBranchClick,
+    renderTerminal,
+    sidebarPaneDragActive = false,
+    profileAccentColor = null,
+    broadcastActive = false,
+    broadcastPaneCount = 0,
+    paneAgentStates,
+    paneLabels,
+    maximizedPaneId = null,
+    onToggleMaximizePane,
+    maximizeShortcutKeys,
+    drag,
+  } = shared;
+
   if (node.kind === "pane") {
     const focused = focusedPaneId === node.pane.id;
     return (
@@ -316,30 +319,7 @@ function SplitPaneLayoutInner({
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
         style={sideStyle("first", ratio, nestedDividerPx(node.first, node.direction))}
       >
-        <SplitPaneLayoutInner
-          node={node.first}
-          focusedPaneId={focusedPaneId}
-          bg={bg}
-          onFocusPane={onFocusPane}
-          onClosePane={onClosePane}
-          onMinimizePane={onMinimizePane}
-          onSplitPane={onSplitPane}
-          onResizeSplit={onResizeSplit}
-          onRenamePane={onRenamePane}
-          onPaneCwdClick={onPaneCwdClick}
-          onPaneBranchClick={onPaneBranchClick}
-          renderTerminal={renderTerminal}
-          sidebarPaneDragActive={sidebarPaneDragActive}
-          profileAccentColor={profileAccentColor}
-          broadcastActive={broadcastActive}
-          broadcastPaneCount={broadcastPaneCount}
-          paneAgentStates={paneAgentStates}
-          paneLabels={paneLabels}
-          maximizedPaneId={maximizedPaneId}
-          onToggleMaximizePane={onToggleMaximizePane}
-          maximizeShortcutKeys={maximizeShortcutKeys}
-          drag={drag}
-        />
+        <SplitPaneLayoutInner {...shared} node={node.first} />
       </div>
 
       <div
@@ -363,30 +343,7 @@ function SplitPaneLayoutInner({
         className="flex min-h-0 min-w-0 flex-col overflow-hidden self-stretch"
         style={sideStyle("second", rest, nestedDividerPx(node.second, node.direction))}
       >
-        <SplitPaneLayoutInner
-          node={node.second}
-          focusedPaneId={focusedPaneId}
-          bg={bg}
-          onFocusPane={onFocusPane}
-          onClosePane={onClosePane}
-          onMinimizePane={onMinimizePane}
-          onSplitPane={onSplitPane}
-          onResizeSplit={onResizeSplit}
-          onRenamePane={onRenamePane}
-          onPaneCwdClick={onPaneCwdClick}
-          onPaneBranchClick={onPaneBranchClick}
-          renderTerminal={renderTerminal}
-          sidebarPaneDragActive={sidebarPaneDragActive}
-          profileAccentColor={profileAccentColor}
-          broadcastActive={broadcastActive}
-          broadcastPaneCount={broadcastPaneCount}
-          paneAgentStates={paneAgentStates}
-          paneLabels={paneLabels}
-          maximizedPaneId={maximizedPaneId}
-          onToggleMaximizePane={onToggleMaximizePane}
-          maximizeShortcutKeys={maximizeShortcutKeys}
-          drag={drag}
-        />
+        <SplitPaneLayoutInner {...shared} node={node.second} />
       </div>
     </div>
   );
@@ -504,6 +461,18 @@ function WarpPaneShell({
     return () => window.clearTimeout(timer);
   }, [broadcastActive]);
 
+  /** Drop zone under the pointer, measured against this pane's shell. */
+  function zoneAt(e: React.DragEvent): PaneDropZone | null {
+    const rect = shellRef.current?.getBoundingClientRect();
+    return rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : null;
+  }
+
+  /** Highlight the zone a profile-sidebar pane would land in. */
+  function trackProfileDragOver(e: React.DragEvent) {
+    const zone = zoneAt(e);
+    if (zone) setProfileDragOver({ targetPaneId: pane.id, zone });
+  }
+
   function clearDrag() {
     setDraggingPaneId(null);
     setDragOverPaneId(null);
@@ -531,28 +500,10 @@ function WarpPaneShell({
       style={{ background: bg, ...chromeStyle }}
       onMouseDown={onFocus}
       onDragOverCapture={(e) => {
-        if (sidebarPaneDragActive && onProfilePaneDrop && hasProfilePaneDrag(e.dataTransfer)) {
+        if (onProfilePaneDrop && hasProfilePaneDrag(e.dataTransfer)) {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
-          const rect = shellRef.current?.getBoundingClientRect();
-          if (rect) {
-            setProfileDragOver({
-              targetPaneId: pane.id,
-              zone: hitPaneDropZone(e.clientX, e.clientY, rect),
-            });
-          }
-          return;
-        }
-        if (hasProfilePaneDrag(e.dataTransfer) && onProfilePaneDrop) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          const rect = shellRef.current?.getBoundingClientRect();
-          if (rect) {
-            setProfileDragOver({
-              targetPaneId: pane.id,
-              zone: hitPaneDropZone(e.clientX, e.clientY, rect),
-            });
-          }
+          trackProfileDragOver(e);
           return;
         }
         if (!draggingPaneId && isOsFileDrag(Array.from(e.dataTransfer.types))) {
@@ -565,10 +516,8 @@ function WarpPaneShell({
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = "move";
-        const rect = shellRef.current?.getBoundingClientRect();
-        if (rect) {
-          setDropZone(hitPaneDropZone(e.clientX, e.clientY, rect));
-        }
+        const zone = zoneAt(e);
+        if (zone) setDropZone(zone);
         setDragOverPaneId(pane.id);
       }}
       onDragLeave={(e) => {
@@ -592,9 +541,7 @@ function WarpPaneShell({
           }
           e.preventDefault();
           e.stopPropagation();
-          const rect = shellRef.current?.getBoundingClientRect();
-          const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
-          onProfilePaneDrop(payload.paneId, pane.id, zone);
+          onProfilePaneDrop(payload.paneId, pane.id, zoneAt(e) ?? "right");
           clearDrag();
           return;
         }
@@ -611,9 +558,7 @@ function WarpPaneShell({
         if (!canReorder || !draggingPaneId || draggingPaneId === pane.id) return;
         e.preventDefault();
         e.stopPropagation();
-        const rect = shellRef.current?.getBoundingClientRect();
-        const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "swap";
-        onMovePane?.(draggingPaneId, pane.id, zone);
+        onMovePane?.(draggingPaneId, pane.id, zoneAt(e) ?? "swap");
         clearDrag();
       }}
     >
@@ -783,38 +728,21 @@ function WarpPaneShell({
           dimmed ? "opacity-80" : "opacity-100"
         }`}
       >
+        {/*
+          Plain drag target over xterm while a sidebar pane is dragged, so the
+          terminal's canvas / helper textarea never becomes the drag target.
+          Dragover and drop are handled by the shell's capture handlers.
+        */}
         {sidebarPaneDragActive && onProfilePaneDrop && (
           <div
             className="absolute inset-0 z-30"
             aria-hidden
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.dataTransfer.dropEffect = "move";
-              const rect = shellRef.current?.getBoundingClientRect();
-              if (rect) {
-                setProfileDragOver({
-                  targetPaneId: pane.id,
-                  zone: hitPaneDropZone(e.clientX, e.clientY, rect),
-                });
-              }
-            }}
             onDragLeave={(e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
                 if (profileDragOver?.targetPaneId === pane.id) {
                   setProfileDragOver(null);
                 }
               }
-            }}
-            onDrop={(e) => {
-              const payload = readProfilePaneDrag(e.dataTransfer);
-              if (!payload || payload.paneId === pane.id) return;
-              e.preventDefault();
-              e.stopPropagation();
-              const rect = shellRef.current?.getBoundingClientRect();
-              const zone = rect ? hitPaneDropZone(e.clientX, e.clientY, rect) : "right";
-              onProfilePaneDrop(payload.paneId, pane.id, zone);
-              clearDrag();
             }}
           />
         )}
