@@ -699,6 +699,8 @@ function ChatTabInner({
 
   const handleTerminalNotify = useTerminalNotifications({
     panes,
+    backgroundPanes: backgroundAgentPanes,
+    shownSessionIds,
     focusedPaneId,
     windowFocused,
     viewActive: active,
