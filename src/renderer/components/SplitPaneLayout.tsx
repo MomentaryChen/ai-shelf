@@ -60,6 +60,11 @@ function nestedDividerPx(node: LayoutNode, direction: SplitDirection): number {
 
 interface Props {
   node: LayoutNode;
+  /**
+   * Changing this (e.g. the active profile id) resets new-pane tracking, so the
+   * panes of a freshly shown profile don't play the pane enter fade.
+   */
+  paneMotionScope?: string | null;
   focusedPaneId: string | null;
   bg: string;
   onFocusPane: (paneId: string) => void;
@@ -132,13 +137,21 @@ const NO_ENTERING_PANES: ReadonlySet<string> = new Set();
  * for the length of the enter fade. A layout effect so the class is on before
  * the first paint of the new pane.
  */
-function useEnteringPanes(paneIds: readonly string[]): ReadonlySet<string> {
+function useEnteringPanes(
+  paneIds: readonly string[],
+  scope: string | null,
+): ReadonlySet<string> {
   const [entering, setEntering] = useState(NO_ENTERING_PANES);
   const prevIdsRef = useRef<readonly string[] | null>(null);
   const timersRef = useRef<number[]>([]);
+  const scopeRef = useRef(scope);
   const idsKey = paneIds.join("\n");
 
   useLayoutEffect(() => {
+    if (scopeRef.current !== scope) {
+      scopeRef.current = scope;
+      prevIdsRef.current = null;
+    }
     const added = enteringPaneIds(prevIdsRef.current, paneIds);
     prevIdsRef.current = paneIds;
     if (added.length === 0) return;
@@ -154,7 +167,7 @@ function useEnteringPanes(paneIds: readonly string[]): ReadonlySet<string> {
     }, PANE_ENTER_MS + 80);
     timersRef.current.push(timer);
     // idsKey stands in for paneIds (a new array every render).
-  }, [idsKey]);
+  }, [idsKey, scope]);
 
   useEffect(() => {
     const timers = timersRef.current;
@@ -173,7 +186,10 @@ export function SplitPaneLayout(props: Props) {
   const [profileDragOver, setProfileDragOver] = useState<ProfileDragOver | null>(null);
   const panes = collectPanes(props.node);
   const paneCount = panes.length;
-  const entering = useEnteringPanes(panes.map((p) => p.id));
+  const entering = useEnteringPanes(
+    panes.map((p) => p.id),
+    props.paneMotionScope ?? null,
+  );
 
   useEffect(() => {
     if (!props.sidebarPaneDragActive) setProfileDragOver(null);
