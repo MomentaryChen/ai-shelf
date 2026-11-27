@@ -9,6 +9,30 @@ GitHub Releases use the matching `## [x.y.z]` section here as the release descri
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-11-27
+
+Rearrange the panes you already have, bring back one you just closed, and choose how much the others fade.
+
+### Added
+
+- **Reopen a closed pane** — Ctrl/Cmd+Shift+T brings back the last pane you closed, up to the newest 10, in the main window or a view window. It keeps the folder, the title, and the Claude conversation when that can resume. The same action is in the command palette and on the empty state. Closing a whole view window is not remembered.
+- **Layout presets** — Columns, Rows, Grid, or Main + side rearrange the panes already on screen. Nothing is opened or closed. Use the **Layout** menu, the command palette, or Alt+Shift+1–4. View windows have the same menu and shortcuts.
+- **Dim unfocused panes** — A terminal setting with Off, Subtle, Normal, or Strong. Normal is the previous look. It applies live in the main window and in view windows.
+- **Open the folder** — A button next to the path in the status bar opens that folder in the file explorer. It is hidden for SSH panes.
+- **Notifications you cannot see** — A minimized pane, or a pane in another profile, can notify when a long command finishes or the bell rings. Choosing the notification switches to that pane.
+
+### Changed
+
+- **Split panes** — Dropping a pane on the centre swaps the whole pane. Dragging a divider stays smooth and stops at a minimum pane size. Double-click or Enter on a divider equalizes that row or column, and the arrow keys nudge a focused divider. A narrow pane header folds the extra actions into a more menu.
+- **Panel motion** — Settings sections, profile dialog tabs, and a newly added pane fade in with the same timing as switching modes.
+- **Documentation visuals** — Refreshed the terminal screenshots and README demo GIFs.
+
+### Fixed
+
+- **Agent status light** — The blue dot keeps the same pulse when you switch profiles, instead of restarting.
+
+[5.4.0]: https://github.com/MomentaryChen/ai-shelf/releases/tag/v5.4.0
+
 ## [5.3.1] - 2026-11-20
 
 View windows show each terminal's folder and whether its agent is waiting, and inventory no longer sends Claude a prompt just to read the model.

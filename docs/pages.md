@@ -96,6 +96,8 @@ The title bar holds the profile, **Folder**, **+ Pane**, **Commands**, the atten
 
 A profile view window lists its terminals in a sidebar: the folder under the title, and the same running, waiting, or stalled light as the main sidebar. Pane headers have split right and split down, and **New terminal** can open a plain shell or an installed AI CLI. Double-click a header or sidebar title to rename the terminal.
 
+**Layout** rearranges the panes already open into Columns, Rows, Grid, or Main + side (Alt+Shift+1–4). Ctrl/Cmd+Shift+T reopens the last pane you closed. **Dim unfocused panes** in terminal settings is Off, Subtle, Normal, or Strong. A button beside the path in the status bar opens that folder; SSH panes hide it. A minimized pane, or one in another profile, can still notify you when a long command finishes.
+
 ### Profiles sidebar
 
 - Create, rename, delete, and reorder profiles
@@ -146,6 +148,8 @@ Ignored while typing in inputs (e.g. profile rename). Every app shortcut (these,
 | **Ctrl+\\**         | Split right (horizontal)                                                                                                      |
 | **Ctrl+Shift+\\**   | Split down (vertical)                                                                                                         |
 | **Ctrl+Shift+J**    | Jump to the next terminal that is waiting for input                                                                          |
+| **Ctrl+Shift+T**    | Reopen the last closed pane                                                                                                   |
+| **Alt+Shift+1–4**   | Layout preset: columns, rows, grid, main + side                                                                              |
 
 ---
 
