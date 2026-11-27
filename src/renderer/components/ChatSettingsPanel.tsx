@@ -427,7 +427,7 @@ export function ChatSettingsPanel({ compact = false, category }: ChatSettingsPan
     <div
       key={category ?? "all"}
       className={`flex flex-col ${compact ? "gap-5" : "gap-6"}${
-        category !== undefined ? " ui-view-fade" : ""
+        category !== undefined ? " ui-view-rise" : ""
       }`}
     >
       {show("appearance") && (

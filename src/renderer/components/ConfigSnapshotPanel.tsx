@@ -304,7 +304,7 @@ export function ConfigSnapshotPanel({ onRestored }: { onRestored?: () => void })
 
       {message && (
         <p
-          className={`ui-view-fade mt-3 text-xs ${message.kind === "ok" ? "text-ok" : "text-fail"}`}
+          className={`ui-view-rise mt-3 text-xs ${message.kind === "ok" ? "text-ok" : "text-fail"}`}
           role="status"
         >
           {message.text}

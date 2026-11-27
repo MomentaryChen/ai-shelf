@@ -1,5 +1,5 @@
 /** How long a newly added pane's frame takes to fade in. */
-export const PANE_ENTER_MS = 240;
+export const PANE_ENTER_MS = 320;
 
 /**
  * Pane ids that should play the enter fade: ids in `next` that were not on

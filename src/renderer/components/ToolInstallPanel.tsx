@@ -100,7 +100,7 @@ export function ToolInstallPanel({
           )}
         </div>
         {result && (
-          <p className={`ui-view-fade ml-7 mt-1 text-[11px] ${result.success ? "text-ok" : "text-fail"}`}>
+          <p className={`ui-view-rise ml-7 mt-1 text-[11px] ${result.success ? "text-ok" : "text-fail"}`}>
             {result.message}
           </p>
         )}
@@ -130,7 +130,7 @@ export function ToolInstallPanel({
         )}
       </div>
       {result && (
-        <p className={`ui-view-fade ${result.success ? "text-ok" : "text-fail"}`}>{result.message}</p>
+        <p className={`ui-view-rise ${result.success ? "text-ok" : "text-fail"}`}>{result.message}</p>
       )}
       {result?.success && (
         <p className="text-[11px] text-text-tertiary">{t("inventory.install.rescanHint")}</p>

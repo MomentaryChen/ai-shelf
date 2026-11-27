@@ -265,7 +265,7 @@ export function ProfileCreateDialog({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 pb-4">
         {tab === "general" ? (
-        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general" className="ui-view-fade">
+        <div role="tabpanel" id="profile-tabpanel-general" aria-labelledby="profile-tab-general" className="ui-view-rise">
         <fieldset className="mb-4">
           <legend className="mb-2 block text-[11px] text-chrome-text-subtle">
             {t("profile.dialog.startFromLegend")}
