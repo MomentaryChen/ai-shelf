@@ -95,7 +95,7 @@ export function SkillsSyncPanel() {
       }
     >
       {results && (
-        <div className="mb-4 rounded-lg border border-border bg-bg-primary p-3">
+        <div className="ui-view-rise mb-4 rounded-lg border border-border bg-bg-primary p-3">
           {results.map((r) => (
             <div key={r.tool} className="mb-1 text-sm">
               <strong className="inline-flex items-center gap-1.5">

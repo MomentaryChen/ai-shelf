@@ -2817,6 +2817,7 @@ function ChatTabInner({
       {shownLayout ? (
       <SplitPaneLayout
         node={shownLayout}
+        paneMotionScope={activeProfile?.id ?? null}
         focusedPaneId={focusedPaneId}
         bg={bg}
         sidebarPaneDragActive={profileSidebarDrag}
