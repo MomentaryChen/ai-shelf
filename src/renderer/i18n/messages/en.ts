@@ -784,6 +784,9 @@ export const en = {
   "pane.divider.resizeColumns": "Resize left and right panes (arrow keys; Shift for 1% steps; Enter or double-click to equalize)",
   "pane.divider.resizeRows": "Resize top and bottom panes (arrow keys; Shift for 1% steps; Enter or double-click to equalize)",
   "pane.close": "Close pane",
+  "pane.reopenClosed.named": "Reopen closed pane: {name}",
+  "pane.reopenClosed.empty": "No recently closed panes",
+  "pane.reopenClosed.alreadyOpen": "That conversation is already open in another pane",
   "pane.closeBusyTitle": "Close this pane?",
   "pane.closeBusyConfirm":
     "This pane still has an agent running or waiting for input. Closing it will stop the process.",
@@ -1007,6 +1010,7 @@ export const en = {
   "shortcuts.pane.layoutRows": "Arrange panes: rows (stacked)",
   "shortcuts.pane.layoutGrid": "Arrange panes: grid",
   "shortcuts.pane.layoutMainSide": "Arrange panes: focused pane large, others on the side",
+  "shortcuts.pane.reopenClosed": "Reopen closed pane",
   "terminal.ctx.newConversation": "Start new conversation",
   "settings.agentSessions.title": "AI agent conversations",
   "settings.resumeAgentSessions": "Resume agent conversations",

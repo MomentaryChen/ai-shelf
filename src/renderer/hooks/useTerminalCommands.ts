@@ -11,6 +11,7 @@ import {
   Monitor,
   Radio,
   Rows3,
+  RotateCcw,
   Terminal,
   User,
   Zap,
@@ -41,6 +42,8 @@ export interface TerminalCommandActions {
   jumpNextAttention?: () => void;
   /** Rearrange the panes on screen into a preset. */
   applyLayoutPreset?: (preset: LayoutPreset) => void;
+  /** Reopen the most recently closed pane (Ctrl+Shift+T). */
+  reopenClosedPane?: () => void;
 }
 
 export interface TerminalCommandOptions {
@@ -54,6 +57,8 @@ export interface TerminalCommandOptions {
   attentionCount?: number;
   /** Panes on screen (minimized / popped-out excluded); layout presets need two. */
   shownPaneCount?: number;
+  /** Label of the pane "reopen closed pane" would bring back; null hides the command. */
+  reopenClosedLabel?: string | null;
 }
 
 /** Plain .ts file — build lucide icon elements without JSX. */
@@ -69,8 +74,21 @@ export function useTerminalCommands(
 ): Command[] {
   const { addPane, openExternal, activateProfile, broadcastCommand, runSavedCommand, newWorktreePane } =
     actions;
-  const { openCommandHistory, openConversationHistory, jumpNextAttention, applyLayoutPreset } = actions;
-  const { currentGroupId, paneCount, savedCommands, attentionCount = 0, shownPaneCount = 0 } = options;
+  const {
+    openCommandHistory,
+    openConversationHistory,
+    jumpNextAttention,
+    applyLayoutPreset,
+    reopenClosedPane,
+  } = actions;
+  const {
+    currentGroupId,
+    paneCount,
+    savedCommands,
+    attentionCount = 0,
+    shownPaneCount = 0,
+    reopenClosedLabel = null,
+  } = options;
 
   return useMemo(() => {
     const available = data.filter((e) => e.available);
@@ -89,6 +107,18 @@ export function useTerminalCommands(
           placeholder: t("cmd.input.broadcastPlaceholder"),
           onSubmit: (value) => broadcastCommand(value),
         },
+      });
+    }
+
+    if (reopenClosedLabel !== null && reopenClosedPane) {
+      cmds.push({
+        id: "reopen-closed-pane",
+        title: t("pane.reopenClosed.named", { name: reopenClosedLabel }),
+        group: t("cmd.group.agents"),
+        icon: icon(RotateCcw),
+        keywords: "reopen closed pane terminal undo close restore last recently",
+        shortcut: shortcutKeys("reopenClosedPane"),
+        run: () => reopenClosedPane(),
       });
     }
 
@@ -265,6 +295,7 @@ export function useTerminalCommands(
     savedCommands,
     attentionCount,
     shownPaneCount,
+    reopenClosedLabel,
     addPane,
     openExternal,
     activateProfile,
@@ -275,5 +306,6 @@ export function useTerminalCommands(
     openConversationHistory,
     jumpNextAttention,
     applyLayoutPreset,
+    reopenClosedPane,
   ]);
 }

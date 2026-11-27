@@ -321,6 +321,24 @@ describe("font zoom shortcuts", () => {
     );
   });
 
+  it("maps Ctrl+Shift+T to reopen closed pane, only while there is one to reopen", () => {
+    const chord = key("T", { ctrlKey: true, shiftKey: true, code: "KeyT" });
+    assert.deepEqual(matchPaneShortcutWithBindings(chord, map), { type: "reopen-closed" });
+    let reopened = 0;
+    const h = handlers({ onReopenClosedPane: () => (reopened += 1), canReopenClosedPane: true });
+    // No panes left (the last one was closed) still reopens.
+    assert.equal(shouldConsumePaneShortcut({ type: "reopen-closed" }, h), true);
+    applyPaneShortcutAction({ type: "reopen-closed" }, h);
+    assert.equal(reopened, 1);
+    assert.equal(
+      shouldConsumePaneShortcut(
+        { type: "reopen-closed" },
+        { panes: [pane("a")], onReopenClosedPane: () => {}, canReopenClosedPane: false },
+      ),
+      false,
+    );
+  });
+
   it("runs the zoom handler", () => {
     const seen: string[] = [];
     applyPaneShortcutAction(

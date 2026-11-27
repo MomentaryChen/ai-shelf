@@ -76,6 +76,7 @@ export const SHORTCUT_IDS = [
   "layoutRows",
   "layoutGrid",
   "layoutMainSide",
+  "reopenClosedPane",
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_IDS)[number];
@@ -138,6 +139,7 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "layoutRows", section: "pane" },
   { id: "layoutGrid", section: "pane" },
   { id: "layoutMainSide", section: "pane" },
+  { id: "reopenClosedPane", section: "pane" },
 ];
 
 const DEF_BY_ID = new Map(SHORTCUT_DEFS.map((d) => [d.id, d]));
@@ -219,6 +221,8 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
     layoutRows: { key: "2", alt: true, shift: true },
     layoutGrid: { key: "3", alt: true, shift: true },
     layoutMainSide: { key: "4", alt: true, shift: true },
+    // Bring back the last closed pane (browser "reopen closed tab").
+    reopenClosedPane: { key: "t", mod: true, shift: true },
   };
 }
 
