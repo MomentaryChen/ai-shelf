@@ -1426,6 +1426,8 @@ export type PaneViewAction =
   | { type: "close-view" }
   | { type: "move-in-view"; dragPaneId: string; targetPaneId: string; zone: import("./terminal/pane-drop-zone").PaneDropZone }
   | { type: "resize"; splitId: string; ratio: number }
+  /** Divider double-click / Enter: even out the row or column split `splitId` belongs to. */
+  | { type: "equalize-split"; splitId: string }
   | { type: "cwd"; sessionId: string; cwd: string }
   | { type: "title"; sessionId: string; title: string }
   /** User title for a pane ("" clears it back to the auto / tool label). */

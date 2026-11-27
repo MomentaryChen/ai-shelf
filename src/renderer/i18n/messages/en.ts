@@ -773,6 +773,9 @@ export const en = {
   "pane.clickPickCwd": "Click to choose working directory",
   "pane.splitRight": "Split right",
   "pane.splitDown": "Split down",
+  "pane.moreActions": "More pane actions",
+  "pane.divider.resizeColumns": "Resize left and right panes (arrow keys; Shift for 1% steps; Enter or double-click to equalize)",
+  "pane.divider.resizeRows": "Resize top and bottom panes (arrow keys; Shift for 1% steps; Enter or double-click to equalize)",
   "pane.close": "Close pane",
   "pane.closeBusyTitle": "Close this pane?",
   "pane.closeBusyConfirm":
