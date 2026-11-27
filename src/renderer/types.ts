@@ -1428,6 +1428,8 @@ export type PaneViewAction =
   | { type: "resize"; splitId: string; ratio: number }
   /** Divider double-click / Enter: even out the row or column split `splitId` belongs to. */
   | { type: "equalize-split"; splitId: string }
+  /** Rearrange every pane of the view into a preset (columns / rows / grid / main + side). */
+  | { type: "apply-layout-preset"; preset: import("./terminal/layout-presets").LayoutPreset }
   | { type: "cwd"; sessionId: string; cwd: string }
   | { type: "title"; sessionId: string; title: string }
   /** User title for a pane ("" clears it back to the auto / tool label). */

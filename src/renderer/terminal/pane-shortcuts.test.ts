@@ -226,6 +226,30 @@ describe("matchPaneShortcutWithBindings", () => {
     }
     assert.deepEqual(calls, ["swap b left", "resize b down", "equalize"]);
   });
+
+  it("maps Alt+Shift+1-4 to layout presets (by physical key) and needs several panes", () => {
+    const map = resolveKeybindings({}, "win");
+    const expected = ["columns", "rows", "grid", "main-side"] as const;
+    const glyphs = ["!", "@", "#", "$"];
+    const calls: string[] = [];
+    const multi = handlers({
+      panes: [pane("a"), pane("b")],
+      focusedPaneId: "a",
+      onApplyLayoutPreset: (preset) => calls.push(preset),
+    });
+    expected.forEach((preset, i) => {
+      const action = matchPaneShortcutWithBindings(
+        key(glyphs[i]!, { altKey: true, shiftKey: true, code: `Digit${i + 1}` }),
+        map,
+        xterm(),
+      );
+      assert.deepEqual(action, { type: "layout-preset", preset });
+      assert.equal(shouldConsumePaneShortcut(action!, multi), true);
+      assert.equal(shouldConsumePaneShortcut(action!, { ...multi, panes: [pane("a")] }), false);
+      applyPaneShortcutAction(action!, multi);
+    });
+    assert.deepEqual(calls, [...expected]);
+  });
 });
 
 describe("font zoom shortcuts", () => {

@@ -1,6 +1,7 @@
 import type { PaneDirection, PaneInfo } from "./split-tree";
 import { shouldIgnoreShortcutForIme } from "./ime-keys";
 import type { FontZoomDirection } from "./font-zoom";
+import type { LayoutPreset } from "./layout-presets";
 import { getActiveKeybindings } from "../shortcuts/active-keybindings";
 import {
   combosEqual,
@@ -24,6 +25,7 @@ export type PaneShortcutAction =
   | { type: "swap-pane"; direction: PaneDirection }
   | { type: "resize-pane"; direction: PaneDirection }
   | { type: "equalize-panes" }
+  | { type: "layout-preset"; preset: LayoutPreset }
   | { type: "next-attention" };
 
 /** Sidebar / profile forms — not xterm's hidden textarea. */
@@ -121,6 +123,9 @@ export function applyPaneShortcutAction(action: PaneShortcutAction, h: PaneShort
     case "equalize-panes":
       h.onEqualizePanes?.();
       break;
+    case "layout-preset":
+      h.onApplyLayoutPreset?.(action.preset);
+      break;
   }
 }
 
@@ -147,6 +152,8 @@ export interface PaneShortcutHandlers {
   onResizePane?: (paneId: string, direction: PaneDirection) => void;
   /** Give every pane in each row / column the same size. */
   onEqualizePanes?: () => void;
+  /** Rearrange the panes on screen into a preset (columns / rows / grid / main + side). */
+  onApplyLayoutPreset?: (preset: LayoutPreset) => void;
   /** Jump to the next pane in the attention inbox (any profile). */
   onJumpNextAttention?: () => void;
 }
@@ -183,6 +190,10 @@ const PANE_SHORTCUT_IDS: readonly ShortcutId[] = [
   "resizePaneDown",
   "equalizePanes",
   "nextAttentionPane",
+  "layoutColumns",
+  "layoutRows",
+  "layoutGrid",
+  "layoutMainSide",
 ];
 
 /** Default close chord is Ctrl/Cmd+W. Inside a terminal that chord is the shell's delete-word. */
@@ -303,6 +314,14 @@ export function matchPaneShortcutWithBindings(
       return { type: "equalize-panes" };
     case "nextAttentionPane":
       return { type: "next-attention" };
+    case "layoutColumns":
+      return { type: "layout-preset", preset: "columns" };
+    case "layoutRows":
+      return { type: "layout-preset", preset: "rows" };
+    case "layoutGrid":
+      return { type: "layout-preset", preset: "grid" };
+    case "layoutMainSide":
+      return { type: "layout-preset", preset: "main-side" };
     default:
       return null;
   }
@@ -348,6 +367,7 @@ export function shouldConsumePaneShortcut(
         | "onSwapPane"
         | "onResizePane"
         | "onEqualizePanes"
+        | "onApplyLayoutPreset"
         | "onJumpNextAttention"
       >
     >,
@@ -366,6 +386,7 @@ export function shouldConsumePaneShortcut(
   if (action.type === "swap-pane") return h.panes.length > 1 && Boolean(h.onSwapPane);
   if (action.type === "resize-pane") return h.panes.length > 1 && Boolean(h.onResizePane);
   if (action.type === "equalize-panes") return h.panes.length > 1 && Boolean(h.onEqualizePanes);
+  if (action.type === "layout-preset") return h.panes.length > 1 && Boolean(h.onApplyLayoutPreset);
   return true;
 }
 

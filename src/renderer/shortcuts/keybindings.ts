@@ -72,6 +72,10 @@ export const SHORTCUT_IDS = [
   "resizePaneDown",
   "equalizePanes",
   "nextAttentionPane",
+  "layoutColumns",
+  "layoutRows",
+  "layoutGrid",
+  "layoutMainSide",
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_IDS)[number];
@@ -130,6 +134,10 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   { id: "resizePaneDown", section: "pane" },
   { id: "equalizePanes", section: "pane" },
   { id: "nextAttentionPane", section: "pane" },
+  { id: "layoutColumns", section: "pane" },
+  { id: "layoutRows", section: "pane" },
+  { id: "layoutGrid", section: "pane" },
+  { id: "layoutMainSide", section: "pane" },
 ];
 
 const DEF_BY_ID = new Map(SHORTCUT_DEFS.map((d) => [d.id, d]));
@@ -205,6 +213,12 @@ export function defaultKeybindings(platform: KeyPlatform): KeybindingMap {
     equalizePanes: { key: "=", alt: true, shift: true },
     // Attention inbox: jump to the next pane waiting on the user (any profile).
     nextAttentionPane: { key: "j", mod: true, shift: true },
+    // Layout presets (rearrange the open panes), next to Alt+Shift+= equalize.
+    // Shift+digit is matched by physical key, so "!" / "@" on US layouts still hit 1 / 2.
+    layoutColumns: { key: "1", alt: true, shift: true },
+    layoutRows: { key: "2", alt: true, shift: true },
+    layoutGrid: { key: "3", alt: true, shift: true },
+    layoutMainSide: { key: "4", alt: true, shift: true },
   };
 }
 
