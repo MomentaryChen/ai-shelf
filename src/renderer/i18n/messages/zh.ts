@@ -84,6 +84,7 @@ export const zh: Record<MessageKey, string> = {
   "status.exit": "exit",
   "status.copyCwd": "點擊複製路徑",
   "status.cwdCopied": "已複製路徑",
+  "status.openCwdFolder": "在檔案總管中開啟資料夾",
   "status.usage.title": "Claude 對話用量",
   "status.usage.tokensUnit": "tok",
   "status.usage.input": "輸入",
